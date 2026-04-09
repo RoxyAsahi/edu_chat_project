@@ -1,0 +1,80 @@
+﻿const {
+    command,
+    query,
+    subscription,
+} = require('./apiFactory');
+
+function createCatalog(ops) {
+    return {
+        loadSettings: query(() => ops.invoke('load-settings')),
+        saveSettings: query((settings) => ops.invoke('save-settings', settings)),
+        saveAvatarColor: query((data) => ops.invoke('save-avatar-color', data)),
+        readImageFromClipboard: query(async () => {
+            const result = await ops.invoke('read-image-from-clipboard-main');
+            if (result && result.success) {
+                return { data: result.data, extension: result.extension };
+            }
+            return null;
+        }),
+        readTextFromClipboard: query(async () => {
+            const result = await ops.invoke('read-text-from-clipboard-main');
+            return result?.success ? result.text : '';
+        }),
+        minimizeWindow: command(() => ops.send('minimize-window')),
+        maximizeWindow: command(() => ops.send('maximize-window')),
+        unmaximizeWindow: command(() => ops.send('unmaximize-window')),
+        closeWindow: command(() => ops.send('close-window')),
+        openDevTools: command(() => ops.send('open-dev-tools')),
+        onWindowMaximized: subscription(ops.subscribe('window-maximized', () => undefined)),
+        onWindowUnmaximized: subscription(ops.subscribe('window-unmaximized', () => undefined)),
+        showImageContextMenu: command((imageUrl) => ops.send('show-image-context-menu', imageUrl)),
+        openImageViewer: command((data) => ops.send('open-image-viewer', data)),
+        openImageInNewWindow: command((imageUrl, imageTitle) => ops.send('open-image-in-new-window', imageUrl, imageTitle)),
+        openTextInNewWindow: query((textContent, windowTitle, theme) => ops.invoke('display-text-content-in-viewer', textContent, windowTitle, theme)),
+        sendOpenExternalLink: command((url) => ops.send('open-external-link', url)),
+        onThemeUpdated: subscription(ops.subscribe('theme-updated', (_event, theme) => theme)),
+        getCurrentTheme: query(() => ops.invoke('get-current-theme')),
+        setTheme: command((theme) => ops.send('set-theme', theme)),
+        setThemeMode: command((themeMode) => ops.send('set-theme-mode', themeMode)),
+        getPlatform: query(() => ops.invoke('get-platform')),
+        getAgents: query(() => ops.invoke('get-agents')),
+        getAgentConfig: query((agentId) => ops.invoke('get-agent-config', agentId)),
+        saveAgentConfig: query((agentId, config) => ops.invoke('save-agent-config', agentId, config)),
+        updateAgentConfig: query((agentId, updates) => ops.invoke('update-agent-config', agentId, updates)),
+        selectAvatar: query(() => ops.invoke('select-avatar')),
+        saveAvatar: query((agentId, avatarData) => ops.invoke('save-avatar', agentId, avatarData)),
+        createAgent: query((agentName, initialConfig) => ops.invoke('create-agent', agentName, initialConfig)),
+        deleteAgent: query((agentId) => ops.invoke('delete-agent', agentId)),
+        getActiveSystemPrompt: query((agentId) => ops.invoke('get-active-system-prompt', agentId)),
+        getAgentTopics: query((agentId) => ops.invoke('get-agent-topics', agentId)),
+        createNewTopicForAgent: query((agentId, topicName, isBranch, locked) => ops.invoke('create-new-topic-for-agent', agentId, topicName, isBranch, locked)),
+        saveAgentTopicTitle: query((agentId, topicId, newTitle) => ops.invoke('save-agent-topic-title', agentId, topicId, newTitle)),
+        deleteTopic: query((agentId, topicId) => ops.invoke('delete-topic', agentId, topicId)),
+        getUnreadTopicCounts: query(() => ops.invoke('get-unread-topic-counts')),
+        toggleTopicLock: query((agentId, topicId) => ops.invoke('toggle-topic-lock', agentId, topicId)),
+        setTopicUnread: query((agentId, topicId, unread) => ops.invoke('set-topic-unread', agentId, topicId, unread)),
+        getChatHistory: query((agentId, topicId) => ops.invoke('get-chat-history', agentId, topicId)),
+        saveChatHistory: query((agentId, topicId, history) => ops.invoke('save-chat-history', agentId, topicId, history)),
+        getOriginalMessageContent: query((itemId, itemType, topicId, messageId) => ops.invoke('get-original-message-content', itemId, itemType, topicId, messageId)),
+        handleFilePaste: query((agentId, topicId, fileData) => ops.invoke('handle-file-paste', agentId, topicId, fileData)),
+        selectFilesToSend: query((agentId, topicId) => ops.invoke('select-files-to-send', agentId, topicId)),
+        getFileAsBase64: query((filePath) => ops.invoke('get-file-as-base64', filePath)),
+        getTextContent: query((filePath, fileType) => ops.invoke('get-text-content', filePath, fileType)),
+        handleTextPasteAsFile: query((agentId, topicId, textContent) => ops.invoke('handle-text-paste-as-file', agentId, topicId, textContent)),
+        handleFileDrop: query((agentId, topicId, droppedFilesData) => ops.invoke('handle-file-drop', agentId, topicId, droppedFilesData)),
+        searchNotes: query((queryText) => ops.invoke('search-notes', queryText)),
+        sendToVCP: query((request) => ops.invoke('send-to-vcp', request)),
+        onVCPStreamEvent: subscription(ops.subscribe('vcp-stream-event', (_event, eventData) => eventData)),
+        interruptVcpRequest: query((request) => ops.invoke('interrupt-vcp-request', request)),
+        exportTopicAsMarkdown: query((exportData) => ops.invoke('export-topic-as-markdown', exportData)),
+        getEmoticonLibrary: query(() => ops.invoke('get-emoticon-library')),
+        onAddFileToInput: subscription(ops.subscribe('add-file-to-input', (_event, filePath) => filePath)),
+        watcherStart: query((filePath, agentId, topicId) => ops.invoke('watcher:start', filePath, agentId, topicId)),
+        watcherStop: query(() => ops.invoke('watcher:stop')),
+        onHistoryFileUpdated: subscription(ops.subscribe('history-file-updated', (_event, data) => data)),
+    };
+}
+
+module.exports = {
+    createCatalog,
+};
