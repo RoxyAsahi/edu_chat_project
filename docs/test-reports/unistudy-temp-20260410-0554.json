@@ -1,0 +1,22 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "temp",
+  "dataRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-aXKGod",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-YsZJqA",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-temp-20260410-0554.json",
+  "targetAgentId": null,
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "rendererErrors": [],
+  "scenarios": [],
+  "errors": [
+    "未提供有效的 KB_BASE_URL / KB_API_KEY，无法完成 Source 检索验证。"
+  ],
+  "startedAt": "2026-04-09T21:54:30.854Z",
+  "finishedAt": "2026-04-09T21:54:30.854Z",
+  "success": false
+}

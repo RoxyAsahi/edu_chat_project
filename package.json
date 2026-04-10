@@ -1,10 +1,14 @@
 {
   "name": "vcpchat-lite",
   "version": "0.1.0",
-  "description": "Standalone Electron single-chat client forked from VCPChat.",
+  "description": "UniStudy desktop learning terminal built on the VCPChat Lite foundation.",
   "main": "src/main/main.js",
   "scripts": {
-    "start": "node scripts/launch-electron.js ."
+    "start": "node scripts/launch-electron.js .",
+    "test:e2e:smoke": "node scripts/electron-unistudy-smoke.js",
+    "test:kb:endpoints": "node scripts/kb-endpoint-normalization.js",
+    "test:kb:smoke": "node scripts/kb-smoke.js",
+    "test:kb:real": "node scripts/kb-real-service-validation.js"
   },
   "keywords": [
     "electron",
@@ -18,6 +22,7 @@
     "playwright": "^1.59.1"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "chokidar": "^4.0.3",
     "fs-extra": "^11.3.2",
     "mammoth": "^1.9.1",

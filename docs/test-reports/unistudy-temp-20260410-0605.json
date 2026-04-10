@@ -1,0 +1,83 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "temp",
+  "dataRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-9bBg5p",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-GNqF5K",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-temp-20260410-0605.json",
+  "targetAgentId": null,
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "temp-single",
+      "label": "临时单文件 Smoke",
+      "agentId": "Smoke______20260410-0605_1775772309650",
+      "topicId": "topic_1775772309681",
+      "topicName": "临时单文件测试-20260410-0605",
+      "historyFilePath": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-9bBg5p\\UserData\\Smoke______20260410-0605_1775772309650\\topics\\topic_1775772309681\\history.json",
+      "uploadedFiles": [
+        "unistudy-20260410-0605-newton-source.txt"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775772322636_6192fdc6",
+          "name": "unistudy-20260410-0605-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772323566
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据资料回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260410-0605-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0605-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0605-newton-source.txt"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用unistudy-20260410-0605-newton-source.txt · score 0.6524 · vec 0.6524\n牛顿第一定律",
+          "kbRefCount": 1,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Smoke 测试学科 20260410-0605 · 临时单文件测试-20260410-0605",
+      "kbId": "kb_1775772320097_d47416d0",
+      "sourceStatusAfter": "当前 Source：Smoke 测试学科 20260410-0605 · 临时单文件测试-20260410-0605",
+      "uploadOk": true,
+      "persistedHistoryCount": 2,
+      "persistedAssistantKbRefs": 1,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0605-newton-source.txt"
+      ],
+      "persistedLatestAssistantContentLength": 6,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "startedAt": "2026-04-09T22:05:00.600Z",
+  "skips": [],
+  "finishedAt": "2026-04-09T22:05:29.134Z",
+  "success": true
+}

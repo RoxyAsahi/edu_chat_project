@@ -3,6 +3,7 @@ const { ipcMain, dialog, BrowserWindow } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
 const contextSanitizer = require('../contextSanitizer');
+const knowledgeBase = require('../knowledge-base');
 const vcpClient = require('../vcpClient');
 
 /**
@@ -293,7 +294,8 @@ function initialize(mainWindow, context) {
                     ...topic,
                     locked: topic.locked !== undefined ? topic.locked : true,
                     unread: topic.unread !== undefined ? topic.unread : false,
-                    creatorSource: topic.creatorSource || 'unknown'
+                    creatorSource: topic.creatorSource || 'unknown',
+                    knowledgeBaseId: topic.knowledgeBaseId || null,
                 }));
                 return normalizedTopics;
             }
@@ -323,7 +325,8 @@ function initialize(mainWindow, context) {
                     createdAt: timestamp,
                     locked: locked,
                     unread: false,
-                    creatorSource: "ui"
+                    creatorSource: "ui",
+                    knowledgeBaseId: null,
                 };
                 await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
                     ...existingConfig,
@@ -354,15 +357,17 @@ function initialize(mainWindow, context) {
                 if (!currentConfig.topics || !Array.isArray(currentConfig.topics)) {
                     return { error: 'Agent topics are unavailable.' };
                 }
-                if (!currentConfig.topics.some(t => t.id === topicIdToDelete)) {
+                const topicToDelete = currentConfig.topics.find(t => t.id === topicIdToDelete);
+                if (!topicToDelete) {
                     return { error: `Topic not found: ${topicIdToDelete}` };
                 }
+                const knowledgeBaseId = topicToDelete.knowledgeBaseId || null;
 
                 let remainingTopics;
                 await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
                     let filtered = (existingConfig.topics || []).filter(topic => topic.id !== topicIdToDelete);
                     if (filtered.length === 0) {
-                        filtered = [{ id: "default", name: "Main Conversation", createdAt: Date.now() }];
+                        filtered = [{ id: "default", name: "Main Conversation", createdAt: Date.now(), knowledgeBaseId: null }];
                     }
                     remainingTopics = filtered;
                     return { ...existingConfig, topics: filtered };
@@ -379,7 +384,42 @@ function initialize(mainWindow, context) {
                 }
 
                 const topicDataDir = path.join(USER_DATA_DIR, agentId, 'topics', topicIdToDelete);
-                if (await fs.pathExists(topicDataDir)) await fs.remove(topicDataDir);
+                const topicNotesDir = path.join(APP_DATA_ROOT_IN_PROJECT, 'Notes', agentId, topicIdToDelete);
+                const cleanupErrors = [];
+
+                if (await fs.pathExists(topicDataDir)) {
+                    try {
+                        await fs.remove(topicDataDir);
+                    } catch (error) {
+                        cleanupErrors.push(`history cleanup failed: ${error.message}`);
+                    }
+                }
+
+                if (await fs.pathExists(topicNotesDir)) {
+                    try {
+                        await fs.remove(topicNotesDir);
+                    } catch (error) {
+                        cleanupErrors.push(`notes cleanup failed: ${error.message}`);
+                    }
+                }
+
+                if (knowledgeBaseId) {
+                    try {
+                        await knowledgeBase.deleteKnowledgeBase(knowledgeBaseId);
+                        const refreshedConfig = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
+                        if (Array.isArray(refreshedConfig?.topics)) {
+                            remainingTopics = refreshedConfig.topics;
+                        }
+                    } catch (error) {
+                        cleanupErrors.push(`source cleanup failed: ${error.message}`);
+                    }
+                }
+
+                if (cleanupErrors.length > 0) {
+                    const warning = cleanupErrors.join('；');
+                    console.error(`Topic ${topicIdToDelete} for agent ${agentId} deleted with cleanup warnings: ${warning}`);
+                    return { success: true, remainingTopics, warning };
+                }
 
                 return { success: true, remainingTopics };
             } else {
@@ -551,57 +591,6 @@ function initialize(mainWindow, context) {
             }
         }
         return storedFilesInfo;
-    });
-
-    ipcMain.handle('search-notes', async (_event, query) => {
-        if (!query || typeof query !== 'string') {
-            return [];
-        }
-
-        const lowerCaseQuery = query.toLowerCase();
-        const results = [];
-        const notesRootDir = path.join(APP_DATA_ROOT_IN_PROJECT, 'Notemodules');
-
-        async function searchInDirectory(directory) {
-            let entries = [];
-            try {
-                entries = await fs.readdir(directory, { withFileTypes: true });
-            } catch (error) {
-                if (error?.code !== 'ENOENT') {
-                    console.error(`[LiteNotes] Failed to read notes directory ${directory}:`, error);
-                }
-                return;
-            }
-
-            for (const entry of entries) {
-                const fullPath = path.join(directory, entry.name);
-                if (entry.isDirectory()) {
-                    await searchInDirectory(fullPath);
-                    continue;
-                }
-
-                if (!entry.isFile()) {
-                    continue;
-                }
-
-                const lowerName = entry.name.toLowerCase();
-                if (!lowerName.endsWith('.md') && !lowerName.endsWith('.txt')) {
-                    continue;
-                }
-
-                if (!lowerName.includes(lowerCaseQuery)) {
-                    continue;
-                }
-
-                results.push({
-                    name: entry.name,
-                    path: fullPath,
-                });
-            }
-        }
-
-        await searchInDirectory(notesRootDir);
-        return results.slice(0, 30);
     });
 
     ipcMain.handle('get-original-message-content', async (event, itemId, itemType, topicId, messageId) => {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VCPChat Lite</title>
+  <title>UniStudy</title>
   <link rel="stylesheet" href="../../vendor/katex.min.css" />
   <link rel="stylesheet" href="../../vendor/atom-one-light.min.css" />
   <link rel="stylesheet" href="../styles/messageRenderer.css" />
@@ -16,61 +16,169 @@
   <div class="window-shell">
     <header class="titlebar">
       <div class="titlebar__brand">
-        <div class="brand-mark">VC</div>
+        <div class="brand-mark">US</div>
         <div>
-          <div class="titlebar__title">VCPChat Lite</div>
-          <div class="titlebar__subtitle">Multi-agent single chat workspace</div>
+          <div class="titlebar__title">UniStudy</div>
+          <div class="titlebar__subtitle">个人 AI 学习终端</div>
+        </div>
+      </div>
+      <div class="titlebar__workspace">
+        <div class="titlebar__context-card">
+          <span class="titlebar__context-label">当前学科</span>
+          <strong id="titlebarCurrentAgent">未选择学科</strong>
+        </div>
+        <div class="titlebar__context-card titlebar__context-card--topic">
+          <span class="titlebar__context-label">当前话题</span>
+          <strong id="titlebarCurrentTopic">请选择一个话题</strong>
         </div>
       </div>
       <div class="titlebar__meta">
-        <button id="globalSettingsBtn" class="ghost-button icon-btn" title="Settings"><span class="material-symbols-outlined">settings</span></button>
-        <button id="themeToggleBtn" class="ghost-button icon-btn" title="Toggle Theme"><span class="material-symbols-outlined">dark_mode</span></button>
-        <button id="minimize-btn" class="window-button">_</button>
-        <button id="maximize-btn" class="window-button">▢</button>
-        <button id="close-btn" class="window-button window-button--danger">×</button>
+        <button id="globalSettingsBtn" class="ghost-button icon-btn" title="设置"><span class="material-symbols-outlined">settings</span></button>
+        <button id="themeToggleBtn" class="ghost-button icon-btn" title="切换主题"><span class="material-symbols-outlined">dark_mode</span></button>
+        <button id="minimize-btn" class="window-button"><span class="material-symbols-outlined" style="font-size: 16px;">remove</span></button>
+        <button id="maximize-btn" class="window-button"><span class="material-symbols-outlined" style="font-size: 14px;">crop_square</span></button>
+        <button id="close-btn" class="window-button window-button--danger"><span class="material-symbols-outlined" style="font-size: 18px;">close</span></button>
       </div>
     </header>
 
     <main class="layout">
-      <!-- Navigation / Sources -->
-      <aside class="sidebar">
-        <div class="panel panel--agents">
-          <div class="panel__header">
+      <!-- Workspace Navigation / Files -->
+      <aside class="workspace-sidebar">
+        <section class="panel workspace-nav workspace-topic-card">
+          <div class="workspace-card__header">
             <div>
-              <p class="eyebrow">Assistants</p>
-              <h2>Agents</h2>
+              <p class="workspace-card__title">学习主题</p>
             </div>
-            <button id="createNewAgentBtn" class="accent-button icon-text-btn"><span class="material-symbols-outlined">add</span> New</button>
+            <button id="quickNewTopicBtn" class="ghost-button workspace-card__cta" type="button">
+              <span class="material-symbols-outlined">add</span> 新建话题
+            </button>
           </div>
-          <input id="agentSearchInput" class="search-input" type="text" placeholder="Search agents" />
-          <ul id="agentList" class="list list--agents"></ul>
-        </div>
 
-        <div class="panel panel--topics">
-          <div class="panel__header panel__header--stacked">
+          <div class="hidden">
+            <strong id="workspaceCurrentAgent">未选择学科</strong>
+            <strong id="workspaceCurrentTopic">请选择一个话题</strong>
+            <button id="createNewAgentBtn" class="accent-button icon-text-btn" type="button"><span class="material-symbols-outlined">add</span> 新建学科</button>
+            <input id="agentSearchInput" class="search-input" type="text" placeholder="搜索学科入口" />
+            <ul id="agentList" class="list list--agents"></ul>
+            <button id="exportTopicBtn" class="ghost-button icon-btn" title="导出" type="button"><span class="material-symbols-outlined">download</span></button>
+            <input id="topicSearchInput" class="search-input" type="text" placeholder="筛选学习主题" />
+          </div>
+
+          <ul id="topicList" class="list list--topics workspace-card__list"></ul>
+        </section>
+
+        <div
+          id="workspaceVerticalResizeHandle"
+          class="layout-splitter layout-splitter--vertical"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="调整话题和来源高度"
+        ></div>
+
+        <section class="panel source-sidebar-card">
+          <div class="workspace-card__header">
             <div>
-              <p class="eyebrow">History</p>
-              <h2>Topics</h2>
-            </div>
-            <div class="panel__actions">
-              <button id="quickNewTopicBtn" class="ghost-button icon-text-btn"><span class="material-symbols-outlined">add_comment</span> New</button>
-              <button id="exportTopicBtn" class="ghost-button icon-btn" title="Export"><span class="material-symbols-outlined">download</span></button>
+              <p class="workspace-card__title">学习来源</p>
             </div>
           </div>
-          <input id="topicSearchInput" class="search-input" type="text" placeholder="Filter topics" />
-          <ul id="topicList" class="list list--topics"></ul>
-        </div>
+
+          <button id="importTopicKnowledgeBaseFilesBtn" class="ghost-button workspace-card__cta" type="button">
+            <span class="material-symbols-outlined">add</span> 添加来源
+          </button>
+
+          <div class="hidden">
+            <p id="sourcePanelBindingStatus" class="settings-caption">每个话题都会自动使用自己的 Source。</p>
+            <button id="openKnowledgeBaseManagerBtn" class="ghost-button icon-text-btn" type="button"><span class="material-symbols-outlined">database</span> 管理来源</button>
+            <div id="topicKnowledgeBaseFilesStatus" class="topic-files__status">选择话题后可查看资料</div>
+            <div id="topicKnowledgeBaseFilesHint" class="topic-files__hint">当前话题会自动拥有独立的 Source，上传的资料会直接进入这一组学习来源。</div>
+          </div>
+
+          <div id="topicKnowledgeBaseFiles" class="knowledge-base-documents topic-knowledge-base-documents workspace-card__list"></div>
+        </section>
+
+        <section id="workspaceReaderPanel" class="panel workspace-reader-panel hidden" aria-live="polite">
+          <div class="workspace-reader-panel__header">
+            <div class="workspace-reader-panel__header-main">
+              <button id="workspaceReaderBackBtn" class="ghost-button icon-text-btn workspace-reader-panel__back" type="button">
+                <span class="material-symbols-outlined">arrow_back</span> 返回学习来源
+              </button>
+              <div>
+                <p class="eyebrow">来源阅读</p>
+                <h2 id="readerDocumentTitle">选择一份资料开始阅读</h2>
+                <p id="readerDocumentMeta" class="settings-caption">打开资料后，系统会异步生成来源指南；你也可以随时切到原文进行阅读和选段注入。</p>
+              </div>
+            </div>
+            <div class="workspace-reader-panel__header-actions">
+              <button id="refreshReaderGuideBtn" class="ghost-button icon-text-btn" type="button">
+                <span class="material-symbols-outlined">refresh</span> 刷新指南
+              </button>
+              <button id="readerPrevBtn" class="ghost-button icon-btn" type="button" title="上一页 / 上一段"><span class="material-symbols-outlined">navigate_before</span></button>
+              <button id="readerNextBtn" class="ghost-button icon-btn" type="button" title="下一页 / 下一段"><span class="material-symbols-outlined">navigate_next</span></button>
+            </div>
+          </div>
+
+          <div class="reader-toolbar workspace-reader-panel__badges">
+            <div id="readerLocationBadge" class="reader-badge">未打开文档</div>
+            <div id="readerIndexStatusBadge" class="reader-badge">尚未入库</div>
+            <div id="readerProcessingStatusBadge" class="reader-badge">等待中</div>
+            <div id="readerGuideStatusBadge" class="reader-badge">指南未生成</div>
+          </div>
+
+          <div class="workspace-reader-tabs">
+            <button id="leftReaderGuideTabBtn" class="workspace-reader-tab workspace-reader-tab--active" type="button">来源指南</button>
+            <button id="leftReaderContentTabBtn" class="workspace-reader-tab" type="button">原文</button>
+          </div>
+
+          <div id="readerGuidePane" class="workspace-reader-pane workspace-reader-pane--active">
+            <div id="readerGuideContent" class="reader-guide-content">
+              <div class="empty-list-state">
+                <strong>来源指南会显示在这里</strong>
+                <span>从“学习来源”中打开任意 PDF、DOCX 或文本资料后，系统会先生成一份学习导向的阅读指南。</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="readerContentPane" class="workspace-reader-pane hidden">
+            <div id="readerSelectionBar" class="reader-selection-bar hidden">
+              <div>
+                <strong>已选中片段</strong>
+                <p id="readerSelectionSummary" class="settings-caption">当前没有选中内容。</p>
+              </div>
+              <div class="panel__actions">
+                <button id="clearReaderSelectionBtn" class="ghost-button icon-text-btn" type="button"><span class="material-symbols-outlined">close</span> 清空</button>
+                <button id="injectReaderSelectionBtn" class="accent-button icon-text-btn" type="button"><span class="material-symbols-outlined">arrow_circle_up</span> 注入当前对话</button>
+              </div>
+            </div>
+            <div id="readerContent" class="reader-content">
+              <div class="empty-list-state">
+                <strong>原文阅读区已就绪</strong>
+                <span>你可以在这里查看 PDF 页级内容、DOCX 段落结构，并把选中的片段直接注入当前对话。</span>
+              </div>
+            </div>
+          </div>
+        </section>
       </aside>
+
+      <div
+        id="leftResizeHandle"
+        class="layout-splitter layout-splitter--left"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整左侧导航宽度"
+      ></div>
 
       <!-- Chat Stage -->
       <section class="chat-stage">
           <header class="chat-stage__header">
             <div>
-              <p class="eyebrow">Current Chat</p>
-              <h1 id="currentChatAgentName">Select an agent</h1>
+              <h1 class="chat-stage__title">对话</h1>
+              <p class="eyebrow hidden">当前学习主题</p>
+              <h1 id="currentChatTopicName" class="hidden">请选择一个话题</h1>
+              <p id="currentChatAgentName" class="chat-stage__subtitle hidden">当前学科：未选择</p>
+              <p id="currentTopicKnowledgeBaseStatus" class="chat-stage__status hidden">每个话题会自动准备独立 Source</p>
             </div>
-            <div class="chat-stage__header-actions">
-              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn"><span class="material-symbols-outlined">tune</span> Settings</button>
+            <div class="chat-stage__header-actions hidden">
+              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn"><span class="material-symbols-outlined">tune</span> 智能体设置</button>
             </div>
           </header>
 
@@ -81,6 +189,7 @@
           <footer class="chat-input-area">
             <div class="chat-input-card">
               <div id="attachmentPreviewArea" class="attachment-preview-area"></div>
+              <div id="selectionContextPreview" class="selection-context-preview hidden"></div>
               <textarea id="messageInput" rows="1" placeholder="输入消息... (Shift+Enter 换行)" disabled></textarea>
               <div class="chat-input-actions">
                 <button id="composerQuickNewTopicBtn" title="新建聊天话题" disabled>
@@ -128,183 +237,491 @@
           <input id="hiddenFileInput" type="file" multiple hidden />
       </section>
 
+      <div
+        id="rightResizeHandle"
+        class="layout-splitter layout-splitter--right"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整右侧面板宽度"
+      ></div>
+
       <aside id="settingsPanel" class="settings-panel">
-          <div class="settings-panel__header">
-            <div>
-              <p class="eyebrow">Configuration</p>
-              <h2 id="agentSettingsContainerTitle">Settings</h2>
-              <p id="selectedAgentNameForSettings" class="settings-caption"></p>
-            </div>
-            <button id="deleteAgentBtn" class="ghost-button ghost-button--danger">Delete</button>
-          </div>
-
-          <div id="selectAgentPromptForSettings" class="empty-state"><span class="material-symbols-outlined empty-icon">smart_toy</span><p>Select an agent to configure</p></div>
-
-          <div id="agentSettingsContainer" class="settings-stack hidden">
-            <!-- Card 1: Identity Profile (Span 2) -->
-            <section class="settings-card bento-identity">
-              <h3><span class="material-symbols-outlined bento-icon">account_circle</span> Profile</h3>
-              <div class="identity-grid">
-                <div class="avatar-editor" title="Click to upload avatar">
-                  <img id="agentAvatarPreview" src="../assets/default_avatar.png" alt="avatar" />
-                  <input id="agentAvatarInput" type="file" accept="image/*" />
+          <div id="notesPanelTab" class="side-panel-pane side-panel-pane--active">
+            <section id="notesWorkspaceCard" class="settings-card notes-studio">
+              <div class="notes-studio__header">
+                <div class="notes-studio__titleblock">
+                  <h2>Studio</h2>
                 </div>
-                <div class="field-grid">
-                  <label>
-                    <span>Name</span>
-                    <input id="agentNameInput" type="text" />
-                  </label>
-                  <label>
-                    <span>Model</span>
-                    <input id="agentModel" type="text" />
-                  </label>
+                <button id="notesStudioOpenBtn" class="ghost-button icon-btn notes-studio__expand" type="button" title="展开 Notes 工作台">
+                  <span class="material-symbols-outlined">arrow_outward</span>
+                </button>
+              </div>
+
+              <div class="notes-tool-grid">
+                <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
+                  <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
+                  <span class="notes-tool-tile__body">
+                    <strong>新建笔记</strong>
+                    <span>从空白开始</span>
+                  </span>
+                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
+                </button>
+                <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
+                  <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
+                  <span class="notes-tool-tile__body">
+                    <strong>深度分析</strong>
+                    <span>整理重点内容</span>
+                  </span>
+                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
+                </button>
+                <button id="generateQuizBtn" class="notes-tool-tile notes-tool-tile--quiz" type="button">
+                  <span class="notes-tool-tile__icon material-symbols-outlined">quiz</span>
+                  <span class="notes-tool-tile__body">
+                    <strong>生成选择题</strong>
+                    <span>围绕重点出题</span>
+                  </span>
+                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
+                </button>
+                <button id="generateFlashcardsBtn" class="notes-tool-tile notes-tool-tile--flashcards" type="button">
+                  <span class="notes-tool-tile__icon material-symbols-outlined">style</span>
+                  <span class="notes-tool-tile__body">
+                    <strong>生成闪卡</strong>
+                    <span>压缩成卡组</span>
+                  </span>
+                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
+                </button>
+              </div>
+
+              <div class="notes-stream">
+                <div class="notes-stream__header">
+                  <div class="notes-stream__heading">
+                    <h3>最近笔记</h3>
+                    <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
+                  </div>
+                  <div class="notes-scope-switch">
+                    <button id="topicNotesScopeBtn" class="ghost-button notes-scope-btn notes-scope-btn--active" type="button">当前话题</button>
+                    <button id="agentNotesScopeBtn" class="ghost-button notes-scope-btn" type="button">学科汇总</button>
+                  </div>
                 </div>
+                <div id="notesList" class="notes-list notes-list--studio"></div>
               </div>
-              <input id="editingAgentId" type="hidden" />
-            </section>
 
-            <!-- Card 2: System Prompt (Span 2) -->
-            <section class="settings-card bento-prompt">
-              <h3><span class="material-symbols-outlined bento-icon">code_blocks</span> System Prompt</h3>
-              <div id="systemPromptContainer"></div>
-            </section>
-
-            <!-- Card 3: Model Parameters (Span 1) -->
-            <section class="settings-card bento-params">
-              <h3><span class="material-symbols-outlined bento-icon">instant_mix</span> Parameters</h3>
-              <div class="field-grid" style="grid-template-columns: 1fr;">
-                <label>
-                  <span>Temperature</span>
-                  <input id="agentTemperature" type="number" min="0" max="2" step="0.1" />
-                </label>
-                <label>
-                  <span>Top P</span>
-                  <input id="agentTopP" type="number" min="0" max="1" step="0.01" />
-                </label>
-                <label>
-                  <span>Top K</span>
-                  <input id="agentTopK" type="number" min="0" step="1" />
-                </label>
+              <div class="notes-studio__footer">
+                <button id="newNoteFabBtn" class="accent-button notes-fab" type="button">
+                  <span class="material-symbols-outlined">note_add</span>
+                  <span>添加笔记</span>
+                </button>
               </div>
-            </section>
-
-            <!-- Card 4: Constraints & Streaming (Span 1) -->
-            <section class="settings-card bento-limits">
-              <h3><span class="material-symbols-outlined bento-icon">rule</span> Constraints</h3>
-              <div class="field-grid" style="grid-template-columns: 1fr;">
-                <label>
-                  <span>Context Tokens</span>
-                  <input id="agentContextTokenLimit" type="number" min="1" step="1" />
-                </label>
-                <label>
-                  <span>Max Output Tokens</span>
-                  <input id="agentMaxOutputTokens" type="number" min="1" step="1" />
-                </label>
-              </div>
-              <div class="radio-row" style="margin-top: 12px; font-weight: 500; font-size: 13px;">
-                <span style="display:block; margin-bottom: 4px;">Streaming</span>
-                <label><input id="agentStreamOutputTrue" type="radio" name="agentStreamOutput" checked /> On</label>
-                <label><input id="agentStreamOutputFalse" type="radio" name="agentStreamOutput" /> Off</label>
-              </div>
-            </section>
-
-            <!-- Card 5: Chat Styling (Span 2) -->
-            <section class="settings-card bento-style">
-              <h3><span class="material-symbols-outlined bento-icon">palette</span> Chat Styling</h3>
-              <div class="field-grid">
-                <label>
-                  <span>Avatar Border</span>
-                  <input id="agentAvatarBorderColor" type="color" value="#3d5a80" />
-                  <input id="agentAvatarBorderColorText" type="text" value="#3d5a80" style="display:none" />
-                </label>
-                <label>
-                  <span>Name Color</span>
-                  <input id="agentNameTextColor" type="color" value="#ffffff" />
-                  <input id="agentNameTextColorText" type="text" value="#ffffff" style="display:none" />
-                </label>
-              </div>
-              <label>
-                <span>Card CSS</span>
-                <textarea id="agentCardCss" rows="2" style="min-height: 60px;"></textarea>
-              </label>
-              <label>
-                <span>Chat CSS</span>
-                <textarea id="agentChatCss" rows="2" style="min-height: 60px;"></textarea>
-              </label>
-              <label>
-                <span>Custom CSS</span>
-                <textarea id="agentCustomCss" rows="2" style="min-height: 60px;"></textarea>
-              </label>
-              <div class="checkbox-row">
-                <label><input id="disableCustomColors" type="checkbox" /> Disable custom colors</label>
-                <label><input id="useThemeColorsInChat" type="checkbox" /> Use theme colors in chat</label>
-              </div>
-            </section>
-
-            <!-- Card 6: Actions (Span 2) -->
-            <section class="settings-card bento-actions" style="background: transparent; box-shadow: none; padding: 0;">
-              <button id="saveAgentSettingsBtn" class="accent-button" style="width: 100%; height: 48px; border-radius: 24px;">Save Agent Settings</button>
             </section>
           </div>
-          <section class="settings-card settings-card--global">
-            <h3><span class="material-symbols-outlined bento-icon">public</span> Global Connection</h3>
-            <div class="field-grid">
-              <label>
-                <span>User Name</span>
-                <input id="userNameInput" type="text" />
-              </label>
-              <label>
-                <span>VCP Server URL</span>
-                <input id="vcpServerUrl" type="text" placeholder="http://host:port/v1/chat/completions" />
-              </label>
-              <label>
-                <span>API Key</span>
-                <input id="vcpApiKey" type="password" />
-              </label>
-            </div>
-            <h3><span class="material-symbols-outlined bento-icon">brush</span> Rendering</h3>
-            <div class="field-grid">
-              <label>
-                <span>Chat Font</span>
-                <select id="chatFontPreset">
-                  <option value="system">System</option>
-                  <option value="serif">Serif</option>
-                  <option value="monospace">Monospace</option>
-                </select>
-              </label>
-              <label>
-                <span>Code Font</span>
-                <select id="chatCodeFontPreset">
-                  <option value="consolas">Consolas</option>
-                  <option value="monospace">Monospace</option>
-                  <option value="system">System</option>
-                </select>
-              </label>
-              <label>
-                <span>Bubble Width %</span>
-                <input id="chatBubbleMaxWidthWideDefault" type="number" min="50" max="96" />
-              </label>
-            </div>
-            <div class="checkbox-row">
-              <label><input id="enableAgentBubbleTheme" type="checkbox" /> Bubble theme injection</label>
-              <label><input id="enableWideChatLayout" type="checkbox" /> Wide chat layout</label>
-              <label><input id="enableSmoothStreaming" type="checkbox" /> Smooth streaming</label>
-            </div>
-            <h3><span class="material-symbols-outlined bento-icon">contrast</span> Theme</h3>
-            <div class="radio-row">
-              <label><input type="radio" name="themeMode" value="light" /> Light</label>
-              <label><input type="radio" name="themeMode" value="dark" /> Dark</label>
-              <label><input type="radio" name="themeMode" value="system" checked /> System</label>
-            </div>
-            <button id="saveGlobalSettingsBtn" class="ghost-button">Save Global Settings</button>
-          </section>
       </aside>
     </main>
+
+    <div id="noteDetailModal" class="note-detail-modal hidden" aria-hidden="true">
+      <div id="noteDetailModalBackdrop" class="note-detail-modal__backdrop"></div>
+      <div class="note-detail-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="noteDetailTitle">
+        <div class="note-detail-modal__header">
+          <div class="note-detail-modal__header-main">
+            <button id="flashcardsBackToNotesBtn" class="ghost-button icon-text-btn note-detail-modal__back" type="button">
+              <span class="material-symbols-outlined">arrow_back</span> 返回 Studio
+            </button>
+            <div>
+              <p id="noteDetailEyebrow" class="eyebrow">笔记详情</p>
+              <h2 id="noteDetailTitle">笔记详情</h2>
+              <p id="noteDetailSubtitle" class="settings-caption">查看、编辑和整理当前笔记内容。</p>
+            </div>
+          </div>
+          <div class="panel__actions note-detail-modal__actions">
+            <button id="saveNoteBtn" class="accent-button icon-text-btn" type="button">
+              <span class="material-symbols-outlined">save</span> 保存
+            </button>
+            <button id="deleteNoteBtn" class="ghost-button ghost-button--danger icon-text-btn" type="button">
+              <span class="material-symbols-outlined">delete</span> 删除
+            </button>
+            <button id="noteDetailCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭笔记详情">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="note-detail-modal__body">
+          <section id="noteEditorCard" class="settings-card note-detail-editor">
+            <h3><span class="material-symbols-outlined bento-icon">edit_note</span> Markdown 编辑器</h3>
+            <div class="field-grid" style="grid-template-columns: 1fr;">
+              <label>
+                <span>标题</span>
+                <input id="noteTitleInput" type="text" placeholder="输入笔记标题" />
+              </label>
+              <label>
+                <span>内容</span>
+                <textarea id="noteContentInput" rows="18" placeholder="在这里记录学习总结、概念分析和最终产出。"></textarea>
+              </label>
+            </div>
+            <div id="noteMetaSummary" class="settings-caption">当前没有打开的笔记。</div>
+          </section>
+
+          <section id="flashcardsPracticeCard" class="settings-card flashcards-practice-card hidden">
+            <div class="flashcards-practice__header">
+              <div class="flashcards-practice__title-block">
+                <p class="eyebrow">交互练习</p>
+                <h2 id="flashcardsDeckTitle">闪卡练习</h2>
+                <p id="flashcardsDeckMeta" class="settings-caption">请选择一组结构化闪卡开始抽认。</p>
+              </div>
+              <div class="flashcards-practice__summary">
+                <span id="flashcardsDeckProgress" class="flashcards-practice__pill">0 / 0</span>
+                <div class="flashcards-practice__stats">
+                  <span id="flashcardsUnknownCount" class="flashcards-practice__stat flashcards-practice__stat--unknown">
+                    <span class="material-symbols-outlined">close</span>
+                    <span>0</span>
+                  </span>
+                  <span id="flashcardsKnownCount" class="flashcards-practice__stat flashcards-practice__stat--known">
+                    <span class="material-symbols-outlined">done</span>
+                    <span>0</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <button id="flashcardCardButton" class="flashcard-card" type="button">
+              <div class="flashcard-card__inner">
+                <div class="flashcard-card__face flashcard-card__face--front">
+                  <span class="flashcard-card__label">问题</span>
+                  <div id="flashcardFrontContent" class="flashcard-card__content"></div>
+                  <span class="flashcard-card__hint">点击查看答案</span>
+                </div>
+                <div class="flashcard-card__face flashcard-card__face--back">
+                  <span class="flashcard-card__label">答案</span>
+                  <div id="flashcardBackContent" class="flashcard-card__content"></div>
+                  <span class="flashcard-card__hint">点击回到问题</span>
+                </div>
+              </div>
+            </button>
+            <div class="flashcards-practice__actions">
+              <button id="flashcardsPrevBtn" class="ghost-button flashcards-practice__action-btn" type="button" aria-label="上一张">
+                <span class="material-symbols-outlined">arrow_back</span>
+              </button>
+              <button id="flashcardsMarkUnknownBtn" class="ghost-button flashcards-practice__result-btn flashcards-practice__result-btn--unknown" type="button">
+                <span class="material-symbols-outlined">close</span> 不知道
+              </button>
+              <button id="flashcardsMarkKnownBtn" class="ghost-button flashcards-practice__result-btn flashcards-practice__result-btn--known" type="button">
+                <span class="material-symbols-outlined">done</span> 知道了
+              </button>
+              <button id="flashcardsNextBtn" class="ghost-button flashcards-practice__action-btn" type="button" aria-label="下一张">
+                <span class="material-symbols-outlined">arrow_forward</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsModal" class="settings-modal hidden" aria-hidden="true">
+      <div id="settingsModalBackdrop" class="settings-modal__backdrop"></div>
+      <div class="settings-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+        <div class="settings-modal__header">
+          <div>
+            <p class="eyebrow">工作台设置</p>
+            <h2 id="settingsModalTitle">设置</h2>
+            <p id="settingsModalSubtitle" class="settings-caption">统一管理全局连接、智能体参数与 Source 配置。</p>
+          </div>
+          <button id="settingsModalCloseBtn" class="ghost-button icon-btn settings-modal__close" type="button" aria-label="关闭设置">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="settings-modal__body">
+          <nav class="settings-modal__nav" aria-label="设置分类">
+            <button id="settingsNavGlobalBtn" class="settings-modal__nav-button settings-modal__nav-button--active" type="button" data-settings-section-button="global">
+              <span class="material-symbols-outlined">tune</span>
+              <span>全局设置</span>
+            </button>
+            <button id="settingsNavAgentBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="agent">
+              <span class="material-symbols-outlined">smart_toy</span>
+              <span>智能体设置</span>
+            </button>
+            <button id="settingsNavKnowledgeBaseBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="knowledge-base">
+              <span class="material-symbols-outlined">database</span>
+              <span>来源管理</span>
+            </button>
+          </nav>
+
+          <div class="settings-modal__content">
+            <section id="settingsModalSectionGlobal" class="settings-modal__section" data-settings-section="global">
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">public</span> 全局连接</h3>
+                <div class="field-grid">
+                  <label>
+                    <span>用户名</span>
+                    <input id="userNameInput" type="text" />
+                  </label>
+                  <label>
+                    <span>VCP 服务器 URL</span>
+                    <input id="vcpServerUrl" type="text" placeholder="http://host:port/v1/chat/completions" />
+                  </label>
+                  <label>
+                    <span>API Key</span>
+                    <input id="vcpApiKey" type="password" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">brush</span> 渲染</h3>
+                <div class="field-grid">
+                  <label>
+                    <span>聊天字体</span>
+                    <select id="chatFontPreset">
+                      <option value="system">系统</option>
+                      <option value="serif">衬线</option>
+                      <option value="monospace">等宽</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>代码字体</span>
+                    <select id="chatCodeFontPreset">
+                      <option value="consolas">Consolas</option>
+                      <option value="monospace">等宽</option>
+                      <option value="system">系统</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>气泡宽度 %</span>
+                    <input id="chatBubbleMaxWidthWideDefault" type="number" min="50" max="96" />
+                  </label>
+                </div>
+                <div class="checkbox-row">
+                  <label><input id="enableAgentBubbleTheme" type="checkbox" /> 注入气泡主题</label>
+                  <label><input id="enableWideChatLayout" type="checkbox" /> 宽屏聊天布局</label>
+                  <label><input id="enableSmoothStreaming" type="checkbox" /> 平滑流式输出</label>
+                </div>
+              </section>
+
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">contrast</span> 主题</h3>
+                <div class="radio-row">
+                  <label><input type="radio" name="themeMode" value="light" /> 浅色</label>
+                  <label><input type="radio" name="themeMode" value="dark" /> 深色</label>
+                  <label><input type="radio" name="themeMode" value="system" checked /> 跟随系统</label>
+                </div>
+              </section>
+            </section>
+
+            <section id="settingsModalSectionAgent" class="settings-modal__section hidden" data-settings-section="agent">
+              <div class="settings-panel__header settings-modal__agent-header">
+                <div>
+                  <p class="eyebrow">配置</p>
+                  <h2 id="agentSettingsContainerTitle">智能体设置</h2>
+                  <p id="selectedAgentNameForSettings" class="settings-caption"></p>
+                </div>
+                <button id="deleteAgentBtn" class="ghost-button ghost-button--danger" type="button">删除</button>
+              </div>
+
+              <div id="selectAgentPromptForSettings" class="empty-state">
+                <span class="material-symbols-outlined empty-icon">smart_toy</span>
+                <p>请选择一个智能体以进行配置</p>
+              </div>
+
+              <div id="agentSettingsContainer" class="settings-stack hidden">
+                <section class="settings-card bento-identity">
+                  <h3><span class="material-symbols-outlined bento-icon">account_circle</span> 资料</h3>
+                  <div class="identity-grid">
+                    <div class="avatar-editor" title="点击上传头像">
+                      <img id="agentAvatarPreview" src="../assets/default_avatar.png" alt="avatar" />
+                      <input id="agentAvatarInput" type="file" accept="image/*" />
+                    </div>
+                    <div class="field-grid">
+                      <label>
+                        <span>名称</span>
+                        <input id="agentNameInput" type="text" />
+                      </label>
+                      <label>
+                        <span>模型</span>
+                        <input id="agentModel" type="text" />
+                      </label>
+                    </div>
+                  </div>
+                  <input id="editingAgentId" type="hidden" />
+                </section>
+
+                <section class="settings-card bento-prompt">
+                  <h3><span class="material-symbols-outlined bento-icon">code_blocks</span> 系统提示词</h3>
+                  <div id="systemPromptContainer"></div>
+                </section>
+
+                <section class="settings-card bento-params">
+                  <h3><span class="material-symbols-outlined bento-icon">instant_mix</span> 参数</h3>
+                  <div class="field-grid" style="grid-template-columns: 1fr;">
+                    <label>
+                      <span>温度 (Temperature)</span>
+                      <input id="agentTemperature" type="number" min="0" max="2" step="0.1" />
+                    </label>
+                    <label>
+                      <span>Top P</span>
+                      <input id="agentTopP" type="number" min="0" max="1" step="0.01" />
+                    </label>
+                    <label>
+                      <span>Top K</span>
+                      <input id="agentTopK" type="number" min="0" step="1" />
+                    </label>
+                  </div>
+                </section>
+
+                <section class="settings-card bento-limits">
+                  <h3><span class="material-symbols-outlined bento-icon">rule</span> 约束</h3>
+                  <div class="field-grid" style="grid-template-columns: 1fr;">
+                    <label>
+                      <span>上下文 Token</span>
+                      <input id="agentContextTokenLimit" type="number" min="1" step="1" />
+                    </label>
+                    <label>
+                      <span>最大输出 Token</span>
+                      <input id="agentMaxOutputTokens" type="number" min="1" step="1" />
+                    </label>
+                  </div>
+                  <div class="radio-row" style="margin-top: 12px; font-weight: 500; font-size: 13px;">
+                    <span style="display:block; margin-bottom: 4px;">流式输出</span>
+                    <label><input id="agentStreamOutputTrue" type="radio" name="agentStreamOutput" checked /> 开启</label>
+                    <label><input id="agentStreamOutputFalse" type="radio" name="agentStreamOutput" /> 关闭</label>
+                  </div>
+                </section>
+
+                <section class="settings-card bento-style">
+                  <h3><span class="material-symbols-outlined bento-icon">palette</span> 聊天样式</h3>
+                  <div class="field-grid">
+                    <label>
+                      <span>头像边框色</span>
+                      <input id="agentAvatarBorderColor" type="color" value="#3d5a80" />
+                      <input id="agentAvatarBorderColorText" type="text" value="#3d5a80" style="display:none" />
+                    </label>
+                    <label>
+                      <span>名称颜色</span>
+                      <input id="agentNameTextColor" type="color" value="#ffffff" />
+                      <input id="agentNameTextColorText" type="text" value="#ffffff" style="display:none" />
+                    </label>
+                  </div>
+                  <label>
+                    <span>卡片 CSS</span>
+                    <textarea id="agentCardCss" rows="2" style="min-height: 60px;"></textarea>
+                  </label>
+                  <label>
+                    <span>聊天 CSS</span>
+                    <textarea id="agentChatCss" rows="2" style="min-height: 60px;"></textarea>
+                  </label>
+                  <label>
+                    <span>自定义 CSS</span>
+                    <textarea id="agentCustomCss" rows="2" style="min-height: 60px;"></textarea>
+                  </label>
+                  <div class="checkbox-row">
+                    <label><input id="disableCustomColors" type="checkbox" /> 禁用自定义颜色</label>
+                    <label><input id="useThemeColorsInChat" type="checkbox" /> 在聊天中使用主题色</label>
+                  </div>
+                </section>
+
+                <section class="settings-card bento-actions" style="background: transparent; box-shadow: none; padding: 0;">
+                  <button id="saveAgentSettingsBtn" class="accent-button" style="width: 100%; height: 48px; border-radius: 24px;">保存智能体设置</button>
+                </section>
+              </div>
+            </section>
+
+            <section id="settingsModalSectionKnowledgeBase" class="settings-modal__section hidden" data-settings-section="knowledge-base">
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">hub</span> 来源模型</h3>
+                <div class="field-grid">
+                  <label>
+                    <span>Source Base URL</span>
+                    <input id="kbBaseUrl" type="text" placeholder="http://host:port/v1" />
+                  </label>
+                  <label>
+                    <span>Source API Key</span>
+                    <input id="kbApiKey" type="password" />
+                  </label>
+                  <label>
+                    <span>Embedding Model</span>
+                    <input id="kbEmbeddingModel" type="text" placeholder="BAAI/bge-m3" />
+                  </label>
+                  <div class="checkbox-row" style="grid-column: span 2;">
+                    <label>
+                      <input id="kbUseRerank" type="checkbox" />
+                      <span>启用 Rerank 重排</span>
+                    </label>
+                  </div>
+                  <label>
+                    <span>Rerank Model</span>
+                    <input id="kbRerankModel" type="text" placeholder="BAAI/bge-reranker-v2-m3" />
+                  </label>
+                  <label>
+                    <span>Top K / Threshold</span>
+                    <div class="kb-inline-fields">
+                      <input id="kbTopK" type="number" min="1" step="1" />
+                      <input id="kbScoreThreshold" type="number" min="0" max="1" step="0.01" />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Candidate Top K</span>
+                    <input id="kbCandidateTopK" type="number" min="1" step="1" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">database</span> 来源管理</h3>
+                <div class="field-grid">
+                  <label style="grid-column: span 2;">
+                    <span>Source 名称</span>
+                    <input id="knowledgeBaseNameInput" type="text" placeholder="输入来源名称" />
+                  </label>
+                </div>
+                <div class="checkbox-row">
+                  <button id="createKnowledgeBaseBtn" class="ghost-button" type="button">创建</button>
+                  <button id="renameKnowledgeBaseBtn" class="ghost-button" type="button">重命名</button>
+                  <button id="deleteKnowledgeBaseBtn" class="ghost-button ghost-button--danger" type="button">删除</button>
+                  <button id="importKnowledgeBaseFilesBtn" class="ghost-button" type="button">导入文件</button>
+                </div>
+                <p id="knowledgeBaseSelectionSummary" class="settings-caption">每个话题会自动拥有自己的 Source；这里可统一查看和维护来源库。</p>
+                <div id="knowledgeBaseList" class="knowledge-base-list"></div>
+                <div id="knowledgeBaseDocuments" class="knowledge-base-documents"></div>
+                <div class="kb-debug-panel">
+                  <div class="kb-debug-panel__header">
+                    <div>
+                      <h4>Source 检索调试</h4>
+                      <p class="settings-caption">对当前选中的来源运行搜索或完整调试，查看命中和最终注入上下文。</p>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <label style="grid-column: span 2;">
+                      <span>Debug Query</span>
+                      <input id="knowledgeBaseDebugQueryInput" type="text" placeholder="输入一个问题，查看来源命中与最终注入内容" />
+                    </label>
+                  </div>
+                  <div class="checkbox-row">
+                    <button id="runKnowledgeBaseSearchBtn" class="ghost-button" type="button">搜索</button>
+                    <button id="runKnowledgeBaseDebugBtn" class="ghost-button" type="button">调试</button>
+                  </div>
+                  <div id="knowledgeBaseDebugResults" class="kb-debug-results">
+                    <div class="empty-list-state"><strong>还没有调试结果</strong><span>选择一个 Source 并输入 query 后，这里会显示搜索或调试信息。</span></div>
+                  </div>
+                </div>
+              </section>
+            </section>
+          </div>
+        </div>
+
+        <div id="settingsModalFooter" class="settings-modal__footer">
+          <p class="settings-caption">全局设置和 Source 模型配置会一起保存。</p>
+          <button id="saveGlobalSettingsBtn" class="accent-button" type="button">保存全局与来源设置</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="floating-toast-notifications-container"></div>
   <div id="modal-container"></div>
+  <div id="topicActionMenu" class="topic-action-menu hidden"></div>
+  <div id="noteActionMenu" class="topic-action-menu hidden"></div>
+  <div id="sourceFileTooltip" class="source-file-tooltip hidden" role="tooltip"></div>
+  <div id="sourceFileActionMenu" class="source-file-action-menu hidden"></div>
   <div id="emoticonPanel" class="emoticon-panel"></div>
+  <input id="hiddenKnowledgeBaseFileInput" type="file" multiple hidden />
+  <input id="hiddenTopicKnowledgeBaseFileInput" type="file" multiple hidden />
 
   <script src="../../vendor/purify.min.js"></script>
   <script src="../../vendor/marked.min.js"></script>

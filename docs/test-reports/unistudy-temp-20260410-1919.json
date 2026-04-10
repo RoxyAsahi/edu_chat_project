@@ -1,0 +1,38 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "temp",
+  "dataRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-BJU9O5",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-Y6Tsid",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-temp-20260410-1919.json",
+  "targetAgentId": null,
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "guideModel": "gemini-3.1-flash-lite-preview",
+    "defaultModel": "gemini-3.1-flash-lite-preview",
+    "lastModel": "gemini-3.1-flash-lite-preview",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "configurationDiagnostics": {
+    "hasVcpApiKey": true,
+    "hasKbApiKey": true
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "temp-single",
+      "label": "临时单文件 Smoke",
+      "topicName": "临时单文件测试-20260410-1919",
+      "passed": false,
+      "error": "page.waitForFunction: Timeout 30000ms exceeded.\n    at openSourceDocumentInReader (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:544:16)\n    at async runScenario (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:742:13)\n    at async run (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:895:32)"
+    }
+  ],
+  "errors": [
+    "临时单文件 Smoke 失败：page.waitForFunction: Timeout 30000ms exceeded."
+  ],
+  "startedAt": "2026-04-10T11:19:34.623Z",
+  "skips": [],
+  "finishedAt": "2026-04-10T11:20:43.191Z",
+  "success": false
+}

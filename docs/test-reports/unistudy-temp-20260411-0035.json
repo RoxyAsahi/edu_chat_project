@@ -1,0 +1,116 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "temp",
+  "dataRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-Z09crS",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-6tsfz6",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-temp-20260411-0035.json",
+  "targetAgentId": null,
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "guideModel": "gemini-3.1-flash-lite-preview",
+    "defaultModel": "gemini-3.1-flash-lite-preview",
+    "lastModel": "gemini-3.1-flash-lite-preview",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "configurationDiagnostics": {
+    "hasVcpApiKey": true,
+    "hasKbApiKey": true
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "temp-single",
+      "label": "临时单文件 Smoke",
+      "agentId": "Smoke______20260411-0035_1775838936362",
+      "topicId": "topic_1775838936391",
+      "topicName": "临时单文件测试-20260411-0035",
+      "historyFilePath": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-Z09crS\\UserData\\Smoke______20260411-0035_1775838936362\\topics\\topic_1775838936391\\history.json",
+      "uploadedFiles": [
+        "unistudy-20260411-0035-newton-source.txt"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775838947023_62c8bb6a",
+          "name": "unistudy-20260411-0035-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775838947982
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据资料回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260411-0035-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260411-0035-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260411-0035-newton-source.txt"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用\n            unistudy-20260411-0035-newton-source.txt\n            点击回到阅读区\n            资料编号：NEWTON-101 资料主题：牛顿第一定律。 核心内容：当一个物体不受外力作用时，它将保持静止状态或匀速直线运动状态。 测试问题：请根据资料说明 NEWTON-101 对应的知识点是什么。\n            score 0.6518 · vec 0.6518\n牛顿第一定律",
+          "kbRefCount": 1,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "guideAssertions": [
+        {
+          "targetFile": "unistudy-20260411-0035-newton-source.txt",
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "NEWTON-101"
+          ],
+          "expectedAllKeywords": [],
+          "guideStatus": "done",
+          "guideError": null,
+          "guideGeneratedAt": 1775838951881,
+          "guideContentLength": 370,
+          "guidePreview": "# 文档主题\n\n牛顿第一定律（惯性定律）。\n\n# 资料概览\n\n本资料（NEWTON-101）简要阐述了牛顿第一定律的核心定义，明确了物体在不受外力作用时的运动状态规律。\n\n# 关键知识点\n\n*   **牛顿第一定律定义**：物体在不受外力作用时，其运动状态保持不变。\n*   **静止状态**：不受外力时，静止的物体将保持静止。\n*   **匀速直线运动状态**：不受外力时，运动的物体将保持匀速直线运动。\n\n# 章节导航\n\n*   第 1 段：牛顿第一定律的定义与核心运动状态描述。\n\n# 推荐阅读路径\n\n1.  阅读第 1 段，理解“不受外力”与“运动状态保持”之间的逻辑关系。\n\n# 可直接提问的问题\n\n*   根据 NEWTON-101，当物体不受外力作用时，它会处于哪两种状态之一？\n*   牛顿第一定律描述的核心物理现象是什么？",
+          "uiGuidePreview": "",
+          "uiGuideStatusBadge": "指南生成中",
+          "keywordOk": true,
+          "contentLengthOk": true,
+          "readerUiOk": true,
+          "cacheOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Smoke 测试学科 20260411-0035 · 临时单文件测试-20260411-0035",
+      "kbId": "kb_1775838944440_36d9a121",
+      "sourceStatusAfter": "当前 Source：Smoke 测试学科 20260411-0035 · 临时单文件测试-20260411-0035",
+      "uploadOk": true,
+      "persistedHistoryCount": 2,
+      "persistedAssistantKbRefs": 1,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260411-0035-newton-source.txt"
+      ],
+      "persistedLatestAssistantContentLength": 6,
+      "noteSaved": true,
+      "noteId": "note_1775838955409_wu1lq2",
+      "noteTitle": "临时单文件 Smoke 测试记录",
+      "noteError": null,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "startedAt": "2026-04-10T16:35:27.682Z",
+  "skips": [],
+  "finishedAt": "2026-04-10T16:35:55.915Z",
+  "success": true
+}

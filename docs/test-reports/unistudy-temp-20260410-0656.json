@@ -1,0 +1,83 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "temp",
+  "dataRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-XcLNaA",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-h2mbR1",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-temp-20260410-0656.json",
+  "targetAgentId": null,
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "temp-single",
+      "label": "临时单文件 Smoke",
+      "agentId": "Smoke______20260410-0656_1775775404352",
+      "topicId": "topic_1775775404381",
+      "topicName": "临时单文件测试-20260410-0656",
+      "historyFilePath": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-XcLNaA\\UserData\\Smoke______20260410-0656_1775775404352\\topics\\topic_1775775404381\\history.json",
+      "uploadedFiles": [
+        "unistudy-20260410-0656-newton-source.txt"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775775416948_10335e03",
+          "name": "unistudy-20260410-0656-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775775417815
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据资料回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260410-0656-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0656-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0656-newton-source.txt"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用\n            unistudy-20260410-0656-newton-source.txt\n            第 0 页 · 第 0 段\n            资料编号：NEWTON-101 资料主题：牛顿第一定律。 核心内容：当一个物体不受外力作用时，它将保持静止状态或匀速直线运动状态。 测试问题：请根据资料说明 NEWTON-101 对应的知识点是什么。\n            score 0.6509 · vec 0.6509\n牛顿第一定律",
+          "kbRefCount": 1,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Smoke 测试学科 20260410-0656 · 临时单文件测试-20260410-0656",
+      "kbId": "kb_1775775414368_21711e1c",
+      "sourceStatusAfter": "当前 Source：Smoke 测试学科 20260410-0656 · 临时单文件测试-20260410-0656",
+      "uploadOk": true,
+      "persistedHistoryCount": 2,
+      "persistedAssistantKbRefs": 1,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0656-newton-source.txt"
+      ],
+      "persistedLatestAssistantContentLength": 6,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "startedAt": "2026-04-09T22:56:32.932Z",
+  "skips": [],
+  "finishedAt": "2026-04-09T22:57:07.998Z",
+  "success": true
+}

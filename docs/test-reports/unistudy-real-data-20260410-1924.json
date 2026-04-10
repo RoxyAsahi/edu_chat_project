@@ -1,0 +1,129 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "real-data",
+  "dataRoot": "C:\\VCP\\Eric\\VCPChatLite\\AppData",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-ui7Hs1",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-real-data-20260410-1924.json",
+  "targetAgentId": "Lite_Real_Test_Nova_1775682726542",
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "guideModel": "gemini-3.1-flash-lite-preview",
+    "defaultModel": "gemini-3.1-flash-lite-preview",
+    "lastModel": "gemini-3.1-flash-lite-preview",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "configurationDiagnostics": {
+    "hasVcpApiKey": true,
+    "hasKbApiKey": true
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "real-single",
+      "label": "真实单文件测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775820286957",
+      "topicName": "真实单文件测试-20260410-1924",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775820286957\\history.json",
+      "uploadedFiles": [
+        "unistudy-20260410-1924-newton-source.txt"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775820298411_aa41ac74",
+          "name": "unistudy-20260410-1924-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820299159
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据当前来源回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260410-1924-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-1924-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-1924-newton-source.txt"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用\n            unistudy-20260410-1924-newton-source.txt\n            点击回到阅读区\n            资料编号：NEWTON-101 资料主题：牛顿第一定律。 核心内容：当一个物体不受外力作用时，它将保持静止状态或匀速直线运动状态。 测试问题：请根据资料说明 NEWTON-101 对应的知识点是什么。\n            score 0.6518 · vec 0.6518\n牛顿第一定律",
+          "kbRefCount": 1,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "guideAssertions": [
+        {
+          "targetFile": "unistudy-20260410-1924-newton-source.txt",
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "NEWTON-101"
+          ],
+          "expectedAllKeywords": [],
+          "guideStatus": "done",
+          "guideError": null,
+          "guideGeneratedAt": 1775820303331,
+          "guideContentLength": 383,
+          "guidePreview": "# 文档主题\n\n牛顿第一定律（惯性定律）。\n\n# 资料概览\n\n本资料（编号：NEWTON-101）简要阐述了牛顿第一定律的定义，明确了物体在不受外力作用时的两种运动状态：静止或匀速直线运动。\n\n# 关键知识点\n\n*   **牛顿第一定律定义**：当物体不受外力作用时，其运动状态保持不变。\n*   **状态一**：静止状态。\n*   **状态二**：匀速直线运动状态。\n\n# 章节导航\n\n*   第 1 段：牛顿第一定律的定义与物理状态描述。\n\n# 推荐阅读路径\n\n1.  优先阅读第 1 段，掌握牛顿第一定律的核心定义。\n2.  通过分析“不受外力”对物体运动状态的影响，理解惯性的本质。\n\n# 可直接提问的问题\n\n*   牛顿第一定律描述了物体在什么情况下保持静止或匀速直线运动？\n*   根据资料 NEWTON-101，当物体不受外力时，它会表现出哪两种状态？",
+          "uiGuidePreview": "",
+          "uiGuideStatusBadge": "指南生成中",
+          "keywordOk": true,
+          "contentLengthOk": true,
+          "readerUiOk": true,
+          "cacheOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-1924",
+      "kbId": "kb_1775820295877_51d195fd",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-1924",
+      "uploadOk": true,
+      "persistedHistoryCount": 2,
+      "persistedAssistantKbRefs": 1,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-1924-newton-source.txt"
+      ],
+      "persistedLatestAssistantContentLength": 6,
+      "passed": true
+    },
+    {
+      "id": "real-multi",
+      "label": "真实多文件测试",
+      "topicName": "真实多文件测试-20260410-1924",
+      "passed": false,
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-ohm-law.txt' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n\n    at openSourceDocumentInReader (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:541:15)\n    at runScenario (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:744:19)\n    at async run (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:897:32)"
+    },
+    {
+      "id": "real-pressure",
+      "label": "真实中等压力测试",
+      "topicName": "真实压力测试-20260410-1924",
+      "passed": false,
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-pythagorean.md' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n\n    at openSourceDocumentInReader (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:541:15)\n    at runScenario (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:744:19)\n    at async run (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:897:32)"
+    }
+  ],
+  "errors": [
+    "真实多文件测试 失败：locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-ohm-law.txt' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n",
+    "真实中等压力测试 失败：locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-pythagorean.md' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n"
+  ],
+  "startedAt": "2026-04-10T11:24:37.848Z",
+  "skips": [],
+  "finishedAt": "2026-04-10T11:29:59.440Z",
+  "success": false
+}

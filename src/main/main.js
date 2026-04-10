@@ -3,14 +3,73 @@ const fs = require('fs-extra');
 const path = require('path');
 const chokidar = require('chokidar');
 
+function isBrokenPipeError(error) {
+    if (!error) {
+        return false;
+    }
+    return error.code === 'EPIPE'
+        || error.code === 'ERR_STREAM_DESTROYED'
+        || /broken pipe/i.test(String(error.message || ''));
+}
+
+function installSafeConsoleWrite() {
+    const safeWrap = (methodName) => {
+        const originalMethod = console[methodName];
+        if (typeof originalMethod !== 'function') {
+            return;
+        }
+
+        console[methodName] = (...args) => {
+            try {
+                return originalMethod.apply(console, args);
+            } catch (error) {
+                if (!isBrokenPipeError(error)) {
+                    throw error;
+                }
+                return undefined;
+            }
+        };
+    };
+
+    [process.stdout, process.stderr].forEach((stream) => {
+        if (!stream || typeof stream.on !== 'function') {
+            return;
+        }
+
+        stream.on('error', (error) => {
+            if (!isBrokenPipeError(error)) {
+                try {
+                    fs.ensureDirSync(path.join(process.cwd(), '.tmp'));
+                    fs.appendFileSync(
+                        path.join(process.cwd(), '.tmp', 'main-process-stream-errors.log'),
+                        `[${new Date().toISOString()}] ${error?.stack || error}\n`
+                    );
+                } catch (_writeError) {
+                    // Swallow secondary logging failures to avoid cascading crashes.
+                }
+            }
+        });
+    });
+
+    safeWrap('log');
+    safeWrap('info');
+    safeWrap('warn');
+    safeWrap('error');
+}
+
+installSafeConsoleWrite();
+
 const settingsHandlers = require('../modules/main/ipc/settingsHandlers');
 const fileDialogHandlers = require('../modules/main/ipc/fileDialogHandlers');
 const { getAgentConfigById, ...agentHandlers } = require('../modules/main/ipc/agentHandlers');
 const chatHandlers = require('../modules/main/ipc/chatHandlers');
+const knowledgeBaseHandlers = require('../modules/main/ipc/knowledgeBaseHandlers');
+const notesHandlers = require('../modules/main/ipc/notesHandlers');
 const promptHandlers = require('../modules/main/ipc/promptHandlers');
 const themeHandlers = require('../modules/main/ipc/themeHandlers');
 const emoticonHandlers = require('../modules/main/ipc/emoticonHandlers');
 const fileManager = require('../modules/main/fileManager');
+const knowledgeBase = require('../modules/main/knowledge-base');
 const SettingsManager = require('../modules/main/utils/appSettingsManager');
 const AgentConfigManager = require('../modules/main/utils/agentConfigManager');
 const { PRELOAD_ROLES, resolveProjectPreload } = require('../modules/main/services/preloadPaths');
@@ -277,6 +336,12 @@ async function bootstrap() {
     agentConfigManager.startCleanupTimer();
 
     fileManager.initializeFileManager(USER_DATA_DIR, AGENT_DIR);
+    await knowledgeBase.initializeKnowledgeBase({
+        dataRoot: APP_DATA_ROOT_IN_PROJECT,
+        settingsManager,
+        agentConfigManager,
+        agentDir: AGENT_DIR,
+    });
 
     registerWindowHandlers();
     registerWatcherHandlers();
@@ -315,6 +380,15 @@ async function bootstrap() {
         APP_DATA_ROOT_IN_PROJECT,
         fileWatcher,
         settingsManager,
+        agentConfigManager,
+    });
+
+    knowledgeBaseHandlers.initialize({
+        agentConfigManager,
+    });
+
+    notesHandlers.initialize({
+        APP_DATA_ROOT_IN_PROJECT,
         agentConfigManager,
     });
 
@@ -359,4 +433,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     fileWatcher.stopWatching();
+    void knowledgeBase.shutdownKnowledgeBase().catch((error) => {
+        console.warn('[LiteBootstrap] Failed to shutdown knowledge base cleanly:', error?.message || error);
+    });
 });

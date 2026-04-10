@@ -442,13 +442,13 @@ function initialize(context) {
                     temperature: 0.7,
                     contextTokenLimit: 1000000,
                     maxOutputTokens: 60000,
-                    topics: [{ id: "default", name: "主要对话", createdAt: Date.now() }],
+                    topics: [{ id: "default", name: "主要对话", createdAt: Date.now(), knowledgeBaseId: null }],
                     disableCustomColors: true,  // 默认启用：禁用自定义颜色（使用主题默认颜色）
                     useThemeColorsInChat: true  // 默认启用：会话中使用主题颜色
                 };
             }
             if (!configToSave.topics || !Array.isArray(configToSave.topics) || configToSave.topics.length === 0) {
-                configToSave.topics = [{ id: "default", name: "主要对话", createdAt: Date.now() }];
+                configToSave.topics = [{ id: "default", name: "主要对话", createdAt: Date.now(), knowledgeBaseId: null }];
             }
 
             if (agentConfigManager) {

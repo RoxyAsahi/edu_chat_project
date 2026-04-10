@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 function command(value) {
     return { kind: 'command', value };
@@ -40,6 +40,13 @@ function createOps() {
             dirname: (filePath) => ipcRenderer.invoke('path:dirname', filePath),
             extname: (filePath) => ipcRenderer.invoke('path:extname', filePath),
             basename: (filePath) => ipcRenderer.invoke('path:basename', filePath),
+            getPathForFile: (file) => {
+                try {
+                    return webUtils.getPathForFile(file);
+                } catch (_error) {
+                    return '';
+                }
+            },
         },
     };
 }

@@ -1,0 +1,390 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "real-data",
+  "dataRoot": "C:\\VCP\\Eric\\VCPChatLite\\AppData",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-AvmPuA",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-real-data-20260410-0555.json",
+  "targetAgentId": "Lite_Real_Test_Nova_1775682726542",
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "real-single",
+      "label": "真实单文件测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775771714191",
+      "topicName": "真实单文件测试-20260410-0555",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771714191\\history.json",
+      "uploadedFiles": [
+        "unistudy-20260410-0555-newton-source.txt"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775771726066_57d7f65b",
+          "name": "unistudy-20260410-0555-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771726971
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据当前来源回答：资料编号 NEWTON-101 对应的知识点是什么？",
+          "expectedDocuments": [
+            "unistudy-20260410-0555-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0555-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0555-newton-source.txt"
+          ],
+          "answerPreview": "📂 资料溯源与解析：NEWTON-101\n    \n主人，根据刚才检索到的知识",
+          "kbRefCount": 1,
+          "keywordOk": false,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": false
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-0555",
+      "kbId": "kb_1775771723553_7c9866a6",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-0555",
+      "uploadOk": false,
+      "persistedHistoryCount": 2,
+      "persistedAssistantKbRefs": 1,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0555-newton-source.txt"
+      ],
+      "passed": false
+    },
+    {
+      "id": "real-multi",
+      "label": "真实多文件测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775771748507",
+      "topicName": "真实多文件测试-20260410-0555",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771748507\\history.json",
+      "uploadedFiles": [
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "unistudy-20260410-0555-ohm-law.txt",
+        "unistudy-20260410-0555-pythagorean.md"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775771761114_17f3b845",
+          "name": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "status": "failed",
+          "chunkCount": 0,
+          "contentType": null,
+          "attemptCount": 1,
+          "lastError": "input batch size 176 > maximum allowed batch size 64",
+          "completedAt": null
+        },
+        {
+          "id": "kbdoc_1775771761139_f0637956",
+          "name": "unistudy-20260410-0555-ohm-law.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771766075
+        },
+        {
+          "id": "kbdoc_1775771763624_6db081e0",
+          "name": "unistudy-20260410-0555-pythagorean.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771766615
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据 PDF 资料回答：这个项目手册对应的是第几届活动？",
+          "expectedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "expectedAnyKeywords": [
+            "第五届"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [],
+          "referenceDocuments": [
+            "unistudy-20260410-0555-ohm-law.txt",
+            "unistudy-20260410-0555-pythagorean.md"
+          ],
+          "answerPreview": "主人，您好！我是 Nova。\n刚才我为您检索了知识库中的相关资料，但遗憾的是，在现有的 unistudy-20260410-0555-ohm-law.txt（欧姆定律）和 unistudy-20260410-0555-pythagorean.md（勾股定理）这两份文件中，并没有包含关于“项目手册”或“活动届次”的相关信息。\n\n\n为了能准确回答您的问题，请问您方便提供一下那份项目手册的文件路径或者名称吗？或者，您可以直接把手册的内容发给我，我一定立刻为您查阅！\nKB 引用unistudy-20260410-0555-ohm-law.txt · score 0.0004 · vec 0.3722 · rerank 0.0004unistudy-20260410-0555-pythagorean.md · score 0.0002 · vec 0.3765 · rerank 0.0002\n主人，您好！我是 Nova。\n\n刚才我为您检索了知识库中的相关资料，但遗憾的是，在现有的 `unistudy-20260410-0555-ohm-law.txt`（欧姆定律）和 `unistudy-2026",
+          "kbRefCount": 2,
+          "keywordOk": false,
+          "documentOk": false,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": false
+        },
+        {
+          "prompt": "请根据来源回答：资料编号 OHM-204 对应的知识点和关键公式是什么？",
+          "expectedDocuments": [
+            "unistudy-20260410-0555-ohm-law.txt"
+          ],
+          "expectedAnyKeywords": [
+            "欧姆定律",
+            "i=u/r"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0555-ohm-law.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0555-ohm-law.txt",
+            "unistudy-20260410-0555-pythagorean.md"
+          ],
+          "answerPreview": "📂 系统组件：[VCP-Visual-Synesthesia] (视觉通感协议)\n\n\n⚡ 资料检索结果：OHM-204\n\n    \n\n核心知识点： 欧",
+          "kbRefCount": 2,
+          "keywordOk": false,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": false
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实多文件测试-20260410-0555",
+      "kbId": "kb_1775771758606_88a5e0e5",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实多文件测试-20260410-0555",
+      "uploadOk": false,
+      "persistedHistoryCount": 4,
+      "persistedAssistantKbRefs": 2,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0555-ohm-law.txt",
+        "unistudy-20260410-0555-pythagorean.md"
+      ],
+      "passed": false
+    },
+    {
+      "id": "real-pressure",
+      "label": "真实中等压力测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775771791944",
+      "topicName": "真实压力测试-20260410-0555",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771791944\\history.json",
+      "uploadedFiles": [
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "unistudy-20260410-0555-newton-source.txt",
+        "unistudy-20260410-0555-ohm-law.txt",
+        "unistudy-20260410-0555-pythagorean.md",
+        "unistudy-20260410-0555-photosynthesis.txt",
+        "unistudy-20260410-0555-chemistry-review.md",
+        "unistudy-20260410-0555-industrial-history.txt",
+        "unistudy-20260410-0555-english-reading.md"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775771805118_171aaa11",
+          "name": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "status": "failed",
+          "chunkCount": 0,
+          "contentType": null,
+          "attemptCount": 1,
+          "lastError": "input batch size 176 > maximum allowed batch size 64",
+          "completedAt": null
+        },
+        {
+          "id": "kbdoc_1775771805142_13c53a49",
+          "name": "unistudy-20260410-0555-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771808514
+        },
+        {
+          "id": "kbdoc_1775771806394_5754db77",
+          "name": "unistudy-20260410-0555-ohm-law.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771809064
+        },
+        {
+          "id": "kbdoc_1775771806426_68c074a0",
+          "name": "unistudy-20260410-0555-pythagorean.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771809605
+        },
+        {
+          "id": "kbdoc_1775771806454_d877e4ff",
+          "name": "unistudy-20260410-0555-photosynthesis.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771810145
+        },
+        {
+          "id": "kbdoc_1775771806477_8dbdc536",
+          "name": "unistudy-20260410-0555-chemistry-review.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771810685
+        },
+        {
+          "id": "kbdoc_1775771806497_38fbc27b",
+          "name": "unistudy-20260410-0555-industrial-history.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771811221
+        },
+        {
+          "id": "kbdoc_1775771806520_0920c79b",
+          "name": "unistudy-20260410-0555-english-reading.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775771811758
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据来源回答：资料编号 NEWTON-101 对应的知识点是什么？",
+          "expectedDocuments": [
+            "unistudy-20260410-0555-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0555-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0555-newton-source.txt",
+            "unistudy-20260410-0555-pythagorean.md",
+            "unistudy-20260410-0555-photosynthesis.txt",
+            "unistudy-20260410-0555-ohm-law.txt",
+            "unistudy-20260410-0555-english-reading.md",
+            "unistudy-20260410-0555-chemistry-review.md"
+          ],
+          "answerPreview": "📚 知识溯源报告\n主人，根据您提供的资料库检索，NEWTON-101 对应的知识点为：",
+          "kbRefCount": 6,
+          "keywordOk": false,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": false
+        },
+        {
+          "prompt": "请根据 PDF 来源回答：这个项目手册主要面向什么类型的活动？",
+          "expectedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "expectedAnyKeywords": [
+            "青少年人工智能与编程实践活动",
+            "人工智能与编程实践活动"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [],
+          "referenceDocuments": [
+            "unistudy-20260410-0555-photosynthesis.txt",
+            "unistudy-20260410-0555-newton-source.txt",
+            "unistudy-20260410-0555-industrial-history.txt",
+            "unistudy-20260410-0555-ohm-law.txt",
+            "unistudy-20260410-0555-english-reading.md",
+            "unistudy-20260410-0555-pythagorean.md"
+          ],
+          "answerPreview": "🔍\n\n检索反馈\n\n    \n主人，很抱歉，在您当前提供的知识库索引中，我未能检索到包含“项目手册”关键词的具体文件内容。\n    \n\n当前知识库已检索范围：\n\n光合作用 (BIO-410)\n牛顿第一定律 (NEWTON-101)\n第一次工业",
+          "kbRefCount": 6,
+          "keywordOk": false,
+          "documentOk": false,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": false
+        },
+        {
+          "prompt": "请比较资料编号 OHM-204 和 PYTH-305：它们分别对应什么知识点？",
+          "expectedDocuments": [
+            "unistudy-20260410-0555-ohm-law.txt",
+            "unistudy-20260410-0555-pythagorean.md"
+          ],
+          "expectedAnyKeywords": [],
+          "expectedAllKeywords": [
+            "欧姆定律",
+            "勾股定理"
+          ],
+          "matchedDocuments": [
+            "unistudy-20260410-0555-ohm-law.txt",
+            "unistudy-20260410-0555-pythagorean.md"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0555-photosynthesis.txt",
+            "unistudy-20260410-0555-newton-source.txt",
+            "unistudy-20260410-0555-industrial-history.txt",
+            "unistudy-20260410-0555-ohm-law.txt",
+            "unistudy-20260410-0555-english-reading.md",
+            "unistudy-20260410-0555-pythagorean.md"
+          ],
+          "answerPreview": "🔍\n\n检索反馈\n\n    \n主人，很抱歉，在您当前提供的知识库索引中，我未能检索到包含“项目手册”关键词的具体文件内容。\n    \n\n当前知识库已检索范围：\n\n光合作用 (BIO-410)\n牛顿第一定律 (NEWTON-101)\n第一次工业革命 (HIST-630)\n欧姆定律 (OHM-204)\n英语阅读KB 引用unistudy-20260410-0555-photosynthesis.txt · score 0.0044 · vec 0.3403 · rerank 0.0044unistudy-20260410-0555-newton-source.txt · score 0.0015 · vec 0.3622 · rerank 0.0015unistudy-20260410-0555-industrial-history.txt · score 0.0014 · vec 0.355 · rerank 0.0014unistudy-20260410-0555-ohm-law.txt · score 0.0008 · vec 0.3849 · rerank 0.0008unistu",
+          "kbRefCount": 6,
+          "keywordOk": false,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": false
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实压力测试-20260410-0555",
+      "kbId": "kb_1775771802612_4d2f15ae",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实压力测试-20260410-0555",
+      "uploadOk": false,
+      "persistedHistoryCount": 4,
+      "persistedAssistantKbRefs": 6,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0555-photosynthesis.txt",
+        "unistudy-20260410-0555-newton-source.txt",
+        "unistudy-20260410-0555-industrial-history.txt",
+        "unistudy-20260410-0555-ohm-law.txt",
+        "unistudy-20260410-0555-english-reading.md",
+        "unistudy-20260410-0555-pythagorean.md"
+      ],
+      "passed": false
+    }
+  ],
+  "errors": [],
+  "startedAt": "2026-04-09T21:55:04.851Z",
+  "finishedAt": "2026-04-09T21:59:24.276Z",
+  "success": false
+}

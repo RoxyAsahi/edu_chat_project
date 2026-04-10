@@ -1,0 +1,529 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "real-data",
+  "dataRoot": "C:\\VCP\\Eric\\VCPChatLite\\AppData",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-spcfRJ",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-real-data-20260410-1930.json",
+  "targetAgentId": "Lite_Real_Test_Nova_1775682726542",
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "guideModel": "gemini-3.1-flash-lite-preview",
+    "defaultModel": "gemini-3.1-flash-lite-preview",
+    "lastModel": "gemini-3.1-flash-lite-preview",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "configurationDiagnostics": {
+    "hasVcpApiKey": true,
+    "hasKbApiKey": true
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "real-single",
+      "label": "真实单文件测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775820626985",
+      "topicName": "真实单文件测试-20260410-1930",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775820626985\\history.json",
+      "uploadedFiles": [
+        "unistudy-20260410-1930-newton-source.txt"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775820638635_c6358a1d",
+          "name": "unistudy-20260410-1930-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820639479
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据当前来源回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260410-1930-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-1930-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-1930-newton-source.txt"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用\n            unistudy-20260410-1930-newton-source.txt\n            点击回到阅读区\n            资料编号：NEWTON-101 资料主题：牛顿第一定律。 核心内容：当一个物体不受外力作用时，它将保持静止状态或匀速直线运动状态。 测试问题：请根据资料说明 NEWTON-101 对应的知识点是什么。\n            score 0.6509 · vec 0.6509\n牛顿第一定律",
+          "kbRefCount": 1,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "guideAssertions": [
+        {
+          "targetFile": "unistudy-20260410-1930-newton-source.txt",
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "NEWTON-101"
+          ],
+          "expectedAllKeywords": [],
+          "guideStatus": "done",
+          "guideError": null,
+          "guideGeneratedAt": 1775820643669,
+          "guideContentLength": 350,
+          "guidePreview": "# 文档主题\n\n牛顿第一定律（惯性定律）。\n\n# 资料概览\n\n本资料（NEWTON-101）简要阐述了牛顿第一定律的核心定义，明确了物体在不受外力作用时的运动状态规律。\n\n# 关键知识点\n\n*   **定义**：当物体不受外力作用时，其运动状态保持不变。\n*   **状态表现**：物体将保持静止状态或匀速直线运动状态。\n\n# 章节导航\n\n*   **第 1 段**：牛顿第一定律的定义与运动状态描述。\n\n# 推荐阅读路径\n\n*   **第 1 段**：阅读并理解“不受外力”与“静止/匀速直线运动”之间的逻辑关系。\n\n# 可直接提问的问题\n\n*   牛顿第一定律的核心内容是什么？\n*   当物体不受外力作用时，它可能处于哪两种运动状态？\n*   NEWTON-101 资料主要探讨了哪条物理定律？",
+          "uiGuidePreview": "",
+          "uiGuideStatusBadge": "指南生成中",
+          "keywordOk": true,
+          "contentLengthOk": true,
+          "readerUiOk": true,
+          "cacheOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-1930",
+      "kbId": "kb_1775820636098_2ab14a4e",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-1930",
+      "uploadOk": true,
+      "persistedHistoryCount": 2,
+      "persistedAssistantKbRefs": 1,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-1930-newton-source.txt"
+      ],
+      "persistedLatestAssistantContentLength": 6,
+      "passed": true
+    },
+    {
+      "id": "real-multi",
+      "label": "真实多文件测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775820657117",
+      "topicName": "真实多文件测试-20260410-1930",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775820657117\\history.json",
+      "uploadedFiles": [
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "unistudy-20260410-1930-ohm-law.txt",
+        "unistudy-20260410-1930-pythagorean.md"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775820668303_486cb644",
+          "name": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "status": "done",
+          "chunkCount": 176,
+          "contentType": "pdf-text",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820677780
+        },
+        {
+          "id": "kbdoc_1775820668331_a705907f",
+          "name": "unistudy-20260410-1930-ohm-law.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820678250
+        },
+        {
+          "id": "kbdoc_1775820669514_a79511c0",
+          "name": "unistudy-20260410-1930-pythagorean.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820678701
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据 PDF 资料回答：这个项目手册标题里写的是第几届活动？请只回答届数。",
+          "expectedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "expectedAnyKeywords": [
+            "第五届"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "referenceDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "第五届\nKB 引用\n            第五届上海市青少年人工智能与编程实践活动项目手册.pdf\n            第 2 页 · 第 2 段\n            .................................................................................. 29 2.Yocoding专项 ....................................................................................\n            score 0.7239 · vec 0.5881 · rerank 0.7239\n        \n            第五届上海市青少年人工智能与编程实践活动项目手册.pdf\n            第 2 页 · 第 2 段\n            ....... 44 3.“可持续发展”项目 ..............................................................",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        },
+        {
+          "prompt": "请根据来源回答：资料编号 OHM-204 对应的知识点和关键公式。请简洁作答。",
+          "expectedDocuments": [
+            "unistudy-20260410-1930-ohm-law.txt"
+          ],
+          "expectedAnyKeywords": [
+            "欧姆定律",
+            "i=u/r",
+            "i=u / r",
+            "i = u / r"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-1930-ohm-law.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-1930-ohm-law.txt",
+            "unistudy-20260410-1930-pythagorean.md",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "知识点：欧姆定律关键公式：I=U/R\nKB 引用\n            unistudy-20260410-1930-ohm-law.txt\n            点击回到阅读区\n            资料编号：OHM-204 知识点：欧姆定律。 关键公式：I=U/R。 学科方向：电学基础。\n            score 0.9983 · vec 0.7166 · rerank 0.9983\n        \n            unistudy-20260410-1930-pythagorean.md\n            # 资料编号：PYTH-305\n            # 资料编号：PYTH-305 知识点：勾股定理。 核心关系：直角三角形中 a^2 + b^2 = c^2。 学科方向：平面几何。\n            score 0.0881 · vec 0.5251 · rerank 0.0881\n        \n            第五届上海市青少年人工智能与编程实践活动项目手册.pdf\n            第 39 页 · 第 39 段",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "guideAssertions": [
+        {
+          "targetFile": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "expectedAnyKeywords": [
+            "第五届",
+            "人工智能",
+            "项目手册"
+          ],
+          "expectedAllKeywords": [],
+          "guideStatus": "done",
+          "guideError": null,
+          "guideGeneratedAt": 1775820731331,
+          "guideContentLength": 1509,
+          "guidePreview": "# 文档主题\n\n本手册为《第五届上海市青少年人工智能与编程实践活动》的官方指南，旨在规范青少年参与人工智能、编程实践、机器人竞技及科创展示类活动的流程、标准与技术要求。\n\n# 资料概览\n\n本手册系统涵盖了从报名通道、项目申报、创作记录到比赛现场规则、器材限制及申诉流程的全方位指导。内容分为五大板块：\n*   **创作类项目**：包含 AI 绘画、AI 短视频、创新实践及 TED 秀。\n*   **科创类项目**：涵盖课题研究、智科探、可持续发展及科技馆探秘。\n*   **机器人专项**：涉及“智能协同”及“和而不同”、“狭路相逢”、“文明破晓”等主题竞赛。\n*   **技术与合规要求**：详述了硬件清单、开源器材限制及AI辅助工具的申报规范。\n*   **管理与评价**：明确了评审流程、匿名原则、违规惩处及申诉机制。\n\n# 关键知识点\n\n*   **诚信与 AI 使用规范**：严禁抄袭与代做。若使用 AI 辅助（如 ChatGPT、AI 绘图），必须披露工具名称、用途及修改环节。\n*   **创作过程记录**：AI 类项目强制要求提交“创作迭代记录”（不少于 3 轮），侧重考察思维逻辑",
+          "uiGuidePreview": "文档主题\n本手册为《第五届上海市青少年人工智能与编程实践活动》的官方指南，旨在规范青少年参与人工智能、编程实践、机器人竞技及科创展示类活动的流程、标准与技术要求。\n资料概览\n本手册系统涵盖了从报名通道、项目申报、创作记录到比赛现场规则、器材限制及申诉流程的全方位指导。内容分为五大板块：\n\n创作类项目：包含 AI 绘画、AI 短视频、创新实践及 TED 秀。\n科创类项目：涵盖课题研究、智科探、可持续发展及科技馆探秘。\n机器人专项：涉及“智能协同”及“和而不同”、“狭路相逢”、“文明破晓”等主题竞赛。\n技术与合规要求：详述了硬件清单、开源器材限制及AI辅助工具的申报规范。\n管理与评价：明确了评审流程、匿名原则、违规惩处及申诉机制。\n\n关键知识点\n\n诚信与 AI 使用规范：严禁抄袭与代做。若使用 AI 辅助（如 ChatGPT、AI 绘图），必须披露工具名称、用途及修改环节。\n创作过程记录：AI 类项目强制要求提交“创作迭代记录”（不少于 3 轮），侧重考察思维逻辑而非最终成品。\n匿名评审原则：所有提交的报告、视频与作品材料中，严禁出现姓名、学校、教师等个人身份信息。\n硬件器材“清单制”：机器人及开源硬件项目有严格的器材清单与规格限制（如电机数量、电压等级、塑料拼插要求等）。\n评价维度：采用多维评分体系，核心包含：创新性（25%）、技术应用（25%）、规范性（15%）、团队协作/展示（20%）及结构实现（15%）。\n报名双通道：分为“组织报名”（截止 2026 年 5 月 8 日）与“个人报名”（截止 2026 年 5 月 15 日）。\n\n章节导航\n\n项目设置与要求（第 1-3 页）：涵盖创新实践、AI 创作、开源硬件及科创系列项目。\n机器人专项规则（第 4-5 页）：涉及“智能协同”及“文明破晓”等任务赛项规则。\n赛事执行规范（第 5 页）：标准类与启蒙类机器人的技术规格及赛场",
+          "uiGuideStatusBadge": "指南已生成",
+          "keywordOk": true,
+          "contentLengthOk": true,
+          "readerUiOk": true,
+          "cacheOk": true,
+          "passed": true
+        },
+        {
+          "targetFile": "unistudy-20260410-1930-ohm-law.txt",
+          "expectedAnyKeywords": [
+            "欧姆定律",
+            "OHM-204",
+            "I=U/R"
+          ],
+          "expectedAllKeywords": [],
+          "guideStatus": "done",
+          "guideError": null,
+          "guideGeneratedAt": 1775820737268,
+          "guideContentLength": 440,
+          "guidePreview": "# 文档主题\n\n欧姆定律及其基础计算公式。\n\n# 资料概览\n\n本文档为电学基础资料（编号：OHM-204），重点阐述了欧姆定律的核心定义及计算公式，是理解电路基础行为的入门指南。\n\n# 关键知识点\n\n*   **欧姆定律定义**：描述电压、电流与电阻之间关系的电学定律。\n*   **核心公式**：$I = U / R$\n    *   $I$ 代表电流\n    *   $U$ 代表电压\n    *   $R$ 代表电阻\n\n# 章节导航\n\n*   第 1 段：欧姆定律的定义、学科归类及核心计算公式。\n\n# 推荐阅读路径\n\n*   **第一步**：阅读第 1 段，掌握欧姆定律的基本概念。\n*   **第二步**：重点记忆核心公式 $I = U / R$ 并理解各符号代表的物理量。\n\n# 可直接提问的问题\n\n*   欧姆定律的计算公式是什么？\n*   在 $I = U / R$ 这个公式中，字母 $I$、$U$、$R$ 分别代表什么？\n*   这份资料主要属于哪门学科方向？",
+          "uiGuidePreview": "",
+          "uiGuideStatusBadge": "指南生成中",
+          "keywordOk": true,
+          "contentLengthOk": true,
+          "readerUiOk": true,
+          "cacheOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实多文件测试-20260410-1930",
+      "kbId": "kb_1775820665792_3ec9be01",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实多文件测试-20260410-1930",
+      "uploadOk": true,
+      "persistedHistoryCount": 4,
+      "persistedAssistantKbRefs": 6,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-1930-ohm-law.txt",
+        "unistudy-20260410-1930-pythagorean.md",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+      ],
+      "persistedLatestAssistantContentLength": 19,
+      "passed": true
+    },
+    {
+      "id": "real-pressure",
+      "label": "真实中等压力测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775820760111",
+      "topicName": "真实压力测试-20260410-1930",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775820760111\\history.json",
+      "uploadedFiles": [
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "unistudy-20260410-1930-newton-source.txt",
+        "unistudy-20260410-1930-ohm-law.txt",
+        "unistudy-20260410-1930-pythagorean.md",
+        "unistudy-20260410-1930-photosynthesis.txt",
+        "unistudy-20260410-1930-chemistry-review.md",
+        "unistudy-20260410-1930-industrial-history.txt",
+        "unistudy-20260410-1930-english-reading.md"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775820771146_a99bb96a",
+          "name": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "status": "done",
+          "chunkCount": 176,
+          "contentType": "pdf-text",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820780399
+        },
+        {
+          "id": "kbdoc_1775820771176_f43fb2a1",
+          "name": "unistudy-20260410-1930-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820780882
+        },
+        {
+          "id": "kbdoc_1775820771183_a6263531",
+          "name": "unistudy-20260410-1930-ohm-law.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820781348
+        },
+        {
+          "id": "kbdoc_1775820772203_9d20609c",
+          "name": "unistudy-20260410-1930-pythagorean.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820781819
+        },
+        {
+          "id": "kbdoc_1775820772215_d770e1e3",
+          "name": "unistudy-20260410-1930-photosynthesis.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820782305
+        },
+        {
+          "id": "kbdoc_1775820772223_e9b83d29",
+          "name": "unistudy-20260410-1930-chemistry-review.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820782775
+        },
+        {
+          "id": "kbdoc_1775820772232_b366daf9",
+          "name": "unistudy-20260410-1930-industrial-history.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820783247
+        },
+        {
+          "id": "kbdoc_1775820772241_73f25420",
+          "name": "unistudy-20260410-1930-english-reading.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775820783752
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据来源回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260410-1930-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-1930-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-1930-newton-source.txt",
+            "unistudy-20260410-1930-ohm-law.txt",
+            "unistudy-20260410-1930-english-reading.md",
+            "unistudy-20260410-1930-pythagorean.md",
+            "unistudy-20260410-1930-chemistry-review.md",
+            "unistudy-20260410-1930-industrial-history.txt"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用\n            unistudy-20260410-1930-newton-source.txt\n            点击回到阅读区\n            资料编号：NEWTON-101 资料主题：牛顿第一定律。 核心内容：当一个物体不受外力作用时，它将保持静止状态或匀速直线运动状态。 测试问题：请根据资料说明 NEWTON-101 对应的知识点是什么。\n            score 0.9996 · vec 0.648 · rerank 0.9996\n        \n            unistudy-20260410-1930-ohm-law.txt\n            点击回到阅读区\n            资料编号：OHM-204 知识点：欧姆定律。 关键公式：I=U/R。 学科方向：电学基础。\n            score 0.0294 · vec 0.5701 · rerank 0.0294\n        \n            unistudy-20260410-1930-english-reading.",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        },
+        {
+          "prompt": "请根据 PDF 来源回答：这个项目手册标题里写的是第几届活动？请只回答届数。",
+          "expectedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "expectedAnyKeywords": [
+            "第五届"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "referenceDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "第五届\nKB 引用\n            第五届上海市青少年人工智能与编程实践活动项目手册.pdf\n            第 2 页 · 第 2 段\n            .................................................................................. 29 2.Yocoding专项 ....................................................................................\n            score 0.6986 · vec 0.5886 · rerank 0.6986\n        \n            第五届上海市青少年人工智能与编程实践活动项目手册.pdf\n            第 2 页 · 第 2 段\n            ....... 44 3.“可持续发展”项目 ..............................................................",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        },
+        {
+          "prompt": "请比较资料编号 OHM-204 和 PYTH-305：它们分别对应什么知识点？请用“OHM-204=...；PYTH-305=...”格式回答。",
+          "expectedDocuments": [
+            "unistudy-20260410-1930-ohm-law.txt",
+            "unistudy-20260410-1930-pythagorean.md"
+          ],
+          "expectedAnyKeywords": [],
+          "expectedAllKeywords": [
+            "欧姆定律",
+            "勾股定理"
+          ],
+          "matchedDocuments": [
+            "unistudy-20260410-1930-ohm-law.txt",
+            "unistudy-20260410-1930-pythagorean.md"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-1930-ohm-law.txt",
+            "unistudy-20260410-1930-pythagorean.md",
+            "unistudy-20260410-1930-chemistry-review.md",
+            "unistudy-20260410-1930-newton-source.txt",
+            "unistudy-20260410-1930-english-reading.md",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "OHM-204=欧姆定律；PYTH-305=勾股定理\nKB 引用\n            unistudy-20260410-1930-ohm-law.txt\n            点击回到阅读区\n            资料编号：OHM-204 知识点：欧姆定律。 关键公式：I=U/R。 学科方向：电学基础。\n            score 0.9497 · vec 0.5853 · rerank 0.9497\n        \n            unistudy-20260410-1930-pythagorean.md\n            # 资料编号：PYTH-305\n            # 资料编号：PYTH-305 知识点：勾股定理。 核心关系：直角三角形中 a^2 + b^2 = c^2。 学科方向：平面几何。\n            score 0.8826 · vec 0.4663 · rerank 0.8826\n        \n            unistudy-20260410-1930-chemistry-review.md\n     ",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "guideAssertions": [
+        {
+          "targetFile": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "expectedAnyKeywords": [
+            "第五届",
+            "人工智能",
+            "项目手册"
+          ],
+          "expectedAllKeywords": [],
+          "guideStatus": "done",
+          "guideError": null,
+          "guideGeneratedAt": 1775820845682,
+          "guideContentLength": 1431,
+          "guidePreview": "# 文档主题\n\n本手册旨在指导学生参与“第五届上海市青少年人工智能与编程实践活动”，涵盖了从人工智能创新实践、机器人竞技到开源硬件编程等多个赛项的参赛规则、技术规范、评价指标及材料申报流程。\n\n# 资料概览\n\n本手册是参赛者的核心参考指南，包含以下核心维度：\n*   **项目分类**：涵盖人工智能（创新、绘画、短视频）、编程（Python/C++/图形化）、机器人竞赛（标准/启蒙）及科创课题。\n*   **合规性要求**：强调原创性、AI工具使用透明度（需披露模型与提示词）、知识产权保护及现场竞技规范。\n*   **操作指引**：明确了报名渠道（组织 vs 个人）、截止日期（2026年5月）、申报材料模版及详细的硬件器材限制。\n*   **评价逻辑**：建立了涵盖技术实现、创新性、过程记录及现场答辩的综合评分体系。\n\n# 关键知识点\n\n*   **AI 使用规范**：AI 辅助创作（如绘画、视频、代码）必须申报所用模型及提示词。严禁直接使用随机生成结果，必须展示“版本迭代”与“Prompt 调整思路”。\n*   **过程记录要求**：所有项目需提交完整的过程记录（PDF格式），强调真实",
+          "uiGuidePreview": "文档主题\n本手册旨在指导学生参与“第五届上海市青少年人工智能与编程实践活动”，涵盖了从人工智能创新实践、机器人竞技到开源硬件编程等多个赛项的参赛规则、技术规范、评价指标及材料申报流程。\n资料概览\n本手册是参赛者的核心参考指南，包含以下核心维度：\n\n项目分类：涵盖人工智能（创新、绘画、短视频）、编程（Python/C++/图形化）、机器人竞赛（标准/启蒙）及科创课题。\n合规性要求：强调原创性、AI工具使用透明度（需披露模型与提示词）、知识产权保护及现场竞技规范。\n操作指引：明确了报名渠道（组织 vs 个人）、截止日期（2026年5月）、申报材料模版及详细的硬件器材限制。\n评价逻辑：建立了涵盖技术实现、创新性、过程记录及现场答辩的综合评分体系。\n\n关键知识点\n\nAI 使用规范：AI 辅助创作（如绘画、视频、代码）必须申报所用模型及提示词。严禁直接使用随机生成结果，必须展示“版本迭代”与“Prompt 调整思路”。\n过程记录要求：所有项目需提交完整的过程记录（PDF格式），强调真实参与度。科创类报告严禁出现个人身份信息，需遵循逻辑严谨的撰写规范。\n硬件与竞技限制：\n机器人项目严格限制电机数量、控制器接口及电池电压。\n现场竞赛禁止上网及私自联系外界，且严禁使用胶水、3D打印件等非规格内材料。\n\n\n评价核心：评审不仅看重最终作品，更关注“解决实际问题的能力”、“技术应用的合理性”及“现场答辩的逻辑性”。\n报名与申诉：分为组织和个人两个通道。如有异议，需在结果公布后 7 日内书面提出。\n\n章节导航\n\n第 1-2 页：活动类别概览、报名机制（组织/个人）、AI 使用透明度准则。\n第 3-4 页：各专项（智学未来、编程、科创系列）的技术指标与评价维度。\n第 5-6 页：机器人竞赛具体规则（任务目标、硬件尺寸、计分细则、排名逻辑）。\n第 7-8 页：申报表格、创作记录模版、硬件器材限制清单及",
+          "uiGuideStatusBadge": "指南已生成",
+          "keywordOk": true,
+          "contentLengthOk": true,
+          "readerUiOk": true,
+          "cacheOk": true,
+          "passed": true
+        },
+        {
+          "targetFile": "unistudy-20260410-1930-pythagorean.md",
+          "expectedAnyKeywords": [
+            "勾股定理",
+            "PYTH-305"
+          ],
+          "expectedAllKeywords": [],
+          "guideStatus": "done",
+          "guideError": null,
+          "guideGeneratedAt": 1775820860277,
+          "guideContentLength": 468,
+          "guidePreview": "# 文档主题\n\n勾股定理（Pythagorean Theorem）的基础定义与核心数学关系。\n\n# 资料概览\n\n本资料（编号：PYTH-305）简要介绍了平面几何中勾股定理的数学表达式及其适用范围，重点阐述了直角三角形三条边之间的定量关系。\n\n# 关键知识点\n\n*   **勾股定理定义**：在直角三角形中，两条直角边（a 和 b）的平方和等于斜边（c）的平方。\n*   **数学公式**：$a^2 + b^2 = c^2$。\n*   **适用领域**：平面几何。\n\n# 章节导航\n\n*   **第 1-2 段**：勾股定理的定义、公式表达及学科背景。\n\n# 推荐阅读路径\n\n1.  **第 1 段**：了解勾股定理的学科方向及核心定义。\n2.  **第 2 段**：掌握勾股定理的数学公式 $a^2 + b^2 = c^2$ 及其各变量代表的几何意义。\n\n# 可直接提问的问题\n\n*   勾股定理适用于哪种类型的三角形？\n*   在公式 $a^2 + b^2 = c^2$ 中，字母 c 代表什么？\n*   勾股定理属于哪个数学分支？",
+          "uiGuidePreview": "",
+          "uiGuideStatusBadge": "指南生成中",
+          "keywordOk": true,
+          "contentLengthOk": true,
+          "readerUiOk": true,
+          "cacheOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实压力测试-20260410-1930",
+      "kbId": "kb_1775820768612_d2aa71b5",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实压力测试-20260410-1930",
+      "uploadOk": true,
+      "persistedHistoryCount": 6,
+      "persistedAssistantKbRefs": 6,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-1930-ohm-law.txt",
+        "unistudy-20260410-1930-pythagorean.md",
+        "unistudy-20260410-1930-chemistry-review.md",
+        "unistudy-20260410-1930-newton-source.txt",
+        "unistudy-20260410-1930-english-reading.md",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+      ],
+      "persistedLatestAssistantContentLength": 26,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "startedAt": "2026-04-10T11:30:18.145Z",
+  "skips": [],
+  "finishedAt": "2026-04-10T11:34:55.683Z",
+  "success": true
+}

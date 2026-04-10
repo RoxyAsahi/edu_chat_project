@@ -1329,6 +1329,60 @@ async function renderAttachments(message, contentDiv) {
     }
 }
 
+function renderKnowledgeBaseRefs(message, contentDiv) {
+    if (!Array.isArray(message?.kbContextRefs) || message.kbContextRefs.length === 0) {
+        return;
+    }
+
+    const refsContainer = document.createElement('div');
+    refsContainer.className = 'message-kb-refs';
+
+    const title = document.createElement('div');
+    title.className = 'message-kb-refs__title';
+    title.textContent = 'KB 引用';
+    refsContainer.appendChild(title);
+
+    message.kbContextRefs.forEach((ref) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'message-kb-refs__item';
+        const scoreParts = [];
+        if (typeof ref.score === 'number') {
+            scoreParts.push(`score ${ref.score}`);
+        }
+        if (typeof ref.vectorScore === 'number') {
+            scoreParts.push(`vec ${ref.vectorScore}`);
+        }
+        if (typeof ref.rerankScore === 'number') {
+            scoreParts.push(`rerank ${ref.rerankScore}`);
+        }
+        const locationParts = [];
+        if (ref.pageNumber !== null && ref.pageNumber !== undefined && Number.isFinite(Number(ref.pageNumber))) {
+            locationParts.push(`第 ${Number(ref.pageNumber)} 页`);
+        }
+        if (ref.paragraphIndex !== null && ref.paragraphIndex !== undefined && Number.isFinite(Number(ref.paragraphIndex))) {
+            locationParts.push(`第 ${Number(ref.paragraphIndex)} 段`);
+        }
+        if (ref.sectionTitle) {
+            locationParts.push(String(ref.sectionTitle));
+        }
+        item.innerHTML = `
+            <strong>${escapeHtml(ref.documentName || ref.documentId || '未知文档')}</strong>
+            <span>${escapeHtml(locationParts.join(' · ') || '点击回到阅读区')}</span>
+            ${ref.snippet ? `<span>${escapeHtml(ref.snippet)}</span>` : ''}
+            ${scoreParts.length > 0 ? `<span>${escapeHtml(scoreParts.join(' · '))}</span>` : ''}
+        `;
+        item.addEventListener('click', () => {
+            document.dispatchEvent(new CustomEvent('unistudy-open-kb-ref', {
+                detail: ref,
+            }));
+        });
+        refsContainer.appendChild(item);
+    });
+
+    contentDiv.appendChild(refsContainer);
+}
+
 async function renderMessage(message, isInitialLoad = false, appendToDom = true, renderSessionId = getActiveRenderSessionId()) {
     // console.debug('[MessageRenderer renderMessage] Received message:', JSON.parse(JSON.stringify(message)));
     const { chatMessagesDiv, electronAPI, markedInstance, uiHelper } = mainRendererReferences;
@@ -1535,6 +1589,7 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
             }
 
             renderAttachments(message, contentDiv);
+            renderKnowledgeBaseRefs(message, contentDiv);
             contentProcessor.processRenderedContent(contentDiv, globalSettings);
             await renderMermaidDiagrams(contentDiv); // Render mermaid diagrams
 
@@ -1961,7 +2016,10 @@ function updateMessageContent(messageId, newContent) {
     if (messageInHistory) {
         const existingAttachments = contentDiv.querySelector('.message-attachments');
         if (existingAttachments) existingAttachments.remove();
+        const existingRefs = contentDiv.querySelector('.message-kb-refs');
+        if (existingRefs) existingRefs.remove();
         renderAttachments({ ...messageInHistory, content: newContent }, contentDiv);
+        renderKnowledgeBaseRefs({ ...messageInHistory, content: newContent }, contentDiv);
     }
 
     // 3. Synchronous processing (KaTeX, buttons, etc.)

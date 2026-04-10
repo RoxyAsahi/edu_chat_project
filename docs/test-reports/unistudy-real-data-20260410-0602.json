@@ -1,0 +1,413 @@
+{
+  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "mode": "real-data",
+  "dataRoot": "C:\\VCP\\Eric\\VCPChatLite\\AppData",
+  "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-bfq3Oz",
+  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-real-data-20260410-0602.json",
+  "targetAgentId": "Lite_Real_Test_Nova_1775682726542",
+  "settings": {
+    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "kbBaseUrl": "http://154.36.184.44:3000",
+    "kbEmbeddingModel": "BAAI/bge-m3",
+    "kbRerankModel": "BAAI/bge-reranker-v2-m3"
+  },
+  "rendererErrors": [],
+  "scenarios": [
+    {
+      "id": "real-single",
+      "label": "真实单文件测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775772137458",
+      "topicName": "真实单文件测试-20260410-0602",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772137458\\history.json",
+      "uploadedFiles": [
+        "unistudy-20260410-0602-newton-source.txt"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775772148719_75e9c6c0",
+          "name": "unistudy-20260410-0602-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772149590
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据当前来源回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260410-0602-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0602-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0602-newton-source.txt"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用unistudy-20260410-0602-newton-source.txt · score 0.6496 · vec 0.6496\n牛顿第一定律",
+          "kbRefCount": 1,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-0602",
+      "kbId": "kb_1775772146265_d3c1ce6d",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实单文件测试-20260410-0602",
+      "uploadOk": true,
+      "persistedHistoryCount": 2,
+      "persistedAssistantKbRefs": 1,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0602-newton-source.txt"
+      ],
+      "persistedLatestAssistantContentLength": 6,
+      "passed": true
+    },
+    {
+      "id": "real-multi",
+      "label": "真实多文件测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775772167656",
+      "topicName": "真实多文件测试-20260410-0602",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772167656\\history.json",
+      "uploadedFiles": [
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "unistudy-20260410-0602-ohm-law.txt",
+        "unistudy-20260410-0602-pythagorean.md"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775772178654_07f63ed9",
+          "name": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "status": "done",
+          "chunkCount": 176,
+          "contentType": "pdf-text",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772188556
+        },
+        {
+          "id": "kbdoc_1775772178680_0f67bded",
+          "name": "unistudy-20260410-0602-ohm-law.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772189058
+        },
+        {
+          "id": "kbdoc_1775772179807_990d4c5e",
+          "name": "unistudy-20260410-0602-pythagorean.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772189577
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据 PDF 资料回答：这个项目手册标题里写的是第几届活动？请只回答届数。",
+          "expectedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "expectedAnyKeywords": [
+            "第五届"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "referenceDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "第五届\nKB 引用第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.7225 · vec 0.5881 · rerank 0.7225第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.7078 · vec 0.5906 · rerank 0.7078第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.6793 · vec 0.5756 · rerank 0.6793第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.6197 · vec 0.5914 · rerank 0.6197第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.6169 · vec 0.6033 · rerank 0.6169第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.5915 · vec 0.5652 · rerank 0.5915\n第五届",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        },
+        {
+          "prompt": "请根据来源回答：资料编号 OHM-204 对应的知识点和关键公式。请简洁作答。",
+          "expectedDocuments": [
+            "unistudy-20260410-0602-ohm-law.txt"
+          ],
+          "expectedAnyKeywords": [
+            "欧姆定律",
+            "i=u/r",
+            "i=u / r",
+            "i = u / r"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0602-ohm-law.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0602-ohm-law.txt",
+            "unistudy-20260410-0602-pythagorean.md",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "知识点：欧姆定律。关键公式：I=U/R。\nKB 引用unistudy-20260410-0602-ohm-law.txt · score 0.9985 · vec 0.7202 · rerank 0.9985unistudy-20260410-0602-pythagorean.md · score 0.0838 · vec 0.5252 · rerank 0.0838第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.0058 · vec 0.4458 · rerank 0.0058第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.0052 · vec 0.4529 · rerank 0.0052第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.0045 · vec 0.4579 · rerank 0.0045第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.0045 · vec 0.4781 · rerank 0.0045\n知识点：欧姆定律。\n关键公式：I=U/R。",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实多文件测试-20260410-0602",
+      "kbId": "kb_1775772176437_1fb1db9c",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实多文件测试-20260410-0602",
+      "uploadOk": true,
+      "persistedHistoryCount": 4,
+      "persistedAssistantKbRefs": 6,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0602-ohm-law.txt",
+        "unistudy-20260410-0602-pythagorean.md",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+      ],
+      "persistedLatestAssistantContentLength": 21,
+      "passed": true
+    },
+    {
+      "id": "real-pressure",
+      "label": "真实中等压力测试",
+      "agentId": "Lite_Real_Test_Nova_1775682726542",
+      "topicId": "topic_1775772221264",
+      "topicName": "真实压力测试-20260410-0602",
+      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772221264\\history.json",
+      "uploadedFiles": [
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+        "unistudy-20260410-0602-newton-source.txt",
+        "unistudy-20260410-0602-ohm-law.txt",
+        "unistudy-20260410-0602-pythagorean.md",
+        "unistudy-20260410-0602-photosynthesis.txt",
+        "unistudy-20260410-0602-chemistry-review.md",
+        "unistudy-20260410-0602-industrial-history.txt",
+        "unistudy-20260410-0602-english-reading.md"
+      ],
+      "uploadedDocuments": [
+        {
+          "id": "kbdoc_1775772231698_00f87d22",
+          "name": "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+          "status": "done",
+          "chunkCount": 176,
+          "contentType": "pdf-text",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772241641
+        },
+        {
+          "id": "kbdoc_1775772231722_b8402f9a",
+          "name": "unistudy-20260410-0602-newton-source.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772242111
+        },
+        {
+          "id": "kbdoc_1775772231776_265f28f7",
+          "name": "unistudy-20260410-0602-ohm-law.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772242566
+        },
+        {
+          "id": "kbdoc_1775772233220_3b6bb396",
+          "name": "unistudy-20260410-0602-pythagorean.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772243015
+        },
+        {
+          "id": "kbdoc_1775772233260_eaa47a8f",
+          "name": "unistudy-20260410-0602-photosynthesis.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772243502
+        },
+        {
+          "id": "kbdoc_1775772233275_e69bbfb1",
+          "name": "unistudy-20260410-0602-chemistry-review.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772243957
+        },
+        {
+          "id": "kbdoc_1775772233296_29fb2e76",
+          "name": "unistudy-20260410-0602-industrial-history.txt",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "plain",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772244417
+        },
+        {
+          "id": "kbdoc_1775772233312_b7daad5e",
+          "name": "unistudy-20260410-0602-english-reading.md",
+          "status": "done",
+          "chunkCount": 1,
+          "contentType": "markdown",
+          "attemptCount": 1,
+          "lastError": null,
+          "completedAt": 1775772244915
+        }
+      ],
+      "retrievalAssertions": [
+        {
+          "prompt": "请根据来源回答：资料编号 NEWTON-101 对应的知识点名称。请直接回答知识点名称。",
+          "expectedDocuments": [
+            "unistudy-20260410-0602-newton-source.txt"
+          ],
+          "expectedAnyKeywords": [
+            "牛顿第一定律",
+            "惯性定律"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "unistudy-20260410-0602-newton-source.txt"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0602-newton-source.txt",
+            "unistudy-20260410-0602-photosynthesis.txt",
+            "unistudy-20260410-0602-english-reading.md",
+            "unistudy-20260410-0602-ohm-law.txt",
+            "unistudy-20260410-0602-pythagorean.md",
+            "unistudy-20260410-0602-chemistry-review.md"
+          ],
+          "answerPreview": "牛顿第一定律\nKB 引用unistudy-20260410-0602-newton-source.txt · score 0.9996 · vec 0.647 · rerank 0.9996unistudy-20260410-0602-photosynthesis.txt · score 0.0375 · vec 0.4449 · rerank 0.0375unistudy-20260410-0602-english-reading.md · score 0.0289 · vec 0.4998 · rerank 0.0289unistudy-20260410-0602-ohm-law.txt · score 0.0287 · vec 0.5744 · rerank 0.0287unistudy-20260410-0602-pythagorean.md · score 0.0235 · vec 0.4732 · rerank 0.0235unistudy-20260410-0602-chemistry-review.md · score 0.0166 · vec 0.5104 · rer",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        },
+        {
+          "prompt": "请根据 PDF 来源回答：这个项目手册标题里写的是第几届活动？请只回答届数。",
+          "expectedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "expectedAnyKeywords": [
+            "第五届"
+          ],
+          "expectedAllKeywords": [],
+          "matchedDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "referenceDocuments": [
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "第五届\nKB 引用第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.6986 · vec 0.5884 · rerank 0.6986第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.6737 · vec 0.5905 · rerank 0.6737第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.6533 · vec 0.5797 · rerank 0.6533第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.5785 · vec 0.5918 · rerank 0.5785第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.575 · vec 0.5652 · rerank 0.575第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.5643 · vec 0.6072 · rerank 0.5643\n第五届",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        },
+        {
+          "prompt": "请比较资料编号 OHM-204 和 PYTH-305：它们分别对应什么知识点？请用“OHM-204=...；PYTH-305=...”格式回答。",
+          "expectedDocuments": [
+            "unistudy-20260410-0602-ohm-law.txt",
+            "unistudy-20260410-0602-pythagorean.md"
+          ],
+          "expectedAnyKeywords": [],
+          "expectedAllKeywords": [
+            "欧姆定律",
+            "勾股定理"
+          ],
+          "matchedDocuments": [
+            "unistudy-20260410-0602-ohm-law.txt",
+            "unistudy-20260410-0602-pythagorean.md"
+          ],
+          "referenceDocuments": [
+            "unistudy-20260410-0602-ohm-law.txt",
+            "unistudy-20260410-0602-pythagorean.md",
+            "unistudy-20260410-0602-chemistry-review.md",
+            "unistudy-20260410-0602-newton-source.txt",
+            "unistudy-20260410-0602-english-reading.md",
+            "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+          ],
+          "answerPreview": "OHM-204=欧姆定律；PYTH-305=勾股定理\nKB 引用unistudy-20260410-0602-ohm-law.txt · score 0.9547 · vec 0.5792 · rerank 0.9547unistudy-20260410-0602-pythagorean.md · score 0.8762 · vec 0.4677 · rerank 0.8762unistudy-20260410-0602-chemistry-review.md · score 0.0309 · vec 0.4874 · rerank 0.0309unistudy-20260410-0602-newton-source.txt · score 0.0127 · vec 0.4339 · rerank 0.0127unistudy-20260410-0602-english-reading.md · score 0.0087 · vec 0.4575 · rerank 0.0087第五届上海市青少年人工智能与编程实践活动项目手册.pdf · score 0.0041 · vec 0.43",
+          "kbRefCount": 6,
+          "keywordOk": true,
+          "documentOk": true,
+          "refCountOk": true,
+          "nonThinkingOk": true,
+          "passed": true
+        }
+      ],
+      "rendererErrors": [],
+      "sourceStatusBefore": "当前 Source：Lite Real Test Nova · 真实压力测试-20260410-0602",
+      "kbId": "kb_1775772229189_80313850",
+      "sourceStatusAfter": "当前 Source：Lite Real Test Nova · 真实压力测试-20260410-0602",
+      "uploadOk": true,
+      "persistedHistoryCount": 6,
+      "persistedAssistantKbRefs": 6,
+      "persistedLatestAssistantRefDocuments": [
+        "unistudy-20260410-0602-ohm-law.txt",
+        "unistudy-20260410-0602-pythagorean.md",
+        "unistudy-20260410-0602-chemistry-review.md",
+        "unistudy-20260410-0602-newton-source.txt",
+        "unistudy-20260410-0602-english-reading.md",
+        "第五届上海市青少年人工智能与编程实践活动项目手册.pdf"
+      ],
+      "persistedLatestAssistantContentLength": 26,
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "startedAt": "2026-04-09T22:02:07.574Z",
+  "skips": [],
+  "finishedAt": "2026-04-09T22:04:36.079Z",
+  "success": true
+}

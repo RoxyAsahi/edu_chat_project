@@ -2,6 +2,13 @@
 const fs = require('fs-extra');
 const path = require('path');
 const { EventEmitter } = require('events');
+const {
+    DEFAULT_KB_EMBEDDING_MODEL,
+    DEFAULT_KB_RERANK_MODEL,
+    DEFAULT_KB_TOP_K,
+    DEFAULT_KB_CANDIDATE_TOP_K,
+    DEFAULT_KB_SCORE_THRESHOLD,
+} = require('../knowledge-base/constants');
 
 class SettingsValidator {
     static validate(settings, defaultSettings) {
@@ -38,6 +45,21 @@ class SettingsValidator {
             validated.sidebarWidth = 260;
             hasIssues = true;
         }
+
+        if (!Number.isFinite(validated.layoutLeftWidth) || validated.layoutLeftWidth < 160 || validated.layoutLeftWidth > 1200) {
+            validated.layoutLeftWidth = 410;
+            hasIssues = true;
+        }
+
+        if (!Number.isFinite(validated.layoutRightWidth) || validated.layoutRightWidth < 220 || validated.layoutRightWidth > 1200) {
+            validated.layoutRightWidth = 400;
+            hasIssues = true;
+        }
+
+        if (!Number.isFinite(validated.layoutLeftTopHeight) || validated.layoutLeftTopHeight < 140 || validated.layoutLeftTopHeight > 1600) {
+            validated.layoutLeftTopHeight = 360;
+            hasIssues = true;
+        }
         
         if (!Array.isArray(validated.networkNotesPaths)) {
             validated.networkNotesPaths = [];
@@ -72,9 +94,23 @@ class SettingsManager extends EventEmitter {
         this.defaultSettings = {
             sidebarWidth: 260,
             notificationsSidebarWidth: 300,
+            layoutLeftWidth: 410,
+            layoutRightWidth: 400,
+            layoutLeftTopHeight: 360,
             userName: 'User',
             vcpServerUrl: '',
             vcpApiKey: '',
+            guideModel: '',
+            defaultModel: '',
+            lastModel: '',
+            kbBaseUrl: '',
+            kbApiKey: '',
+            kbEmbeddingModel: DEFAULT_KB_EMBEDDING_MODEL,
+            kbUseRerank: true,
+            kbRerankModel: DEFAULT_KB_RERANK_MODEL,
+            kbTopK: DEFAULT_KB_TOP_K,
+            kbCandidateTopK: DEFAULT_KB_CANDIDATE_TOP_K,
+            kbScoreThreshold: DEFAULT_KB_SCORE_THRESHOLD,
             vcpLogUrl: '',
             vcpLogKey: '',
             networkNotesPaths: [],

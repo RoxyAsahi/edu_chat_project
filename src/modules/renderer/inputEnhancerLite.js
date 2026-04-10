@@ -99,6 +99,37 @@ function initializeInputEnhancer(refs) {
         notify(`导入附件失败: ${first?.error || '未知错误'}`, 'error');
     };
 
+    const resolveNoteAttachment = async (note) => {
+        if (note?.sourceType === 'topic-note') {
+            if (typeof electronAPI.exportNoteAsAttachment !== 'function') {
+                throw new Error('当前环境不支持导出笔记附件。');
+            }
+
+            const result = await electronAPI.exportNoteAsAttachment({
+                noteId: note.noteId,
+                agentId: note.agentId,
+                topicId: note.topicId,
+            });
+            if (!result?.success || !result.path) {
+                throw new Error(result?.error || '笔记导出失败');
+            }
+
+            return {
+                filePath: result.path,
+                fileName: result.name || note.name,
+            };
+        }
+
+        if (typeof note?.path === 'string' && note.path.trim()) {
+            return {
+                filePath: note.path.trim(),
+                fileName: note.name,
+            };
+        }
+
+        throw new Error('未找到可导入的笔记附件路径。');
+    };
+
     const handlePastedImage = async (imageData, context) => {
         const result = await electronAPI.handleFilePaste(context.agentId, context.topicId, {
             type: 'base64',
@@ -265,7 +296,13 @@ function initializeInputEnhancer(refs) {
         }
 
         hideNoteSuggestions();
-        await importPathAttachment(note.path, note.name, context);
+        try {
+            const attachment = await resolveNoteAttachment(note);
+            await importPathAttachment(attachment.filePath, attachment.fileName, context);
+        } catch (error) {
+            console.error('[LiteInputEnhancer] Failed to import note suggestion:', error);
+            notify(`导入笔记失败: ${error.message}`, 'error');
+        }
     };
 
     const ensureSuggestionPopup = () => {
@@ -292,7 +329,11 @@ function initializeInputEnhancer(refs) {
             name.textContent = note.name;
             item.appendChild(name);
 
-            const relativePath = note.path.replace(/\\/g, '/').split('/').slice(-3, -1).join('/');
+            const relativePath = typeof note.pathLabel === 'string' && note.pathLabel.trim()
+                ? note.pathLabel.trim()
+                : (typeof note.path === 'string' && note.path.trim()
+                    ? note.path.replace(/\\/g, '/').split('/').slice(-3, -1).join('/')
+                    : (note.sourceType || 'note'));
             const path = document.createElement('span');
             path.className = 'suggestion-path';
             path.textContent = relativePath;
