@@ -1,5 +1,7 @@
 // modules/renderer/contentProcessor.js
 
+import { scopeCss } from './scopedCss.js';
+
 let mainRefs = {};
 
 /**
@@ -837,87 +839,6 @@ function processRenderedContent(contentDiv, settings = {}) {
     }
 }
 
-
-
-/**
- * 为 CSS 字符串中的所有选择器添加作用域 ID 前缀。
- * @param {string} cssString - 原始 CSS 文本。
- * @param {string} scopeId - 唯一的作用域 ID (不带 #)。
- * @returns {string} 处理后的 CSS 文本。
- */
-function scopeSelector(selector, scopeId) {
-    // 跳过 @规则 和 keyframe 步骤（这些不是选择器）
-    if (selector.match(/^(@|from|to|\d+%)/)) {
-        return selector;
-    }
-    
-    // 🔴 关键安全修复：将全局选择器（:root, html, body）重写为 scoped 选择器
-    // 防止AI输出的CSS（如 body { background: black }）影响整个页面
-    if (selector.match(/^:root$/)) {
-        return `#${scopeId}`;
-    }
-    if (selector.match(/^(html|body)$/i)) {
-        return `#${scopeId}`;
-    }
-    // 处理带后续选择器的情况，如 "body .class" → "#scopeId .class"
-    if (selector.match(/^(html|body)\s+/i)) {
-        return selector.replace(/^(html|body)\s+/i, `#${scopeId} `);
-    }
-    // 处理 ":root .class" 的情况
-    if (selector.match(/^:root\s+/)) {
-        return selector.replace(/^:root\s+/, `#${scopeId} `);
-    }
-    
-    // 处理伪类/伪元素
-    if (selector.match(/^::?[\w-]+$/)) {
-        return `#${scopeId}${selector}`;
-    }
-    
-    // 🔴 处理通配符选择器 "*"
-    if (selector === '*') {
-        return `#${scopeId} *`;
-    }
-    
-    return `#${scopeId} ${selector}`;
-}
-
-function scopeCss(cssString, scopeId) {
-    // 1. 先移除注释
-    let css = cssString.replace(/\/\*[\s\S]*?\*\//g, '');
-    
-    // 2. 分割规则
-    const rules = [];
-    let depth = 0;
-    let currentRule = '';
-    
-    for (let i = 0; i < css.length; i++) {
-        const char = css[i];
-        currentRule += char;
-        
-        if (char === '{') depth++;
-        else if (char === '}') {
-            depth--;
-            if (depth === 0) {
-                rules.push(currentRule.trim());
-                currentRule = '';
-            }
-        }
-    }
-    
-    // 3. 处理每个规则
-    return rules.map(rule => {
-        const match = rule.match(/^([^{]+)\{(.+)\}$/s);
-        if (!match) return rule;
-        
-        const [, selectors, body] = match;
-        const scopedSelectors = selectors
-            .split(',')
-            .map(s => scopeSelector(s.trim(), scopeId))
-            .join(', ');
-        
-        return `${scopedSelectors} { ${body} }`;
-    }).join('\n');
-}
 
 
 /**

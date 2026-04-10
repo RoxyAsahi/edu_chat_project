@@ -1,6 +1,7 @@
 ﻿import * as emoticonFixer from './emoticonUrlFixer.js';
 
 import { renderMarkdownToSafeHtml, sanitizeHtml } from './safeHtml.js';
+import { scopeCss } from './scopedCss.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const viewerAPI = window.utilityAPI || window.electronAPI;
@@ -41,54 +42,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const timestampPart = Date.now().toString(36);
         const randomPart = Math.random().toString(36).substring(2, 9);
         return `vcp-viewer-${timestampPart}${randomPart}`;
-    }
-
-    /**
-     * Scopes a single CSS selector.
-     * @param {string} selector - The CSS selector.
-     * @param {string} scopeId - The unique ID to scope to.
-     * @returns {string} The scoped selector.
-     */
-    function scopeSelector(selector, scopeId) {
-        if (selector.match(/^(@|from|to|\d+%|:root|html|body)/)) {
-            return selector;
-        }
-        if (selector.match(/^::?[\w-]+$/)) {
-            return `#${scopeId}${selector}`;
-        }
-        return `#${scopeId} ${selector}`;
-    }
-
-    /**
-     * Scopes an entire string of CSS rules.
-     * @param {string} cssString - The raw CSS text.
-     * @param {string} scopeId - The unique ID.
-     * @returns {string} The scoped CSS text.
-     */
-    function scopeCss(cssString, scopeId) {
-        let css = cssString.replace(/\/\*[\s\S]*?\*\//g, '');
-        const rules = [];
-        let depth = 0;
-        let currentRule = '';
-        for (let i = 0; i < css.length; i++) {
-            const char = css[i];
-            currentRule += char;
-            if (char === '{') depth++;
-            else if (char === '}') {
-                depth--;
-                if (depth === 0) {
-                    rules.push(currentRule.trim());
-                    currentRule = '';
-                }
-            }
-        }
-        return rules.map(rule => {
-            const match = rule.match(/^([^{]+)\{(.+)\}$/s);
-            if (!match) return rule;
-            const [, selectors, body] = match;
-            const scopedSelectors = selectors.split(',').map(s => scopeSelector(s.trim(), scopeId)).join(', ');
-            return `${scopedSelectors} { ${body} }`;
-        }).join('\n');
     }
 
     /**
