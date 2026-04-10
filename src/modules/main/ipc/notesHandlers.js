@@ -416,8 +416,8 @@ function initialize(context = {}) {
         return;
     }
 
-    const { APP_DATA_ROOT_IN_PROJECT, agentConfigManager: nextAgentConfigManager } = context;
-    notesRootDir = path.join(APP_DATA_ROOT_IN_PROJECT, 'Notes');
+    const { DATA_ROOT, agentConfigManager: nextAgentConfigManager } = context;
+    notesRootDir = path.join(DATA_ROOT, 'Notes');
     agentConfigManager = nextAgentConfigManager || null;
 
     ipcMain.handle('list-topic-notes', async (_event, agentId, topicId) => {
@@ -541,7 +541,7 @@ function initialize(context = {}) {
 
     ipcMain.handle('search-notes', async (_event, query) => {
         try {
-            return await searchNotesIndex(APP_DATA_ROOT_IN_PROJECT, query);
+            return await searchNotesIndex(DATA_ROOT, query);
         } catch (error) {
             console.error('[UniStudyNotes] Failed to search notes:', error);
             return [];
@@ -550,7 +550,7 @@ function initialize(context = {}) {
 
     ipcMain.handle('export-note-as-attachment', async (_event, payload = {}) => {
         try {
-            return await exportNoteToTempAttachment(APP_DATA_ROOT_IN_PROJECT, payload);
+            return await exportNoteToTempAttachment(DATA_ROOT, payload);
         } catch (error) {
             return { success: false, error: error.message };
         }

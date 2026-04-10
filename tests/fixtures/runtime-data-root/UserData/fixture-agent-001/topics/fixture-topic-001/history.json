@@ -1,0 +1,23 @@
+[
+  {
+    "id": "user_fixture_1",
+    "role": "user",
+    "content": "Who are you?",
+    "timestamp": 1776000000100,
+    "attachments": []
+  },
+  {
+    "id": "assistant_fixture_1",
+    "role": "assistant",
+    "name": "Fixture Agent",
+    "agentId": "fixture-agent-001",
+    "avatarUrl": "assets/default_avatar.png",
+    "avatarColor": null,
+    "content": "I am the fixture agent used for runtime data-root smoke tests.",
+    "timestamp": 1776000000200,
+    "isThinking": false,
+    "topicId": "fixture-topic-001",
+    "isGroupMessage": false,
+    "finishReason": "completed"
+  }
+]

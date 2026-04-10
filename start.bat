@@ -3,7 +3,11 @@ setlocal
 cd /d "%~dp0"
 
 echo [VCPChat Lite] Working directory: %cd%
-echo [VCPChat Lite] Data root: %cd%\AppData
+if defined VCPCHAT_DATA_ROOT (
+  echo [VCPChat Lite] Data root override: %VCPCHAT_DATA_ROOT%
+) else (
+  echo [VCPChat Lite] Data root: Electron userData default
+)
 
 if not exist package.json (
   echo [VCPChat Lite] package.json not found.

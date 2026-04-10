@@ -5,6 +5,7 @@ const path = require('path');
 const contextSanitizer = require('../contextSanitizer');
 const knowledgeBase = require('../knowledge-base');
 const vcpClient = require('../vcpClient');
+const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
 
 /**
  * Initializes chat and topic related IPC handlers.
@@ -12,7 +13,7 @@ const vcpClient = require('../vcpClient');
  * @param {object} context - An object containing necessary context.
  * @param {string} context.AGENT_DIR - The path to the agents directory.
  * @param {string} context.USER_DATA_DIR - The path to the user data directory.
- * @param {string} context.APP_DATA_ROOT_IN_PROJECT - The path to the app data root.
+ * @param {string} context.DATA_ROOT - The path to the app data root.
  * @param {function} context.getSelectionListenerStatus - Function to get the current status of the selection listener.
  * @param {function} context.stopSelectionListener - Function to stop the selection listener.
  * @param {function} context.startSelectionListener - Function to start the selection listener.
@@ -113,11 +114,44 @@ function applyContextSanitizer(messages, settings) {
     return [...systemMessages, ...sanitizedMessages];
 }
 
+async function buildPromptResolutionOptions({ settings, context, modelConfig, agentConfigManager }) {
+    const nextContext = { ...(context || {}) };
+    let agentConfig = null;
+
+    if (nextContext.agentId && agentConfigManager && typeof agentConfigManager.readAgentConfig === 'function') {
+        try {
+            agentConfig = await agentConfigManager.readAgentConfig(nextContext.agentId);
+        } catch (error) {
+            console.warn(`[Main - sendToVCP] Failed to read agent config for prompt resolution (${nextContext.agentId}):`, error);
+        }
+    }
+
+    if (agentConfig) {
+        if (!nextContext.agentName && typeof agentConfig.name === 'string') {
+            nextContext.agentName = agentConfig.name;
+        }
+
+        if (!nextContext.topicName && nextContext.topicId && Array.isArray(agentConfig.topics)) {
+            const matchedTopic = agentConfig.topics.find((topic) => topic?.id === nextContext.topicId);
+            if (matchedTopic?.name) {
+                nextContext.topicName = matchedTopic.name;
+            }
+        }
+    }
+
+    return {
+        settings,
+        agentConfig,
+        context: nextContext,
+        modelConfig,
+    };
+}
+
 function initialize(mainWindow, context) {
     const {
         AGENT_DIR,
         USER_DATA_DIR,
-        APP_DATA_ROOT_IN_PROJECT,
+        DATA_ROOT,
         fileWatcher,
         settingsManager,
         agentConfigManager,
@@ -384,7 +418,7 @@ function initialize(mainWindow, context) {
                 }
 
                 const topicDataDir = path.join(USER_DATA_DIR, agentId, 'topics', topicIdToDelete);
-                const topicNotesDir = path.join(APP_DATA_ROOT_IN_PROJECT, 'Notes', agentId, topicIdToDelete);
+                const topicNotesDir = path.join(DATA_ROOT, 'Notes', agentId, topicIdToDelete);
                 const cleanupErrors = [];
 
                 if (await fs.pathExists(topicDataDir)) {
@@ -655,6 +689,12 @@ function initialize(mainWindow, context) {
             console.error('[Main - sendToVCP] Failed to read settings:', error);
         }
 
+        let promptVariableResolution = {
+            unresolvedTokens: [],
+            substitutions: {},
+            variableSources: {},
+        };
+
         try {
             if (settings.enableAgentBubbleTheme === true) {
                 processedMessages = applyAgentBubbleTheme(processedMessages);
@@ -665,6 +705,26 @@ function initialize(mainWindow, context) {
             }
 
             processedMessages = applyContextSanitizer(processedMessages, settings);
+
+            const promptResolutionOptions = await buildPromptResolutionOptions({
+                settings,
+                context,
+                modelConfig,
+                agentConfigManager,
+            });
+            const resolution = resolvePromptMessageSet(processedMessages, promptResolutionOptions);
+            processedMessages = resolution.messages;
+            promptVariableResolution = {
+                unresolvedTokens: resolution.unresolvedTokens,
+                substitutions: resolution.substitutions,
+                variableSources: resolution.variableSources,
+            };
+
+            if (resolution.unresolvedTokens.length > 0) {
+                console.warn(
+                    `[Main - sendToVCP] Unresolved prompt variables for request ${requestId || 'unknown'}: ${resolution.unresolvedTokens.join(', ')}`
+                );
+            }
         } catch (error) {
             console.error('[Main - sendToVCP] Message preprocessing failed:', error);
             return { error: `Message preprocessing failed: ${error.message}` };
@@ -679,7 +739,7 @@ function initialize(mainWindow, context) {
             console.error('[ModelUsage] Failed to record model usage:', error);
         }
 
-        return vcpClient.send({
+        const result = await vcpClient.send({
             requestId,
             endpoint,
             apiKey,
@@ -689,6 +749,11 @@ function initialize(mainWindow, context) {
             webContents: event.sender,
             streamChannel: 'vcp-stream-event',
         });
+
+        return {
+            ...(result || {}),
+            promptVariableResolution,
+        };
     });
 
     ipcMain.handle('interrupt-vcp-request', async (_event, request) => {
@@ -804,6 +869,22 @@ function initialize(mainWindow, context) {
                 return { success: false, error: `Agent config file not found for ${agentId}.` };
             }
 
+            if (agentConfigManager) {
+                const result = await agentConfigManager.updateTopic(agentId, topicId, (topic) => {
+                    const currentLocked = topic.locked === undefined ? true : topic.locked;
+                    return {
+                        ...topic,
+                        locked: !currentLocked,
+                    };
+                });
+
+                return {
+                    success: true,
+                    locked: result.topic.locked,
+                    message: result.topic.locked ? 'Topic locked.' : 'Topic unlocked.'
+                };
+            }
+
             let config;
             try {
                 config = await fs.readJson(agentConfigPath);
@@ -819,30 +900,23 @@ function initialize(mainWindow, context) {
             const topic = config.topics.find(t => t.id === topicId);
             if (!topic) {
                 return { success: false, error: `Topic not found: ${topicId}` };
-            }
-
-            // Part A: 鍘嗗彶鏁版嵁鍏煎 - 濡傛灉璇濋娌℃湁 locked 瀛楁锛岄粯璁よ缃负 true
-            if (topic.locked === undefined) {
-                topic.locked = true;
-            }
-
-            // Toggle the lock flag.
-            topic.locked = !topic.locked;
-
-            if (agentConfigManager) {
-                await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
-                    ...existingConfig,
-                    topics: config.topics
-                }));
             } else {
-                await fs.writeJson(agentConfigPath, config, { spaces: 2 });
-            }
+                // Part A: 鍘嗗彶鏁版嵁鍏煎 - 濡傛灉璇濋娌℃湁 locked 瀛楁锛岄粯璁よ缃负 true
+                if (topic.locked === undefined) {
+                    topic.locked = true;
+                }
 
-            return {
-                success: true,
-                locked: topic.locked,
-                message: topic.locked ? 'Topic locked.' : 'Topic unlocked.'
-            };
+                // Toggle the lock flag.
+                topic.locked = !topic.locked;
+
+                await fs.writeJson(agentConfigPath, config, { spaces: 2 });
+
+                return {
+                    success: true,
+                    locked: topic.locked,
+                    message: topic.locked ? 'Topic locked.' : 'Topic unlocked.'
+                };
+            }
         } catch (error) {
             console.error('[toggleTopicLock] Error:', error);
             return { success: false, error: error.message };
@@ -855,6 +929,20 @@ function initialize(mainWindow, context) {
             const agentConfigPath = path.join(AGENT_DIR, agentId, 'config.json');
             if (!await fs.pathExists(agentConfigPath)) {
                 return { success: false, error: `Agent config file not found for ${agentId}.` };
+            }
+
+            if (agentConfigManager) {
+                const result = await agentConfigManager.updateTopic(agentId, topicId, (topic) => {
+                    const normalizedTopic = topic.unread === undefined
+                        ? { ...topic, unread: false }
+                        : topic;
+                    return {
+                        ...normalizedTopic,
+                        unread,
+                    };
+                });
+
+                return { success: true, unread: result.topic.unread };
             }
 
             let config;
@@ -872,25 +960,17 @@ function initialize(mainWindow, context) {
             const topic = config.topics.find(t => t.id === topicId);
             if (!topic) {
                 return { success: false, error: `Topic not found: ${topicId}` };
-            }
-
-            // Part A: 鍘嗗彶鏁版嵁鍏煎 - 濡傛灉璇濋娌℃湁 unread 瀛楁锛岄粯璁よ缃负 false
-            if (topic.unread === undefined) {
-                topic.unread = false;
-            }
-
-            topic.unread = unread;
-
-            if (agentConfigManager) {
-                await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
-                    ...existingConfig,
-                    topics: config.topics
-                }));
             } else {
-                await fs.writeJson(agentConfigPath, config, { spaces: 2 });
-            }
+                // Part A: 鍘嗗彶鏁版嵁鍏煎 - 濡傛灉璇濋娌℃湁 unread 瀛楁锛岄粯璁よ缃负 false
+                if (topic.unread === undefined) {
+                    topic.unread = false;
+                }
 
-            return { success: true, unread: topic.unread };
+                topic.unread = unread;
+                await fs.writeJson(agentConfigPath, config, { spaces: 2 });
+
+                return { success: true, unread: topic.unread };
+            }
         } catch (error) {
             console.error('[setTopicUnread] Error:', error);
             return { success: false, error: error.message };

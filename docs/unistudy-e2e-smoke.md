@@ -5,7 +5,7 @@
 用一套固定流程验证 UniStudy 的关键学习链路没有回归，并明确区分：
 
 1. 临时目录 smoke
-2. 真实 `AppData` 目录测试
+2. 显式外部 data root 测试
 3. Source 检索是否真的参与了回答
 4. 聊天记录是否真的落进 `history.json`
 5. 左侧阅读模式下的“来源指南”是否真的成功生成并缓存
@@ -14,7 +14,7 @@
 
 ### 1. 临时模式
 
-默认模式，会把数据写入临时 `VCPCHAT_DATA_ROOT`，不会污染真实聊天记录。
+默认模式，会把专用 fixture 复制到临时 `VCPCHAT_DATA_ROOT`，不会污染真实聊天记录，也不会依赖仓库根 `AppData`。
 
 ```powershell
 node scripts/electron-unistudy-smoke.js
@@ -22,9 +22,9 @@ node scripts/electron-unistudy-smoke.js
 
 ### 2. 真实数据目录模式
 
-会直接写入项目真实数据根，例如：
+会直接写入你显式指定的外部数据根，例如：
 
-- `C:\VCP\Eric\VCPChatLite\AppData\UserData\<agentId>\topics\<topicId>\history.json`
+- `D:\UniStudyData\UserData\<agentId>\topics\<topicId>\history.json`
 - 当前 Topic 对应的 Source 文档记录
 - 真实测试报告 `docs/test-reports/*.json`
 
@@ -32,6 +32,7 @@ node scripts/electron-unistudy-smoke.js
 
 ```powershell
 $env:UNISTUDY_TEST_MODE="real-data"
+$env:UNISTUDY_REAL_DATA_ROOT="D:\UniStudyData"
 $env:UNISTUDY_REAL_AGENT_ID="Lite_Real_Test_Nova_1775682726542"
 $env:KB_BASE_URL="http://154.36.184.44:3000"
 $env:KB_API_KEY="your-kb-key"
@@ -53,7 +54,9 @@ $env:VCP_API_KEY="your-chat-key"
 - `UNISTUDY_REAL_AGENT_ID`
   - 真实模式下复用的 Agent ID
 - `UNISTUDY_REAL_DATA_ROOT`
-  - 可选，默认指向项目下的 `AppData`
+  - 必填，显式指定外部真实数据根
+- `VCPCHAT_TEST_FIXTURE_ROOT`
+  - 可选，覆盖默认测试 fixture 根；默认使用 `tests/fixtures/runtime-data-root`
 - `UNISTUDY_TEST_REPORT_DIR`
   - 可选，默认输出到 `docs/test-reports`
 - `KB_BASE_URL` / `KB_API_KEY`
@@ -132,5 +135,5 @@ $env:VCP_API_KEY="your-chat-key"
 1. 测试 Topic 是否真实出现在目标学科下
 2. Source 文档列表是否可见
 3. 对话区回答是否显示 KB 引用
-4. `AppData/UserData/<agentId>/topics/<topicId>/history.json` 是否存在对应消息
+4. `<外部 data root>/UserData/<agentId>/topics/<topicId>/history.json` 是否存在对应消息
 5. `docs/test-reports/*.json` 是否和 UI 结果一致

@@ -110,6 +110,8 @@ module.exports = {
     query,
     subscription,
     createOps,
+    createIsolationMessage,
+    createIsolationStub,
     materializeApi,
     createCompatApi,
     exposeRoleApis,

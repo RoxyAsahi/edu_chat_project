@@ -1,11 +1,15 @@
 const fs = require('fs-extra');
 const http = require('http');
-const os = require('os');
 const path = require('path');
 const { _electron: electron } = require('playwright');
+const {
+    createTempDataRootFromFixture,
+    ensureFixtureDataRoot,
+    resolveFixtureDataRoot,
+} = require('./lib/runtime-data-roots');
+const { buildPreloadBundles } = require('./lib/preload-bundles');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const SOURCE_DATA_ROOT = path.join(PROJECT_ROOT, 'AppData');
 
 function resolveElectronBinary(appDir) {
     const electronPackagePath = require.resolve('electron/package.json', {
@@ -214,8 +218,11 @@ function createMockServer() {
 }
 
 async function prepareTempDataRoot(port) {
-    const tempRoot = path.join(os.tmpdir(), `vcpchat-lite-recovery-${Date.now()}`);
-    await fs.copy(SOURCE_DATA_ROOT, tempRoot);
+    const fixtureRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot: PROJECT_ROOT }));
+    const tempRoot = await createTempDataRootFromFixture({
+        prefix: 'vcpchat-lite-recovery-',
+        fixtureRoot,
+    });
 
     const settingsPath = path.join(tempRoot, 'settings.json');
     const settings = await fs.readJson(settingsPath);
@@ -381,6 +388,7 @@ async function run() {
 
     let electronApp;
     try {
+        await buildPreloadBundles();
         electronApp = await electron.launch({
             executablePath: electronBinary,
             args: [PROJECT_ROOT],

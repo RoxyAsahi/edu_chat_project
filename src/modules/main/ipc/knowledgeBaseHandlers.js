@@ -8,20 +8,10 @@ async function updateTopicKnowledgeBase(agentConfigManager, agentId, topicId, kn
         throw new Error('AgentConfigManager is unavailable.');
     }
 
-    await agentConfigManager.updateAgentConfig(agentId, (config) => {
-        const nextTopics = Array.isArray(config.topics)
-            ? config.topics.map((topic) => (
-                topic.id === topicId
-                    ? { ...topic, knowledgeBaseId: knowledgeBaseId || null }
-                    : topic
-            ))
-            : [];
-
-        return {
-            ...config,
-            topics: nextTopics,
-        };
-    });
+    await agentConfigManager.updateTopic(agentId, topicId, (topic) => ({
+        ...topic,
+        knowledgeBaseId: knowledgeBaseId || null,
+    }));
 }
 
 function initialize(context = {}) {

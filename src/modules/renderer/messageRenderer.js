@@ -1036,8 +1036,6 @@ function clearChat(options = {}) {
 
         // Remove all injected scoped CSS blocks.
         document.querySelectorAll('style[data-vcp-scope-id]').forEach(el => el.remove());
-        document.querySelectorAll('style[data-chat-scope-id]').forEach(el => el.remove());
-
         // Clear cached Pretext heights when the whole chat view resets.
         if (window.pretextBridge && window.pretextBridge.clearAll) {
             window.pretextBridge.clearAll();
@@ -1728,41 +1726,6 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
         if (customNameColor && senderNameDiv) {
             console.debug(`[DEBUG] Applying custom name color ${customNameColor} to sender name`);
             senderNameDiv.style.color = customNameColor;
-        }
-
-        // Apply per-message chat CSS through a scoped style tag.
-        if (message.role === 'assistant') {
-            let chatCss = '';
-            if (currentSelectedItem) {
-                // Lite uses the selected agent config as the source of chat CSS.
-                const agentConfig = currentSelectedItem.config || currentSelectedItem;
-                chatCss = agentConfig?.chatCss || '';
-            }
-
-            // Apply chat CSS by injecting a scoped style tag for this message.
-            if (chatCss && chatCss.trim()) {
-                console.debug(`[DEBUG] Applying chat CSS to message ${message.id}:`, chatCss);
-
-                // Create a unique scope id for the current message.
-                const chatScopeId = `vcp-chat-${message.id}`;
-                messageItem.setAttribute('data-chat-scope', chatScopeId);
-
-                // Remove any stale scoped style node for the same message.
-                let existingStyle = document.head.querySelector(`style[data-chat-scope-id="${chatScopeId}"]`);
-                if (existingStyle) {
-                    existingStyle.remove();
-                }
-
-                // Prefix the CSS so it only affects this message bubble.
-                const scopedChatCss = `[data-chat-scope="${chatScopeId}"] ${chatCss}`;
-
-                // Inject the scoped style into <head>.
-                const styleElement = document.createElement('style');
-                styleElement.type = 'text/css';
-                styleElement.setAttribute('data-chat-scope-id', chatScopeId);
-                styleElement.textContent = scopedChatCss;
-                document.head.appendChild(styleElement);
-            }
         }
     }
 

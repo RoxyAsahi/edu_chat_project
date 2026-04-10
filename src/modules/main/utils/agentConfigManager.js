@@ -216,6 +216,40 @@ class AgentConfigManager extends EventEmitter {
         });
     }
 
+    async updateTopic(agentId, topicId, topicUpdater) {
+        const result = await this.updateAgentConfig(agentId, async (existingConfig) => {
+            if (!existingConfig.topics || !Array.isArray(existingConfig.topics)) {
+                throw new Error('Topics are unavailable for this agent.');
+            }
+
+            const topicIndex = existingConfig.topics.findIndex((topic) => topic.id === topicId);
+            if (topicIndex === -1) {
+                throw new Error(`Topic not found: ${topicId}`);
+            }
+
+            const currentTopic = existingConfig.topics[topicIndex];
+            const nextTopic = typeof topicUpdater === 'function'
+                ? await topicUpdater({ ...currentTopic })
+                : { ...currentTopic, ...(topicUpdater || {}) };
+            const nextTopics = [...existingConfig.topics];
+            nextTopics[topicIndex] = nextTopic;
+
+            return {
+                ...existingConfig,
+                topics: nextTopics,
+            };
+        });
+
+        const updatedTopic = Array.isArray(result?.config?.topics)
+            ? result.config.topics.find((topic) => topic.id === topicId) || null
+            : null;
+
+        return {
+            ...result,
+            topic: updatedTopic,
+        };
+    }
+
     async processQueue(agentId) {
         const queue = this.queues.get(agentId);
         if (!queue || this.processing.get(agentId) || queue.length === 0) {

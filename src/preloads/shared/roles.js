@@ -99,4 +99,8 @@ const VIEWER_KEYS = [
 module.exports = {
     LITE_KEYS,
     VIEWER_KEYS,
+    ROLE_API_NAMES: Object.freeze({
+        lite: 'chatAPI',
+        viewer: 'utilityAPI',
+    }),
 };

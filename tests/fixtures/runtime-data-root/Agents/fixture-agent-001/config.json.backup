@@ -1,0 +1,23 @@
+{
+  "name": "Fixture Agent",
+  "systemPrompt": "You are the fixture agent.",
+  "originalSystemPrompt": "You are the fixture agent.",
+  "model": "fixture-model",
+  "temperature": 0.7,
+  "contextTokenLimit": 4000,
+  "maxOutputTokens": 1024,
+  "topics": [
+    {
+      "id": "fixture-topic-001",
+      "name": "Fixture Topic",
+      "createdAt": 1776000000000,
+      "locked": false,
+      "unread": false,
+      "creatorSource": "fixture",
+      "knowledgeBaseId": "kb_1775845209651_bd599e9d"
+    }
+  ],
+  "disableCustomColors": true,
+  "useThemeColorsInChat": true,
+  "streamOutput": true
+}

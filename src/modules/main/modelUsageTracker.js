@@ -1,29 +1,83 @@
 /**
  * modelUsageTracker.js
- * 
+ *
  * 轻量级模块：追踪用户聊天中各模型的使用频率。
- * 数据持久化到 AppData/model_usage_stats.json。
+ * 数据持久化到 dataRoot/model_usage_stats.json。
  * 使用内存缓存 + 防抖写入策略，避免频繁磁盘 IO。
  */
 const fs = require('fs-extra');
 const path = require('path');
 
-const APP_DATA_ROOT = path.join(__dirname, '..', 'AppData');
-const STATS_FILE = path.join(APP_DATA_ROOT, 'model_usage_stats.json');
-
+let trackerPaths = null;
 let usageCache = null; // 内存缓存: { "model-id": count, ... }
+let favoritesCache = null; // 内存缓存: ["model-id", ...]
 let isDirty = false;   // 是否有未写入的变更
 let writeTimer = null; // 防抖写入定时器
 const DEBOUNCE_MS = 2000; // 2秒防抖
+
+function clearWriteTimer() {
+    if (writeTimer) {
+        clearTimeout(writeTimer);
+        writeTimer = null;
+    }
+}
+
+function assertConfigured() {
+    if (!trackerPaths) {
+        throw new Error('ModelUsageTracker is not initialized. Call initializeModelUsageTracker({ dataRoot }) first.');
+    }
+    return trackerPaths;
+}
+
+function buildTrackerPaths(dataRoot) {
+    return {
+        dataRoot,
+        statsFile: path.join(dataRoot, 'model_usage_stats.json'),
+        favoritesFile: path.join(dataRoot, 'model_favorites.json'),
+    };
+}
+
+function initializeModelUsageTracker({ dataRoot }) {
+    if (!dataRoot || typeof dataRoot !== 'string') {
+        throw new Error('ModelUsageTracker requires a valid dataRoot.');
+    }
+
+    trackerPaths = buildTrackerPaths(path.resolve(dataRoot));
+    usageCache = null;
+    favoritesCache = null;
+    isDirty = false;
+    clearWriteTimer();
+}
+
+async function persistStats() {
+    const { dataRoot, statsFile } = assertConfigured();
+    if (!usageCache) {
+        return;
+    }
+
+    await fs.ensureDir(dataRoot);
+    await fs.writeJson(statsFile, usageCache, { spaces: 2 });
+    isDirty = false;
+    console.log('[ModelUsageTracker] Stats saved to disk.');
+}
+
+async function flushPendingWrites() {
+    clearWriteTimer();
+    if (!isDirty || !usageCache) {
+        return;
+    }
+    await persistStats();
+}
 
 /**
  * 加载统计数据到内存缓存
  */
 async function loadStats() {
+    const { statsFile } = assertConfigured();
     if (usageCache !== null) return usageCache;
     try {
-        if (await fs.pathExists(STATS_FILE)) {
-            usageCache = await fs.readJson(STATS_FILE);
+        if (await fs.pathExists(statsFile)) {
+            usageCache = await fs.readJson(statsFile);
         } else {
             usageCache = {};
         }
@@ -38,14 +92,11 @@ async function loadStats() {
  * 防抖写入统计数据到磁盘
  */
 function scheduleSave() {
-    if (writeTimer) clearTimeout(writeTimer);
+    clearWriteTimer();
     writeTimer = setTimeout(async () => {
         if (!isDirty || !usageCache) return;
         try {
-            await fs.ensureDir(APP_DATA_ROOT);
-            await fs.writeJson(STATS_FILE, usageCache, { spaces: 2 });
-            isDirty = false;
-            console.log('[ModelUsageTracker] Stats saved to disk.');
+            await persistStats();
         } catch (error) {
             console.error('[ModelUsageTracker] Failed to save stats:', error);
         }
@@ -89,20 +140,15 @@ async function getModelUsageStats() {
     return await loadStats();
 }
 
-// ========================================
-// ⭐ Favorite Models（收藏模型）
-// ========================================
-const FAVORITES_FILE = path.join(APP_DATA_ROOT, 'model_favorites.json');
-let favoritesCache = null; // 内存缓存: ["model-id", ...]
-
 /**
  * 加载收藏数据
  */
 async function loadFavorites() {
+    const { favoritesFile } = assertConfigured();
     if (favoritesCache !== null) return favoritesCache;
     try {
-        if (await fs.pathExists(FAVORITES_FILE)) {
-            favoritesCache = await fs.readJson(FAVORITES_FILE);
+        if (await fs.pathExists(favoritesFile)) {
+            favoritesCache = await fs.readJson(favoritesFile);
             if (!Array.isArray(favoritesCache)) favoritesCache = [];
         } else {
             favoritesCache = [];
@@ -118,9 +164,10 @@ async function loadFavorites() {
  * 保存收藏数据到磁盘（即时写入，因为操作频率低）
  */
 async function saveFavorites() {
+    const { dataRoot, favoritesFile } = assertConfigured();
     try {
-        await fs.ensureDir(APP_DATA_ROOT);
-        await fs.writeJson(FAVORITES_FILE, favoritesCache || [], { spaces: 2 });
+        await fs.ensureDir(dataRoot);
+        await fs.writeJson(favoritesFile, favoritesCache || [], { spaces: 2 });
         console.log('[ModelUsageTracker] Favorites saved to disk.');
     } catch (error) {
         console.error('[ModelUsageTracker] Failed to save favorites:', error);
@@ -155,10 +202,21 @@ async function getFavoriteModels() {
     return await loadFavorites();
 }
 
+function __resetForTests() {
+    trackerPaths = null;
+    usageCache = null;
+    favoritesCache = null;
+    isDirty = false;
+    clearWriteTimer();
+}
+
 module.exports = {
+    initializeModelUsageTracker,
     recordModelUsage,
     getHotModels,
     getModelUsageStats,
     toggleFavoriteModel,
-    getFavoriteModels
+    getFavoriteModels,
+    flushPendingWrites,
+    __resetForTests,
 };

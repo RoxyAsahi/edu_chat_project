@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { buildPreloadBundles } = require('./lib/preload-bundles');
 
 function resolveElectronBinary(appDir) {
   const electronPackagePath = require.resolve('electron/package.json', {
@@ -11,11 +12,13 @@ function resolveElectronBinary(appDir) {
   return path.join(electronPackageDir, 'dist', binaryName);
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const appDirArg = args[0] || '.';
   const appDir = path.resolve(process.cwd(), appDirArg);
   const electronBinary = resolveElectronBinary(appDir);
+
+  await buildPreloadBundles();
 
   if (!fs.existsSync(electronBinary)) {
     console.error(`[launch-electron] Electron binary not found: ${electronBinary}`);
@@ -46,4 +49,7 @@ function main() {
   });
 }
 
-main();
+main().catch((error) => {
+  console.error('[launch-electron] Failed to prepare Electron launch:', error);
+  process.exit(1);
+});

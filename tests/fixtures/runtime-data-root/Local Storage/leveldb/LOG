@@ -1,0 +1,3 @@
+2026/04/11-03:08:41.040 137dc Reusing MANIFEST C:\VCP\Eric\VCPChatLite\tests\fixtures\runtime-data-root\Local Storage\leveldb/MANIFEST-000001
+2026/04/11-03:08:41.050 137dc Recovering log #3
+2026/04/11-03:08:41.050 137dc Reusing old log C:\VCP\Eric\VCPChatLite\tests\fixtures\runtime-data-root\Local Storage\leveldb/000003.log 

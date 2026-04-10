@@ -3,6 +3,8 @@ const fs = require('fs-extra');
 const path = require('path');
 const chokidar = require('chokidar');
 
+let mainProcessLogDir = null;
+
 function isBrokenPipeError(error) {
     if (!error) {
         return false;
@@ -10,6 +12,18 @@ function isBrokenPipeError(error) {
     return error.code === 'EPIPE'
         || error.code === 'ERR_STREAM_DESTROYED'
         || /broken pipe/i.test(String(error.message || ''));
+}
+
+function resolveMainProcessLogDir() {
+    if (mainProcessLogDir) {
+        return mainProcessLogDir;
+    }
+
+    try {
+        return path.join(app.getPath('userData'), '.tmp');
+    } catch (_error) {
+        return path.join(process.cwd(), '.tmp');
+    }
 }
 
 function installSafeConsoleWrite() {
@@ -39,9 +53,10 @@ function installSafeConsoleWrite() {
         stream.on('error', (error) => {
             if (!isBrokenPipeError(error)) {
                 try {
-                    fs.ensureDirSync(path.join(process.cwd(), '.tmp'));
+                    const logDir = resolveMainProcessLogDir();
+                    fs.ensureDirSync(logDir);
                     fs.appendFileSync(
-                        path.join(process.cwd(), '.tmp', 'main-process-stream-errors.log'),
+                        path.join(logDir, 'main-process-stream-errors.log'),
                         `[${new Date().toISOString()}] ${error?.stack || error}\n`
                     );
                 } catch (_writeError) {
@@ -70,21 +85,22 @@ const themeHandlers = require('../modules/main/ipc/themeHandlers');
 const emoticonHandlers = require('../modules/main/ipc/emoticonHandlers');
 const fileManager = require('../modules/main/fileManager');
 const knowledgeBase = require('../modules/main/knowledge-base');
+const modelUsageTracker = require('../modules/main/modelUsageTracker');
 const SettingsManager = require('../modules/main/utils/appSettingsManager');
 const AgentConfigManager = require('../modules/main/utils/agentConfigManager');
+const { resolveDataRootPaths } = require('../modules/main/utils/dataRootResolver');
 const { PRELOAD_ROLES, resolveProjectPreload } = require('../modules/main/services/preloadPaths');
 
 const SRC_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(SRC_ROOT, '..');
-const DEFAULT_LITE_DATA_ROOT = path.join(REPO_ROOT, 'AppData');
-const APP_DATA_ROOT_IN_PROJECT = process.env.VCPCHAT_DATA_ROOT
-    ? path.resolve(process.env.VCPCHAT_DATA_ROOT)
-    : DEFAULT_LITE_DATA_ROOT;
-
-const AGENT_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'Agents');
-const USER_DATA_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'UserData');
-const SETTINGS_FILE = path.join(APP_DATA_ROOT_IN_PROJECT, 'settings.json');
-const USER_AVATAR_FILE = path.join(USER_DATA_DIR, 'user_avatar.png');
+const DATA_ROOT_PATHS = resolveDataRootPaths({ app, env: process.env, cwd: REPO_ROOT });
+const DATA_ROOT = DATA_ROOT_PATHS.dataRoot;
+const AGENT_DIR = DATA_ROOT_PATHS.agentsDir;
+const USER_DATA_DIR = DATA_ROOT_PATHS.userDataDir;
+const SETTINGS_FILE = DATA_ROOT_PATHS.settingsFile;
+const USER_AVATAR_FILE = DATA_ROOT_PATHS.userAvatarFile;
+const AVATAR_IMAGE_DIR = DATA_ROOT_PATHS.avatarImageDir;
+mainProcessLogDir = path.join(DATA_ROOT, '.tmp');
 
 let mainWindow = null;
 const openChildWindows = [];
@@ -148,12 +164,12 @@ const fileWatcher = {
 };
 
 async function bootstrapIndependentDataRoot() {
-    await fs.ensureDir(APP_DATA_ROOT_IN_PROJECT);
-    console.log(`[LiteBootstrap] Data root: ${APP_DATA_ROOT_IN_PROJECT}`);
-    if (process.env.VCPCHAT_DATA_ROOT) {
+    await fs.ensureDir(DATA_ROOT);
+    console.log(`[LiteBootstrap] Data root: ${DATA_ROOT}`);
+    if (DATA_ROOT_PATHS.source === 'env-override') {
         console.log('[LiteBootstrap] Using VCPCHAT_DATA_ROOT override.');
     } else {
-        console.log('[LiteBootstrap] Using Lite AppData only.');
+        console.log('[LiteBootstrap] Using Electron userData default.');
     }
 }
 
@@ -209,6 +225,12 @@ function registerWindowHandlers() {
 
 function registerWatcherHandlers() {
     ipcMain.handle('watcher:start', (_event, filePath, agentId, topicId) => {
+        if (typeof filePath !== 'string' || filePath.trim() === ''
+            || typeof agentId !== 'string' || agentId.trim() === ''
+            || typeof topicId !== 'string' || topicId.trim() === '') {
+            return { success: false, error: 'watcher:start expects non-empty filePath, agentId, and topicId.' };
+        }
+
         fileWatcher.watchFile(filePath, (changedPath) => {
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('history-file-updated', { path: changedPath, agentId, topicId });
@@ -281,7 +303,7 @@ function createWindow() {
             preload: resolveProjectPreload(SRC_ROOT, PRELOAD_ROLES.LITE),
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: false,
+            sandbox: true,
         },
     });
 
@@ -336,8 +358,9 @@ async function bootstrap() {
     agentConfigManager.startCleanupTimer();
 
     fileManager.initializeFileManager(USER_DATA_DIR, AGENT_DIR);
+    modelUsageTracker.initializeModelUsageTracker({ dataRoot: DATA_ROOT });
     await knowledgeBase.initializeKnowledgeBase({
-        dataRoot: APP_DATA_ROOT_IN_PROJECT,
+        dataRoot: DATA_ROOT,
         settingsManager,
         agentConfigManager,
         agentDir: AGENT_DIR,
@@ -365,6 +388,7 @@ async function bootstrap() {
     agentHandlers.initialize({
         AGENT_DIR,
         USER_DATA_DIR,
+        AVATAR_IMAGE_DIR,
         SETTINGS_FILE,
         USER_AVATAR_FILE,
         settingsManager,
@@ -377,7 +401,7 @@ async function bootstrap() {
     chatHandlers.initialize(mainWindow, {
         AGENT_DIR,
         USER_DATA_DIR,
-        APP_DATA_ROOT_IN_PROJECT,
+        DATA_ROOT,
         fileWatcher,
         settingsManager,
         agentConfigManager,
@@ -388,26 +412,26 @@ async function bootstrap() {
     });
 
     notesHandlers.initialize({
-        APP_DATA_ROOT_IN_PROJECT,
+        DATA_ROOT,
         agentConfigManager,
     });
 
     promptHandlers.initialize({
         AGENT_DIR,
-        APP_DATA_ROOT_IN_PROJECT,
+        DATA_ROOT,
     });
 
     themeHandlers.initialize({
         mainWindow,
         openChildWindows,
         projectRoot: REPO_ROOT,
-        APP_DATA_ROOT_IN_PROJECT,
+        APP_DATA_ROOT_IN_PROJECT: DATA_ROOT,
         settingsManager,
     });
 
     await emoticonHandlers.initialize({
         SETTINGS_FILE,
-        APP_DATA_ROOT_IN_PROJECT,
+        DATA_ROOT,
     });
     emoticonHandlers.setupEmoticonHandlers();
 }

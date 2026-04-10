@@ -2,300 +2,66 @@
 import { initialize as initializeInterruptHandler, interrupt as interruptRequest } from '../modules/renderer/interruptHandler.js';
 import { initializeInputEnhancer } from '../modules/renderer/inputEnhancerLite.js';
 import * as messageRenderer from '../modules/renderer/messageRenderer.js';
+import { renderMarkdownToSafeHtml } from '../modules/renderer/safeHtml.js';
+import { createAppStore, createInitialAppState } from '../modules/renderer/app/store/appStore.js';
+import { collectRootElements } from '../modules/renderer/app/dom/collectRootElements.js';
+import { createLayoutController } from '../modules/renderer/app/layout/layoutController.js';
+import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
 
 const chatAPI = window.chatAPI || window.electronAPI;
 const ui = window.uiHelperFunctions;
-
-const state = {
-    settings: {
-        userName: 'User',
-        vcpServerUrl: '',
-        vcpApiKey: '',
-        kbBaseUrl: '',
-        kbApiKey: '',
-        kbEmbeddingModel: 'BAAI/bge-m3',
-        kbUseRerank: true,
-        kbRerankModel: 'BAAI/bge-reranker-v2-m3',
-        kbTopK: 6,
-        kbCandidateTopK: 20,
-        kbScoreThreshold: 0.25,
-        currentThemeMode: 'system',
-        enableAgentBubbleTheme: false,
-        enableWideChatLayout: true,
-        enableSmoothStreaming: true,
-        chatFontPreset: 'system',
-        chatCodeFontPreset: 'consolas',
-        chatBubbleMaxWidthWideDefault: 92,
-        layoutLeftWidth: 410,
-        layoutRightWidth: 400,
-        layoutLeftTopHeight: 360,
-    },
-    agents: [],
-    topics: [],
-    knowledgeBases: [],
-    knowledgeBaseDocuments: [],
-    topicKnowledgeBaseDocuments: [],
-    knowledgeBaseDebugResult: null,
-    selectedKnowledgeBaseId: null,
-    topicNotes: [],
-    agentNotes: [],
-    notesScope: 'topic',
-    activeNoteId: null,
-    selectedNoteIds: [],
-    notesStudioView: 'overview',
-    noteDetailKind: null,
-    layoutLeftWidth: 410,
-    layoutRightWidth: 400,
-    layoutLeftTopHeight: 360,
-    layoutInitialized: false,
-    activeResizeHandle: null,
-    activeVerticalResizeHandle: null,
-    activeTopicMenu: null,
-    activeSourceFileMenu: null,
-    activeNoteMenu: null,
-    sidePanelTab: 'notes',
-    rightPanelMode: 'notes',
-    settingsModalSection: 'global',
-    activeFlashcardNoteId: null,
-    pendingFlashcardGeneration: null,
-    leftSidebarMode: 'source-list',
-    leftReaderActiveTab: 'guide',
-    sourceListScrollTop: 0,
-    currentSelectedItem: { id: null, type: 'agent', name: null, avatarUrl: null, config: null },
-    currentTopicId: null,
-    currentChatHistory: [],
-    pendingAttachments: [],
-    pendingSelectionContextRefs: [],
-    reader: {
-        documentId: null,
-        documentName: '',
-        contentType: null,
-        status: 'idle',
-        isIndexed: false,
-        view: null,
-        activePageNumber: null,
-        activeParagraphIndex: null,
-        activeSectionTitle: null,
-        pendingSelection: null,
-        guideStatus: 'idle',
-        guideMarkdown: '',
-        guideGeneratedAt: null,
-        guideError: null,
-    },
-    promptModule: null,
-    activeRequestId: null,
-};
+const appStore = createAppStore(createInitialAppState());
+const state = appStore.getState();
 
 const TOPIC_SOURCE_FILE_LIMIT = 50;
-const LAYOUT_DEFAULTS = Object.freeze({
-    leftWidth: 410,
-    rightWidth: 400,
-    leftMin: 220,
-    rightMin: 300,
-    centerMin: 560,
-    leftCompactMin: 160,
-    rightCompactMin: 220,
-    leftTopHeight: 360,
-    leftTopMin: 220,
-    leftBottomMin: 240,
-    leftTopCompactMin: 140,
-    leftBottomCompactMin: 180,
-    dividerWidth: 12,
-    leftVerticalDividerHeight: 12,
-    desktopBreakpoint: 1200,
+const el = collectRootElements(document);
+const layoutController = createLayoutController({
+    state,
+    el,
+    chatAPI,
+    ui,
+    windowObj: window,
+    documentObj: document,
 });
-
-const el = {
-    layout: document.querySelector('.layout'),
-    workspaceSidebar: document.querySelector('.workspace-sidebar'),
-    workspaceTopicCard: document.querySelector('.workspace-topic-card'),
-    sourceSidebarCard: document.querySelector('.source-sidebar-card'),
-    workspaceReaderPanel: document.getElementById('workspaceReaderPanel'),
-    workspaceReaderBackBtn: document.getElementById('workspaceReaderBackBtn'),
-    leftReaderGuideTabBtn: document.getElementById('leftReaderGuideTabBtn'),
-    leftReaderContentTabBtn: document.getElementById('leftReaderContentTabBtn'),
-    readerGuidePane: document.getElementById('readerGuidePane'),
-    readerContentPane: document.getElementById('readerContentPane'),
-    readerGuideContent: document.getElementById('readerGuideContent'),
-    readerGuideStatusBadge: document.getElementById('readerGuideStatusBadge'),
-    refreshReaderGuideBtn: document.getElementById('refreshReaderGuideBtn'),
-    chatStage: document.querySelector('.chat-stage'),
-    leftResizeHandle: document.getElementById('leftResizeHandle'),
-    rightResizeHandle: document.getElementById('rightResizeHandle'),
-    workspaceVerticalResizeHandle: document.getElementById('workspaceVerticalResizeHandle'),
-    titlebarCurrentAgent: document.getElementById('titlebarCurrentAgent'),
-    titlebarCurrentTopic: document.getElementById('titlebarCurrentTopic'),
-    workspaceCurrentAgent: document.getElementById('workspaceCurrentAgent'),
-    workspaceCurrentTopic: document.getElementById('workspaceCurrentTopic'),
-    agentList: document.getElementById('agentList'),
-    agentSearchInput: document.getElementById('agentSearchInput'),
-    topicSearchInput: document.getElementById('topicSearchInput'),
-    topicList: document.getElementById('topicList'),
-    currentChatAgentName: document.getElementById('currentChatAgentName'),
-    currentChatTopicName: document.getElementById('currentChatTopicName'),
-    currentTopicKnowledgeBaseSelect: document.getElementById('currentTopicKnowledgeBaseSelect'),
-    currentTopicKnowledgeBaseStatus: document.getElementById('currentTopicKnowledgeBaseStatus'),
-    sourcePanelKnowledgeBaseSelect: document.getElementById('sourcePanelKnowledgeBaseSelect'),
-    sourcePanelBindingStatus: document.getElementById('sourcePanelBindingStatus'),
-    topicActionMenu: document.getElementById('topicActionMenu'),
-    noteActionMenu: document.getElementById('noteActionMenu'),
-    sourceFileTooltip: document.getElementById('sourceFileTooltip'),
-    sourceFileActionMenu: document.getElementById('sourceFileActionMenu'),
-    chatMessages: document.getElementById('chatMessages'),
-    chatInputCard: document.querySelector('.chat-input-card'),
-    messageInput: document.getElementById('messageInput'),
-    sendMessageBtn: document.getElementById('sendMessageBtn'),
-    attachFileBtn: document.getElementById('attachFileBtn'),
-    emoticonTriggerBtn: document.getElementById('emoticonTriggerBtn'),
-    composerQuickNewTopicBtn: document.getElementById('composerQuickNewTopicBtn'),
-    hiddenFileInput: document.getElementById('hiddenFileInput'),
-    attachmentPreviewArea: document.getElementById('attachmentPreviewArea'),
-    emoticonPanel: document.getElementById('emoticonPanel'),
-    createNewAgentBtn: document.getElementById('createNewAgentBtn'),
-    quickNewTopicBtn: document.getElementById('quickNewTopicBtn'),
-    exportTopicBtn: document.getElementById('exportTopicBtn'),
-    openKnowledgeBaseManagerBtn: document.getElementById('openKnowledgeBaseManagerBtn'),
-    importTopicKnowledgeBaseFilesBtn: document.getElementById('importTopicKnowledgeBaseFilesBtn'),
-    topicKnowledgeBaseFilesStatus: document.getElementById('topicKnowledgeBaseFilesStatus'),
-    topicKnowledgeBaseFilesHint: document.getElementById('topicKnowledgeBaseFilesHint'),
-    topicKnowledgeBaseFiles: document.getElementById('topicKnowledgeBaseFiles'),
-    currentAgentSettingsBtn: document.getElementById('currentAgentSettingsBtn'),
-    settingsPanel: document.getElementById('settingsPanel'),
-    globalSettingsBtn: document.getElementById('globalSettingsBtn'),
-    themeToggleBtn: document.getElementById('themeToggleBtn'),
-    notesPanelTab: document.getElementById('notesPanelTab'),
-    settingsModal: document.getElementById('settingsModal'),
-    settingsModalBackdrop: document.getElementById('settingsModalBackdrop'),
-    settingsModalTitle: document.getElementById('settingsModalTitle'),
-    settingsModalSubtitle: document.getElementById('settingsModalSubtitle'),
-    settingsModalCloseBtn: document.getElementById('settingsModalCloseBtn'),
-    settingsModalFooter: document.getElementById('settingsModalFooter'),
-    settingsModalSectionGlobal: document.getElementById('settingsModalSectionGlobal'),
-    settingsModalSectionAgent: document.getElementById('settingsModalSectionAgent'),
-    settingsModalSectionKnowledgeBase: document.getElementById('settingsModalSectionKnowledgeBase'),
-    settingsNavButtons: document.querySelectorAll('[data-settings-section-button]'),
-    minimizeBtn: document.getElementById('minimize-btn'),
-    maximizeBtn: document.getElementById('maximize-btn'),
-    closeBtn: document.getElementById('close-btn'),
-    agentSettingsContainerTitle: document.getElementById('agentSettingsContainerTitle'),
-    selectedAgentNameForSettings: document.getElementById('selectedAgentNameForSettings'),
-    selectAgentPromptForSettings: document.getElementById('selectAgentPromptForSettings'),
-    agentSettingsContainer: document.getElementById('agentSettingsContainer'),
-    deleteAgentBtn: document.getElementById('deleteAgentBtn'),
-    saveAgentSettingsBtn: document.getElementById('saveAgentSettingsBtn'),
-    editingAgentId: document.getElementById('editingAgentId'),
-    agentNameInput: document.getElementById('agentNameInput'),
-    agentAvatarPreview: document.getElementById('agentAvatarPreview'),
-    agentAvatarInput: document.getElementById('agentAvatarInput'),
-    agentModel: document.getElementById('agentModel'),
-    agentTemperature: document.getElementById('agentTemperature'),
-    agentContextTokenLimit: document.getElementById('agentContextTokenLimit'),
-    agentMaxOutputTokens: document.getElementById('agentMaxOutputTokens'),
-    agentTopP: document.getElementById('agentTopP'),
-    agentTopK: document.getElementById('agentTopK'),
-    agentStreamOutputTrue: document.getElementById('agentStreamOutputTrue'),
-    agentStreamOutputFalse: document.getElementById('agentStreamOutputFalse'),
-    agentAvatarBorderColor: document.getElementById('agentAvatarBorderColor'),
-    agentAvatarBorderColorText: document.getElementById('agentAvatarBorderColorText'),
-    agentNameTextColor: document.getElementById('agentNameTextColor'),
-    agentNameTextColorText: document.getElementById('agentNameTextColorText'),
-    agentCardCss: document.getElementById('agentCardCss'),
-    agentChatCss: document.getElementById('agentChatCss'),
-    agentCustomCss: document.getElementById('agentCustomCss'),
-    disableCustomColors: document.getElementById('disableCustomColors'),
-    useThemeColorsInChat: document.getElementById('useThemeColorsInChat'),
-    userNameInput: document.getElementById('userNameInput'),
-    vcpServerUrl: document.getElementById('vcpServerUrl'),
-    vcpApiKey: document.getElementById('vcpApiKey'),
-    kbBaseUrl: document.getElementById('kbBaseUrl'),
-    kbApiKey: document.getElementById('kbApiKey'),
-    kbEmbeddingModel: document.getElementById('kbEmbeddingModel'),
-    kbUseRerank: document.getElementById('kbUseRerank'),
-    kbRerankModel: document.getElementById('kbRerankModel'),
-    kbTopK: document.getElementById('kbTopK'),
-    kbCandidateTopK: document.getElementById('kbCandidateTopK'),
-    kbScoreThreshold: document.getElementById('kbScoreThreshold'),
-    chatFontPreset: document.getElementById('chatFontPreset'),
-    chatCodeFontPreset: document.getElementById('chatCodeFontPreset'),
-    chatBubbleMaxWidthWideDefault: document.getElementById('chatBubbleMaxWidthWideDefault'),
-    enableAgentBubbleTheme: document.getElementById('enableAgentBubbleTheme'),
-    enableWideChatLayout: document.getElementById('enableWideChatLayout'),
-    enableSmoothStreaming: document.getElementById('enableSmoothStreaming'),
-    saveGlobalSettingsBtn: document.getElementById('saveGlobalSettingsBtn'),
-    systemPromptContainer: document.getElementById('systemPromptContainer'),
-    knowledgeBaseNameInput: document.getElementById('knowledgeBaseNameInput'),
-    createKnowledgeBaseBtn: document.getElementById('createKnowledgeBaseBtn'),
-    renameKnowledgeBaseBtn: document.getElementById('renameKnowledgeBaseBtn'),
-    deleteKnowledgeBaseBtn: document.getElementById('deleteKnowledgeBaseBtn'),
-    importKnowledgeBaseFilesBtn: document.getElementById('importKnowledgeBaseFilesBtn'),
-    hiddenKnowledgeBaseFileInput: document.getElementById('hiddenKnowledgeBaseFileInput'),
-    hiddenTopicKnowledgeBaseFileInput: document.getElementById('hiddenTopicKnowledgeBaseFileInput'),
-    knowledgeBaseList: document.getElementById('knowledgeBaseList'),
-    knowledgeBaseDocuments: document.getElementById('knowledgeBaseDocuments'),
-    knowledgeBaseSelectionSummary: document.getElementById('knowledgeBaseSelectionSummary'),
-    knowledgeBaseDebugQueryInput: document.getElementById('knowledgeBaseDebugQueryInput'),
-    runKnowledgeBaseSearchBtn: document.getElementById('runKnowledgeBaseSearchBtn'),
-    runKnowledgeBaseDebugBtn: document.getElementById('runKnowledgeBaseDebugBtn'),
-    knowledgeBaseDebugResults: document.getElementById('knowledgeBaseDebugResults'),
-    notesList: document.getElementById('notesList'),
-    notesWorkspaceCard: document.getElementById('notesWorkspaceCard'),
-    notesStudioOpenBtn: document.getElementById('notesStudioOpenBtn'),
-    newNoteFabBtn: document.getElementById('newNoteFabBtn'),
-    noteDetailModal: document.getElementById('noteDetailModal'),
-    noteDetailModalBackdrop: document.getElementById('noteDetailModalBackdrop'),
-    noteDetailBackBtn: document.getElementById('flashcardsBackToNotesBtn'),
-    noteDetailCloseBtn: document.getElementById('noteDetailCloseBtn'),
-    noteDetailTitle: document.getElementById('noteDetailTitle'),
-    noteDetailSubtitle: document.getElementById('noteDetailSubtitle'),
-    noteDetailEyebrow: document.getElementById('noteDetailEyebrow'),
-    noteEditorCard: document.getElementById('noteEditorCard'),
-    notesSelectionSummary: document.getElementById('notesSelectionSummary'),
-    topicNotesScopeBtn: document.getElementById('topicNotesScopeBtn'),
-    agentNotesScopeBtn: document.getElementById('agentNotesScopeBtn'),
-    newNoteBtn: document.getElementById('newNoteBtn'),
-    saveNoteBtn: document.getElementById('saveNoteBtn'),
-    deleteNoteBtn: document.getElementById('deleteNoteBtn'),
-    analyzeNotesBtn: document.getElementById('analyzeNotesBtn'),
-    generateQuizBtn: document.getElementById('generateQuizBtn'),
-    generateFlashcardsBtn: document.getElementById('generateFlashcardsBtn'),
-    noteTitleInput: document.getElementById('noteTitleInput'),
-    noteContentInput: document.getElementById('noteContentInput'),
-    noteMetaSummary: document.getElementById('noteMetaSummary'),
-    flashcardsPracticeCard: document.getElementById('flashcardsPracticeCard'),
-    flashcardsBackToNotesBtn: document.getElementById('flashcardsBackToNotesBtn'),
-    flashcardsDeckTitle: document.getElementById('flashcardsDeckTitle'),
-    flashcardsDeckMeta: document.getElementById('flashcardsDeckMeta'),
-    flashcardsDeckProgress: document.getElementById('flashcardsDeckProgress'),
-    flashcardsUnknownCount: document.getElementById('flashcardsUnknownCount'),
-    flashcardsKnownCount: document.getElementById('flashcardsKnownCount'),
-    flashcardCardButton: document.getElementById('flashcardCardButton'),
-    flashcardFrontContent: document.getElementById('flashcardFrontContent'),
-    flashcardBackContent: document.getElementById('flashcardBackContent'),
-    flashcardsPrevBtn: document.getElementById('flashcardsPrevBtn'),
-    flashcardsNextBtn: document.getElementById('flashcardsNextBtn'),
-    flashcardsMarkUnknownBtn: document.getElementById('flashcardsMarkUnknownBtn'),
-    flashcardsMarkKnownBtn: document.getElementById('flashcardsMarkKnownBtn'),
-    selectionContextPreview: document.getElementById('selectionContextPreview'),
-    readerDocumentTitle: document.getElementById('readerDocumentTitle'),
-    readerDocumentMeta: document.getElementById('readerDocumentMeta'),
-    readerLocationBadge: document.getElementById('readerLocationBadge'),
-    readerIndexStatusBadge: document.getElementById('readerIndexStatusBadge'),
-    readerProcessingStatusBadge: document.getElementById('readerProcessingStatusBadge'),
-    readerPrevBtn: document.getElementById('readerPrevBtn'),
-    readerNextBtn: document.getElementById('readerNextBtn'),
-    readerSelectionBar: document.getElementById('readerSelectionBar'),
-    readerSelectionSummary: document.getElementById('readerSelectionSummary'),
-    clearReaderSelectionBtn: document.getElementById('clearReaderSelectionBtn'),
-    injectReaderSelectionBtn: document.getElementById('injectReaderSelectionBtn'),
-    readerContent: document.getElementById('readerContent'),
-};
+const {
+    normalizeStoredLayoutWidth,
+    normalizeStoredLayoutHeight,
+    applyLayoutWidths,
+    applyLeftSidebarHeights,
+    scheduleLayoutRefresh,
+    initializeResizableLayout,
+    beginLayoutResize,
+    updateLayoutResize,
+    endLayoutResize,
+    beginVerticalLayoutResize,
+    updateVerticalLayoutResize,
+    endVerticalLayoutResize,
+} = layoutController;
+const settingsController = createSettingsController({
+    state,
+    el,
+    chatAPI,
+    windowObj: window,
+    documentObj: document,
+    messageRendererApi: messageRenderer,
+    normalizeStoredLayoutWidth,
+    normalizeStoredLayoutHeight,
+    applyLayoutWidths,
+    applyLeftSidebarHeights,
+});
+const {
+    applyTheme,
+    applyRendererSettings,
+    syncGlobalSettingsForm,
+    loadSettings,
+    switchSettingsModalSection,
+    openSettingsModal,
+    closeSettingsModal,
+} = settingsController;
 
 let markedInstance;
 let knowledgeBasePollTimer = null;
 let knowledgeBasePollInFlight = false;
-let layoutResizeFrame = 0;
-let layoutPanelObserver = null;
-let settingsModalTrigger = null;
 let noteDetailTrigger = null;
 const DEFAULT_SEND_BUTTON_HTML = el.sendMessageBtn?.innerHTML || '';
 const INTERRUPT_SEND_BUTTON_HTML = `
@@ -335,11 +101,14 @@ function renderMarkdownFragment(text) {
         return '';
     }
 
-    if (markedInstance?.parse) {
-        return markedInstance.parse(markdown);
-    }
-
-    return `<p>${escapeHtml(markdown)}</p>`;
+    return renderMarkdownToSafeHtml(
+        markdown,
+        markedInstance || {
+            parse(value) {
+                return `<p>${escapeHtml(value)}</p>`;
+            },
+        },
+    );
 }
 
 function extractStructuredJsonPayload(text) {
@@ -470,323 +239,6 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
-function isDesktopResizableLayout() {
-    return window.innerWidth > LAYOUT_DEFAULTS.desktopBreakpoint;
-}
-
-function isRightPanelCollapsed() {
-    return false;
-}
-
-function getLayoutContentWidth() {
-    if (!el.layout) {
-        return 0;
-    }
-
-    const rect = el.layout.getBoundingClientRect();
-    const styles = window.getComputedStyle(el.layout);
-    const paddingLeft = Number.parseFloat(styles.paddingLeft || '0') || 0;
-    const paddingRight = Number.parseFloat(styles.paddingRight || '0') || 0;
-    return Math.max(0, rect.width - paddingLeft - paddingRight);
-}
-
-function normalizeStoredLayoutWidth(value, fallback) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function normalizeStoredLayoutHeight(value, fallback) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function consumeWidth(value, floor, requested) {
-    const available = Math.max(0, value - floor);
-    const used = Math.min(requested, available);
-    return {
-        value: value - used,
-        used,
-    };
-}
-
-function resolveLayoutWidths(desiredLeft = state.layoutLeftWidth, desiredRight = state.layoutRightWidth, options = {}) {
-    const collapsed = options.collapsed ?? isRightPanelCollapsed();
-    const dividerWidth = LAYOUT_DEFAULTS.dividerWidth;
-    const effectiveRightDividerWidth = collapsed ? 0 : dividerWidth;
-    const contentWidth = getLayoutContentWidth();
-    const panelBudget = Math.max(0, contentWidth - dividerWidth - effectiveRightDividerWidth);
-
-    let left = Math.min(
-        Math.max(normalizeStoredLayoutWidth(desiredLeft, LAYOUT_DEFAULTS.leftWidth), LAYOUT_DEFAULTS.leftCompactMin),
-        panelBudget
-    );
-    let right = 0;
-
-    if (!collapsed) {
-        const remainingAfterLeft = Math.max(0, panelBudget - left);
-        right = Math.min(
-            Math.max(normalizeStoredLayoutWidth(desiredRight, LAYOUT_DEFAULTS.rightWidth), LAYOUT_DEFAULTS.rightCompactMin),
-            remainingAfterLeft
-        );
-    }
-
-    let center = Math.max(0, panelBudget - left - right);
-
-    if (center < LAYOUT_DEFAULTS.centerMin) {
-        let shortage = LAYOUT_DEFAULTS.centerMin - center;
-        let reduction = consumeWidth(left, LAYOUT_DEFAULTS.leftMin, shortage);
-        left = reduction.value;
-        shortage -= reduction.used;
-
-        if (!collapsed && shortage > 0) {
-            reduction = consumeWidth(right, LAYOUT_DEFAULTS.rightMin, shortage);
-            right = reduction.value;
-            shortage -= reduction.used;
-        }
-
-        if (shortage > 0) {
-            reduction = consumeWidth(left, LAYOUT_DEFAULTS.leftCompactMin, shortage);
-            left = reduction.value;
-            shortage -= reduction.used;
-        }
-
-        if (!collapsed && shortage > 0) {
-            reduction = consumeWidth(right, LAYOUT_DEFAULTS.rightCompactMin, shortage);
-            right = reduction.value;
-        }
-
-        center = Math.max(0, panelBudget - left - right);
-    }
-
-    return {
-        left: Math.round(left),
-        right: Math.round(right),
-        center: Math.round(center),
-        collapsed,
-        dividerWidth,
-        effectiveRightDividerWidth,
-    };
-}
-
-function syncLayoutHandleVisibility() {
-    const desktopMode = isDesktopResizableLayout();
-    el.leftResizeHandle?.classList.toggle('layout-splitter--hidden', !desktopMode);
-    el.rightResizeHandle?.classList.toggle('layout-splitter--hidden', !desktopMode);
-    el.workspaceVerticalResizeHandle?.classList.toggle('layout-splitter--hidden', !desktopMode);
-}
-
-function getLeftSidebarContentHeight() {
-    if (!el.workspaceSidebar) {
-        return 0;
-    }
-
-    const rect = el.workspaceSidebar.getBoundingClientRect();
-    return Math.max(0, rect.height);
-}
-
-function resolveLeftSidebarHeights(desiredTop = state.layoutLeftTopHeight) {
-    const dividerHeight = LAYOUT_DEFAULTS.leftVerticalDividerHeight;
-    const contentHeight = getLeftSidebarContentHeight();
-    const panelBudget = Math.max(0, contentHeight - dividerHeight);
-    const canHonorFullMins = panelBudget >= (LAYOUT_DEFAULTS.leftTopMin + LAYOUT_DEFAULTS.leftBottomMin);
-    const topFloor = canHonorFullMins ? LAYOUT_DEFAULTS.leftTopMin : LAYOUT_DEFAULTS.leftTopCompactMin;
-    const bottomFloor = canHonorFullMins ? LAYOUT_DEFAULTS.leftBottomMin : LAYOUT_DEFAULTS.leftBottomCompactMin;
-    const maxTop = Math.max(topFloor, panelBudget - bottomFloor);
-
-    let top = clamp(
-        normalizeStoredLayoutHeight(desiredTop, LAYOUT_DEFAULTS.leftTopHeight),
-        topFloor,
-        maxTop
-    );
-    let bottom = Math.max(0, panelBudget - top);
-
-    if (bottom < bottomFloor) {
-        bottom = Math.min(panelBudget, bottomFloor);
-        top = Math.max(0, panelBudget - bottom);
-    }
-
-    return {
-        top: Math.round(top),
-        bottom: Math.round(bottom),
-        dividerHeight,
-    };
-}
-
-function applyLayoutWidths() {
-    if (!el.layout || !state.layoutInitialized) {
-        return;
-    }
-
-    if (!isDesktopResizableLayout()) {
-        el.layout.style.removeProperty('--unistudy-left-width');
-        el.layout.style.removeProperty('--unistudy-right-width');
-        el.layout.style.removeProperty('--unistudy-effective-right-width');
-        el.layout.style.removeProperty('--unistudy-divider-width');
-        el.layout.style.removeProperty('--unistudy-effective-right-divider-width');
-        syncLayoutHandleVisibility();
-        return;
-    }
-
-    const resolved = resolveLayoutWidths(state.layoutLeftWidth, state.layoutRightWidth);
-    state.layoutLeftWidth = resolved.left;
-    if (!resolved.collapsed) {
-        state.layoutRightWidth = resolved.right;
-    }
-
-    el.layout.style.setProperty('--unistudy-left-width', `${resolved.left}px`);
-    el.layout.style.setProperty('--unistudy-right-width', `${state.layoutRightWidth}px`);
-    el.layout.style.setProperty('--unistudy-effective-right-width', `${resolved.collapsed ? 0 : resolved.right}px`);
-    el.layout.style.setProperty('--unistudy-center-min', `${LAYOUT_DEFAULTS.centerMin}px`);
-    el.layout.style.setProperty('--unistudy-divider-width', `${resolved.dividerWidth}px`);
-    el.layout.style.setProperty('--unistudy-effective-right-divider-width', `${resolved.effectiveRightDividerWidth}px`);
-
-    syncLayoutHandleVisibility();
-}
-
-function applyLeftSidebarHeights() {
-    if (!el.workspaceSidebar || !state.layoutInitialized) {
-        return;
-    }
-
-    if (!isDesktopResizableLayout()) {
-        el.workspaceSidebar.style.removeProperty('--unistudy-left-top-height');
-        el.workspaceSidebar.style.removeProperty('--unistudy-left-vertical-divider-height');
-        syncLayoutHandleVisibility();
-        return;
-    }
-
-    const resolved = resolveLeftSidebarHeights(state.layoutLeftTopHeight);
-    state.layoutLeftTopHeight = resolved.top;
-    el.workspaceSidebar.style.setProperty('--unistudy-left-top-height', `${resolved.top}px`);
-    el.workspaceSidebar.style.setProperty('--unistudy-left-vertical-divider-height', `${resolved.dividerHeight}px`);
-    syncLayoutHandleVisibility();
-}
-
-function scheduleLayoutRefresh() {
-    if (layoutResizeFrame) {
-        cancelAnimationFrame(layoutResizeFrame);
-    }
-    layoutResizeFrame = requestAnimationFrame(() => {
-        layoutResizeFrame = 0;
-        applyLayoutWidths();
-        applyLeftSidebarHeights();
-    });
-}
-
-async function persistLayoutWidths() {
-    const patch = {
-        layoutLeftWidth: Math.round(state.layoutLeftWidth),
-        layoutRightWidth: Math.round(state.layoutRightWidth),
-        layoutLeftTopHeight: Math.round(state.layoutLeftTopHeight),
-    };
-
-    if (
-        patch.layoutLeftWidth === state.settings.layoutLeftWidth
-        && patch.layoutRightWidth === state.settings.layoutRightWidth
-        && patch.layoutLeftTopHeight === state.settings.layoutLeftTopHeight
-    ) {
-        return;
-    }
-
-    const result = await chatAPI.saveSettings(patch);
-    if (!result?.success) {
-        ui.showToastNotification(`保存布局失败：${result?.error || '未知错误'}`, 'error');
-        return;
-    }
-
-    state.settings = { ...state.settings, ...patch };
-    window.globalSettings = state.settings;
-}
-
-function initializeResizableLayout() {
-    if (state.layoutInitialized) {
-        applyLayoutWidths();
-        applyLeftSidebarHeights();
-        return;
-    }
-
-    state.layoutLeftWidth = normalizeStoredLayoutWidth(state.settings.layoutLeftWidth, LAYOUT_DEFAULTS.leftWidth);
-    state.layoutRightWidth = normalizeStoredLayoutWidth(state.settings.layoutRightWidth, LAYOUT_DEFAULTS.rightWidth);
-    state.layoutLeftTopHeight = normalizeStoredLayoutHeight(state.settings.layoutLeftTopHeight, LAYOUT_DEFAULTS.leftTopHeight);
-    state.layoutInitialized = true;
-    applyLayoutWidths();
-    applyLeftSidebarHeights();
-}
-
-function beginLayoutResize(handle, event) {
-    if (!isDesktopResizableLayout()) {
-        return;
-    }
-
-    state.activeResizeHandle = handle;
-    document.body.classList.add('layout-resizing');
-    event.preventDefault();
-}
-
-function updateLayoutResize(event) {
-    if (!state.activeResizeHandle || !isDesktopResizableLayout() || !el.layout) {
-        return;
-    }
-
-    const layoutRect = el.layout.getBoundingClientRect();
-    const styles = window.getComputedStyle(el.layout);
-    const paddingLeft = Number.parseFloat(styles.paddingLeft || '0') || 0;
-    const contentLeft = layoutRect.left + paddingLeft;
-    const contentWidth = getLayoutContentWidth();
-    const offsetX = clamp(event.clientX - contentLeft, 0, contentWidth);
-    const handleOffset = LAYOUT_DEFAULTS.dividerWidth / 2;
-
-    if (state.activeResizeHandle === 'left') {
-        state.layoutLeftWidth = Math.round(offsetX - handleOffset);
-    } else if (state.activeResizeHandle === 'right') {
-        state.layoutRightWidth = Math.round(contentWidth - offsetX - handleOffset);
-    }
-
-    applyLayoutWidths();
-}
-
-function endLayoutResize() {
-    if (!state.activeResizeHandle) {
-        return;
-    }
-
-    state.activeResizeHandle = null;
-    document.body.classList.remove('layout-resizing');
-    void persistLayoutWidths();
-}
-
-function beginVerticalLayoutResize(event) {
-    if (!isDesktopResizableLayout()) {
-        return;
-    }
-
-    state.activeVerticalResizeHandle = 'workspace';
-    document.body.classList.add('layout-resizing-vertical');
-    event.preventDefault();
-}
-
-function updateVerticalLayoutResize(event) {
-    if (!state.activeVerticalResizeHandle || !isDesktopResizableLayout() || !el.workspaceSidebar) {
-        return;
-    }
-
-    const sidebarRect = el.workspaceSidebar.getBoundingClientRect();
-    const offsetY = clamp(event.clientY - sidebarRect.top, 0, sidebarRect.height);
-    const handleOffset = LAYOUT_DEFAULTS.leftVerticalDividerHeight / 2;
-    state.layoutLeftTopHeight = Math.round(offsetY - handleOffset);
-    applyLeftSidebarHeights();
-}
-
-function endVerticalLayoutResize() {
-    if (!state.activeVerticalResizeHandle) {
-        return;
-    }
-
-    state.activeVerticalResizeHandle = null;
-    document.body.classList.remove('layout-resizing-vertical');
-    void persistLayoutWidths();
-}
-
 function initMarked() {
     if (window.marked && typeof window.marked.Marked === 'function') {
         markedInstance = new window.marked.Marked({
@@ -815,66 +267,6 @@ function initMarked() {
     };
 }
 
-function applyTheme(theme) {
-    document.body.classList.toggle('dark-theme', theme === 'dark');
-    document.body.classList.toggle('light-theme', theme !== 'dark');
-}
-
-function applyRendererSettings() {
-    const chatFonts = {
-        system: '"Segoe UI", "PingFang SC", sans-serif',
-        serif: 'Georgia, "Noto Serif SC", serif',
-        monospace: '"Cascadia Code", "Consolas", monospace',
-        consolas: '"Cascadia Code", "Consolas", monospace',
-    };
-
-    document.documentElement.style.setProperty('--lite-chat-max-width', `${Number(state.settings.chatBubbleMaxWidthWideDefault || 92)}%`);
-    document.documentElement.style.setProperty('--lite-chat-font', chatFonts[state.settings.chatFontPreset] || chatFonts.system);
-    document.documentElement.style.setProperty('--lite-code-font', chatFonts[state.settings.chatCodeFontPreset] || chatFonts.consolas);
-    document.body.classList.toggle('wide-chat-layout', state.settings.enableWideChatLayout === true);
-}
-
-function syncGlobalSettingsForm() {
-    el.userNameInput.value = state.settings.userName || '';
-    el.vcpServerUrl.value = state.settings.vcpServerUrl || '';
-    el.vcpApiKey.value = state.settings.vcpApiKey || '';
-    el.kbBaseUrl.value = state.settings.kbBaseUrl || '';
-    el.kbApiKey.value = state.settings.kbApiKey || '';
-    el.kbEmbeddingModel.value = state.settings.kbEmbeddingModel || '';
-    el.kbUseRerank.checked = state.settings.kbUseRerank !== false;
-    el.kbRerankModel.value = state.settings.kbRerankModel || 'BAAI/bge-reranker-v2-m3';
-    el.kbTopK.value = state.settings.kbTopK ?? 6;
-    el.kbCandidateTopK.value = state.settings.kbCandidateTopK ?? 20;
-    el.kbScoreThreshold.value = state.settings.kbScoreThreshold ?? 0.25;
-    el.chatFontPreset.value = state.settings.chatFontPreset || 'system';
-    el.chatCodeFontPreset.value = state.settings.chatCodeFontPreset || 'consolas';
-    el.chatBubbleMaxWidthWideDefault.value = state.settings.chatBubbleMaxWidthWideDefault ?? 92;
-    el.enableAgentBubbleTheme.checked = state.settings.enableAgentBubbleTheme === true;
-    el.enableWideChatLayout.checked = state.settings.enableWideChatLayout !== false;
-    el.enableSmoothStreaming.checked = state.settings.enableSmoothStreaming === true;
-
-    const themeMode = state.settings.currentThemeMode || 'system';
-    const themeInput = document.querySelector(`input[name="themeMode"][value="${themeMode}"]`);
-    if (themeInput) themeInput.checked = true;
-}
-
-async function loadSettings() {
-    const loaded = await chatAPI.loadSettings();
-    state.settings = { ...state.settings, ...(loaded || {}) };
-    window.globalSettings = state.settings;
-    syncGlobalSettingsForm();
-    applyRendererSettings();
-    if (state.layoutInitialized) {
-        state.layoutLeftWidth = normalizeStoredLayoutWidth(state.settings.layoutLeftWidth, state.layoutLeftWidth);
-        state.layoutRightWidth = normalizeStoredLayoutWidth(state.settings.layoutRightWidth, state.layoutRightWidth);
-        state.layoutLeftTopHeight = normalizeStoredLayoutHeight(state.settings.layoutLeftTopHeight, state.layoutLeftTopHeight);
-        applyLayoutWidths();
-        applyLeftSidebarHeights();
-    }
-    messageRenderer?.setUserAvatar(state.settings.userAvatarUrl || '../assets/default_user_avatar.png');
-    messageRenderer?.setUserAvatarColor(state.settings.userAvatarCalculatedColor || null);
-}
-
 function getCurrentTopic() {
     return state.topics.find((topic) => topic.id === state.currentTopicId) || null;
 }
@@ -900,77 +292,6 @@ function setRightPanelMode(mode) {
     setSidePanelTab('notes');
     el.noteEditorCard?.classList.toggle('hidden', nextMode !== 'notes');
     el.flashcardsPracticeCard?.classList.toggle('hidden', nextMode !== 'flashcards');
-}
-
-const SETTINGS_MODAL_META = Object.freeze({
-    global: {
-        title: '全局设置',
-        subtitle: '管理账号、VCP 连接、渲染样式与主题外观。',
-    },
-    agent: {
-        title: '智能体设置',
-        subtitle: '调整当前学科入口的模型、提示词、输出参数与聊天样式。',
-    },
-    'knowledge-base': {
-        title: '来源管理',
-        subtitle: '统一维护 Source 模型、来源库文档与调试工具。',
-    },
-});
-
-function switchSettingsModalSection(section) {
-    const nextSection = Object.prototype.hasOwnProperty.call(SETTINGS_MODAL_META, section)
-        ? section
-        : 'global';
-    state.settingsModalSection = nextSection;
-
-    el.settingsNavButtons?.forEach((button) => {
-        const active = button.dataset.settingsSectionButton === nextSection;
-        button.classList.toggle('settings-modal__nav-button--active', active);
-        button.setAttribute('aria-current', active ? 'page' : 'false');
-    });
-
-    const sections = [
-        ['global', el.settingsModalSectionGlobal],
-        ['agent', el.settingsModalSectionAgent],
-        ['knowledge-base', el.settingsModalSectionKnowledgeBase],
-    ];
-    sections.forEach(([name, node]) => {
-        const active = name === nextSection;
-        node?.classList.toggle('hidden', !active);
-        node?.classList.toggle('settings-modal__section--active', active);
-    });
-
-    const meta = SETTINGS_MODAL_META[nextSection];
-    if (el.settingsModalTitle) {
-        el.settingsModalTitle.textContent = meta.title;
-    }
-    if (el.settingsModalSubtitle) {
-        el.settingsModalSubtitle.textContent = meta.subtitle;
-    }
-    el.settingsModalFooter?.classList.toggle('hidden', nextSection === 'agent');
-}
-
-function openSettingsModal(section = 'global', trigger = null) {
-    if (trigger instanceof HTMLElement) {
-        settingsModalTrigger = trigger;
-    }
-    switchSettingsModalSection(section);
-    el.settingsModal?.classList.remove('hidden');
-    el.settingsModal?.classList.add('settings-modal--open');
-    el.settingsModal?.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('settings-modal-open');
-    el.settingsModalCloseBtn?.focus();
-}
-
-function closeSettingsModal() {
-    el.settingsModal?.classList.add('hidden');
-    el.settingsModal?.classList.remove('settings-modal--open');
-    el.settingsModal?.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('settings-modal-open');
-    if (settingsModalTrigger instanceof HTMLElement && document.body.contains(settingsModalTrigger)) {
-        settingsModalTrigger.focus();
-    }
-    settingsModalTrigger = null;
 }
 
 const NOTE_DETAIL_META = Object.freeze({
@@ -1380,10 +701,14 @@ function renderReaderPanel() {
             </div>
         `;
     } else if (reader.guideMarkdown) {
-        const rendered = markedInstance?.parse ? markedInstance.parse(reader.guideMarkdown) : `<pre>${escapeHtml(reader.guideMarkdown)}</pre>`;
-        const sanitized = window.DOMPurify?.sanitize
-            ? window.DOMPurify.sanitize(rendered)
-            : rendered;
+        const sanitized = renderMarkdownToSafeHtml(
+            reader.guideMarkdown,
+            markedInstance || {
+                parse(value) {
+                    return `<pre>${escapeHtml(value)}</pre>`;
+                },
+            },
+        );
         el.readerGuideContent.innerHTML = `
             <article class="reader-guide-card">
                 ${sanitized}
@@ -4065,9 +3390,6 @@ async function populateAgentForm(config) {
     el.agentAvatarBorderColorText.value = config.avatarBorderColor || '#3d5a80';
     el.agentNameTextColor.value = config.nameTextColor || '#ffffff';
     el.agentNameTextColorText.value = config.nameTextColor || '#ffffff';
-    el.agentCardCss.value = config.cardCss || '';
-    el.agentChatCss.value = config.chatCss || '';
-    el.agentCustomCss.value = config.customCss || '';
     el.disableCustomColors.checked = config.disableCustomColors === true;
     el.useThemeColorsInChat.checked = config.useThemeColorsInChat === true;
     await syncPromptModule(state.currentSelectedItem.id, config);
@@ -4453,9 +3775,6 @@ async function saveAgentSettings() {
         streamOutput: el.agentStreamOutputTrue.checked,
         avatarBorderColor: el.agentAvatarBorderColor.value,
         nameTextColor: el.agentNameTextColor.value,
-        cardCss: el.agentCardCss.value,
-        chatCss: el.agentChatCss.value,
-        customCss: el.agentCustomCss.value,
         disableCustomColors: el.disableCustomColors.checked,
         useThemeColorsInChat: el.useThemeColorsInChat.checked,
         promptMode: 'original',
@@ -5557,8 +4876,14 @@ async function initInputFeatures() {
 }
 
 async function bootstrap() {
-    if (!chatAPI) {
-        throw new Error('Preload bridge missing.');
+    const bridgeDiagnostics = {
+        chatAPI: Boolean(window.chatAPI),
+        electronAPI: Boolean(window.electronAPI),
+        electronPath: Boolean(window.electronPath),
+    };
+
+    if (!bridgeDiagnostics.chatAPI || !bridgeDiagnostics.electronAPI || !bridgeDiagnostics.electronPath) {
+        throw new Error(`Preload bridge missing: ${JSON.stringify(bridgeDiagnostics)}`);
     }
 
     syncWorkspaceContext();

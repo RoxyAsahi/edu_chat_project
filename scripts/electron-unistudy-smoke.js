@@ -2,6 +2,13 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 const { _electron: electron } = require('playwright');
+const {
+    createTempDataRootFromFixture,
+    ensureFixtureDataRoot,
+    resolveFixtureDataRoot,
+    resolveRequiredExternalDataRoot,
+} = require('./lib/runtime-data-roots');
+const { buildPreloadBundles } = require('./lib/preload-bundles');
 
 function readOptionalEnv(name, fallback = '') {
     const value = String(process.env[name] || '').trim();
@@ -319,6 +326,7 @@ function buildScenarios(mode, fixtures, runStamp) {
 }
 
 async function launchApp(dataRoot) {
+    await buildPreloadBundles();
     return electron.launch({
         args: [path.resolve(__dirname, '..')],
         cwd: path.resolve(__dirname, '..'),
@@ -330,12 +338,210 @@ async function launchApp(dataRoot) {
     });
 }
 
+async function waitForWindowCount(app, expectedCount, timeoutMs = 15000) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+        const windows = app.windows();
+        if (windows.length === expectedCount) {
+            return windows;
+        }
+        await delay(250);
+    }
+
+    return app.windows();
+}
+
+async function waitForFirstWindow(app, timeoutMs = 30000) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+        const windows = app.windows();
+        if (windows.length > 0) {
+            return windows[0];
+        }
+        await delay(250);
+    }
+
+    throw new Error(`Timed out waiting for the first Electron window after ${timeoutMs}ms.`);
+}
+
+async function readMainBridgeStatus(page) {
+    return page.evaluate(() => ({
+        chatAPI: Boolean(window.chatAPI),
+        electronAPI: Boolean(window.electronAPI),
+        electronPath: Boolean(window.electronPath),
+        openTextInNewWindow: typeof window.chatAPI?.openTextInNewWindow === 'function',
+        openImageViewer: typeof window.chatAPI?.openImageViewer === 'function',
+    })).catch((error) => ({
+        chatAPI: false,
+        electronAPI: false,
+        electronPath: false,
+        openTextInNewWindow: false,
+        openImageViewer: false,
+        evaluationError: error?.message || String(error),
+    }));
+}
+
+async function waitForMainBridge(page, timeoutMs = 30000) {
+    const startedAt = Date.now();
+    let lastStatus = null;
+
+    while (Date.now() - startedAt < timeoutMs) {
+        lastStatus = await readMainBridgeStatus(page);
+        if (lastStatus.chatAPI
+            && lastStatus.electronAPI
+            && lastStatus.electronPath
+            && lastStatus.openTextInNewWindow
+            && lastStatus.openImageViewer) {
+            return lastStatus;
+        }
+        await delay(250);
+    }
+
+    throw new Error(`Timed out waiting for main preload bridge: ${JSON.stringify(lastStatus)}`);
+}
+
+async function readViewerBridgeStatus(page) {
+    return page.evaluate(() => ({
+        utilityAPI: Boolean(window.utilityAPI),
+        electronAPI: Boolean(window.electronAPI),
+        electronPath: Boolean(window.electronPath),
+        getCurrentTheme: typeof window.utilityAPI?.getCurrentTheme === 'function',
+        openImageViewer: typeof window.utilityAPI?.openImageViewer === 'function',
+    })).catch((error) => ({
+        utilityAPI: false,
+        electronAPI: false,
+        electronPath: false,
+        getCurrentTheme: false,
+        openImageViewer: false,
+        evaluationError: error?.message || String(error),
+    }));
+}
+
+async function waitForViewerBridge(page, timeoutMs = 30000) {
+    const startedAt = Date.now();
+    let lastStatus = null;
+
+    while (Date.now() - startedAt < timeoutMs) {
+        lastStatus = await readViewerBridgeStatus(page);
+        if (lastStatus.utilityAPI
+            && lastStatus.electronAPI
+            && lastStatus.electronPath
+            && lastStatus.getCurrentTheme
+            && lastStatus.openImageViewer) {
+            return lastStatus;
+        }
+        await delay(250);
+    }
+
+    throw new Error(`Timed out waiting for viewer preload bridge: ${JSON.stringify(lastStatus)}`);
+}
+
+function getChildWindow(app, mainWindow) {
+    return app.windows().find((window) => window !== mainWindow) || null;
+}
+
+async function closeViewerWindow(viewerWindow, app) {
+    await viewerWindow.evaluate(() => {
+        document.getElementById('close-viewer-btn')?.click();
+    }).catch(() => {});
+    await waitForWindowCount(app, 1, 15000);
+}
+
+async function runViewerSmoke(dataRoot) {
+    let lastResult = null;
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const app = await launchApp(dataRoot);
+        const result = {
+            passed: false,
+            attempt,
+            textViewer: {},
+            imageViewer: {},
+            error: null,
+        };
+
+        try {
+            const page = await waitForFirstWindow(app, 30000);
+            await page.waitForLoadState('domcontentloaded');
+            await waitForMainBridge(page, 30000);
+
+            await page.evaluate(() => window.chatAPI.setTheme('dark'));
+
+            await page.evaluate(() => window.chatAPI.openTextInNewWindow('Viewer smoke **ok**', 'Viewer Smoke Text', 'dark'));
+            await waitForWindowCount(app, 2, 15000);
+            const textWindow = getChildWindow(app, page);
+            if (!textWindow) {
+                throw new Error('Text viewer window did not open.');
+            }
+
+            await textWindow.waitForLoadState('domcontentloaded');
+            await waitForViewerBridge(textWindow, 15000);
+            await textWindow.waitForFunction(
+                () => document.getElementById('viewer-title-text')?.textContent?.includes('Viewer Smoke Text'),
+                null,
+                { timeout: 15000 },
+            );
+            await page.evaluate(() => window.chatAPI.setTheme('light'));
+            await textWindow.waitForFunction(() => document.body.classList.contains('light-theme'), null, { timeout: 15000 });
+            result.textViewer.title = await textWindow.locator('#viewer-title-text').textContent();
+            await closeViewerWindow(textWindow, app);
+
+            const imagePayload = {
+                src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII=',
+                title: 'Viewer Smoke Image',
+            };
+            await page.evaluate((payload) => window.chatAPI.openImageViewer(payload), imagePayload);
+            await waitForWindowCount(app, 2, 15000);
+            const imageWindow = getChildWindow(app, page);
+            if (!imageWindow) {
+                throw new Error('Image viewer window did not open.');
+            }
+
+            await imageWindow.waitForLoadState('domcontentloaded');
+            await waitForViewerBridge(imageWindow, 15000);
+            await imageWindow.waitForFunction(
+                () => document.getElementById('image-title-text')?.textContent?.includes('Viewer Smoke Image'),
+                null,
+                { timeout: 15000 },
+            );
+            await imageWindow.waitForFunction(
+                () => {
+                    const image = document.getElementById('viewerImage');
+                    return Boolean(image?.getAttribute('src')?.startsWith('data:image/png'));
+                },
+                null,
+                { timeout: 15000 },
+            );
+            await page.evaluate(() => window.chatAPI.setTheme('light'));
+            await imageWindow.waitForFunction(() => document.body.classList.contains('light-theme'), null, { timeout: 15000 });
+            result.imageViewer.title = await imageWindow.locator('#image-title-text').textContent();
+            await closeViewerWindow(imageWindow, app);
+
+            result.passed = true;
+            return result;
+        } catch (error) {
+            result.error = error && error.stack ? error.stack : String(error);
+            lastResult = result;
+        } finally {
+            await app.close();
+        }
+    }
+
+    return lastResult || {
+        passed: false,
+        textViewer: {},
+        imageViewer: {},
+        error: 'Viewer smoke failed before producing a result.',
+    };
+}
+
 async function prepareScenarioWorkspace(dataRoot, config, scenario) {
     const app = await launchApp(dataRoot);
 
     try {
-        const page = await app.firstWindow({ timeout: 30000 });
+        const page = await waitForFirstWindow(app, 30000);
         await page.waitForLoadState('domcontentloaded');
+        await waitForMainBridge(page, 30000);
         await delay(1500);
 
         const result = await page.evaluate(async (payload) => {
@@ -752,7 +958,7 @@ async function runScenario(dataRoot, config, scenario, globalSummary) {
     const app = await launchApp(dataRoot);
 
     try {
-        const page = await app.firstWindow({ timeout: 30000 });
+        const page = await waitForFirstWindow(app, 30000);
         page.on('pageerror', (error) => {
             const message = String(error);
             scenarioSummary.rendererErrors.push(message);
@@ -767,6 +973,7 @@ async function runScenario(dataRoot, config, scenario, globalSummary) {
         });
 
         await page.waitForLoadState('domcontentloaded');
+        await waitForMainBridge(page, 30000);
         await page.waitForFunction(
             (topicName) => document.getElementById('currentChatTopicName')?.textContent?.includes(topicName),
             prepared.topicName,
@@ -901,17 +1108,29 @@ async function run() {
     const runStamp = formatStamp();
     const mode = readOptionalEnv('UNISTUDY_TEST_MODE', 'temp');
     const realAgentId = readOptionalEnv('UNISTUDY_REAL_AGENT_ID', 'Lite_Real_Test_Nova_1775682726542');
-    const realDataRoot = path.resolve(readOptionalEnv('UNISTUDY_REAL_DATA_ROOT', path.join(repoRoot, 'AppData')));
+    const fixtureDataRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot }));
+    const realDataRoot = mode === 'real-data'
+        ? resolveRequiredExternalDataRoot({
+            env: process.env,
+            envName: 'UNISTUDY_REAL_DATA_ROOT',
+            description: 'UniStudy real-data smoke mode',
+        })
+        : null;
     const dataRoot = mode === 'real-data'
         ? realDataRoot
-        : await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-electron-smoke-'));
+        : await createTempDataRootFromFixture({
+            prefix: 'unistudy-electron-smoke-',
+            fixtureRoot: fixtureDataRoot,
+        });
     const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-fixtures-'));
+    const viewerSmokeDataRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-viewer-smoke-'));
     const reportDir = path.resolve(readOptionalEnv('UNISTUDY_TEST_REPORT_DIR', path.join(repoRoot, 'docs', 'test-reports')));
     await fs.ensureDir(reportDir);
     const reportPath = path.join(reportDir, `unistudy-${mode}-${runStamp}.json`);
 
-    const persistedSettings = await readSettingsFile(mode === 'real-data' ? dataRoot : realDataRoot);
-    const resolvedGuideModel = await resolveGuideModel(realDataRoot, persistedSettings, realAgentId);
+    const settingsSeedRoot = mode === 'real-data' ? realDataRoot : fixtureDataRoot;
+    const persistedSettings = await readSettingsFile(settingsSeedRoot);
+    const resolvedGuideModel = await resolveGuideModel(settingsSeedRoot, persistedSettings, realAgentId);
     const settings = {
         userName: 'SmokeUser',
         vcpServerUrl: readOptionalEnv('VCP_SERVER_URL', persistedSettings.vcpServerUrl || 'http://vcp.uniquest.us.kg/v1/chat/completions'),
@@ -944,8 +1163,10 @@ async function run() {
         mode,
         dataRoot,
         fixtureRoot,
+        fixtureDataRoot,
         reportPath,
         targetAgentId: mode === 'real-data' ? config.realAgentId : null,
+        viewerSmokeDataRoot,
         settings: {
             vcpServerUrl: settings.vcpServerUrl,
             kbBaseUrl: settings.kbBaseUrl,
@@ -966,6 +1187,10 @@ async function run() {
     };
 
     summary.skips = [];
+    summary.viewerSmoke = await runViewerSmoke(viewerSmokeDataRoot);
+    if (!summary.viewerSmoke.passed) {
+        summary.errors.push(`viewer smoke 失败：${summary.viewerSmoke.error || '未知错误'}`);
+    }
 
     if (!settings.vcpServerUrl || !settings.vcpApiKey) {
         const message = '未提供有效的 VCP_SERVER_URL / VCP_API_KEY，无法完成真实对话测试。';
@@ -984,7 +1209,15 @@ async function run() {
         }
     }
 
-    if (summary.errors.length === 0) {
+    const hasConversationConfig = Boolean(settings.vcpServerUrl && settings.vcpApiKey);
+    const hasKnowledgeBaseConfig = Boolean(settings.kbBaseUrl && settings.kbApiKey);
+    const canRunScenarios = hasConversationConfig && hasKnowledgeBaseConfig;
+
+    if (!canRunScenarios && mode !== 'real-data') {
+        summary.skips.push('已跳过 UniStudy 主链场景：当前环境仅验证 preload bridge 与 viewer，未提供完整外部服务配置。');
+    }
+
+    if (summary.errors.length === 0 && canRunScenarios) {
         for (const scenario of scenarios) {
             try {
                 const result = await runScenario(dataRoot, config, scenario, summary);
@@ -1003,7 +1236,9 @@ async function run() {
     }
 
     summary.finishedAt = new Date().toISOString();
-    summary.success = summary.errors.length === 0 && summary.scenarios.length > 0 && summary.scenarios.every((item) => item.passed);
+    summary.success = summary.errors.length === 0
+        && summary.viewerSmoke?.passed === true
+        && (summary.scenarios.length === 0 || summary.scenarios.every((item) => item.passed));
     await fs.writeJson(reportPath, summary, { spaces: 2 });
     return summary;
 }

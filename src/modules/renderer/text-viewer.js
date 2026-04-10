@@ -1,5 +1,7 @@
 ﻿import * as emoticonFixer from './emoticonUrlFixer.js';
 
+import { renderMarkdownToSafeHtml, sanitizeHtml } from './safeHtml.js';
+
 document.addEventListener('DOMContentLoaded', async () => {
     const viewerAPI = window.utilityAPI || window.electronAPI;
 
@@ -662,7 +664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // A simple check for HTML content. It looks for a string that starts with a tag.
         const isHtml = /^<[a-z][\s\S]*>/i.test(trimmedResult);
         if (isHtml) {
-            outputContainer.innerHTML = trimmedResult;
+            outputContainer.innerHTML = sanitizeHtml(trimmedResult);
         } else {
             outputContainer.textContent = trimmedResult || '执行完成，没有输出。';
         }
@@ -903,7 +905,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 originalRawContent = existingTextarea.value;
 
                 const processedContent = preprocessFullContent(originalRawContent);
-                const renderedHtml = window.marked.parse(processedContent);
+                const renderedHtml = renderMarkdownToSafeHtml(processedContent, window.marked);
                 contentDiv.innerHTML = renderedHtml;
                 enhanceRenderedContent(contentDiv);
 
@@ -1339,7 +1341,7 @@ ${codeContent}
                 originalRawContent = decodedText;
 
                 const processedContent = preprocessFullContent(originalRawContent, scopeId);
-                const renderedHtml = window.marked.parse(processedContent);
+                const renderedHtml = renderMarkdownToSafeHtml(processedContent, window.marked);
                 contentDiv.innerHTML = renderedHtml;
 
                 // Wait for async enhancements (Mermaid, etc.) AND image loading to complete.
@@ -1372,9 +1374,9 @@ ${codeContent}
                     <h3 style="color: #e06c75;">Render Error</h3>
                     <p>查看器无法渲染这段内容，下面保留原始文本以便排查。</p>
                     <p><strong>错误详情：</strong></p>
-                    <pre style="white-space: pre-wrap; word-wrap: break-word;">${error.toString()}</pre>
+                    <pre style="white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(error.toString())}</pre>
                     <p><strong>原始内容：</strong></p>
-                    <pre style="white-space: pre-wrap; word-wrap: break-word;">${textContent}</pre>
+                    <pre style="white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(textContent)}</pre>
                 `;
             }
         } else {
@@ -1399,8 +1401,8 @@ ${codeContent}
 
             event.preventDefault();
 
-            contextMenu.style.top = ${event.pageY}px;
-            contextMenu.style.left = ${event.pageX}px;
+            contextMenu.style.top = `${event.pageY}px`;
+            contextMenu.style.left = `${event.pageX}px`;
             contextMenu.style.display = 'block';
 
             if (selectedText) {
@@ -1538,7 +1540,7 @@ ${codeContent}
                     if (viewerAPI && viewerAPI.openImageViewer) {
                         viewerAPI.openImageViewer({
                             src: imageDataUrl,
-                            title: Screenshot - 
+                            title: 'Screenshot Preview',
                         });
                     } else {
                         console.error('viewerAPI.openImageViewer is not available.');

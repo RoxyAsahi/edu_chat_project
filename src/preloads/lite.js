@@ -1,17 +1,13 @@
-﻿const {
-    createOps,
-    materializeApi,
-    createCompatApi,
-    exposeRoleApis,
-} = require('./shared/apiFactory');
-const { createCatalog } = require('./shared/catalog');
-const { LITE_KEYS } = require('./shared/roles');
+const { bootstrapPreload } = require('./shared/bootstrap');
+const { LITE_KEYS, ROLE_API_NAMES } = require('./shared/roles');
 
-const ops = createOps();
-const definitions = createCatalog(ops);
-const roleApi = materializeApi(definitions, LITE_KEYS);
-const compatApi = createCompatApi(definitions, LITE_KEYS);
-
-exposeRoleApis('chatAPI', roleApi, compatApi, ops);
-
-console.log('[Preload][lite] loaded');
+try {
+    bootstrapPreload({
+        apiName: ROLE_API_NAMES.lite,
+        allowedKeys: LITE_KEYS,
+    });
+    console.log('[Preload][lite] loaded via shared bootstrap');
+} catch (error) {
+    console.error('[Preload][lite] failed to initialize:', error);
+    throw error;
+}

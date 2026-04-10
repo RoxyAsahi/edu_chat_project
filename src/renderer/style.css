@@ -1,6 +1,14 @@
 @font-face {
   font-family: 'MavenProExtraBold';
-src: url('../assets/font/MavenPro-ExtraBold.ttf') format('truetype');
+  src: url('../assets/font/MavenPro-ExtraBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/font/MaterialSymbolsOutlined-latin-wght-normal.woff2') format('woff2');
 }
 
 :root {
@@ -2339,6 +2347,7 @@ body.dark-theme .settings-card select:focus {
   word-wrap: normal;
   direction: ltr;
   font-feature-settings: 'liga';
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   -webkit-font-smoothing: antialiased;
 }
 

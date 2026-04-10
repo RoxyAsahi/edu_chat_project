@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://app.diagrams.net https://viewer.diagrams.net; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: file: http: https:; connect-src 'self' https://cdn.jsdelivr.net https://app.diagrams.net https://viewer.diagrams.net; frame-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
+    >
     <title>阅读模式</title>
     <link rel="stylesheet" href="../../styles/themes.css"> <!-- Theme styles -->
     <link rel="stylesheet" href="../../renderer/style.css"> <!-- Reuse Lite renderer styles -->
@@ -987,11 +991,11 @@
 <script src="../../../vendor/marked.min.js"></script>
 <script src="../../../vendor/highlight.min.js"></script>
 <script src="../../../vendor/html2canvas.min.js"></script>
-    <!-- draw.io viewer for embedding diagrams -->
+    <script src="../../../vendor/purify.min.js"></script>
     <script src="https://app.diagrams.net/js/viewer.min.js"></script>
     <!-- Pretext text layout engine -->
-    <script src="renderer/pretext.bundle.js"></script>
-    <script src="renderer/pretext-bridge.js"></script>
+    <script src="./pretext.bundle.js"></script>
+    <script src="./pretext-bridge.js"></script>
     <script type="module" src="text-viewer.js"></script>
 </body>
 </html>

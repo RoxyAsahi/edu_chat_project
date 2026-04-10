@@ -43,8 +43,8 @@ UniStudy 是在 VCPChat Lite 基础上继续演进的个人 AI 学习终端。
 - `Ctrl+Shift+I`
 
 ## 数据目录策略
-当前版本继续使用 `C:\VCP\Eric\VCPChatLite\AppData` 作为正式数据根。
-本轮更名为 UniStudy 仅影响产品与 UI 名称，不迁移底层数据目录。
+当前版本正式运行时默认使用 Electron `app.getPath('userData')` 作为数据根。
+如需复用现有外部数据目录，可显式设置 `VCPCHAT_DATA_ROOT` 覆盖默认值。
 
 兼容读取范围:
 - `settings.json`

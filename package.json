@@ -4,7 +4,19 @@
   "description": "UniStudy desktop learning terminal built on the VCPChat Lite foundation.",
   "main": "src/main/main.js",
   "scripts": {
+    "build:preloads": "node scripts/build-preloads.js",
+    "migrate:legacy-data": "node scripts/migrate-legacy-data-root.js",
     "start": "node scripts/launch-electron.js .",
+    "pack:win": "electron-builder --win dir",
+    "dist:win": "electron-builder --win nsis portable",
+    "test": "npm run test:main && npm run test:renderer && npm run test:e2e:controlled",
+    "test:main": "node --test tests/*.test.js",
+    "test:renderer": "vitest run --environment jsdom tests/renderer/safe-html.test.js",
+    "test:e2e:controlled": "node --test tests/e2e/*.test.js",
+    "test:chat-config": "node --test tests/chat-config.test.js",
+    "test:data-root": "node --test tests/data-root-resolver.test.js tests/model-usage-tracker.test.js tests/runtime-data-roots.test.js",
+    "test:e2e:preload-bridge": "node scripts/electron-preload-bridge-smoke.js",
+    "test:e2e:css-removal": "node scripts/electron-deprecated-css-removal.js",
     "test:e2e:smoke": "node scripts/electron-unistudy-smoke.js",
     "test:kb:endpoints": "node scripts/kb-endpoint-normalization.js",
     "test:kb:smoke": "node scripts/kb-smoke.js",
@@ -16,10 +28,15 @@
     "chat",
     "lite"
   ],
+  "author": "UniStudy Team",
   "license": "MIT",
   "devDependencies": {
+    "dompurify": "^3.3.0",
     "electron": "^37.2.6",
-    "playwright": "^1.59.1"
+    "electron-builder": "^26.0.12",
+    "jsdom": "^26.1.0",
+    "playwright": "^1.59.1",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",
@@ -29,5 +46,46 @@
     "pdf-parse": "^1.1.1",
     "pdf-poppler": "^0.2.1",
     "sharp": "^0.34.2"
+  },
+  "build": {
+    "appId": "com.unistudy.desktop",
+    "productName": "UniStudy",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "vendor/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/pdf-poppler/**"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

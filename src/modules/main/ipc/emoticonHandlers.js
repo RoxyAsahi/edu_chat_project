@@ -30,7 +30,7 @@ function clearDegradedState() {
 
 async function initialize(paths) {
     settingsFilePath = paths.SETTINGS_FILE;
-    generatedListsPath = path.join(paths.APP_DATA_ROOT_IN_PROJECT, 'generated_lists');
+    generatedListsPath = path.join(paths.DATA_ROOT, 'generated_lists');
     emoticonLibraryPath = path.join(generatedListsPath, 'emoticon_library.json');
 }
 

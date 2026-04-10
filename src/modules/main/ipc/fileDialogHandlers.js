@@ -17,6 +17,10 @@ const { PRELOAD_ROLES, resolveAppPreload } = require('../services/preloadPaths')
  */
 let ipcHandlersRegistered = false;
 
+function isNonEmptyString(value) {
+    return typeof value === 'string' && value.trim() !== '';
+}
+
 function initialize(mainWindow, context) {
     let { openChildWindows } = context;
     const appRoot = app.getAppPath();
@@ -311,7 +315,7 @@ function initialize(mainWindow, context) {
                 preload: resolveAppPreload(appRoot, PRELOAD_ROLES.VIEWER),
                 contextIsolation: true,
                 nodeIntegration: false,
-                sandbox: false,
+                sandbox: true,
                 devTools: true,
             },
         });
@@ -329,23 +333,32 @@ function initialize(mainWindow, context) {
     }
 
     ipcMain.on('open-image-viewer', async (_event, payload = {}) => {
-        if (!payload?.src) {
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !isNonEmptyString(payload.src)) {
+            console.warn('[Main Process] Ignored invalid open-image-viewer payload.');
             return;
         }
         await openImageViewerWindow(payload.src, payload.title);
     });
 
     ipcMain.on('open-image-in-new-window', async (_event, imageUrl, imageTitle) => {
+        if (!isNonEmptyString(imageUrl)) {
+            console.warn('[Main Process] Ignored invalid open-image-in-new-window request.');
+            return;
+        }
         await openImageViewerWindow(imageUrl, imageTitle);
     });
 
     ipcMain.handle('display-text-content-in-viewer', async (_event, textContent, windowTitle, theme) => {
+        if (!isNonEmptyString(textContent)) {
+            return { success: false, error: 'display-text-content-in-viewer expects non-empty textContent.' };
+        }
+
         const textViewerWindow = new BrowserWindow({
             width: 800,
             height: 700,
             minWidth: 500,
             minHeight: 400,
-            title: decodeURIComponent(windowTitle) || 'Text Viewer',
+            title: isNonEmptyString(windowTitle) ? decodeURIComponent(windowTitle) : 'Text Viewer',
             modal: false,
             show: false,
             frame: false,
@@ -356,7 +369,7 @@ function initialize(mainWindow, context) {
                 preload: resolveAppPreload(appRoot, PRELOAD_ROLES.VIEWER),
                 contextIsolation: true,
                 nodeIntegration: false,
-                sandbox: false,
+                sandbox: true,
                 devTools: true,
             },
         });
@@ -374,6 +387,8 @@ function initialize(mainWindow, context) {
             context.openChildWindows = openChildWindows.filter((win) => win !== textViewerWindow);
             if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
         });
+
+        return { success: true };
     });
 
     ipcHandlersRegistered = true;
