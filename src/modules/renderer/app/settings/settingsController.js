@@ -17,6 +17,7 @@ function createSettingsController(deps = {}) {
     const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
+    const ui = deps.ui;
     const windowObj = deps.windowObj || window;
     const documentObj = deps.documentObj || document;
     const messageRendererApi = deps.messageRendererApi;
@@ -24,6 +25,8 @@ function createSettingsController(deps = {}) {
     const normalizeStoredLayoutHeight = deps.normalizeStoredLayoutHeight;
     const applyLayoutWidths = deps.applyLayoutWidths;
     const applyLeftSidebarHeights = deps.applyLeftSidebarHeights;
+    const resolvePromptText = deps.resolvePromptText || (async () => '');
+    const reloadSelectedAgent = deps.reloadSelectedAgent || (async () => {});
     let settingsModalTrigger = null;
 
     function applyTheme(theme) {
@@ -88,6 +91,42 @@ function createSettingsController(deps = {}) {
         messageRendererApi?.setUserAvatarColor(state.settings.userAvatarCalculatedColor || null);
     }
 
+    async function saveGlobalSettings() {
+        const themeMode = documentObj.querySelector('input[name="themeMode"]:checked')?.value || 'system';
+        const patch = {
+            userName: el.userNameInput.value.trim() || 'User',
+            vcpServerUrl: el.vcpServerUrl.value.trim(),
+            vcpApiKey: el.vcpApiKey.value.trim(),
+            kbBaseUrl: el.kbBaseUrl.value.trim(),
+            kbApiKey: el.kbApiKey.value.trim(),
+            kbEmbeddingModel: el.kbEmbeddingModel.value.trim(),
+            kbUseRerank: el.kbUseRerank.checked,
+            kbRerankModel: el.kbRerankModel.value.trim(),
+            kbTopK: Number(el.kbTopK.value || 6),
+            kbCandidateTopK: Number(el.kbCandidateTopK.value || 20),
+            kbScoreThreshold: Number(el.kbScoreThreshold.value || 0.25),
+            chatFontPreset: el.chatFontPreset.value,
+            chatCodeFontPreset: el.chatCodeFontPreset.value,
+            chatBubbleMaxWidthWideDefault: Number(el.chatBubbleMaxWidthWideDefault.value || 92),
+            enableAgentBubbleTheme: el.enableAgentBubbleTheme.checked,
+            enableWideChatLayout: el.enableWideChatLayout.checked,
+            enableSmoothStreaming: el.enableSmoothStreaming.checked,
+            currentThemeMode: themeMode,
+        };
+        const result = await chatAPI.saveSettings(patch);
+        if (!result?.success) {
+            ui.showToastNotification(`保存设置失败：${result?.error || '未知错误'}`, 'error');
+            return;
+        }
+
+        state.settings = { ...state.settings, ...patch };
+        windowObj.globalSettings = state.settings;
+        applyRendererSettings();
+        chatAPI.setThemeMode(themeMode);
+        windowObj.emoticonManager?.reload?.();
+        ui.showToastNotification('全局设置已保存。', 'success');
+    }
+
     function switchSettingsModalSection(section) {
         const nextSection = Object.prototype.hasOwnProperty.call(SETTINGS_MODAL_META, section)
             ? section
@@ -144,14 +183,103 @@ function createSettingsController(deps = {}) {
         settingsModalTrigger = null;
     }
 
+    function setPromptVisible(visible) {
+        el.selectAgentPromptForSettings?.classList.toggle('hidden', visible);
+        el.agentSettingsContainer?.classList.toggle('hidden', !visible);
+    }
+
+    async function saveAgentSettings() {
+        if (!state.currentSelectedItem.id) {
+            return;
+        }
+
+        const promptText = await resolvePromptText();
+        const patch = {
+            name: el.agentNameInput.value.trim(),
+            model: el.agentModel.value.trim(),
+            temperature: Number(el.agentTemperature.value || 0.7),
+            contextTokenLimit: Number(el.agentContextTokenLimit.value || 4000),
+            maxOutputTokens: Number(el.agentMaxOutputTokens.value || 1000),
+            top_p: el.agentTopP.value === '' ? undefined : Number(el.agentTopP.value),
+            top_k: el.agentTopK.value === '' ? undefined : Number(el.agentTopK.value),
+            streamOutput: el.agentStreamOutputTrue.checked,
+            avatarBorderColor: el.agentAvatarBorderColor.value,
+            nameTextColor: el.agentNameTextColor.value,
+            disableCustomColors: el.disableCustomColors.checked,
+            useThemeColorsInChat: el.useThemeColorsInChat.checked,
+            promptMode: 'original',
+            originalSystemPrompt: promptText,
+            systemPrompt: promptText,
+        };
+
+        const saveResult = await chatAPI.saveAgentConfig(state.currentSelectedItem.id, patch);
+        if (saveResult?.error) {
+            ui.showToastNotification(`保存智能体失败：${saveResult.error}`, 'error');
+            return;
+        }
+
+        const avatarFile = el.agentAvatarInput.files?.[0];
+        if (avatarFile) {
+            const buffer = await avatarFile.arrayBuffer();
+            await chatAPI.saveAvatar(state.currentSelectedItem.id, {
+                name: avatarFile.name,
+                type: avatarFile.type,
+                buffer,
+            });
+            el.agentAvatarInput.value = '';
+        }
+
+        ui.showToastNotification('智能体设置已保存。', 'success');
+        await reloadSelectedAgent(state.currentSelectedItem.id);
+    }
+
+    function bindEvents() {
+        el.currentAgentSettingsBtn?.addEventListener('click', () => {
+            openSettingsModal('agent', el.currentAgentSettingsBtn);
+        });
+        el.globalSettingsBtn?.addEventListener('click', () => {
+            openSettingsModal('global', el.globalSettingsBtn);
+        });
+        el.settingsModalCloseBtn?.addEventListener('click', closeSettingsModal);
+        el.settingsModalBackdrop?.addEventListener('click', closeSettingsModal);
+        el.settingsNavButtons?.forEach((button) => {
+            button.addEventListener('click', () => {
+                switchSettingsModalSection(button.dataset.settingsSectionButton || 'global');
+            });
+        });
+        el.saveGlobalSettingsBtn?.addEventListener('click', () => {
+            void saveGlobalSettings();
+        });
+        el.saveAgentSettingsBtn?.addEventListener('click', () => {
+            void saveAgentSettings();
+        });
+
+        documentObj.querySelectorAll('input[name="themeMode"]').forEach((input) => {
+            input.addEventListener('change', () => {
+                if (input.checked) {
+                    chatAPI.setThemeMode(input.value);
+                }
+            });
+        });
+
+        el.themeToggleBtn?.addEventListener('click', () => {
+            const nextTheme = documentObj.body.classList.contains('dark-theme') ? 'light' : 'dark';
+            chatAPI.setTheme(nextTheme);
+        });
+    }
+
     return {
         applyTheme,
         applyRendererSettings,
         syncGlobalSettingsForm,
         loadSettings,
+        saveGlobalSettings,
         switchSettingsModalSection,
         openSettingsModal,
         closeSettingsModal,
+        setPromptVisible,
+        saveAgentSettings,
+        bindEvents,
     };
 }
 

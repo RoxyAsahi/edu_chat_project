@@ -1,12 +1,13 @@
 ﻿
-import { initialize as initializeInterruptHandler, interrupt as interruptRequest } from '../modules/renderer/interruptHandler.js';
-import { initializeInputEnhancer } from '../modules/renderer/inputEnhancerLite.js';
+import { interrupt as interruptRequest } from '../modules/renderer/interruptHandler.js';
 import * as messageRenderer from '../modules/renderer/messageRenderer.js';
 import { renderMarkdownToSafeHtml } from '../modules/renderer/safeHtml.js';
 import { createAppStore, createInitialAppState } from '../modules/renderer/app/store/appStore.js';
 import { collectRootElements } from '../modules/renderer/app/dom/collectRootElements.js';
 import { createLayoutController } from '../modules/renderer/app/layout/layoutController.js';
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
+import { createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
+import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime } from '../modules/renderer/app/bootstrap.js';
 
 const chatAPI = window.chatAPI || window.electronAPI;
 const ui = window.uiHelperFunctions;
@@ -28,19 +29,14 @@ const {
     normalizeStoredLayoutHeight,
     applyLayoutWidths,
     applyLeftSidebarHeights,
-    scheduleLayoutRefresh,
     initializeResizableLayout,
-    beginLayoutResize,
-    updateLayoutResize,
-    endLayoutResize,
-    beginVerticalLayoutResize,
-    updateVerticalLayoutResize,
-    endVerticalLayoutResize,
+    bindEvents: bindLayoutEvents,
 } = layoutController;
 const settingsController = createSettingsController({
     state,
     el,
     chatAPI,
+    ui,
     windowObj: window,
     documentObj: document,
     messageRendererApi: messageRenderer,
@@ -48,16 +44,111 @@ const settingsController = createSettingsController({
     normalizeStoredLayoutHeight,
     applyLayoutWidths,
     applyLeftSidebarHeights,
+    resolvePromptText: async () => (
+        state.promptModule
+            ? await state.promptModule.getPrompt().catch(() => '')
+            : (document.getElementById('litePromptFallback')?.value || '').trim()
+    ),
+    reloadSelectedAgent: async (agentId) => {
+        await workspaceController.loadAgents();
+        await workspaceController.selectAgent(agentId);
+    },
 });
 const {
     applyTheme,
     applyRendererSettings,
-    syncGlobalSettingsForm,
     loadSettings,
-    switchSettingsModalSection,
     openSettingsModal,
     closeSettingsModal,
+    setPromptVisible,
+    bindEvents: bindSettingsEvents,
 } = settingsController;
+const workspaceController = createWorkspaceController({
+    state,
+    el,
+    chatAPI,
+    ui,
+    normalizeTopic,
+    normalizeHistory,
+    toggleTopicActionMenu,
+    renderCurrentHistory,
+    renderTopicKnowledgeBaseFiles,
+    syncCurrentTopicKnowledgeBaseControls,
+    syncComposerAvailability,
+    renderNotesPanel,
+    renderReaderPanel,
+    refreshAttachmentPreview,
+    closeNoteDetail,
+    closeNoteActionMenu,
+    clearPendingFlashcardGeneration,
+    clearPendingSelectionContext,
+    resetReaderState,
+    setLeftSidebarMode,
+    setLeftReaderTab,
+    setRightPanelMode,
+    ensureTopicSource,
+    loadCurrentTopicKnowledgeBaseDocuments,
+    loadTopicNotes,
+    loadAgentNotes,
+    populateAgentForm,
+    setPromptVisible: (visible) => settingsController.setPromptVisible(visible),
+    messageRendererApi: messageRenderer,
+    closeTopicActionMenu,
+});
+const {
+    getCurrentTopic,
+    getCurrentTopicDisplayName,
+    syncWorkspaceContext,
+    renderTopics,
+    loadAgents,
+    loadTopics,
+    renameTopic,
+    setTopicUnreadState,
+    toggleTopicLockState,
+    deleteTopicFromList,
+    selectTopic,
+    selectAgent,
+    createAgent,
+    createTopic,
+    deleteCurrentAgent,
+    exportCurrentTopic,
+    bindEvents: bindWorkspaceEvents,
+} = workspaceController;
+const { bootstrap } = createAppBootstrap({
+    state,
+    chatAPI,
+    ui,
+    applyTheme,
+    loadSettings,
+    initializeResizableLayout,
+    loadKnowledgeBases,
+    initializeAppRuntime: () => initializeBootstrapRuntime({
+        state,
+        el,
+        chatAPI,
+        ui,
+        initMarked,
+        messageRendererApi: messageRenderer,
+        interruptRequest,
+        appendAttachments: appendStoredAttachments,
+        windowObj: window,
+    }),
+    workspaceController,
+    setLeftSidebarMode,
+    setLeftReaderTab,
+    setRightPanelMode,
+    renderReaderPanel,
+    renderSelectionContextPreview,
+    bindFeatureEvents,
+    handleStreamEvent,
+    setPromptVisible,
+    renderNotesPanel,
+    renderCurrentHistory,
+    finalizeBootstrap: () => {
+        ui.autoResizeTextarea(el.messageInput);
+        updateSendButtonState();
+    },
+});
 
 let markedInstance;
 let knowledgeBasePollTimer = null;
@@ -252,12 +343,12 @@ function initMarked() {
             highlight(code, lang) {
                 if (window.hljs) {
                     const language = window.hljs.getLanguage(lang) ? lang : 'plaintext';
-                    return window.hljs.highlight(code, { language }).value;
-                }
-                return code;
-            },
+                return window.hljs.highlight(code, { language }).value;
+            }
+            return code;
+        },
         });
-        return;
+        return markedInstance;
     }
 
     markedInstance = {
@@ -265,18 +356,7 @@ function initMarked() {
             return `<p>${String(text || '').replace(/\n/g, '<br>')}</p>`;
         },
     };
-}
-
-function getCurrentTopic() {
-    return state.topics.find((topic) => topic.id === state.currentTopicId) || null;
-}
-
-function getCurrentTopicDisplayName() {
-    return getCurrentTopic()?.name || '请选择一个话题';
-}
-
-function getCurrentAgentDisplayName() {
-    return state.currentSelectedItem.name || '未选择学科';
+    return markedInstance;
 }
 
 function setSidePanelTab(tab) {
@@ -479,30 +559,6 @@ function setLeftSidebarMode(mode) {
 
     if (nextMode === 'source-list') {
         restoreSourceListScrollPosition();
-    }
-}
-
-function syncWorkspaceContext() {
-    const agentName = getCurrentAgentDisplayName();
-    const topicName = getCurrentTopicDisplayName();
-
-    if (el.titlebarCurrentAgent) {
-        el.titlebarCurrentAgent.textContent = agentName;
-    }
-    if (el.titlebarCurrentTopic) {
-        el.titlebarCurrentTopic.textContent = topicName;
-    }
-    if (el.workspaceCurrentAgent) {
-        el.workspaceCurrentAgent.textContent = agentName;
-    }
-    if (el.workspaceCurrentTopic) {
-        el.workspaceCurrentTopic.textContent = topicName;
-    }
-    if (el.currentChatTopicName) {
-        el.currentChatTopicName.textContent = topicName;
-    }
-    if (el.currentChatAgentName) {
-        el.currentChatAgentName.textContent = `当前学科：${agentName}`;
     }
 }
 
@@ -2150,47 +2206,6 @@ function renderKnowledgeBaseManager() {
     syncKnowledgeBasePolling();
 }
 
-async function saveGlobalSettings() {
-    const themeMode = document.querySelector('input[name="themeMode"]:checked')?.value || 'system';
-    const patch = {
-        userName: el.userNameInput.value.trim() || 'User',
-        vcpServerUrl: el.vcpServerUrl.value.trim(),
-        vcpApiKey: el.vcpApiKey.value.trim(),
-        kbBaseUrl: el.kbBaseUrl.value.trim(),
-        kbApiKey: el.kbApiKey.value.trim(),
-        kbEmbeddingModel: el.kbEmbeddingModel.value.trim(),
-        kbUseRerank: el.kbUseRerank.checked,
-        kbRerankModel: el.kbRerankModel.value.trim(),
-        kbTopK: Number(el.kbTopK.value || 6),
-        kbCandidateTopK: Number(el.kbCandidateTopK.value || 20),
-        kbScoreThreshold: Number(el.kbScoreThreshold.value || 0.25),
-        chatFontPreset: el.chatFontPreset.value,
-        chatCodeFontPreset: el.chatCodeFontPreset.value,
-        chatBubbleMaxWidthWideDefault: Number(el.chatBubbleMaxWidthWideDefault.value || 92),
-        enableAgentBubbleTheme: el.enableAgentBubbleTheme.checked,
-        enableWideChatLayout: el.enableWideChatLayout.checked,
-        enableSmoothStreaming: el.enableSmoothStreaming.checked,
-        currentThemeMode: themeMode,
-    };
-    const result = await chatAPI.saveSettings(patch);
-    if (!result?.success) {
-        ui.showToastNotification(`保存设置失败：${result?.error || '未知错误'}`, 'error');
-        return;
-    }
-
-    state.settings = { ...state.settings, ...patch };
-    window.globalSettings = state.settings;
-    applyRendererSettings();
-    chatAPI.setThemeMode(themeMode);
-    window.emoticonManager?.reload?.();
-    ui.showToastNotification('全局设置已保存。', 'success');
-}
-
-function setPromptVisible(visible) {
-    el.selectAgentPromptForSettings.classList.toggle('hidden', visible);
-    el.agentSettingsContainer.classList.toggle('hidden', !visible);
-}
-
 function normalizeStoredAttachment(rawAttachment) {
     if (!rawAttachment || typeof rawAttachment !== 'object') {
         return null;
@@ -3395,252 +3410,6 @@ async function populateAgentForm(config) {
     await syncPromptModule(state.currentSelectedItem.id, config);
 }
 
-function renderAgentList(unreadCounts = {}) {
-    el.agentList.innerHTML = '';
-    if (state.agents.length === 0) {
-        el.agentList.innerHTML = `
-            <li class="empty-list-state">
-                <strong>暂无学科入口</strong>
-                <span>使用“新建学科”创建一个学习入口，或在首次启动时导入已有数据。</span>
-            </li>
-        `;
-        return;
-    }
-    state.agents.forEach((agent) => {
-        const li = document.createElement('li');
-        const unreadCount = Number(unreadCounts[agent.id] || 0);
-        const isActive = agent.id === state.currentSelectedItem.id;
-        const statusLabel = unreadCount > 0 ? `${unreadCount} 个待处理话题` : (isActive ? '当前学科入口' : '已整理完成');
-        li.className = 'list-item list-item--agent';
-        li.dataset.agentId = agent.id || '';
-        li.dataset.searchText = `${agent.name || ''} ${agent.id || ''}`.toLowerCase();
-        li.classList.toggle('active', isActive);
-        li.innerHTML = `
-          <div class="list-item__media">
-            <img class="avatar" src="${agent.avatarUrl || '../assets/default_avatar.png'}" alt="${agent.name || agent.id}" />
-            <span class="list-item__media-glow"></span>
-          </div>
-          <div class="list-item__body">
-              <div class="list-item__title-row">
-                  <span class="list-item__title">${agent.name || agent.id}</span>
-                  ${isActive ? '<span class="list-pill list-pill--active">当前</span>' : ''}
-              </div>
-              <span class="list-item__meta">${statusLabel}</span>
-              <span class="list-item__submeta">${agent.id}</span>
-          </div>
-          <span class="badge ${unreadCount > 0 ? 'badge--active' : ''}">${unreadCount > 0 ? unreadCount : ''}</span>
-        `;
-        li.addEventListener('click', () => selectAgent(agent.id));
-        el.agentList.appendChild(li);
-    });
-    filterAgents();
-}
-
-async function loadAgents() {
-    const agents = await chatAPI.getAgents();
-    if (agents?.error) {
-        console.error('[LiteRenderer] getAgents failed:', agents.error);
-        ui.showToastNotification(`加载智能体失败：${agents.error}`, 'error');
-        state.agents = [];
-        renderAgentList({});
-        return;
-    }
-    state.agents = Array.isArray(agents) ? agents : [];
-    const unreadResult = await chatAPI.getUnreadTopicCounts().catch(() => ({ counts: {} }));
-    renderAgentList(unreadResult?.counts || {});
-}
-
-function filterAgents() {
-    const keyword = el.agentSearchInput.value.trim().toLowerCase();
-    Array.from(el.agentList.children).forEach((item) => {
-        item.hidden = !item.dataset.searchText.includes(keyword);
-    });
-}
-
-function renderTopics() {
-    el.topicList.innerHTML = '';
-    if (state.topics.length === 0) {
-        el.topicList.innerHTML = `
-            <li class="empty-list-state" style="border: none; background: transparent; padding: 0;">
-                <span style="font-size: 12px; color: var(--muted); text-align: center;">暂无话题</span>
-            </li>
-        `;
-        return;
-    }
-    state.topics.forEach((topic) => {
-        const li = document.createElement('li');
-        const isActive = topic.id === state.currentTopicId;
-        const sourceReady = Boolean(topic.knowledgeBaseId);
-        li.className = 'list-item topic-item topic-item--compact';
-        li.dataset.topicId = topic.id || '';
-        li.dataset.agentId = state.currentSelectedItem.id || '';
-        li.dataset.searchText = `${topic.name || ''} ${new Date(topic.createdAt || Date.now()).toLocaleString()}`.toLowerCase();
-        li.classList.toggle('active', isActive);
-
-        li.innerHTML = `
-            <div class="topic-item__body">
-                <strong>${escapeHtml(topic.name || topic.id)}</strong>
-            </div>
-            <div class="topic-item__actions">
-                <button
-                    type="button"
-                    class="ghost-button icon-btn topic-item__menu-btn"
-                    data-topic-menu-button
-                    title="更多操作"
-                    aria-label="更多操作"
-                >
-                    <span class="material-symbols-outlined">more_horiz</span>
-                </button>
-            </div>
-        `;
-
-        li.addEventListener('click', async (event) => {
-            const actionButton = event.target.closest('[data-topic-menu-button]');
-            if (actionButton) {
-                event.stopPropagation();
-                toggleTopicActionMenu(topic, actionButton);
-                return;
-            }
-
-            await selectTopic(topic.id);
-        });
-
-        li.addEventListener('dblclick', () => renameTopic(topic));
-        el.topicList.appendChild(li);
-    });
-    filterTopics();
-}
-
-function filterTopics() {
-    const keyword = el.topicSearchInput.value.trim().toLowerCase();
-    Array.from(el.topicList.children).forEach((item) => {
-        item.hidden = !item.dataset.searchText.includes(keyword);
-    });
-}
-
-async function loadTopics() {
-    if (!state.currentSelectedItem.id) {
-        state.topics = [];
-        state.currentTopicId = null;
-        state.topicKnowledgeBaseDocuments = [];
-        syncWorkspaceContext();
-        renderTopics();
-        renderTopicKnowledgeBaseFiles();
-        syncComposerAvailability();
-        return;
-    }
-    const topics = await chatAPI.getAgentTopics(state.currentSelectedItem.id);
-    state.topics = Array.isArray(topics) ? topics.map(normalizeTopic) : [];
-    if (!state.topics.some((topic) => topic.id === state.currentTopicId)) {
-        state.currentTopicId = null;
-    }
-    if (!state.currentTopicId && state.topics.length > 0) {
-        state.currentTopicId = state.topics[0].id;
-    }
-    syncWorkspaceContext();
-    renderTopics();
-    syncCurrentTopicKnowledgeBaseControls();
-    syncComposerAvailability();
-}
-
-async function renameTopic(topic) {
-    const nextName = await ui.showPromptDialog({
-        title: '重命名话题',
-        message: '更新话题标题。',
-        placeholder: '话题名称',
-        defaultValue: topic.name || topic.id,
-        confirmText: '保存',
-        cancelText: '取消',
-    });
-    if (!nextName) return;
-
-    const result = await chatAPI.saveAgentTopicTitle(state.currentSelectedItem.id, topic.id, nextName.trim());
-    if (result?.error) {
-        ui.showToastNotification(`重命名话题失败：${result.error}`, 'error');
-        return;
-    }
-
-    topic.name = nextName.trim();
-    renderTopics();
-}
-
-async function setTopicUnreadState(topic, unread) {
-    const result = await chatAPI.setTopicUnread(state.currentSelectedItem.id, topic.id, unread);
-    if (!result?.success) {
-        ui.showToastNotification(`更新话题状态失败：${result?.error || '未知错误'}`, 'error');
-        return;
-    }
-
-    topic.unread = unread;
-    renderTopics();
-    await loadAgents();
-}
-
-async function toggleTopicLockState(topic) {
-    const result = await chatAPI.toggleTopicLock(state.currentSelectedItem.id, topic.id);
-    if (!result?.success) {
-        ui.showToastNotification(`更新锁定状态失败：${result?.error || '未知错误'}`, 'error');
-        return;
-    }
-
-    topic.locked = result.locked;
-    renderTopics();
-}
-
-async function clearCurrentConversationView() {
-    state.currentTopicId = null;
-    state.currentChatHistory = [];
-    state.topicKnowledgeBaseDocuments = [];
-    state.topicNotes = [];
-    state.selectedNoteIds = [];
-    state.pendingAttachments = [];
-    setLeftSidebarMode('source-list');
-    setLeftReaderTab('guide');
-    syncWorkspaceContext();
-    renderTopics();
-    syncCurrentTopicKnowledgeBaseControls();
-    renderTopicKnowledgeBaseFiles();
-    refreshAttachmentPreview();
-    renderNotesPanel();
-    await renderCurrentHistory();
-    syncComposerAvailability();
-}
-
-async function deleteTopicFromList(topic) {
-    const label = topic.name || topic.id;
-    const confirmed = await ui.showConfirmDialog(`确定删除话题 "${label}" 吗？`, '删除话题', '删除', '取消', true);
-    if (!confirmed) return;
-
-    const result = await chatAPI.deleteTopic(state.currentSelectedItem.id, topic.id);
-    if (result?.error) {
-        ui.showToastNotification(`删除话题失败：${result.error}`, 'error');
-        return;
-    }
-    if (result?.warning) {
-        ui.showToastNotification(`话题已删除，但清理时出现问题：${result.warning}`, 'warning', 5000);
-    }
-
-    if (state.currentTopicId === topic.id) {
-        state.currentTopicId = null;
-    }
-
-    await loadTopics();
-    await loadAgents();
-
-    if (state.topics.length > 0) {
-        await selectTopic(state.currentTopicId || state.topics[0].id);
-        return;
-    }
-
-    await clearCurrentConversationView();
-}
-
-function buildHistoryFilePath() {
-    const base = (state.currentSelectedItem?.config?.agentDataPath || '').replace(/[\\/]+$/, '');
-    if (!base || !state.currentTopicId) return null;
-    return `${base}\\topics\\${state.currentTopicId}\\history.json`;
-}
-
 async function renderCurrentHistory() {
     messageRenderer.clearChat({ preserveHistory: true });
     if (state.currentChatHistory.length === 0) {
@@ -3652,156 +3421,6 @@ async function renderCurrentHistory() {
     }
     await messageRenderer.renderHistory(state.currentChatHistory, true);
     decorateChatMessages();
-}
-async function selectTopic(topicId, options = {}) {
-    if (!state.currentSelectedItem.id || !topicId) return;
-    state.currentTopicId = topicId;
-    state.topicKnowledgeBaseDocuments = [];
-    state.selectedNoteIds = [];
-    closeNoteDetail({ restoreFocus: false });
-    closeNoteActionMenu();
-    state.activeFlashcardNoteId = null;
-    clearPendingFlashcardGeneration();
-    state.pendingAttachments = [];
-    clearPendingSelectionContext();
-    resetReaderState();
-    setLeftSidebarMode('source-list');
-    setLeftReaderTab('guide');
-    setRightPanelMode('notes');
-    renderReaderPanel();
-    syncWorkspaceContext();
-    refreshAttachmentPreview();
-    syncComposerAvailability();
-    syncCurrentTopicKnowledgeBaseControls();
-    messageRenderer.setCurrentTopicId?.(topicId);
-
-    const history = await chatAPI.getChatHistory(state.currentSelectedItem.id, topicId);
-    state.currentChatHistory = normalizeHistory(history);
-    renderTopics();
-    syncCurrentTopicKnowledgeBaseControls();
-    await ensureTopicSource({ silent: true });
-    syncCurrentTopicKnowledgeBaseControls();
-    await loadCurrentTopicKnowledgeBaseDocuments({ silent: true });
-    await loadTopicNotes();
-    await renderCurrentHistory();
-
-    const historyPath = buildHistoryFilePath();
-    if (historyPath) {
-        await chatAPI.watcherStart(historyPath, state.currentSelectedItem.id, topicId);
-    }
-
-    if (!options.fromWatcher) {
-        await chatAPI.setTopicUnread(state.currentSelectedItem.id, topicId, false).catch(() => {});
-        await chatAPI.saveSettings({
-            lastOpenItemId: state.currentSelectedItem.id,
-            lastOpenItemType: 'agent',
-            lastOpenTopicId: topicId,
-        }).catch(() => {});
-        await loadAgents();
-    }
-}
-
-async function selectAgent(agentId) {
-    const config = await chatAPI.getAgentConfig(agentId);
-    if (!config || config.error) {
-        ui.showToastNotification(`加载智能体失败：${config?.error || '未知错误'}`, 'error');
-        return;
-    }
-
-    state.currentSelectedItem = {
-        id: agentId,
-        type: 'agent',
-        name: config.name || agentId,
-        avatarUrl: config.avatarUrl || '../assets/default_avatar.png',
-        config,
-    };
-    state.pendingAttachments = [];
-    state.selectedNoteIds = [];
-    closeNoteDetail({ restoreFocus: false });
-    closeNoteActionMenu();
-    state.activeFlashcardNoteId = null;
-    clearPendingFlashcardGeneration();
-    clearPendingSelectionContext();
-    resetReaderState();
-    setLeftSidebarMode('source-list');
-    setLeftReaderTab('guide');
-    renderReaderPanel();
-    refreshAttachmentPreview();
-
-    el.agentSettingsContainerTitle.textContent = '智能体设置';
-    el.selectedAgentNameForSettings.textContent = config.name || agentId;
-    syncWorkspaceContext();
-    setPromptVisible(true);
-    messageRenderer.setCurrentSelectedItem?.(state.currentSelectedItem);
-    messageRenderer.setCurrentItemAvatar?.(state.currentSelectedItem.avatarUrl);
-    messageRenderer.setCurrentItemAvatarColor?.(config.avatarCalculatedColor || null);
-
-    await populateAgentForm(config);
-    await loadTopics();
-    await loadAgentNotes();
-    await loadAgents();
-
-    if (state.topics.length > 0) {
-        await selectTopic(state.currentTopicId || state.topics[0].id);
-    } else {
-        state.currentTopicId = null;
-        state.currentChatHistory = [];
-        state.topicKnowledgeBaseDocuments = [];
-        state.topicNotes = [];
-        resetReaderState();
-        renderReaderPanel();
-        syncCurrentTopicKnowledgeBaseControls();
-        renderTopicKnowledgeBaseFiles();
-        renderNotesPanel();
-        await renderCurrentHistory();
-        syncComposerAvailability();
-    }
-}
-
-async function saveAgentSettings() {
-    if (!state.currentSelectedItem.id) return;
-    const promptText = state.promptModule
-        ? await state.promptModule.getPrompt()
-        : (document.getElementById('litePromptFallback')?.value || '').trim();
-
-    const patch = {
-        name: el.agentNameInput.value.trim(),
-        model: el.agentModel.value.trim(),
-        temperature: Number(el.agentTemperature.value || 0.7),
-        contextTokenLimit: Number(el.agentContextTokenLimit.value || 4000),
-        maxOutputTokens: Number(el.agentMaxOutputTokens.value || 1000),
-        top_p: el.agentTopP.value === '' ? undefined : Number(el.agentTopP.value),
-        top_k: el.agentTopK.value === '' ? undefined : Number(el.agentTopK.value),
-        streamOutput: el.agentStreamOutputTrue.checked,
-        avatarBorderColor: el.agentAvatarBorderColor.value,
-        nameTextColor: el.agentNameTextColor.value,
-        disableCustomColors: el.disableCustomColors.checked,
-        useThemeColorsInChat: el.useThemeColorsInChat.checked,
-        promptMode: 'original',
-        originalSystemPrompt: promptText,
-        systemPrompt: promptText,
-    };
-
-    const saveResult = await chatAPI.saveAgentConfig(state.currentSelectedItem.id, patch);
-    if (saveResult?.error) {
-        ui.showToastNotification(`保存智能体失败：${saveResult.error}`, 'error');
-        return;
-    }
-
-    const avatarFile = el.agentAvatarInput.files?.[0];
-    if (avatarFile) {
-        const buffer = await avatarFile.arrayBuffer();
-        await chatAPI.saveAvatar(state.currentSelectedItem.id, {
-            name: avatarFile.name,
-            type: avatarFile.type,
-            buffer,
-        });
-        el.agentAvatarInput.value = '';
-    }
-
-    ui.showToastNotification('智能体设置已保存。', 'success');
-    await loadAgents();
-    await selectAgent(state.currentSelectedItem.id);
 }
 
 function refreshAttachmentPreview() {
@@ -4309,109 +3928,6 @@ async function handleStreamEvent(eventData) {
     }
 }
 
-function buildMarkdownExport() {
-    return state.currentChatHistory.map((message) => {
-        const title = message.role === 'assistant'
-            ? (message.name || state.currentSelectedItem.name || 'Assistant')
-            : message.role === 'user'
-                ? (state.settings.userName || 'User')
-                : 'System';
-        const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2);
-        const attachments = Array.isArray(message.attachments) && message.attachments.length > 0
-            ? `\n\nAttachments:\n${message.attachments.map((item) => `- ${item.name}: ${item.internalPath || item.src || ''}`).join('\n')}`
-            : '';
-        return `## ${title}\n\n${content}${attachments}`;
-    }).join('\n\n---\n\n');
-}
-
-async function exportCurrentTopic() {
-    if (!state.currentTopicId) return;
-    const topic = state.topics.find((item) => item.id === state.currentTopicId);
-    const result = await chatAPI.exportTopicAsMarkdown({
-        topicName: topic?.name || state.currentTopicId,
-        markdownContent: buildMarkdownExport(),
-    });
-    if (!result?.success) {
-        ui.showToastNotification(result?.error || '导出失败', 'error');
-        return;
-    }
-    ui.showToastNotification('话题已导出。', 'success');
-}
-
-async function createAgent() {
-    const name = await ui.showPromptDialog({
-        title: '新建学科入口',
-        message: '创建一个新的学科入口，并为它配置专属的提示词风格。',
-        placeholder: '例如：语文 / 数学 / 英语',
-        confirmText: '创建',
-        cancelText: '取消',
-    });
-    if (!name) return;
-    const result = await chatAPI.createAgent(name.trim(), null);
-    if (result?.error) {
-        ui.showToastNotification(result.error, 'error');
-        return;
-    }
-    await loadAgents();
-    await selectAgent(result.agentId);
-}
-
-async function createTopic() {
-    if (!state.currentSelectedItem.id) {
-        ui.showToastNotification('请先选择一个智能体。', 'warning');
-        return;
-    }
-    const name = await ui.showPromptDialog({
-        title: '新建话题',
-        message: `为 ${state.currentSelectedItem.name || state.currentSelectedItem.id} 创建一个新的学习主题。`,
-        placeholder: '话题名称',
-        defaultValue: '新建学习话题',
-        confirmText: '创建',
-        cancelText: '取消',
-    });
-    if (!name) return;
-    const result = await chatAPI.createNewTopicForAgent(state.currentSelectedItem.id, name || '', false, true);
-    if (result?.error) {
-        ui.showToastNotification(result.error, 'error');
-        return;
-    }
-    await loadTopics();
-    await selectTopic(result.topicId);
-}
-
-async function deleteCurrentAgent() {
-    if (!state.currentSelectedItem.id) return;
-    const confirmed = await ui.showConfirmDialog(
-        `确定删除智能体 ${state.currentSelectedItem.name || state.currentSelectedItem.id} 吗？`,
-        '删除智能体',
-        '删除',
-        '取消',
-        true
-    );
-    if (!confirmed) return;
-    const result = await chatAPI.deleteAgent(state.currentSelectedItem.id);
-    if (result?.error) {
-        ui.showToastNotification(result.error, 'error');
-        return;
-    }
-    state.currentSelectedItem = { id: null, type: 'agent', name: null, avatarUrl: null, config: null };
-    state.currentTopicId = null;
-    state.currentChatHistory = [];
-    state.topicNotes = [];
-    state.agentNotes = [];
-    state.selectedNoteIds = [];
-    state.pendingAttachments = [];
-    syncWorkspaceContext();
-    setPromptVisible(false);
-    await loadAgents();
-    renderTopics();
-    syncCurrentTopicKnowledgeBaseControls();
-    refreshAttachmentPreview();
-    renderNotesPanel();
-    await renderCurrentHistory();
-    syncComposerAvailability();
-}
-
 async function createKnowledgeBase() {
     const name = el.knowledgeBaseNameInput.value.trim();
     if (!name) {
@@ -4566,17 +4082,14 @@ async function runKnowledgeBaseDebug() {
     renderKnowledgeBaseDebugResults();
 }
 
-function wireEvents() {
-    el.leftResizeHandle?.addEventListener('pointerdown', (event) => beginLayoutResize('left', event));
-    el.rightResizeHandle?.addEventListener('pointerdown', (event) => beginLayoutResize('right', event));
-    el.workspaceVerticalResizeHandle?.addEventListener('pointerdown', beginVerticalLayoutResize);
-    window.addEventListener('pointermove', updateLayoutResize);
-    window.addEventListener('pointermove', updateVerticalLayoutResize);
-    window.addEventListener('pointerup', endLayoutResize);
-    window.addEventListener('pointerup', endVerticalLayoutResize);
-    window.addEventListener('pointercancel', endLayoutResize);
-    window.addEventListener('pointercancel', endVerticalLayoutResize);
-    window.addEventListener('resize', scheduleLayoutRefresh);
+function bindFeatureEvents() {
+    bindLayoutEvents();
+    bindSettingsEvents();
+    bindWorkspaceEvents();
+    bindLegacyFeatureEvents();
+}
+
+function bindLegacyFeatureEvents() {
     window.addEventListener('resize', () => {
         hideSourceFileTooltip();
         closeSourceFileActionMenu();
@@ -4619,9 +4132,6 @@ function wireEvents() {
             closeTopicActionMenu();
         }
     });
-    el.topicList?.addEventListener('scroll', () => {
-        closeTopicActionMenu();
-    });
     el.topicKnowledgeBaseFiles?.addEventListener('scroll', () => {
         state.sourceListScrollTop = el.topicKnowledgeBaseFiles.scrollTop;
         hideSourceFileTooltip();
@@ -4629,25 +4139,6 @@ function wireEvents() {
     });
     el.notesList?.addEventListener('scroll', () => {
         closeNoteActionMenu();
-    });
-    el.agentSearchInput.addEventListener('input', filterAgents);
-    el.topicSearchInput.addEventListener('input', filterTopics);
-    el.createNewAgentBtn.addEventListener('click', createAgent);
-    el.quickNewTopicBtn.addEventListener('click', createTopic);
-    el.composerQuickNewTopicBtn.addEventListener('click', createTopic);
-    el.exportTopicBtn.addEventListener('click', exportCurrentTopic);
-    el.currentAgentSettingsBtn.addEventListener('click', () => {
-        openSettingsModal('agent', el.currentAgentSettingsBtn);
-    });
-    el.globalSettingsBtn.addEventListener('click', () => {
-        openSettingsModal('global', el.globalSettingsBtn);
-    });
-    el.settingsModalCloseBtn?.addEventListener('click', closeSettingsModal);
-    el.settingsModalBackdrop?.addEventListener('click', closeSettingsModal);
-    el.settingsNavButtons?.forEach((button) => {
-        button.addEventListener('click', () => {
-            switchSettingsModalSection(button.dataset.settingsSectionButton || 'global');
-        });
     });
     el.workspaceReaderBackBtn?.addEventListener('click', () => {
         setLeftSidebarMode('source-list');
@@ -4662,8 +4153,6 @@ function wireEvents() {
         }
         void ensureReaderGuide(state.reader.documentId, { forceRefresh: true });
     });
-    el.saveGlobalSettingsBtn.addEventListener('click', saveGlobalSettings);
-    el.saveAgentSettingsBtn.addEventListener('click', saveAgentSettings);
     el.deleteAgentBtn.addEventListener('click', deleteCurrentAgent);
     el.createKnowledgeBaseBtn?.addEventListener('click', createKnowledgeBase);
     el.renameKnowledgeBaseBtn?.addEventListener('click', renameKnowledgeBase);
@@ -4741,19 +4230,6 @@ function wireEvents() {
         el.agentAvatarPreview.src = file.path ? `file://${file.path.replace(/\\/g, '/')}` : URL.createObjectURL(file);
     });
 
-    document.querySelectorAll('input[name="themeMode"]').forEach((input) => {
-        input.addEventListener('change', () => {
-            if (input.checked) {
-                chatAPI.setThemeMode(input.value);
-            }
-        });
-    });
-
-    el.themeToggleBtn.addEventListener('click', () => {
-        const nextTheme = document.body.classList.contains('dark-theme') ? 'light' : 'dark';
-        chatAPI.setTheme(nextTheme);
-    });
-
     el.topicNotesScopeBtn?.addEventListener('click', () => {
         state.notesScope = 'topic';
         state.selectedNoteIds = [];
@@ -4814,127 +4290,6 @@ function wireEvents() {
     document.addEventListener('unistudy-open-kb-ref', (event) => {
         void openReaderFromRef(event.detail || {});
     });
-}
-
-function initMessageRenderer() {
-    initMarked();
-    initializeInterruptHandler(chatAPI);
-
-    messageRenderer.initializeMessageRenderer({
-        currentSelectedItemRef: {
-            get: () => state.currentSelectedItem,
-            set: (value) => {
-                state.currentSelectedItem = value;
-            },
-        },
-        currentTopicIdRef: {
-            get: () => state.currentTopicId,
-            set: (value) => {
-                state.currentTopicId = value;
-            },
-        },
-        currentChatHistoryRef: {
-            get: () => state.currentChatHistory,
-            set: (value) => {
-                state.currentChatHistory = value;
-            },
-        },
-        globalSettingsRef: {
-            get: () => state.settings,
-            set: (value) => {
-                state.settings = value;
-            },
-        },
-        chatMessagesDiv: el.chatMessages,
-        electronAPI: chatAPI,
-        markedInstance,
-        uiHelper: ui,
-        interruptHandler: { interrupt: interruptRequest },
-        summarizeTopicFromMessages: async () => null,
-    });
-}
-
-async function initInputFeatures() {
-    if (window.emoticonManager?.initialize) {
-        await window.emoticonManager.initialize({
-            emoticonPanel: el.emoticonPanel,
-            messageInput: el.messageInput,
-        });
-    }
-
-    initializeInputEnhancer({
-        messageInput: el.messageInput,
-        dropTargetElement: el.chatInputCard,
-        electronAPI: chatAPI,
-        electronPath: window.electronPath,
-        autoResizeTextarea: ui.autoResizeTextarea,
-        appendAttachments: appendStoredAttachments,
-        getCurrentAgentId: () => state.currentSelectedItem.id,
-        getCurrentTopicId: () => state.currentTopicId,
-        showToast: (message, type = 'info', duration = 3000) => ui.showToastNotification(message, type, duration),
-    });
-}
-
-async function bootstrap() {
-    const bridgeDiagnostics = {
-        chatAPI: Boolean(window.chatAPI),
-        electronAPI: Boolean(window.electronAPI),
-        electronPath: Boolean(window.electronPath),
-    };
-
-    if (!bridgeDiagnostics.chatAPI || !bridgeDiagnostics.electronAPI || !bridgeDiagnostics.electronPath) {
-        throw new Error(`Preload bridge missing: ${JSON.stringify(bridgeDiagnostics)}`);
-    }
-
-    syncWorkspaceContext();
-    setLeftSidebarMode('source-list');
-    setLeftReaderTab('guide');
-    setRightPanelMode('notes');
-    renderReaderPanel();
-    renderSelectionContextPreview();
-    initMessageRenderer();
-    await initInputFeatures();
-    await loadSettings();
-    initializeResizableLayout();
-    await loadKnowledgeBases({ silent: true });
-
-    const theme = await chatAPI.getCurrentTheme().catch(() => 'light');
-    applyTheme(theme || 'light');
-
-    chatAPI.onThemeUpdated((nextTheme) => applyTheme(nextTheme));
-    chatAPI.onVCPStreamEvent(handleStreamEvent);
-    chatAPI.onHistoryFileUpdated(async (payload) => {
-        if (payload?.agentId === state.currentSelectedItem.id && payload?.topicId === state.currentTopicId) {
-            await selectTopic(state.currentTopicId, { fromWatcher: true });
-        }
-    });
-
-    wireEvents();
-    await loadAgents();
-
-    if (state.agents.length === 0) {
-        const createResult = await chatAPI.createAgent("我的学习", null);
-        if (createResult && createResult.agentId) {
-            await loadAgents();
-        }
-    }
-
-    const lastOpenItemId = state.settings.lastOpenItemId;
-    if (lastOpenItemId && state.agents.some((agent) => agent.id === lastOpenItemId)) {
-        await selectAgent(lastOpenItemId);
-        if (state.settings.lastOpenTopicId) {
-            await selectTopic(state.settings.lastOpenTopicId);
-        }
-    } else if (state.agents.length > 0) {
-        await selectAgent(state.agents[0].id);
-    } else {
-        setPromptVisible(false);
-        renderNotesPanel();
-        await renderCurrentHistory();
-    }
-
-    ui.autoResizeTextarea(el.messageInput);
-    updateSendButtonState();
 }
 
 bootstrap().catch((error) => {

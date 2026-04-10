@@ -364,6 +364,19 @@ function createLayoutController(deps = {}) {
         void persistLayoutWidths();
     }
 
+    function bindEvents() {
+        el.leftResizeHandle?.addEventListener('pointerdown', (event) => beginLayoutResize('left', event));
+        el.rightResizeHandle?.addEventListener('pointerdown', (event) => beginLayoutResize('right', event));
+        el.workspaceVerticalResizeHandle?.addEventListener('pointerdown', beginVerticalLayoutResize);
+        windowObj.addEventListener('pointermove', updateLayoutResize);
+        windowObj.addEventListener('pointermove', updateVerticalLayoutResize);
+        windowObj.addEventListener('pointerup', endLayoutResize);
+        windowObj.addEventListener('pointerup', endVerticalLayoutResize);
+        windowObj.addEventListener('pointercancel', endLayoutResize);
+        windowObj.addEventListener('pointercancel', endVerticalLayoutResize);
+        windowObj.addEventListener('resize', scheduleLayoutRefresh);
+    }
+
     return {
         LAYOUT_DEFAULTS,
         clamp,
@@ -381,6 +394,7 @@ function createLayoutController(deps = {}) {
         beginVerticalLayoutResize,
         updateVerticalLayoutResize,
         endVerticalLayoutResize,
+        bindEvents,
     };
 }
 
