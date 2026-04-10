@@ -11,6 +11,22 @@ async function loadSourceModule() {
         /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
         'const positionFloatingElement = () => {};\n'
     );
+    source = source.replace(
+        /^import\s+\{\s*isReaderSupportedDocument\s*\}\s+from\s+['"].+?['"];\r?\n/m,
+        `const isReaderSupportedDocument = (documentItem = {}) => {
+    const contentType = String(documentItem.contentType || '').trim();
+    if (['pdf-text', 'docx-text', 'plain', 'markdown', 'html'].includes(contentType)) {
+        return true;
+    }
+    const mimeType = String(documentItem.mimeType || '').trim().toLowerCase();
+    if (mimeType.startsWith('text/')) {
+        return true;
+    }
+    return mimeType === 'application/pdf'
+        || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        || mimeType === 'application/xml';
+};\n`
+    );
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
@@ -286,4 +302,41 @@ test('loadCurrentTopicKnowledgeBaseDocuments reuses selected docs when topic and
     assert.deepEqual(result, documents);
     assert.notEqual(result, documents);
     assert.deepEqual(state.topicKnowledgeBaseDocuments, documents);
+});
+
+test('loadKnowledgeBaseDocuments delegates reader synchronization through injected adapters', async () => {
+    const { createSourceController } = await loadSourceModule();
+    const { window, document, el } = createDomElements();
+    const documents = [
+        { id: 'doc-1', name: 'lecture.pdf', status: 'done', contentType: 'pdf-text' },
+    ];
+    const state = createBaseState({
+        topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-topic' }],
+    });
+    const syncCalls = [];
+
+    const controller = createSourceController({
+        state,
+        el,
+        chatAPI: {
+            async listKnowledgeBaseDocuments() {
+                return { success: true, items: documents };
+            },
+        },
+        ui: createUiStub(),
+        windowObj: window,
+        documentObj: document,
+        syncReaderFromDocuments(items, options) {
+            syncCalls.push({ items, options });
+        },
+    });
+
+    await controller.loadKnowledgeBaseDocuments('kb-topic', { target: 'topic' });
+
+    assert.deepEqual(state.topicKnowledgeBaseDocuments, documents);
+    assert.equal(syncCalls.length, 1);
+    assert.deepEqual(syncCalls[0], {
+        items: documents,
+        options: { resetIfMissing: true },
+    });
 });

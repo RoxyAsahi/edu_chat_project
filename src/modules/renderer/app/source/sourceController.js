@@ -1,4 +1,5 @@
 import { positionFloatingElement } from '../dom/positionFloatingElement.js';
+import { isReaderSupportedDocument } from '../reader/readerUtils.js';
 
 const TOPIC_SOURCE_FILE_LIMIT = 50;
 
@@ -83,22 +84,6 @@ function getKnowledgeBaseDocumentVisual(documentItem = {}) {
     return { icon: 'draft', tone: 'neutral' };
 }
 
-function isReaderSupportedDocument(documentItem = {}) {
-    const contentType = String(documentItem.contentType || '').trim();
-    if (['pdf-text', 'docx-text', 'plain', 'markdown', 'html'].includes(contentType)) {
-        return true;
-    }
-
-    const mimeType = String(documentItem.mimeType || '').trim().toLowerCase();
-    if (mimeType.startsWith('text/')) {
-        return true;
-    }
-
-    return mimeType === 'application/pdf'
-        || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        || mimeType === 'application/xml';
-}
-
 function canReuseSelectedKnowledgeBaseDocuments({
     topicKnowledgeBaseId = null,
     selectedKnowledgeBaseId = null,
@@ -131,12 +116,10 @@ function createSourceController(deps = {}) {
     const documentObj = deps.documentObj || document;
     const renderTopics = deps.renderTopics || (() => {});
     const openSettingsModal = deps.openSettingsModal || (() => {});
-    const resetReaderState = deps.resetReaderState || (() => {});
-    const setLeftSidebarMode = deps.setLeftSidebarMode || (() => {});
-    const setLeftReaderTab = deps.setLeftReaderTab || (() => {});
-    const renderReaderPanel = deps.renderReaderPanel || (() => {});
     const closeTopicActionMenu = deps.closeTopicActionMenu || (() => {});
     const openReaderDocument = deps.openReaderDocument || (async () => {});
+    const isReaderDocumentActive = deps.isReaderDocumentActive || (() => false);
+    const syncReaderFromDocuments = deps.syncReaderFromDocuments || (() => {});
     const getNativePathForFile = deps.getNativePathForFile || (async () => '');
     const loadTopics = deps.loadTopics || (async () => {});
 
@@ -257,17 +240,6 @@ function createSourceController(deps = {}) {
         el.sourceFileTooltip.style.visibility = 'visible';
     }
 
-    function syncReaderGuideFromDocument(documentItem = {}) {
-        if (!documentItem || documentItem.id !== state.reader.documentId) {
-            return;
-        }
-
-        state.reader.guideStatus = documentItem.guideStatus || state.reader.guideStatus || 'idle';
-        state.reader.guideMarkdown = documentItem.guideMarkdown || '';
-        state.reader.guideGeneratedAt = documentItem.guideGeneratedAt || null;
-        state.reader.guideError = documentItem.guideError || null;
-    }
-
     function renderSourceFileActionMenu() {
         if (!el.sourceFileActionMenu) {
             return;
@@ -352,7 +324,7 @@ function createSourceController(deps = {}) {
         const visual = getKnowledgeBaseDocumentVisual(documentItem);
         const menuOpen = state.activeSourceFileMenu?.documentId === documentItem.id;
         row.classList.toggle('kb-document-row--clickable', readable);
-        row.classList.toggle('kb-document-row--active', documentItem.id === state.reader.documentId);
+        row.classList.toggle('kb-document-row--active', isReaderDocumentActive(documentItem.id));
         row.classList.toggle('kb-document-row--menu-open', menuOpen);
 
         row.innerHTML = `
@@ -613,6 +585,9 @@ function createSourceController(deps = {}) {
         if (!kbId) {
             state[target] = [];
             if (isTopicTarget) {
+                syncReaderFromDocuments([], { resetIfMissing: true });
+            }
+            if (isTopicTarget) {
                 renderTopicKnowledgeBaseFiles();
             } else {
                 renderKnowledgeBaseManager();
@@ -628,6 +603,9 @@ function createSourceController(deps = {}) {
 
         if (!result?.success) {
             state[target] = [];
+            if (isTopicTarget) {
+                syncReaderFromDocuments([], { resetIfMissing: true });
+            }
             if (options.silent !== true) {
                 ui.showToastNotification(`加载 Source 文档失败：${result?.error || '未知错误'}`, 'error');
             }
@@ -640,19 +618,7 @@ function createSourceController(deps = {}) {
         }
 
         state[target] = Array.isArray(result.items) ? result.items : [];
-        const activeReaderDoc = state[target].find((item) => item.id === state.reader.documentId) || null;
-        if (activeReaderDoc) {
-            state.reader.status = activeReaderDoc.status || state.reader.status;
-            state.reader.isIndexed = activeReaderDoc.status === 'done';
-            state.reader.contentType = activeReaderDoc.contentType || state.reader.contentType;
-            syncReaderGuideFromDocument(activeReaderDoc);
-            renderReaderPanel();
-        } else if (isTopicTarget && state.reader.documentId) {
-            resetReaderState();
-            setLeftSidebarMode('source-list');
-            setLeftReaderTab('guide');
-            renderReaderPanel();
-        }
+        syncReaderFromDocuments(state[target], { resetIfMissing: isTopicTarget });
 
         if (isTopicTarget) {
             renderTopicKnowledgeBaseFiles();
@@ -676,6 +642,7 @@ function createSourceController(deps = {}) {
             reuseSelected: options.reuseSelected,
         })) {
             state.topicKnowledgeBaseDocuments = [...state.knowledgeBaseDocuments];
+            syncReaderFromDocuments(state.topicKnowledgeBaseDocuments, { resetIfMissing: true });
             renderTopicKnowledgeBaseFiles();
             return state.topicKnowledgeBaseDocuments;
         }
@@ -1228,6 +1195,5 @@ export {
     createSourceController,
     formatDocumentStatus,
     getKnowledgeBaseDocumentVisual,
-    isReaderSupportedDocument,
     shouldPollKnowledgeBaseItems,
 };

@@ -6,6 +6,8 @@ import { createAppStore, createInitialAppState } from '../modules/renderer/app/s
 import { collectRootElements } from '../modules/renderer/app/dom/collectRootElements.js';
 import { positionFloatingElement } from '../modules/renderer/app/dom/positionFloatingElement.js';
 import { createLayoutController } from '../modules/renderer/app/layout/layoutController.js';
+import { createReaderController } from '../modules/renderer/app/reader/readerController.js';
+import { getReaderLocatorLabel } from '../modules/renderer/app/reader/readerUtils.js';
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
 import { createSourceController } from '../modules/renderer/app/source/sourceController.js';
 import { createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
@@ -17,7 +19,9 @@ const appStore = createAppStore(createInitialAppState());
 const state = appStore.getState();
 
 const el = collectRootElements(document);
+let sourceController = null;
 let workspaceController = null;
+let readerController = null;
 const layoutController = createLayoutController({
     state,
     el,
@@ -65,7 +69,26 @@ const {
     setPromptVisible,
     bindEvents: bindSettingsEvents,
 } = settingsController;
-const sourceController = createSourceController({
+readerController = createReaderController({
+    state,
+    el,
+    chatAPI,
+    ui,
+    windowObj: window,
+    documentObj: document,
+    renderMarkdownToSafeHtml,
+    getMarkedInstance: () => markedInstance,
+    setLeftSidebarMode,
+    setLeftReaderTab,
+    renderTopicKnowledgeBaseFiles: (...args) => sourceController?.renderTopicKnowledgeBaseFiles?.(...args),
+    syncKnowledgeBasePolling: (...args) => sourceController?.syncKnowledgeBasePolling?.(...args),
+    hideSourceFileTooltip: (...args) => sourceController?.hideSourceFileTooltip?.(...args),
+    onInjectSelection: (selection) => {
+        state.pendingSelectionContextRefs = [selection];
+        renderSelectionContextPreview();
+    },
+});
+sourceController = createSourceController({
     state,
     el,
     chatAPI,
@@ -74,12 +97,10 @@ const sourceController = createSourceController({
     documentObj: document,
     renderTopics: (...args) => workspaceController?.renderTopics?.(...args),
     openSettingsModal,
-    resetReaderState,
-    setLeftSidebarMode,
-    setLeftReaderTab,
-    renderReaderPanel,
     closeTopicActionMenu: (...args) => workspaceController?.closeTopicActionMenu?.(...args),
-    openReaderDocument,
+    openReaderDocument: (...args) => readerController?.openReaderDocument?.(...args),
+    isReaderDocumentActive: (...args) => readerController?.isDocumentActive?.(...args),
+    syncReaderFromDocuments: (...args) => readerController?.syncFromSourceDocuments?.(...args),
     getNativePathForFile,
     loadTopics: (...args) => workspaceController?.loadTopics?.(...args),
 });
@@ -108,13 +129,13 @@ workspaceController = createWorkspaceController({
     syncCurrentTopicKnowledgeBaseControls,
     syncComposerAvailability,
     renderNotesPanel,
-    renderReaderPanel,
+    renderReaderPanel: (...args) => readerController?.renderReaderPanel?.(...args),
     refreshAttachmentPreview,
     closeNoteDetail,
     closeNoteActionMenu,
     clearPendingFlashcardGeneration,
     clearPendingSelectionContext,
-    resetReaderState,
+    resetReaderState: (...args) => readerController?.resetReaderState?.(...args),
     setLeftSidebarMode,
     setLeftReaderTab,
     setRightPanelMode,
@@ -148,6 +169,11 @@ const {
     closeTopicActionMenu,
     bindEvents: bindWorkspaceEvents,
 } = workspaceController;
+const {
+    renderReaderPanel,
+    resetReaderState,
+    bindEvents: bindReaderEvents,
+} = readerController;
 const { bootstrap } = createAppBootstrap({
     state,
     chatAPI,
@@ -171,7 +197,7 @@ const { bootstrap } = createAppBootstrap({
     setLeftSidebarMode,
     setLeftReaderTab,
     setRightPanelMode,
-    renderReaderPanel,
+    renderReaderPanel: (...args) => readerController?.renderReaderPanel?.(...args),
     renderSelectionContextPreview,
     bindFeatureEvents,
     handleStreamEvent,
@@ -565,6 +591,7 @@ function restoreSourceListScrollPosition() {
 
 function setLeftReaderTab(tab) {
     const nextTab = tab === 'content' ? 'content' : 'guide';
+    const hasPendingSelection = readerController?.hasPendingSelection?.() || false;
     state.leftReaderActiveTab = nextTab;
 
     el.leftReaderGuideTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'guide');
@@ -573,7 +600,7 @@ function setLeftReaderTab(tab) {
     el.readerGuidePane?.classList.toggle('workspace-reader-pane--active', nextTab === 'guide');
     el.readerContentPane?.classList.toggle('hidden', nextTab !== 'content');
     el.readerContentPane?.classList.toggle('workspace-reader-pane--active', nextTab === 'content');
-    el.readerSelectionBar?.classList.toggle('hidden', nextTab !== 'content' || !state.reader.pendingSelection);
+    el.readerSelectionBar?.classList.toggle('hidden', nextTab !== 'content' || !hasPendingSelection);
 }
 
 function setLeftSidebarMode(mode) {
@@ -592,38 +619,6 @@ function setLeftSidebarMode(mode) {
     if (nextMode === 'source-list') {
         restoreSourceListScrollPosition();
     }
-}
-
-function getReaderLocatorLabel(ref = {}) {
-    if (ref.pageNumber !== null && ref.pageNumber !== undefined && Number.isFinite(Number(ref.pageNumber))) {
-        return `第 ${Number(ref.pageNumber)} 页`;
-    }
-    if (ref.paragraphIndex !== null && ref.paragraphIndex !== undefined && Number.isFinite(Number(ref.paragraphIndex))) {
-        return `第 ${Number(ref.paragraphIndex)} 段`;
-    }
-    if (ref.sectionTitle) {
-        return String(ref.sectionTitle);
-    }
-    return '未定位';
-}
-
-function resetReaderState() {
-    state.reader = {
-        documentId: null,
-        documentName: '',
-        contentType: null,
-        status: 'idle',
-        isIndexed: false,
-        view: null,
-        activePageNumber: null,
-        activeParagraphIndex: null,
-        activeSectionTitle: null,
-        pendingSelection: null,
-        guideStatus: 'idle',
-        guideMarkdown: '',
-        guideGeneratedAt: null,
-        guideError: null,
-    };
 }
 
 function clearPendingSelectionContext() {
@@ -657,460 +652,6 @@ function renderSelectionContextPreview() {
 
     el.selectionContextPreview.querySelector('[data-selection-context-action="clear"]')
         ?.addEventListener('click', () => clearPendingSelectionContext());
-}
-
-function renderReaderPanel() {
-    if (!el.readerContent || !el.readerGuideContent) {
-        return;
-    }
-
-    const reader = state.reader;
-    const guideStatusLabels = {
-        idle: '指南未生成',
-        pending: '指南排队中',
-        processing: '指南生成中',
-        done: '指南已生成',
-        failed: '指南生成失败',
-    };
-
-    if (el.readerDocumentTitle) {
-        el.readerDocumentTitle.textContent = reader.documentName || '选择一份资料开始阅读';
-    }
-    if (el.readerDocumentMeta) {
-        el.readerDocumentMeta.textContent = reader.documentId
-            ? `${reader.contentType === 'pdf-text'
-                ? 'PDF 分页阅读'
-                : (reader.contentType === 'docx-text' ? 'DOCX 结构化阅读' : '文本阅读模式')}`
-            : '支持 PDF、DOCX 与文本类资料，选中片段后可直接注入当前对话。';
-    }
-    if (el.readerLocationBadge) {
-        el.readerLocationBadge.textContent = reader.documentId
-            ? getReaderLocatorLabel({
-                pageNumber: reader.activePageNumber,
-                paragraphIndex: reader.activeParagraphIndex,
-                sectionTitle: reader.activeSectionTitle,
-            })
-            : '未打开文档';
-    }
-    if (el.readerIndexStatusBadge) {
-        el.readerIndexStatusBadge.textContent = reader.documentId
-            ? (reader.isIndexed ? '已入库' : '未入库')
-            : '尚未入库';
-    }
-    if (el.readerProcessingStatusBadge) {
-        const statusLabels = {
-            idle: '等待中',
-            pending: '排队中',
-            processing: '处理中',
-            done: '已完成',
-            failed: '失败',
-        };
-        el.readerProcessingStatusBadge.textContent = statusLabels[reader.status] || reader.status || '等待中';
-    }
-    if (el.readerGuideStatusBadge) {
-        el.readerGuideStatusBadge.textContent = guideStatusLabels[reader.guideStatus] || reader.guideStatus || '指南未生成';
-    }
-    if (el.readerSelectionBar) {
-        el.readerSelectionBar.classList.toggle('hidden', state.leftReaderActiveTab !== 'content' || !reader.pendingSelection);
-    }
-    if (el.readerSelectionSummary) {
-        el.readerSelectionSummary.textContent = reader.pendingSelection
-            ? `${getReaderLocatorLabel(reader.pendingSelection)} · ${String(reader.pendingSelection.selectionText || '').slice(0, 160)}`
-            : '当前没有选中内容。';
-    }
-    if (el.readerPrevBtn) {
-        el.readerPrevBtn.disabled = !reader.documentId;
-    }
-    if (el.readerNextBtn) {
-        el.readerNextBtn.disabled = !reader.documentId;
-    }
-    if (el.injectReaderSelectionBtn) {
-        el.injectReaderSelectionBtn.disabled = !reader.pendingSelection;
-    }
-    if (el.clearReaderSelectionBtn) {
-        el.clearReaderSelectionBtn.disabled = !reader.pendingSelection;
-    }
-    if (el.refreshReaderGuideBtn) {
-        el.refreshReaderGuideBtn.disabled = !reader.documentId || reader.guideStatus === 'processing';
-    }
-
-    setLeftReaderTab(state.leftReaderActiveTab);
-
-    if (!reader.documentId) {
-        el.readerGuideContent.innerHTML = `
-            <div class="empty-list-state">
-                <strong>来源指南会显示在这里</strong>
-                <span>从左侧“学习来源”打开资料后，系统会先生成一份学习导向的阅读指南。</span>
-            </div>
-        `;
-    } else if (reader.guideStatus === 'processing' || reader.guideStatus === 'pending') {
-        el.readerGuideContent.innerHTML = `
-            <div class="reader-guide-skeleton">
-                <div class="reader-guide-skeleton__pill"></div>
-                <div class="reader-guide-skeleton__line"></div>
-                <div class="reader-guide-skeleton__line reader-guide-skeleton__line--wide"></div>
-                <div class="reader-guide-skeleton__line"></div>
-                <div class="reader-guide-skeleton__card"></div>
-            </div>
-        `;
-    } else if (reader.guideStatus === 'failed') {
-        el.readerGuideContent.innerHTML = `
-            <div class="empty-list-state reader-guide-empty">
-                <strong>来源指南生成失败</strong>
-                <span>${escapeHtml(reader.guideError || '暂时无法生成来源指南。')}</span>
-            </div>
-        `;
-    } else if (reader.guideMarkdown) {
-        const sanitized = renderMarkdownToSafeHtml(
-            reader.guideMarkdown,
-            markedInstance || {
-                parse(value) {
-                    return `<pre>${escapeHtml(value)}</pre>`;
-                },
-            },
-        );
-        el.readerGuideContent.innerHTML = `
-            <article class="reader-guide-card">
-                ${sanitized}
-            </article>
-        `;
-    } else {
-        el.readerGuideContent.innerHTML = `
-            <div class="empty-list-state reader-guide-empty">
-                <strong>来源指南尚未生成</strong>
-                <span>系统会在你首次打开资料时异步生成一份学习指南；你也可以手动刷新重新生成。</span>
-            </div>
-        `;
-    }
-
-    if (!reader.documentId || !reader.view) {
-        el.readerContent.innerHTML = `
-            <div class="empty-list-state">
-                <strong>原文阅读区已就绪</strong>
-                <span>从左侧“学习来源”打开 PDF、DOCX 或文本资料后，这里会显示可定位的原文内容。</span>
-            </div>
-        `;
-        return;
-    }
-
-    if (reader.view.type === 'pdf') {
-        const pages = Array.isArray(reader.view.pages) ? reader.view.pages : [];
-        el.readerContent.className = 'reader-content reader-content--pdf';
-        el.readerContent.innerHTML = pages.map((page) => `
-            <article class="reader-page ${Number(page.pageNumber) === Number(reader.activePageNumber) ? 'reader-page--active' : ''}" data-reader-page="${page.pageNumber}">
-                <header class="reader-page__header">
-                    <strong class="reader-page__title">第 ${page.pageNumber} 页</strong>
-                    <span>${Array.isArray(page.paragraphs) ? page.paragraphs.length : 0} 段</span>
-                </header>
-                <div class="reader-page__paragraphs">
-                    ${(Array.isArray(page.paragraphs) ? page.paragraphs : []).map((paragraph) => `
-                        <p class="reader-paragraph ${Number(paragraph.index) === Number(reader.activeParagraphIndex) ? 'reader-paragraph--active' : ''}" data-reader-page="${page.pageNumber}" data-reader-paragraph-index="${paragraph.index}">${escapeHtml(paragraph.text || '')}</p>
-                    `).join('')}
-                </div>
-            </article>
-        `).join('');
-        return;
-    }
-
-    const paragraphs = Array.isArray(reader.view.paragraphs) ? reader.view.paragraphs : [];
-    const grouped = [];
-    let currentGroup = null;
-    paragraphs.forEach((paragraph) => {
-        const sectionTitle = paragraph.sectionTitle || '正文';
-        if (!currentGroup || currentGroup.sectionTitle !== sectionTitle) {
-            currentGroup = {
-                key: `${grouped.length}_${sectionTitle}`,
-                sectionTitle,
-                paragraphs: [],
-            };
-            grouped.push(currentGroup);
-        }
-        currentGroup.paragraphs.push(paragraph);
-    });
-
-    el.readerContent.className = 'reader-content reader-content--docx';
-    el.readerContent.innerHTML = grouped.map((group) => `
-        <article class="reader-docx-block ${group.paragraphs.some((paragraph) => Number(paragraph.index) === Number(reader.activeParagraphIndex)) ? 'reader-docx-block--active' : ''}" data-reader-section-title="${escapeHtml(group.sectionTitle)}">
-            <header class="reader-docx-block__header">
-                <strong class="reader-docx-block__title">${escapeHtml(group.sectionTitle)}</strong>
-                <span>${group.paragraphs.length} 段</span>
-            </header>
-            <div class="reader-docx-block__body">
-                ${group.paragraphs.map((paragraph) => `
-                    <p class="reader-paragraph ${Number(paragraph.index) === Number(reader.activeParagraphIndex) ? 'reader-paragraph--active' : ''}" data-reader-paragraph-index="${paragraph.index}" data-reader-section-title="${escapeHtml(group.sectionTitle)}">${escapeHtml(paragraph.text || '')}</p>
-                `).join('')}
-            </div>
-        </article>
-    `).join('');
-}
-
-function syncReaderSelectionFromDom() {
-    if (!el.readerContent) {
-        return;
-    }
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-        state.reader.pendingSelection = null;
-        renderReaderPanel();
-        return;
-    }
-
-    const range = selection.getRangeAt(0);
-    const anchorNode = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
-        ? range.commonAncestorContainer.parentElement
-        : range.commonAncestorContainer;
-
-    const target = anchorNode?.closest?.('[data-reader-page], [data-reader-paragraph-index]');
-    if (!target || !el.readerContent.contains(target)) {
-        state.reader.pendingSelection = null;
-        renderReaderPanel();
-        return;
-    }
-
-    const selectionText = String(selection.toString() || '').replace(/\s+/g, ' ').trim();
-    if (!selectionText) {
-        state.reader.pendingSelection = null;
-        renderReaderPanel();
-        return;
-    }
-
-    state.reader.pendingSelection = {
-        documentId: state.reader.documentId,
-        documentName: state.reader.documentName,
-        contentType: state.reader.contentType,
-        selectionText,
-        snippet: selectionText.slice(0, 180),
-        pageNumber: Number(target.dataset.readerPage || target.closest('[data-reader-page]')?.dataset.readerPage || 0) || null,
-        paragraphIndex: Number(target.dataset.readerParagraphIndex || 0) || null,
-        sectionTitle: target.dataset.readerSectionTitle || target.closest('[data-reader-section-title]')?.dataset.readerSectionTitle || null,
-    };
-    renderReaderPanel();
-}
-
-function scrollReaderToLocator(locator = {}) {
-    if (!el.readerContent) {
-        return;
-    }
-
-    const pageNumber = Number(locator.pageNumber || 0) || null;
-    const paragraphIndex = Number(locator.paragraphIndex || 0) || null;
-    if (paragraphIndex) {
-        state.reader.activeParagraphIndex = paragraphIndex;
-    }
-    if (pageNumber) {
-        state.reader.activePageNumber = pageNumber;
-    }
-    if (locator.sectionTitle) {
-        state.reader.activeSectionTitle = locator.sectionTitle || null;
-    }
-
-    renderReaderPanel();
-
-    let target = null;
-    if (paragraphIndex) {
-        target = el.readerContent.querySelector(`[data-reader-paragraph-index="${paragraphIndex}"]`);
-    }
-    if (!target && pageNumber) {
-        target = el.readerContent.querySelector(`[data-reader-page="${pageNumber}"]`);
-    }
-    if (!target && locator.sectionTitle) {
-        const allSectionNodes = Array.from(el.readerContent.querySelectorAll('[data-reader-section-title]'));
-        target = allSectionNodes.find((node) => node.dataset.readerSectionTitle === locator.sectionTitle) || null;
-    }
-
-    if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-}
-
-function syncReaderGuideFromDocument(documentItem = {}) {
-    if (!documentItem || documentItem.id !== state.reader.documentId) {
-        return;
-    }
-
-    state.reader.guideStatus = documentItem.guideStatus || state.reader.guideStatus || 'idle';
-    state.reader.guideMarkdown = documentItem.guideMarkdown || '';
-    state.reader.guideGeneratedAt = documentItem.guideGeneratedAt || null;
-    state.reader.guideError = documentItem.guideError || null;
-}
-
-function patchDocumentGuideState(documentId, patch = {}) {
-    const applyPatch = (items = []) => items.map((item) => (
-        item.id === documentId
-            ? { ...item, ...patch }
-            : item
-    ));
-
-    state.knowledgeBaseDocuments = applyPatch(state.knowledgeBaseDocuments);
-    state.topicKnowledgeBaseDocuments = applyPatch(state.topicKnowledgeBaseDocuments);
-}
-
-async function ensureReaderGuide(documentId, options = {}) {
-    if (!documentId) {
-        return null;
-    }
-
-    const current = await chatAPI.getKnowledgeBaseDocumentGuide(documentId).catch((error) => ({
-        success: false,
-        error: error.message,
-    }));
-
-    if (current?.success) {
-        patchDocumentGuideState(documentId, {
-            guideStatus: current.guideStatus || 'idle',
-            guideMarkdown: current.guideMarkdown || '',
-            guideGeneratedAt: current.guideGeneratedAt || null,
-            guideError: current.guideError || null,
-        });
-        state.reader.guideStatus = current.guideStatus || 'idle';
-        state.reader.guideMarkdown = current.guideMarkdown || '';
-        state.reader.guideGeneratedAt = current.guideGeneratedAt || null;
-        state.reader.guideError = current.guideError || null;
-        renderReaderPanel();
-    }
-
-    const shouldGenerate = options.forceRefresh === true
-        || !current?.success
-        || (!current.guideMarkdown && !['processing', 'pending'].includes(current.guideStatus));
-
-    if (!shouldGenerate) {
-        return current;
-    }
-
-    const result = await chatAPI.generateKnowledgeBaseDocumentGuide(documentId, {
-        forceRefresh: options.forceRefresh === true,
-    }).catch((error) => ({
-        success: false,
-        error: error.message,
-    }));
-
-    if (result?.success) {
-        patchDocumentGuideState(documentId, {
-            guideStatus: result.guideStatus || 'processing',
-            guideMarkdown: result.guideMarkdown || '',
-            guideGeneratedAt: result.guideGeneratedAt || null,
-            guideError: result.guideError || null,
-        });
-    }
-
-    if (result?.success && state.reader.documentId === documentId) {
-        state.reader.guideStatus = result.guideStatus || 'processing';
-        state.reader.guideMarkdown = result.guideMarkdown || '';
-        state.reader.guideGeneratedAt = result.guideGeneratedAt || null;
-        state.reader.guideError = result.guideError || null;
-        renderReaderPanel();
-    } else if (!result?.success && state.reader.documentId === documentId) {
-        patchDocumentGuideState(documentId, {
-            guideStatus: 'failed',
-            guideError: result?.error || '来源指南生成失败。',
-        });
-        state.reader.guideStatus = 'failed';
-        state.reader.guideError = result?.error || '来源指南生成失败。';
-        renderReaderPanel();
-    }
-
-    renderTopicKnowledgeBaseFiles();
-    syncKnowledgeBasePolling();
-    return result;
-}
-
-async function openReaderDocument(documentId, locator = {}) {
-    hideSourceFileTooltip();
-    if (!documentId) {
-        resetReaderState();
-        setLeftSidebarMode('source-list');
-        setLeftReaderTab('guide');
-        renderReaderPanel();
-        renderTopicKnowledgeBaseFiles();
-        return;
-    }
-
-    const result = await chatAPI.getKnowledgeBaseDocumentViewData(documentId);
-    if (!result?.success) {
-        ui.showToastNotification(`打开阅读区失败：${result?.error || '未知错误'}`, 'error');
-        return;
-    }
-
-    const view = result.view || {};
-    const documentItem = result.document || {};
-    state.reader = {
-        documentId,
-        documentName: documentItem.name || '未命名文档',
-        contentType: documentItem.contentType || view.contentType || null,
-        status: documentItem.status || 'done',
-        isIndexed: documentItem.isIndexed === true,
-        view,
-        activePageNumber: Number(locator.pageNumber || view.pages?.[0]?.pageNumber || 0) || null,
-        activeParagraphIndex: Number(locator.paragraphIndex || view.paragraphs?.[0]?.index || view.pages?.[0]?.paragraphs?.[0]?.index || 0) || null,
-        activeSectionTitle: locator.sectionTitle || view.paragraphs?.[0]?.sectionTitle || null,
-        pendingSelection: null,
-        guideStatus: documentItem.guideStatus || 'idle',
-        guideMarkdown: documentItem.guideMarkdown || '',
-        guideGeneratedAt: documentItem.guideGeneratedAt || null,
-        guideError: documentItem.guideError || null,
-    };
-
-    setLeftSidebarMode('reader');
-    setLeftReaderTab(locator.preferTab === 'content' || locator.pageNumber || locator.paragraphIndex || locator.sectionTitle ? 'content' : 'guide');
-    renderReaderPanel();
-    renderTopicKnowledgeBaseFiles();
-    requestAnimationFrame(() => {
-        scrollReaderToLocator(locator);
-    });
-    void ensureReaderGuide(documentId);
-}
-
-async function openReaderFromRef(ref = {}) {
-    if (!ref?.documentId) {
-        return;
-    }
-    await openReaderDocument(ref.documentId, {
-        ...ref,
-        preferTab: 'content',
-    });
-}
-
-function injectReaderSelectionIntoComposer() {
-    const selection = state.reader.pendingSelection;
-    if (!selection) {
-        return;
-    }
-
-    state.pendingSelectionContextRefs = [{
-        ...selection,
-        sourceType: 'reader-selection',
-    }];
-    renderSelectionContextPreview();
-    ui.showToastNotification('已将当前选段注入本轮对话上下文。', 'success');
-}
-
-function navigateReader(step) {
-    const reader = state.reader;
-    if (!reader.documentId || !reader.view) {
-        return;
-    }
-
-    if (reader.view.type === 'pdf') {
-        const pages = Array.isArray(reader.view.pages) ? reader.view.pages : [];
-        const currentIndex = Math.max(0, pages.findIndex((page) => Number(page.pageNumber) === Number(reader.activePageNumber)));
-        const nextPage = pages[Math.min(Math.max(currentIndex + step, 0), Math.max(pages.length - 1, 0))];
-        if (nextPage) {
-            state.reader.activePageNumber = nextPage.pageNumber;
-            state.reader.activeParagraphIndex = nextPage.paragraphs?.[0]?.index || state.reader.activeParagraphIndex;
-            scrollReaderToLocator({ pageNumber: nextPage.pageNumber });
-        }
-        return;
-    }
-
-    const paragraphs = Array.isArray(reader.view.paragraphs) ? reader.view.paragraphs : [];
-    const currentIndex = Math.max(0, paragraphs.findIndex((paragraph) => Number(paragraph.index) === Number(reader.activeParagraphIndex)));
-    const nextParagraph = paragraphs[Math.min(Math.max(currentIndex + step, 0), Math.max(paragraphs.length - 1, 0))];
-    if (nextParagraph) {
-        state.reader.activeParagraphIndex = nextParagraph.index;
-        state.reader.activeSectionTitle = nextParagraph.sectionTitle || null;
-        scrollReaderToLocator({ paragraphIndex: nextParagraph.index, sectionTitle: nextParagraph.sectionTitle || null });
-    }
 }
 
 function normalizeTopic(topic = {}) {
@@ -2947,6 +2488,7 @@ async function handleStreamEvent(eventData) {
 function bindFeatureEvents() {
     bindLayoutEvents();
     bindSettingsEvents();
+    bindReaderEvents();
     bindSourceEvents();
     bindWorkspaceEvents();
     bindLegacyFeatureEvents();
@@ -2977,19 +2519,6 @@ function bindLegacyFeatureEvents() {
     });
     el.notesList?.addEventListener('scroll', () => {
         closeNoteActionMenu();
-    });
-    el.workspaceReaderBackBtn?.addEventListener('click', () => {
-        setLeftSidebarMode('source-list');
-        setLeftReaderTab('guide');
-        renderTopicKnowledgeBaseFiles();
-    });
-    el.leftReaderGuideTabBtn?.addEventListener('click', () => setLeftReaderTab('guide'));
-    el.leftReaderContentTabBtn?.addEventListener('click', () => setLeftReaderTab('content'));
-    el.refreshReaderGuideBtn?.addEventListener('click', () => {
-        if (!state.reader.documentId) {
-            return;
-        }
-        void ensureReaderGuide(state.reader.documentId, { forceRefresh: true });
     });
 
     el.attachFileBtn.addEventListener('click', async () => {
@@ -3061,21 +2590,6 @@ function bindLegacyFeatureEvents() {
     el.minimizeBtn.addEventListener('click', () => chatAPI.minimizeWindow());
     el.maximizeBtn.addEventListener('click', () => chatAPI.maximizeWindow());
     el.closeBtn.addEventListener('click', () => chatAPI.closeWindow());
-    el.readerPrevBtn?.addEventListener('click', () => navigateReader(-1));
-    el.readerNextBtn?.addEventListener('click', () => navigateReader(1));
-    el.clearReaderSelectionBtn?.addEventListener('click', () => {
-        state.reader.pendingSelection = null;
-        renderReaderPanel();
-    });
-    el.injectReaderSelectionBtn?.addEventListener('click', injectReaderSelectionIntoComposer);
-    el.readerContent?.addEventListener('mouseup', () => {
-        requestAnimationFrame(() => {
-            syncReaderSelectionFromDom();
-        });
-    });
-    document.addEventListener('unistudy-open-kb-ref', (event) => {
-        void openReaderFromRef(event.detail || {});
-    });
 }
 
 bootstrap().catch((error) => {
