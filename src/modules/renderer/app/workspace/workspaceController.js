@@ -1,3 +1,5 @@
+import { positionFloatingElement } from '../dom/positionFloatingElement.js';
+
 const DEFAULT_AGENT_AVATAR = '../assets/default_avatar.png';
 
 function escapeHtml(text) {
@@ -18,9 +20,10 @@ function createWorkspaceController(deps = {}) {
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
+    const windowObj = deps.windowObj || window;
+    const documentObj = deps.documentObj || document;
     const normalizeTopic = deps.normalizeTopic || ((topic) => topic);
     const normalizeHistory = deps.normalizeHistory || ((history) => history);
-    const toggleTopicActionMenu = deps.toggleTopicActionMenu || (() => {});
     const renderCurrentHistory = deps.renderCurrentHistory || (async () => {});
     const renderTopicKnowledgeBaseFiles = deps.renderTopicKnowledgeBaseFiles || (() => {});
     const syncCurrentTopicKnowledgeBaseControls = deps.syncCurrentTopicKnowledgeBaseControls || (() => {});
@@ -44,6 +47,8 @@ function createWorkspaceController(deps = {}) {
     const setPromptVisible = deps.setPromptVisible || (() => {});
     const messageRendererApi = deps.messageRendererApi || null;
     const defaultAgentAvatar = deps.defaultAgentAvatar || DEFAULT_AGENT_AVATAR;
+    const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
+    const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
 
     function getCurrentTopic() {
         return state.topics.find((topic) => topic.id === state.currentTopicId) || null;
@@ -55,6 +60,86 @@ function createWorkspaceController(deps = {}) {
 
     function getCurrentAgentDisplayName() {
         return state.currentSelectedItem.name || '未选择学科';
+    }
+
+    function closeTopicActionMenu() {
+        state.activeTopicMenu = null;
+        if (!el.topicActionMenu) {
+            return;
+        }
+        el.topicActionMenu.classList.add('hidden');
+        el.topicActionMenu.innerHTML = '';
+        el.topicActionMenu.style.left = '0px';
+        el.topicActionMenu.style.top = '0px';
+        el.topicActionMenu.style.visibility = '';
+    }
+
+    function renderTopicActionMenu() {
+        if (!el.topicActionMenu || !state.activeTopicMenu?.topic || !state.activeTopicMenu?.anchorRect) {
+            closeTopicActionMenu();
+            return;
+        }
+
+        const topic = state.activeTopicMenu.topic;
+        const actions = [
+            { key: 'rename', label: '重命名', icon: 'edit' },
+            { key: 'toggle-unread', label: topic.unread ? '标为已读' : '标为未读', icon: topic.unread ? 'drafts' : 'mark_chat_unread' },
+            { key: 'toggle-lock', label: topic.locked === false ? '锁定' : '解锁', icon: topic.locked === false ? 'lock_open' : 'lock' },
+            { key: 'delete', label: '删除', icon: 'delete', danger: true },
+        ];
+
+        el.topicActionMenu.innerHTML = actions.map((action) => `
+            <button
+                type="button"
+                class="topic-action-menu__item ${action.danger ? 'topic-action-menu__item--danger' : ''}"
+                data-topic-action="${escapeHtml(action.key)}"
+            >
+                <span class="material-symbols-outlined">${escapeHtml(action.icon)}</span>
+                <span>${escapeHtml(action.label)}</span>
+            </button>
+        `).join('');
+
+        el.topicActionMenu.classList.remove('hidden');
+        el.topicActionMenu.style.visibility = 'hidden';
+        positionFloatingElement(el.topicActionMenu, state.activeTopicMenu.anchorRect, 'left', windowObj);
+        el.topicActionMenu.style.visibility = 'visible';
+
+        el.topicActionMenu.querySelectorAll('[data-topic-action]').forEach((button) => {
+            button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const action = button.dataset.topicAction;
+                if (action === 'rename') {
+                    await renameTopic(topic);
+                } else if (action === 'toggle-unread') {
+                    await setTopicUnreadState(topic, !topic.unread);
+                } else if (action === 'toggle-lock') {
+                    await toggleTopicLockState(topic);
+                } else if (action === 'delete') {
+                    await deleteTopicFromList(topic);
+                }
+                closeTopicActionMenu();
+            });
+        });
+    }
+
+    function toggleTopicActionMenu(topic, anchorElement) {
+        if (!topic || !anchorElement) {
+            return;
+        }
+
+        if (state.activeTopicMenu?.topicId === topic.id) {
+            closeTopicActionMenu();
+            return;
+        }
+
+        closeSourceFileActionMenu();
+        hideSourceFileTooltip();
+        state.activeTopicMenu = {
+            topicId: topic.id,
+            topic,
+            anchorRect: anchorElement.getBoundingClientRect(),
+        };
+        renderTopicActionMenu();
     }
 
     function syncWorkspaceContext() {
@@ -105,7 +190,7 @@ function createWorkspaceController(deps = {}) {
         }
 
         state.agents.forEach((agent) => {
-            const li = document.createElement('li');
+            const li = documentObj.createElement('li');
             const unreadCount = Number(unreadCounts[agent.id] || 0);
             const isActive = agent.id === state.currentSelectedItem.id;
             const statusLabel = unreadCount > 0 ? `${unreadCount} 个待处理话题` : (isActive ? '当前学科入口' : '已整理完成');
@@ -176,7 +261,7 @@ function createWorkspaceController(deps = {}) {
         }
 
         state.topics.forEach((topic) => {
-            const li = document.createElement('li');
+            const li = documentObj.createElement('li');
             const isActive = topic.id === state.currentTopicId;
             li.className = 'list-item topic-item topic-item--compact';
             li.dataset.topicId = topic.id || '';
@@ -309,6 +394,7 @@ function createWorkspaceController(deps = {}) {
     }
 
     async function clearCurrentConversationView() {
+        closeTopicActionMenu();
         state.currentTopicId = null;
         state.currentChatHistory = [];
         state.topicKnowledgeBaseDocuments = [];
@@ -328,6 +414,7 @@ function createWorkspaceController(deps = {}) {
     }
 
     async function deleteTopicFromList(topic) {
+        closeTopicActionMenu();
         const label = topic.name || topic.id;
         const confirmed = await ui.showConfirmDialog(`确定删除话题 "${label}" 吗？`, '删除话题', '删除', '取消', true);
         if (!confirmed) {
@@ -363,6 +450,7 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
+        closeTopicActionMenu();
         state.currentTopicId = topicId;
         state.topicKnowledgeBaseDocuments = [];
         state.selectedNoteIds = [];
@@ -412,6 +500,7 @@ function createWorkspaceController(deps = {}) {
     }
 
     async function selectAgent(agentId, options = {}) {
+        closeTopicActionMenu();
         const config = await chatAPI.getAgentConfig(agentId);
         if (!config || config.error) {
             ui.showToastNotification(`加载智能体失败：${config?.error || '未知错误'}`, 'error');
@@ -563,6 +652,7 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
+        closeTopicActionMenu();
         const confirmed = await ui.showConfirmDialog(
             `确定删除智能体 ${state.currentSelectedItem.name || state.currentSelectedItem.id} 吗？`,
             '删除智能体',
@@ -613,8 +703,30 @@ function createWorkspaceController(deps = {}) {
         el.exportTopicBtn?.addEventListener('click', () => {
             void exportCurrentTopic();
         });
+        el.deleteAgentBtn?.addEventListener('click', () => {
+            void deleteCurrentAgent();
+        });
         el.topicList?.addEventListener('scroll', () => {
-            deps.closeTopicActionMenu?.();
+            closeTopicActionMenu();
+        });
+        windowObj.addEventListener('resize', () => {
+            closeTopicActionMenu();
+        });
+        documentObj.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!state.activeTopicMenu) {
+                return;
+            }
+
+            if (target instanceof Element && (target.closest('#topicActionMenu') || target.closest('[data-topic-menu-button]'))) {
+                return;
+            }
+            closeTopicActionMenu();
+        });
+        documentObj.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeTopicActionMenu();
+            }
         });
     }
 
@@ -622,6 +734,7 @@ function createWorkspaceController(deps = {}) {
         getCurrentTopic,
         getCurrentTopicDisplayName,
         getCurrentAgentDisplayName,
+        closeTopicActionMenu,
         syncWorkspaceContext,
         filterAgents,
         renderAgentList,

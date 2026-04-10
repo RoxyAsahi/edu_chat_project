@@ -8,6 +8,11 @@ async function loadModule(relativePath) {
     let source = await fs.readFile(modulePath, 'utf8');
     if (relativePath.endsWith('app/bootstrap.js')) {
         source = source.replace(/^import\s.+?;\r?\n/gm, '');
+    } else if (relativePath.endsWith('app/workspace/workspaceController.js')) {
+        source = source.replace(
+            /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
+            'const positionFloatingElement = () => {};\n'
+        );
     }
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
