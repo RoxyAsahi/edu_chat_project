@@ -28,13 +28,10 @@ function createWorkspaceController(deps = {}) {
     const renderTopicKnowledgeBaseFiles = deps.renderTopicKnowledgeBaseFiles || (() => {});
     const syncCurrentTopicKnowledgeBaseControls = deps.syncCurrentTopicKnowledgeBaseControls || (() => {});
     const syncComposerAvailability = deps.syncComposerAvailability || (() => {});
-    const renderNotesPanel = deps.renderNotesPanel || (() => {});
     const renderReaderPanel = deps.renderReaderPanel || (() => {});
     const refreshAttachmentPreview = deps.refreshAttachmentPreview || (() => {});
-    const closeNoteDetail = deps.closeNoteDetail || (() => {});
-    const closeNoteActionMenu = deps.closeNoteActionMenu || (() => {});
-    const clearPendingFlashcardGeneration = deps.clearPendingFlashcardGeneration || (() => {});
-    const clearPendingSelectionContext = deps.clearPendingSelectionContext || (() => {});
+    const resetComposerState = deps.resetComposerState || (() => {});
+    const resetNotesState = deps.resetNotesState || (() => {});
     const resetReaderState = deps.resetReaderState || (() => {});
     const setLeftSidebarMode = deps.setLeftSidebarMode || (() => {});
     const setLeftReaderTab = deps.setLeftReaderTab || (() => {});
@@ -398,19 +395,24 @@ function createWorkspaceController(deps = {}) {
         state.currentTopicId = null;
         state.currentChatHistory = [];
         state.topicKnowledgeBaseDocuments = [];
-        state.topicNotes = [];
-        state.selectedNoteIds = [];
-        state.pendingAttachments = [];
+        resetNotesState({
+            clearTopicNotes: true,
+            clearSelection: true,
+            clearActiveNote: true,
+            closeDetailView: true,
+            clearFlashcards: true,
+        });
+        resetComposerState({
+            clearAttachments: true,
+            clearSelectionContext: true,
+        });
         setLeftSidebarMode('source-list');
         setLeftReaderTab('guide');
         syncWorkspaceContext();
         renderTopics();
         syncCurrentTopicKnowledgeBaseControls();
         renderTopicKnowledgeBaseFiles();
-        refreshAttachmentPreview();
-        renderNotesPanel();
         await renderCurrentHistory();
-        syncComposerAvailability();
     }
 
     async function deleteTopicFromList(topic) {
@@ -453,21 +455,23 @@ function createWorkspaceController(deps = {}) {
         closeTopicActionMenu();
         state.currentTopicId = topicId;
         state.topicKnowledgeBaseDocuments = [];
-        state.selectedNoteIds = [];
-        closeNoteDetail({ restoreFocus: false });
-        closeNoteActionMenu();
-        state.activeFlashcardNoteId = null;
-        clearPendingFlashcardGeneration();
-        state.pendingAttachments = [];
-        clearPendingSelectionContext();
+        resetNotesState({
+            clearTopicNotes: true,
+            clearSelection: true,
+            clearActiveNote: true,
+            closeDetailView: true,
+            clearFlashcards: true,
+        });
+        resetComposerState({
+            clearAttachments: true,
+            clearSelectionContext: true,
+        });
         resetReaderState();
         setLeftSidebarMode('source-list');
         setLeftReaderTab('guide');
         setRightPanelMode('notes');
         renderReaderPanel();
         syncWorkspaceContext();
-        refreshAttachmentPreview();
-        syncComposerAvailability();
         syncCurrentTopicKnowledgeBaseControls();
         messageRendererApi?.setCurrentTopicId?.(topicId);
 
@@ -514,18 +518,22 @@ function createWorkspaceController(deps = {}) {
             avatarUrl: config.avatarUrl || defaultAgentAvatar,
             config,
         };
-        state.pendingAttachments = [];
-        state.selectedNoteIds = [];
-        closeNoteDetail({ restoreFocus: false });
-        closeNoteActionMenu();
-        state.activeFlashcardNoteId = null;
-        clearPendingFlashcardGeneration();
-        clearPendingSelectionContext();
+        resetComposerState({
+            clearAttachments: true,
+            clearSelectionContext: true,
+        });
+        resetNotesState({
+            clearTopicNotes: true,
+            clearAgentNotes: true,
+            clearSelection: true,
+            clearActiveNote: true,
+            closeDetailView: true,
+            clearFlashcards: true,
+        });
         resetReaderState();
         setLeftSidebarMode('source-list');
         setLeftReaderTab('guide');
         renderReaderPanel();
-        refreshAttachmentPreview();
 
         if (el.agentSettingsContainerTitle) {
             el.agentSettingsContainerTitle.textContent = '智能体设置';
@@ -554,12 +562,10 @@ function createWorkspaceController(deps = {}) {
         state.currentTopicId = null;
         state.currentChatHistory = [];
         state.topicKnowledgeBaseDocuments = [];
-        state.topicNotes = [];
         resetReaderState();
         renderReaderPanel();
         syncCurrentTopicKnowledgeBaseControls();
         renderTopicKnowledgeBaseFiles();
-        renderNotesPanel();
         await renderCurrentHistory();
         syncComposerAvailability();
     }
@@ -673,19 +679,24 @@ function createWorkspaceController(deps = {}) {
         state.currentSelectedItem = { id: null, type: 'agent', name: null, avatarUrl: null, config: null };
         state.currentTopicId = null;
         state.currentChatHistory = [];
-        state.topicNotes = [];
-        state.agentNotes = [];
-        state.selectedNoteIds = [];
-        state.pendingAttachments = [];
+        resetNotesState({
+            clearTopicNotes: true,
+            clearAgentNotes: true,
+            clearSelection: true,
+            clearActiveNote: true,
+            closeDetailView: true,
+            clearFlashcards: true,
+        });
+        resetComposerState({
+            clearAttachments: true,
+            clearSelectionContext: true,
+        });
         syncWorkspaceContext();
         setPromptVisible(false);
         await loadAgents();
         renderTopics();
         syncCurrentTopicKnowledgeBaseControls();
-        refreshAttachmentPreview();
-        renderNotesPanel();
         await renderCurrentHistory();
-        syncComposerAvailability();
     }
 
     function bindEvents() {
