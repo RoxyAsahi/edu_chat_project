@@ -2,12 +2,13 @@ const test = require('node:test');
 const assert = require('assert/strict');
 const fs = require('fs/promises');
 const path = require('path');
+const { JSDOM } = require('jsdom');
 
 function stripModuleExports(source) {
     return source.replace(/export\s*\{[\s\S]*?\};?\s*$/m, '');
 }
 
-async function loadNotesUtilsModule() {
+async function buildNotesUtilsSource() {
     const notesPath = path.resolve(__dirname, '../src/modules/renderer/app/notes/notesUtils.js');
     const flashcardsPath = path.resolve(__dirname, '../src/modules/renderer/app/flashcards/flashcardUtils.js');
     let source = await fs.readFile(notesPath, 'utf8');
@@ -18,7 +19,277 @@ async function loadNotesUtilsModule() {
         `${flashcardSource}\n`
     );
 
+    return source;
+}
+
+async function loadNotesUtilsModule() {
+    const source = await buildNotesUtilsSource();
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+}
+
+async function loadNotesControllerModule() {
+    const controllerPath = path.resolve(__dirname, '../src/modules/renderer/app/notes/notesController.js');
+    const moduleCache = new Map();
+
+    async function buildModuleDataUrl(filePath) {
+        const normalizedPath = path.resolve(filePath);
+        if (moduleCache.has(normalizedPath)) {
+            return moduleCache.get(normalizedPath);
+        }
+
+        let source = await fs.readFile(normalizedPath, 'utf8');
+        const importMatches = [...source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)];
+        for (const match of importMatches) {
+            const specifier = match[1];
+            const dependencyPath = path.resolve(path.dirname(normalizedPath), specifier);
+            const dependencyUrl = await buildModuleDataUrl(dependencyPath);
+            source = source.replace(`from '${specifier}'`, `from '${dependencyUrl}'`);
+            source = source.replace(`from "${specifier}"`, `from "${dependencyUrl}"`);
+        }
+
+        const dataUrl = `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+        moduleCache.set(normalizedPath, dataUrl);
+        return dataUrl;
+    }
+
+    return import(await buildModuleDataUrl(controllerPath));
+}
+
+function createBaseState(overrides = {}) {
+    const base = {
+        settings: {
+            settings: {
+                vcpServerUrl: '',
+                vcpApiKey: '',
+            },
+            settingsModalSection: 'global',
+            promptModule: null,
+        },
+        layout: {
+            rightPanelMode: 'notes',
+        },
+        session: {
+            currentSelectedItem: {
+                id: 'agent-1',
+                name: '数学',
+                config: {
+                    model: 'fixture-model',
+                    maxOutputTokens: 1200,
+                },
+            },
+            currentTopicId: 'topic-1',
+            currentChatHistory: [],
+        },
+        source: {},
+        reader: {},
+        notes: {
+            topicNotes: [],
+            agentNotes: [],
+            notesScope: 'topic',
+            activeNoteId: null,
+            selectedNoteIds: [],
+            notesStudioView: 'overview',
+            noteDetailKind: null,
+            activeNoteMenu: null,
+            activeFlashcardNoteId: null,
+            pendingFlashcardGeneration: null,
+        },
+        composer: {},
+    };
+
+    return {
+        ...base,
+        ...overrides,
+        settings: {
+            ...base.settings,
+            ...(overrides.settings || {}),
+            settings: {
+                ...base.settings.settings,
+                ...(overrides.settings?.settings || {}),
+            },
+        },
+        layout: {
+            ...base.layout,
+            ...(overrides.layout || {}),
+        },
+        session: {
+            ...base.session,
+            ...(overrides.session || {}),
+            currentSelectedItem: {
+                ...base.session.currentSelectedItem,
+                ...(overrides.session?.currentSelectedItem || {}),
+                config: {
+                    ...base.session.currentSelectedItem.config,
+                    ...(overrides.session?.currentSelectedItem?.config || {}),
+                },
+            },
+        },
+        notes: {
+            ...base.notes,
+            ...(overrides.notes || {}),
+        },
+    };
+}
+
+function createStore(initialState) {
+    const state = initialState;
+    return {
+        getState() {
+            return state;
+        },
+        patchState(slice, patch) {
+            const currentSlice = state[slice] || {};
+            const nextSlice = typeof patch === 'function'
+                ? patch(currentSlice, state)
+                : { ...currentSlice, ...patch };
+            state[slice] = nextSlice;
+            return nextSlice;
+        },
+    };
+}
+
+function createNotesDom() {
+    const dom = new JSDOM(`
+        <body>
+            <div id="notesList"></div>
+            <div id="notesSelectionSummary"></div>
+            <button id="topicNotesScopeBtn"></button>
+            <button id="agentNotesScopeBtn"></button>
+            <button id="newNoteBtn"></button>
+            <button id="newNoteFabBtn"></button>
+            <button id="notesStudioOpenBtn"></button>
+            <button id="saveNoteBtn"></button>
+            <button id="deleteNoteBtn"></button>
+            <button id="analyzeNotesBtn"></button>
+            <button id="generateQuizBtn"></button>
+            <button id="generateFlashcardsBtn"></button>
+            <div id="noteDetailModal" class="hidden"></div>
+            <button id="noteDetailCloseBtn"></button>
+            <div id="noteDetailModalBackdrop"></div>
+            <div id="noteActionMenu"></div>
+            <input id="noteTitleInput" />
+            <textarea id="noteContentInput"></textarea>
+            <div id="noteMetaSummary"></div>
+            <div id="noteDetailEyebrow"></div>
+            <div id="noteDetailTitle"></div>
+            <div id="noteDetailSubtitle"></div>
+            <div id="noteEditorCard"></div>
+            <div id="flashcardsPracticeCard"></div>
+            <div id="chatMessages"></div>
+        </body>
+    `, { pretendToBeVisual: true });
+
+    const { window } = dom;
+    global.Element = window.Element;
+    global.HTMLElement = window.HTMLElement;
+
+    return {
+        window,
+        document: window.document,
+        el: {
+            notesList: window.document.getElementById('notesList'),
+            notesSelectionSummary: window.document.getElementById('notesSelectionSummary'),
+            topicNotesScopeBtn: window.document.getElementById('topicNotesScopeBtn'),
+            agentNotesScopeBtn: window.document.getElementById('agentNotesScopeBtn'),
+            newNoteBtn: window.document.getElementById('newNoteBtn'),
+            newNoteFabBtn: window.document.getElementById('newNoteFabBtn'),
+            notesStudioOpenBtn: window.document.getElementById('notesStudioOpenBtn'),
+            saveNoteBtn: window.document.getElementById('saveNoteBtn'),
+            deleteNoteBtn: window.document.getElementById('deleteNoteBtn'),
+            analyzeNotesBtn: window.document.getElementById('analyzeNotesBtn'),
+            generateQuizBtn: window.document.getElementById('generateQuizBtn'),
+            generateFlashcardsBtn: window.document.getElementById('generateFlashcardsBtn'),
+            noteDetailModal: window.document.getElementById('noteDetailModal'),
+            noteDetailCloseBtn: window.document.getElementById('noteDetailCloseBtn'),
+            noteDetailModalBackdrop: window.document.getElementById('noteDetailModalBackdrop'),
+            noteActionMenu: window.document.getElementById('noteActionMenu'),
+            noteTitleInput: window.document.getElementById('noteTitleInput'),
+            noteContentInput: window.document.getElementById('noteContentInput'),
+            noteMetaSummary: window.document.getElementById('noteMetaSummary'),
+            noteDetailEyebrow: window.document.getElementById('noteDetailEyebrow'),
+            noteDetailTitle: window.document.getElementById('noteDetailTitle'),
+            noteDetailSubtitle: window.document.getElementById('noteDetailSubtitle'),
+            noteEditorCard: window.document.getElementById('noteEditorCard'),
+            flashcardsPracticeCard: window.document.getElementById('flashcardsPracticeCard'),
+            chatMessages: window.document.getElementById('chatMessages'),
+        },
+    };
+}
+
+function createNotesControllerHarness(createNotesController, options = {}) {
+    const { window, document, el } = createNotesDom();
+    const store = createStore(createBaseState(options.stateOverrides));
+    const toasts = [];
+    const ui = {
+        showToastNotification: (...args) => {
+            toasts.push(args);
+        },
+        showConfirmDialog: async () => true,
+    };
+    const flashcardsApi = {
+        activateNote: () => null,
+        beginPendingGeneration: () => {},
+        buildGeneratedFlashcardContent: () => null,
+        clearPendingGeneration: () => {},
+        getFlashcardSourceCount: () => 0,
+        getPendingGeneration: () => null,
+        hasStructuredFlashcards: () => false,
+        openPractice: () => false,
+        renderPractice: () => {},
+        resetState: () => {},
+        ...(options.flashcardsOverrides || {}),
+    };
+    const chatAPI = {
+        listTopicNotes: async () => ({ success: true, items: [] }),
+        listAgentNotes: async () => ({ success: true, items: [] }),
+        retrieveKnowledgeBaseContext: async () => ({ success: false }),
+        sendToVCP: async () => ({ response: { choices: [{ message: { content: 'fixture-response' } }] } }),
+        saveTopicNote: async (_agentId, _topicId, payload) => ({
+            success: true,
+            item: {
+                id: 'saved-note',
+                agentId: 'agent-1',
+                topicId: 'topic-1',
+                title: payload.title,
+                contentMarkdown: payload.contentMarkdown,
+                sourceMessageIds: payload.sourceMessageIds,
+                sourceDocumentRefs: payload.sourceDocumentRefs,
+                kind: payload.kind,
+            },
+        }),
+        ...(options.chatApiOverrides || {}),
+    };
+
+    const controller = createNotesController({
+        store,
+        el,
+        chatAPI,
+        ui,
+        windowObj: window,
+        documentObj: document,
+        setSidePanelTab: () => {},
+        setRightPanelMode: (mode) => {
+            store.patchState('layout', { rightPanelMode: mode });
+        },
+        getCurrentTopic: () => ({ knowledgeBaseId: 'kb-1' }),
+        getCurrentTopicDisplayName: () => '函数',
+        persistHistory: async () => {},
+        buildTopicContext: () => ({ topicId: store.getState().session.currentTopicId }),
+        flashcardsApi,
+        ...(options.depsOverrides || {}),
+    });
+
+    return {
+        controller,
+        store,
+        chatAPI,
+        ui,
+        flashcardsApi,
+        toasts,
+        window,
+        document,
+        el,
+    };
 }
 
 test('normalizeNote fills default ids and normalizes embedded flashcards', async () => {
@@ -140,4 +411,96 @@ test('note save and delete helpers cover blank drafts, save payloads, and delete
             activeFlashcardNoteId: 'note-3',
         }
     );
+});
+
+test('notes refresh re-renders flashcard practice when the flashcards panel is active', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let renderPracticeCalls = 0;
+
+    const { controller } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            layout: {
+                rightPanelMode: 'flashcards',
+            },
+        },
+        chatApiOverrides: {
+            listTopicNotes: async () => ({
+                success: true,
+                items: [{ id: 'topic-note-1', title: '话题笔记', contentMarkdown: '牛顿第二定律' }],
+            }),
+            listAgentNotes: async () => ({
+                success: true,
+                items: [{ id: 'agent-note-1', title: '学科笔记', contentMarkdown: '匀加速直线运动' }],
+            }),
+        },
+        flashcardsOverrides: {
+            renderPractice: () => {
+                renderPracticeCalls += 1;
+            },
+        },
+    });
+
+    await controller.loadTopicNotes();
+    await controller.loadAgentNotes();
+
+    assert.equal(renderPracticeCalls, 2);
+});
+
+test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            settings: {
+                settings: {
+                    vcpServerUrl: 'https://study.example.test/v1/chat',
+                    vcpApiKey: 'fixture-api-key',
+                },
+            },
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '极限与连续',
+                    sourceMessageIds: ['msg-1'],
+                    sourceDocumentRefs: ['doc-1'],
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendToVCP: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: '这是一份生成后的分析结果。' } }],
+                    },
+                };
+            },
+            listTopicNotes: async () => ({
+                success: true,
+                items: [{
+                    id: 'saved-note',
+                    title: '分析报告',
+                    contentMarkdown: '这是一份生成后的分析结果。',
+                    kind: 'analysis',
+                }],
+            }),
+            listAgentNotes: async () => ({ success: true, items: [] }),
+        },
+    });
+
+    controller.bindEvents();
+    el.analyzeNotesBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(upstreamPayload.endpoint, 'https://study.example.test/v1/chat');
+    assert.equal(upstreamPayload.apiKey, 'fixture-api-key');
 });

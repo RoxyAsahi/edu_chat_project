@@ -92,6 +92,14 @@ function createNotesController(deps = {}) {
         return store.getState().notes;
     }
 
+    function getSettingsSlice() {
+        return store.getState().settings;
+    }
+
+    function getLayoutSlice() {
+        return store.getState().layout;
+    }
+
     function patchNotes(patch) {
         return store.patchState('notes', (current, rootState) => ({
             ...current,
@@ -152,6 +160,12 @@ function createNotesController(deps = {}) {
                 const history = getCurrentChatHistory();
                 return Array.isArray(history) ? history : [];
             },
+        },
+        settings: {
+            get: () => getSettingsSlice().settings,
+        },
+        rightPanelMode: {
+            get: () => getLayoutSlice().rightPanelMode,
         },
     });
 
