@@ -1,5 +1,4 @@
 import { positionFloatingElement } from '../dom/positionFloatingElement.js';
-import { createStoreView } from '../store/storeView.js';
 
 const DEFAULT_AGENT_AVATAR = '../assets/default_avatar.png';
 
@@ -18,9 +17,6 @@ function shouldPersistTopicSelection(options = {}) {
 
 function createWorkspaceController(deps = {}) {
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: ['session'],
-    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -51,6 +47,56 @@ function createWorkspaceController(deps = {}) {
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const clearTopicKnowledgeBaseDocuments = deps.clearTopicKnowledgeBaseDocuments || (() => {});
+    const getGlobalSettings = deps.getGlobalSettings || (() => store.getState().settings.settings);
+
+    function getSessionSlice() {
+        return store.getState().session;
+    }
+
+    function patchSession(patch) {
+        return store.patchState('session', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
+    function updateTopicInSession(topicId, updater) {
+        patchSession((current) => ({
+            topics: current.topics.map((topic) => (
+                topic.id === topicId
+                    ? { ...topic, ...(typeof updater === 'function' ? updater(topic) : updater) }
+                    : topic
+            )),
+        }));
+    }
+
+    const state = {};
+    Object.defineProperties(state, {
+        agents: {
+            get: () => getSessionSlice().agents,
+            set: (value) => patchSession({ agents: value }),
+        },
+        topics: {
+            get: () => getSessionSlice().topics,
+            set: (value) => patchSession({ topics: value }),
+        },
+        currentSelectedItem: {
+            get: () => getSessionSlice().currentSelectedItem,
+            set: (value) => patchSession({ currentSelectedItem: value }),
+        },
+        currentTopicId: {
+            get: () => getSessionSlice().currentTopicId,
+            set: (value) => patchSession({ currentTopicId: value }),
+        },
+        currentChatHistory: {
+            get: () => getSessionSlice().currentChatHistory,
+            set: (value) => patchSession({ currentChatHistory: value }),
+        },
+        activeTopicMenu: {
+            get: () => getSessionSlice().activeTopicMenu,
+            set: (value) => patchSession({ activeTopicMenu: value }),
+        },
+    });
 
     function getCurrentTopic() {
         return state.topics.find((topic) => topic.id === state.currentTopicId) || null;
@@ -360,7 +406,9 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        topic.name = nextName.trim();
+        updateTopicInSession(topic.id, {
+            name: nextName.trim(),
+        });
         renderTopics();
     }
 
@@ -371,7 +419,9 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        topic.unread = unread;
+        updateTopicInSession(topic.id, {
+            unread,
+        });
         renderTopics();
         await loadAgents();
     }
@@ -383,7 +433,9 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        topic.locked = result.locked;
+        updateTopicInSession(topic.id, {
+            locked: result.locked,
+        });
         renderTopics();
     }
 
@@ -595,11 +647,12 @@ function createWorkspaceController(deps = {}) {
     }
 
     function buildMarkdownExport() {
+        const settings = getGlobalSettings();
         return state.currentChatHistory.map((message) => {
             const title = message.role === 'assistant'
                 ? (message.name || state.currentSelectedItem.name || 'Assistant')
                 : message.role === 'user'
-                    ? (state.settings.userName || 'User')
+                    ? (settings.userName || 'User')
                     : 'System';
             const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2);
             const attachments = Array.isArray(message.attachments) && message.attachments.length > 0

@@ -1,5 +1,3 @@
-import { createStoreView } from '../store/storeView.js';
-
 const SETTINGS_MODAL_META = Object.freeze({
     global: {
         title: '全局设置',
@@ -17,9 +15,6 @@ const SETTINGS_MODAL_META = Object.freeze({
 
 function createSettingsController(deps = {}) {
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: ['settings'],
-    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -29,7 +24,32 @@ function createSettingsController(deps = {}) {
     const syncLayoutSettings = deps.syncLayoutSettings || (() => {});
     const resolvePromptText = deps.resolvePromptText || (async () => '');
     const reloadSelectedAgent = deps.reloadSelectedAgent || (async () => {});
+    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     let settingsModalTrigger = null;
+
+    function getSettingsSlice() {
+        return store.getState().settings;
+    }
+
+    function getGlobalSettings() {
+        return getSettingsSlice().settings;
+    }
+
+    function patchSettingsSlice(patch) {
+        return store.patchState('settings', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
+    function patchGlobalSettings(patch) {
+        return patchSettingsSlice((current, rootState) => ({
+            settings: {
+                ...current.settings,
+                ...(typeof patch === 'function' ? patch(current.settings, rootState) : patch),
+            },
+        }));
+    }
 
     function applyTheme(theme) {
         documentObj.body.classList.toggle('dark-theme', theme === 'dark');
@@ -37,6 +57,7 @@ function createSettingsController(deps = {}) {
     }
 
     function applyRendererSettings() {
+        const settings = getGlobalSettings();
         const chatFonts = {
             system: '"Segoe UI", "PingFang SC", sans-serif',
             serif: 'Georgia, "Noto Serif SC", serif',
@@ -44,32 +65,33 @@ function createSettingsController(deps = {}) {
             consolas: '"Cascadia Code", "Consolas", monospace',
         };
 
-        documentObj.documentElement.style.setProperty('--lite-chat-max-width', `${Number(state.settings.chatBubbleMaxWidthWideDefault || 92)}%`);
-        documentObj.documentElement.style.setProperty('--lite-chat-font', chatFonts[state.settings.chatFontPreset] || chatFonts.system);
-        documentObj.documentElement.style.setProperty('--lite-code-font', chatFonts[state.settings.chatCodeFontPreset] || chatFonts.consolas);
-        documentObj.body.classList.toggle('wide-chat-layout', state.settings.enableWideChatLayout === true);
+        documentObj.documentElement.style.setProperty('--lite-chat-max-width', `${Number(settings.chatBubbleMaxWidthWideDefault || 92)}%`);
+        documentObj.documentElement.style.setProperty('--lite-chat-font', chatFonts[settings.chatFontPreset] || chatFonts.system);
+        documentObj.documentElement.style.setProperty('--lite-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.consolas);
+        documentObj.body.classList.toggle('wide-chat-layout', settings.enableWideChatLayout === true);
     }
 
     function syncGlobalSettingsForm() {
-        el.userNameInput.value = state.settings.userName || '';
-        el.vcpServerUrl.value = state.settings.vcpServerUrl || '';
-        el.vcpApiKey.value = state.settings.vcpApiKey || '';
-        el.kbBaseUrl.value = state.settings.kbBaseUrl || '';
-        el.kbApiKey.value = state.settings.kbApiKey || '';
-        el.kbEmbeddingModel.value = state.settings.kbEmbeddingModel || '';
-        el.kbUseRerank.checked = state.settings.kbUseRerank !== false;
-        el.kbRerankModel.value = state.settings.kbRerankModel || 'BAAI/bge-reranker-v2-m3';
-        el.kbTopK.value = state.settings.kbTopK ?? 6;
-        el.kbCandidateTopK.value = state.settings.kbCandidateTopK ?? 20;
-        el.kbScoreThreshold.value = state.settings.kbScoreThreshold ?? 0.25;
-        el.chatFontPreset.value = state.settings.chatFontPreset || 'system';
-        el.chatCodeFontPreset.value = state.settings.chatCodeFontPreset || 'consolas';
-        el.chatBubbleMaxWidthWideDefault.value = state.settings.chatBubbleMaxWidthWideDefault ?? 92;
-        el.enableAgentBubbleTheme.checked = state.settings.enableAgentBubbleTheme === true;
-        el.enableWideChatLayout.checked = state.settings.enableWideChatLayout !== false;
-        el.enableSmoothStreaming.checked = state.settings.enableSmoothStreaming === true;
+        const settings = getGlobalSettings();
+        el.userNameInput.value = settings.userName || '';
+        el.vcpServerUrl.value = settings.vcpServerUrl || '';
+        el.vcpApiKey.value = settings.vcpApiKey || '';
+        el.kbBaseUrl.value = settings.kbBaseUrl || '';
+        el.kbApiKey.value = settings.kbApiKey || '';
+        el.kbEmbeddingModel.value = settings.kbEmbeddingModel || '';
+        el.kbUseRerank.checked = settings.kbUseRerank !== false;
+        el.kbRerankModel.value = settings.kbRerankModel || 'BAAI/bge-reranker-v2-m3';
+        el.kbTopK.value = settings.kbTopK ?? 6;
+        el.kbCandidateTopK.value = settings.kbCandidateTopK ?? 20;
+        el.kbScoreThreshold.value = settings.kbScoreThreshold ?? 0.25;
+        el.chatFontPreset.value = settings.chatFontPreset || 'system';
+        el.chatCodeFontPreset.value = settings.chatCodeFontPreset || 'consolas';
+        el.chatBubbleMaxWidthWideDefault.value = settings.chatBubbleMaxWidthWideDefault ?? 92;
+        el.enableAgentBubbleTheme.checked = settings.enableAgentBubbleTheme === true;
+        el.enableWideChatLayout.checked = settings.enableWideChatLayout !== false;
+        el.enableSmoothStreaming.checked = settings.enableSmoothStreaming === true;
 
-        const themeMode = state.settings.currentThemeMode || 'system';
+        const themeMode = settings.currentThemeMode || 'system';
         const themeInput = documentObj.querySelector(`input[name="themeMode"][value="${themeMode}"]`);
         if (themeInput) {
             themeInput.checked = true;
@@ -78,13 +100,13 @@ function createSettingsController(deps = {}) {
 
     async function loadSettings() {
         const loaded = await chatAPI.loadSettings();
-        state.settings = { ...state.settings, ...(loaded || {}) };
-        windowObj.globalSettings = state.settings;
+        patchGlobalSettings(loaded || {});
+        windowObj.globalSettings = getGlobalSettings();
         syncGlobalSettingsForm();
         applyRendererSettings();
-        syncLayoutSettings(state.settings);
-        messageRendererApi?.setUserAvatar(state.settings.userAvatarUrl || '../assets/default_user_avatar.png');
-        messageRendererApi?.setUserAvatarColor(state.settings.userAvatarCalculatedColor || null);
+        syncLayoutSettings(getGlobalSettings());
+        messageRendererApi?.setUserAvatar(getGlobalSettings().userAvatarUrl || '../assets/default_user_avatar.png');
+        messageRendererApi?.setUserAvatarColor(getGlobalSettings().userAvatarCalculatedColor || null);
     }
 
     async function saveGlobalSettings() {
@@ -115,8 +137,8 @@ function createSettingsController(deps = {}) {
             return;
         }
 
-        state.settings = { ...state.settings, ...patch };
-        windowObj.globalSettings = state.settings;
+        patchGlobalSettings(patch);
+        windowObj.globalSettings = getGlobalSettings();
         applyRendererSettings();
         chatAPI.setThemeMode(themeMode);
         windowObj.emoticonManager?.reload?.();
@@ -127,7 +149,9 @@ function createSettingsController(deps = {}) {
         const nextSection = Object.prototype.hasOwnProperty.call(SETTINGS_MODAL_META, section)
             ? section
             : 'global';
-        state.settingsModalSection = nextSection;
+        patchSettingsSlice({
+            settingsModalSection: nextSection,
+        });
 
         el.settingsNavButtons?.forEach((button) => {
             const active = button.dataset.settingsSectionButton === nextSection;
@@ -185,7 +209,8 @@ function createSettingsController(deps = {}) {
     }
 
     async function saveAgentSettings() {
-        if (!state.currentSelectedItem.id) {
+        const currentSelectedItem = getCurrentSelectedItem();
+        if (!currentSelectedItem.id) {
             return;
         }
 
@@ -208,7 +233,7 @@ function createSettingsController(deps = {}) {
             systemPrompt: promptText,
         };
 
-        const saveResult = await chatAPI.saveAgentConfig(state.currentSelectedItem.id, patch);
+        const saveResult = await chatAPI.saveAgentConfig(currentSelectedItem.id, patch);
         if (saveResult?.error) {
             ui.showToastNotification(`保存智能体失败：${saveResult.error}`, 'error');
             return;
@@ -217,7 +242,7 @@ function createSettingsController(deps = {}) {
         const avatarFile = el.agentAvatarInput.files?.[0];
         if (avatarFile) {
             const buffer = await avatarFile.arrayBuffer();
-            await chatAPI.saveAvatar(state.currentSelectedItem.id, {
+            await chatAPI.saveAvatar(currentSelectedItem.id, {
                 name: avatarFile.name,
                 type: avatarFile.type,
                 buffer,
@@ -226,7 +251,7 @@ function createSettingsController(deps = {}) {
         }
 
         ui.showToastNotification('智能体设置已保存。', 'success');
-        await reloadSelectedAgent(state.currentSelectedItem.id);
+        await reloadSelectedAgent(currentSelectedItem.id);
     }
 
     function bindEvents() {

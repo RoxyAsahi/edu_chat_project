@@ -1,6 +1,27 @@
 import { initialize as initializeInterruptHandler } from '../interruptHandler.js';
 import { initializeInputEnhancer } from '../inputEnhancerLite.js';
-import { createStoreView, RENDERER_WRITABLE_SLICES } from './store/storeView.js';
+
+function getSessionSlice(store) {
+    return store.getState().session;
+}
+
+function getSettingsSlice(store) {
+    return store.getState().settings;
+}
+
+function patchSession(store, patch) {
+    return store.patchState('session', (current, rootState) => ({
+        ...current,
+        ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+    }));
+}
+
+function patchSettingsSlice(store, patch) {
+    return store.patchState('settings', (current, rootState) => ({
+        ...current,
+        ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+    }));
+}
 
 function resolveWorkspaceBootstrapPlan({ agents = [], settings = {} } = {}) {
     const normalizedAgents = Array.isArray(agents) ? agents.filter(Boolean) : [];
@@ -30,9 +51,6 @@ function resolveWorkspaceBootstrapPlan({ agents = [], settings = {} } = {}) {
 
 async function initializeAppRuntime(deps = {}) {
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: RENDERER_WRITABLE_SLICES,
-    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -47,27 +65,27 @@ async function initializeAppRuntime(deps = {}) {
 
     messageRendererApi.initializeMessageRenderer({
         currentSelectedItemRef: {
-            get: () => state.currentSelectedItem,
+            get: () => getSessionSlice(store).currentSelectedItem,
             set: (value) => {
-                state.currentSelectedItem = value;
+                patchSession(store, { currentSelectedItem: value });
             },
         },
         currentTopicIdRef: {
-            get: () => state.currentTopicId,
+            get: () => getSessionSlice(store).currentTopicId,
             set: (value) => {
-                state.currentTopicId = value;
+                patchSession(store, { currentTopicId: value });
             },
         },
         currentChatHistoryRef: {
-            get: () => state.currentChatHistory,
+            get: () => getSessionSlice(store).currentChatHistory,
             set: (value) => {
-                state.currentChatHistory = value;
+                patchSession(store, { currentChatHistory: value });
             },
         },
         globalSettingsRef: {
-            get: () => state.settings,
+            get: () => getSettingsSlice(store).settings,
             set: (value) => {
-                state.settings = value;
+                patchSettingsSlice(store, { settings: value });
             },
         },
         chatMessagesDiv: el.chatMessages,
@@ -92,8 +110,8 @@ async function initializeAppRuntime(deps = {}) {
         electronPath: windowObj.electronPath,
         autoResizeTextarea: ui.autoResizeTextarea,
         appendAttachments,
-        getCurrentAgentId: () => state.currentSelectedItem.id,
-        getCurrentTopicId: () => state.currentTopicId,
+        getCurrentAgentId: () => getSessionSlice(store).currentSelectedItem.id,
+        getCurrentTopicId: () => getSessionSlice(store).currentTopicId,
         showToast: (message, type = 'info', duration = 3000) => ui.showToastNotification(message, type, duration),
     });
 }
@@ -103,9 +121,6 @@ function createAppBootstrap(deps = {}) {
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: RENDERER_WRITABLE_SLICES,
-    });
     const applyTheme = deps.applyTheme;
     const loadSettings = deps.loadSettings;
     const initializeResizableLayout = deps.initializeResizableLayout;
@@ -153,15 +168,16 @@ function createAppBootstrap(deps = {}) {
         chatAPI.onThemeUpdated((nextTheme) => applyTheme(nextTheme));
         chatAPI.onVCPStreamEvent(handleStreamEvent);
         chatAPI.onHistoryFileUpdated(async (payload) => {
-            if (payload?.agentId === state.currentSelectedItem.id && payload?.topicId === state.currentTopicId) {
-                await workspaceController.selectTopic(state.currentTopicId, { fromWatcher: true });
+            const session = getSessionSlice(store);
+            if (payload?.agentId === session.currentSelectedItem.id && payload?.topicId === session.currentTopicId) {
+                await workspaceController.selectTopic(session.currentTopicId, { fromWatcher: true });
             }
         });
 
         bindFeatureEvents();
         await workspaceController.loadAgents();
 
-        if (state.agents.length === 0) {
+        if (getSessionSlice(store).agents.length === 0) {
             const createResult = await chatAPI.createAgent(defaultAgentName, null);
             if (createResult?.agentId) {
                 await workspaceController.loadAgents();
@@ -169,8 +185,8 @@ function createAppBootstrap(deps = {}) {
         }
 
         const plan = resolveWorkspaceBootstrapPlan({
-            agents: state.agents,
-            settings: state.settings,
+            agents: getSessionSlice(store).agents,
+            settings: getSettingsSlice(store).settings,
         });
 
         if (plan.agentId) {

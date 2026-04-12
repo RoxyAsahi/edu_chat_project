@@ -34,6 +34,7 @@ const layoutController = createLayoutController({
     windowObj: window,
     documentObj: document,
     mergeSettingsPatch,
+    getPersistedLayoutSettings: () => getSettingsSlice().settings,
 });
 const {
     normalizeStoredLayoutWidth,
@@ -52,6 +53,7 @@ const settingsController = createSettingsController({
     documentObj: document,
     messageRendererApi: messageRenderer,
     syncLayoutSettings: applyStoredLayoutSettings,
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
     resolvePromptText: async () => (
         getPromptModule()
             ? await getPromptModule().getPrompt().catch(() => '')
@@ -207,6 +209,7 @@ workspaceController = createWorkspaceController({
     closeSourceFileActionMenu,
     hideSourceFileTooltip,
     clearTopicKnowledgeBaseDocuments,
+    getGlobalSettings: () => getSettingsSlice().settings,
 });
 const {
     getCurrentTopic,
