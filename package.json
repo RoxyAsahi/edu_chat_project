@@ -1,11 +1,10 @@
 {
-  "name": "vcpchat-lite",
+  "name": "unistudy",
   "version": "0.1.0",
-  "description": "UniStudy desktop learning terminal built on the VCPChat Lite foundation.",
+  "description": "UniStudy desktop learning terminal.",
   "main": "src/main/main.js",
   "scripts": {
     "build:preloads": "node scripts/build-preloads.js",
-    "migrate:legacy-data": "node scripts/migrate-legacy-data-root.js",
     "start": "node scripts/launch-electron.js .",
     "pack": "node scripts/package-electron.js pack",
     "dist": "node scripts/package-electron.js dist",

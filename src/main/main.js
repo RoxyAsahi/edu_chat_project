@@ -142,7 +142,7 @@ const fileWatcher = {
         });
 
         historyWatcher.on('error', (error) => {
-            console.error('[LiteWatcher] error:', error);
+            console.error('[UniStudyWatcher] error:', error);
         });
     },
     stopWatching() {
@@ -173,11 +173,11 @@ const fileWatcher = {
 
 async function bootstrapIndependentDataRoot() {
     await fs.ensureDir(DATA_ROOT);
-    console.log(`[LiteBootstrap] Data root: ${DATA_ROOT}`);
+    console.log(`[UniStudyBootstrap] Data root: ${DATA_ROOT}`);
     if (DATA_ROOT_PATHS.source === 'env-override') {
-        console.log('[LiteBootstrap] Using VCPCHAT_DATA_ROOT override.');
+        console.log('[UniStudyBootstrap] Using UNISTUDY_DATA_ROOT override.');
     } else {
-        console.log('[LiteBootstrap] Using Electron userData default.');
+        console.log('[UniStudyBootstrap] Using Electron userData default.');
     }
 }
 
@@ -322,7 +322,7 @@ function registerExportHandler() {
             shell.showItemInFolder(filePath);
             return ok({ path: filePath });
         } catch (error) {
-            console.error('[LiteExport] failed:', error);
+            console.error('[UniStudyExport] failed:', error);
             return fail(error);
         }
     });
@@ -528,7 +528,7 @@ function startDeferredServices() {
     })();
 
     deferredServicesPromise.catch((error) => {
-        console.error('[LiteBootstrap] Deferred services failed to start:', error);
+        console.error('[UniStudyBootstrap] Deferred services failed to start:', error);
     });
 
     return deferredServicesPromise;
@@ -579,6 +579,6 @@ app.on('before-quit', () => {
     settingsManager?.dispose?.();
     agentConfigManager?.dispose?.();
     void knowledgeBase.shutdownKnowledgeBase().catch((error) => {
-        console.warn('[LiteBootstrap] Failed to shutdown knowledge base cleanly:', error?.message || error);
+        console.warn('[UniStudyBootstrap] Failed to shutdown knowledge base cleanly:', error?.message || error);
     });
 });

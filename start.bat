@@ -3,10 +3,10 @@ setlocal
 cd /d "%~dp0"
 
 echo [UniStudy] Working directory: %cd%
-if defined VCPCHAT_DATA_ROOT (
-  echo [UniStudy] Data root override: %VCPCHAT_DATA_ROOT%
+if defined UNISTUDY_DATA_ROOT (
+  echo [UniStudy] Data root override: %UNISTUDY_DATA_ROOT%
 ) else (
-  echo [UniStudy] Data root: Electron userData default
+  echo [UniStudy] Data root: Electron userData default (UniStudy namespace)
 )
 
 if not exist package.json (
