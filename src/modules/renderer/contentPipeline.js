@@ -132,12 +132,12 @@ function createContentPipeline(deps = {}) {
         let result = text.replace(desktopPushRegex, (match, rawContent) => {
             const content = rawContent.trim();
             const escapedPreview = escapeHtml(content.length > 120 ? content.substring(0, 120) + '...' : content);
-            return `<div class="vcp-desktop-push-placeholder">` +
-                `<div class="vcp-desktop-push-header">` +
-                `<span class="vcp-desktop-push-icon">🖥️</span>` +
-                `<span class="vcp-desktop-push-label">已推送到桌面画布</span>` +
+            return `<div class="unistudy-desktop-push-placeholder">` +
+                `<div class="unistudy-desktop-push-header">` +
+                `<span class="unistudy-desktop-push-icon">🖥️</span>` +
+                `<span class="unistudy-desktop-push-label">已推送到桌面画布</span>` +
                 `</div>` +
-                `<div class="vcp-desktop-push-preview"><pre>${escapedPreview}</pre></div>` +
+                `<div class="unistudy-desktop-push-preview"><pre>${escapedPreview}</pre></div>` +
                 `</div>`;
         });
 
@@ -148,12 +148,12 @@ function createContentPipeline(deps = {}) {
             const tailLines = lines.slice(-3).join('\n');
             const escapedPreview = escapeHtml(tailLines.length > 120 ? tailLines.substring(tailLines.length - 120) : tailLines);
             const lineCountInfo = totalLines > 3 ? `(${totalLines} 行)` : '';
-            return `<div class="vcp-desktop-push-placeholder constructing">` +
-                `<div class="vcp-desktop-push-header">` +
-                `<span class="vcp-desktop-push-icon">🖥️</span>` +
-                `<span class="vcp-desktop-push-label">正在向桌面推送 ${escapeHtml(lineCountInfo)}<span class="thinking-indicator-dots">...</span></span>` +
+            return `<div class="unistudy-desktop-push-placeholder constructing">` +
+                `<div class="unistudy-desktop-push-header">` +
+                `<span class="unistudy-desktop-push-icon">🖥️</span>` +
+                `<span class="unistudy-desktop-push-label">正在向桌面推送 ${escapeHtml(lineCountInfo)}<span class="thinking-indicator-dots">...</span></span>` +
                 `</div>` +
-                `<div class="vcp-desktop-push-preview"><pre>${escapedPreview}</pre></div>` +
+                `<div class="unistudy-desktop-push-preview"><pre>${escapedPreview}</pre></div>` +
                 `</div>`;
         });
 

@@ -125,7 +125,7 @@ function ensureSeparatorBetweenImgAndCode(text) {
     if (typeof text !== 'string') return text;
     // Looks for an <img> tag, optional whitespace, and then a ```.
     // Inserts a double newline and an HTML comment.
-    return text.replace(/(<img[^>]+>)\s*(```)/g, '$1\n\n<!-- VCP-Renderer-Separator -->\n\n$2');
+    return text.replace(/(<img[^>]+>)\s*(```)/g, '$1\n\n<!-- UniStudy-Renderer-Separator -->\n\n$2');
 }
 
 
@@ -178,7 +178,7 @@ function deIndentToolRequestBlocks(text) {
  * @param {string} toolContent - The raw string content of the tool request.
  * @returns {string|null} The extracted tool name or null.
  */
-function extractVcpToolName(toolContent) {
+function extractToolNameFromRequest(toolContent) {
     const match = toolContent.match(/tool_name:\s*「始」([^「」]+)「末」/);
     return match ? match[1] : null;
 }
@@ -209,13 +209,13 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
 
     if (type === 'vcptool') {
         preElement.classList.add('vcp-tool-use-bubble');
-        const toolName = extractVcpToolName(relevantContent);
+        const toolName = extractToolNameFromRequest(relevantContent);
 
-        let newInnerHtml = `<span class="vcp-tool-label">ToolUse:</span>`;
+        let newInnerHtml = `<span class="unistudy-tool-label">Tool Use:</span>`;
         if (toolName) {
-            newInnerHtml += `<span class="vcp-tool-name-highlight">${toolName}</span>`;
+            newInnerHtml += `<span class="unistudy-tool-name-highlight">${toolName}</span>`;
         } else {
-            newInnerHtml += `<span class="vcp-tool-name-highlight">UnknownTool</span>`;
+            newInnerHtml += `<span class="unistudy-tool-name-highlight">UnknownTool</span>`;
         }
 
         preElement.innerHTML = newInnerHtml;
@@ -389,8 +389,8 @@ function processAllPreBlocksInContentDiv(contentDiv) {
         }
 
         // 🟢 首先检查是否在 VCP 气泡内
-        const isInsideVcpBubble = preElement.closest('.vcp-tool-use-bubble, .vcp-tool-result-bubble, .maid-diary-bubble');
-        if (isInsideVcpBubble) {
+        const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .maid-diary-bubble');
+        if (isInsideRichBubble) {
             // 在气泡内的 pre 不应该被处理为可预览的 HTML
             preElement.dataset.vcpHtmlPreview = "blocked";
             return;
@@ -431,9 +431,9 @@ function setupHtmlPreview(preElement, htmlContent) {
         preElement.dataset.vcpHtmlPreview === "blocked") return;
 
     // 🟢 核心修复：检查是否在 VCP 气泡内
-    const isInsideVcpBubble = preElement.closest('.vcp-tool-use-bubble, .vcp-tool-result-bubble, .maid-diary-bubble');
-    if (isInsideVcpBubble) {
-        console.log('[ContentProcessor] Skipping HTML preview: inside VCP bubble');
+    const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .maid-diary-bubble');
+    if (isInsideRichBubble) {
+        console.log('[ContentProcessor] Skipping HTML preview: inside rich-render bubble');
         preElement.dataset.vcpHtmlPreview = "blocked";
         return;
     }
@@ -449,13 +449,13 @@ function setupHtmlPreview(preElement, htmlContent) {
 
     // Create container for the whole block to manage positioning
     const container = document.createElement('div');
-    container.className = 'vcp-html-preview-container';
+    container.className = 'unistudy-html-preview-container';
     preElement.parentNode.insertBefore(container, preElement);
     container.appendChild(preElement);
 
     // Create the toggle button
     const actionBtn = document.createElement('button');
-    actionBtn.className = 'vcp-html-preview-toggle';
+    actionBtn.className = 'unistudy-html-preview-toggle';
     actionBtn.innerHTML = '<span>▶️ 播放</span>';
     actionBtn.title = '在气泡内预览 HTML';
     actionBtn.dataset.vcpInteractive = 'true';
@@ -464,7 +464,7 @@ function setupHtmlPreview(preElement, htmlContent) {
 
     let previewFrame = null;
     let messageHandler = null;
-    const frameId = `vcp-frame-${Math.random().toString(36).substr(2, 9)}`;
+    const frameId = `unistudy-frame-${Math.random().toString(36).substr(2, 9)}`;
 
     const destroyPreview = () => {
         if (messageHandler) {
@@ -506,7 +506,7 @@ function setupHtmlPreview(preElement, htmlContent) {
             
             if (!previewFrame) {
                 previewFrame = document.createElement('iframe');
-                previewFrame.className = 'vcp-html-preview-frame';
+                previewFrame.className = 'unistudy-html-preview-frame';
                 previewFrame.dataset.frameId = frameId;
                 
                 // 🟢 先设置iframe的初始高度为当前代码块高度
@@ -533,14 +533,14 @@ function setupHtmlPreview(preElement, htmlContent) {
                         </style>
                     </head>
                     <body>
-                        <div id="vcp-wrapper">${htmlContent}</div>
+                        <div id="unistudy-wrapper">${htmlContent}</div>
                         <script>
                             function updateHeight() {
-                                const wrapper = document.getElementById('vcp-wrapper');
+                                const wrapper = document.getElementById('unistudy-wrapper');
                                 if (!wrapper) return;
                                 const height = Math.max(wrapper.scrollHeight + 40, document.body.scrollHeight);
                                 window.parent.postMessage({
-                                    type: 'vcp-html-resize',
+                                    type: 'unistudy-html-resize',
                                     height: height,
                                     frameId: '${frameId}'
                                 }, '*');
@@ -556,7 +556,7 @@ function setupHtmlPreview(preElement, htmlContent) {
                 `;
                 
                 messageHandler = (msg) => {
-                    if (msg.data && msg.data.type === 'vcp-html-resize' && msg.data.frameId === frameId) {
+                    if (msg.data && msg.data.type === 'unistudy-html-resize' && msg.data.frameId === frameId) {
                         if (previewFrame) {
                             // 🟢 平滑过渡到新高度
                             previewFrame.style.transition = 'height 0.3s ease';
@@ -758,7 +758,7 @@ function sendMessageViaMainChat(text) {
         return;
     }
 
-    throw new Error('Lite sendMessage bridge is not available');
+    throw new Error('UniStudy sendMessage bridge is not available');
 }
 
 /**
@@ -864,7 +864,7 @@ function applyContentProcessors(text) {
         // removeSpeakerTags - Simplified regex to remove all occurrences at the start
         .replace(/^(\[(?:(?!\]:\s).)*的发言\]:\s*)+/g, '')
         // ensureSeparatorBetweenImgAndCode
-        .replace(/(<img[^>]+>)\s*(```)/g, '$1\n\n<!-- VCP-Renderer-Separator -->\n\n$2');
+        .replace(/(<img[^>]+>)\s*(```)/g, '$1\n\n<!-- UniStudy-Renderer-Separator -->\n\n$2');
 }
 
 
@@ -937,7 +937,7 @@ function deIndentMisinterpretedCodeBlocks(text) {
  */
 function cleanupPreviewsInContent(contentDiv) {
     if (!contentDiv) return;
-    const containers = contentDiv.querySelectorAll('.vcp-html-preview-container');
+    const containers = contentDiv.querySelectorAll('.unistudy-html-preview-container');
     containers.forEach(container => {
         if (typeof container._vcpCleanup === 'function') {
             try {
