@@ -60,7 +60,7 @@ async function createHarness({
     useAgentConfigManager = true,
     invokeImpl,
 } = {}) {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-agent-handlers-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-agent-handlers-'));
     const agentDir = path.join(tempRoot, 'agents');
     const userDataDir = path.join(tempRoot, 'user-data');
 

@@ -149,7 +149,7 @@ async function runSmoke(options = {}) {
         kbScoreThreshold: Number(options.scoreThreshold ?? process.env.KB_SCORE_THRESHOLD ?? 0),
     };
 
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-kb-smoke-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-kb-smoke-'));
     const sourceDir = path.join(tempRoot, 'fixtures');
     const agentDir = path.join(tempRoot, 'agents');
     const agentId = 'agent-smoke';

@@ -20,7 +20,7 @@ async function launchApp(repoRoot, dataRoot) {
         cwd: repoRoot,
         env: {
             ...process.env,
-            VCPCHAT_DATA_ROOT: dataRoot,
+            UNISTUDY_DATA_ROOT: dataRoot,
             ELECTRON_ENABLE_LOGGING: '1',
         },
     });
@@ -119,7 +119,7 @@ async function run() {
     const repoRoot = path.resolve(__dirname, '..');
     const fixtureRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot }));
     const tempDataRoot = await createTempDataRootFromFixture({
-        prefix: 'vcpchatlite-preload-bridge-',
+        prefix: 'unistudy-preload-bridge-',
         fixtureRoot,
     });
     const summary = {

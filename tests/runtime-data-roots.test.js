@@ -35,7 +35,7 @@ test('temporary data roots are seeded from the dedicated fixture root', async (t
     const repoRoot = path.join(__dirname, '..');
     const fixtureRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot, env: {} }));
     const tempRoot = await createTempDataRootFromFixture({
-        prefix: 'runtime-data-root-test-',
+        prefix: 'unistudy-runtime-data-root-test-',
         fixtureRoot,
     });
 

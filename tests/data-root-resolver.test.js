@@ -27,18 +27,18 @@ function createAppStub(initialUserData) {
 }
 
 test('resolveOverrideRoot normalizes relative env overrides', () => {
-    const cwd = path.join('C:', 'VCP', 'Eric', 'VCPChatLite');
-    const result = resolveOverrideRoot({ VCPCHAT_DATA_ROOT: '.\\custom-data\\..\\custom-data' }, cwd);
+    const cwd = path.join('C:', 'Workspace', 'UniStudy');
+    const result = resolveOverrideRoot({ UNISTUDY_DATA_ROOT: '.\\custom-data\\..\\custom-data' }, cwd);
     assert.equal(result, path.resolve(cwd, '.\\custom-data\\..\\custom-data'));
 });
 
 test('resolveDataRootPaths uses env override as canonical userData root', () => {
-    const cwd = path.join('C:', 'VCP', 'Eric', 'VCPChatLite');
-    const app = createAppStub(path.join('C:', 'Users', 'CHENXI', 'AppData', 'Roaming', 'vcpchat-lite'));
+    const cwd = path.join('C:', 'Workspace', 'UniStudy');
+    const app = createAppStub(path.join('C:', 'Users', 'CHENXI', 'AppData', 'Roaming', 'UniStudy'));
 
     const paths = resolveDataRootPaths({
         app,
-        env: { VCPCHAT_DATA_ROOT: '.\\tmp\\runtime-root' },
+        env: { UNISTUDY_DATA_ROOT: '.\\tmp\\runtime-root' },
         cwd,
     });
 
@@ -55,13 +55,13 @@ test('resolveDataRootPaths uses env override as canonical userData root', () => 
 });
 
 test('resolveDataRootPaths falls back to Electron userData when no override is provided', () => {
-    const defaultUserData = path.join('C:', 'Users', 'CHENXI', 'AppData', 'Roaming', 'vcpchat-lite');
+    const defaultUserData = path.join('C:', 'Users', 'CHENXI', 'AppData', 'Roaming', 'UniStudy');
     const app = createAppStub(defaultUserData);
 
     const paths = resolveDataRootPaths({
         app,
         env: {},
-        cwd: path.join('C:', 'VCP', 'Eric', 'VCPChatLite'),
+        cwd: path.join('C:', 'Workspace', 'UniStudy'),
     });
 
     assert.equal(paths.source, 'electron-userData');
@@ -70,7 +70,7 @@ test('resolveDataRootPaths falls back to Electron userData when no override is p
     assert.equal(paths.resolveInDataRoot('generated_lists'), path.join(path.resolve(defaultUserData), 'generated_lists'));
 });
 
-test('resolveLegacyProjectRoot returns repo AppData when legacy data exists', async () => {
+test('resolveLegacyProjectRoot remains available for explicit legacy tooling only', async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'legacy-data-root-'));
 
     try {
@@ -85,9 +85,9 @@ test('resolveLegacyProjectRoot returns repo AppData when legacy data exists', as
     }
 });
 
-test('resolveDataRootPaths still uses Electron userData even when legacy project AppData exists', async () => {
+test('resolveDataRootPaths does not depend on legacy project AppData during main startup', async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'legacy-project-pref-'));
-    const defaultUserData = path.join(tempRoot, 'Roaming', 'vcpchat-lite');
+    const defaultUserData = path.join(tempRoot, 'Roaming', 'UniStudy');
     const app = createAppStub(defaultUserData);
 
     try {

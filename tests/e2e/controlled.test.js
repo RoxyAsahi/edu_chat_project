@@ -23,7 +23,7 @@ async function launchApp(repoRoot, dataRoot) {
         cwd: repoRoot,
         env: {
             ...process.env,
-            VCPCHAT_DATA_ROOT: dataRoot,
+            UNISTUDY_DATA_ROOT: dataRoot,
             ELECTRON_ENABLE_LOGGING: '1',
         },
     });
@@ -135,10 +135,10 @@ test('controlled Electron E2E covers shortcuts, viewer flow, topic KB binding, a
     const repoRoot = path.resolve(__dirname, '../..');
     const fixtureRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot }));
     const tempDataRoot = await createTempDataRootFromFixture({
-        prefix: 'vcpchatlite-controlled-e2e-',
+        prefix: 'unistudy-controlled-e2e-',
         fixtureRoot,
     });
-    const scratchRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-controlled-e2e-'));
+    const scratchRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-controlled-e2e-'));
     const app = await launchApp(repoRoot, tempDataRoot);
 
     try {

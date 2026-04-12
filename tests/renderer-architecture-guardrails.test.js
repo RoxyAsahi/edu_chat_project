@@ -57,7 +57,7 @@ test('renderer global surface stays within the three approved bridges', async ()
 
     assert.match(rendererSource, /window\.sendMessage\s*=/);
     assert.match(rendererSource, /window\.updateSendButtonState\s*=/);
-    assert.match(rendererSource, /window\.__liteDebugState\s*=/);
+    assert.match(rendererSource, /window\.__unistudyDebugState\s*=/);
     assert.doesNotMatch(rendererSource, /window\.setLiteActiveRequestId\s*=/);
     assert.doesNotMatch(rendererSource, /window\.globalSettings\s*=/);
 
@@ -83,4 +83,3 @@ test('package scripts expose renderer logic and dom checks under renderer-specif
         'vitest run --environment jsdom tests/renderer/safe-html.test.js',
     );
 });
-

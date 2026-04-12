@@ -53,7 +53,7 @@ function loadChatHandlers() {
 }
 
 async function createHarness(config) {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-chat-config-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-chat-config-'));
     const agentDir = path.join(tempRoot, 'agents');
     const userDataDir = path.join(tempRoot, 'user-data');
     const appDataRoot = path.join(tempRoot, 'app-data');

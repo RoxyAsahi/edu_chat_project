@@ -15,7 +15,7 @@ function escapeRegExp(value) {
 }
 
 test('resolveProjectPreload returns the absolute lite preload path when it exists', async () => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'preload-project-root-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-preload-project-root-'));
     const projectSrcRoot = path.join(tempRoot, 'src');
     const expectedPath = path.join(projectSrcRoot, 'preloads', 'runtime', 'lite.bundle.js');
 
@@ -30,7 +30,7 @@ test('resolveProjectPreload returns the absolute lite preload path when it exist
 });
 
 test('resolveAppPreload returns the absolute viewer preload path when it exists', async () => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'preload-app-root-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-preload-app-root-'));
     const expectedPath = path.join(tempRoot, 'src', 'preloads', 'runtime', 'viewer.bundle.js');
 
     try {
@@ -44,7 +44,7 @@ test('resolveAppPreload returns the absolute viewer preload path when it exists'
 });
 
 test('resolveProjectPreload throws a path-rich error when the preload file is missing', async () => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'preload-missing-root-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-preload-missing-root-'));
     const projectSrcRoot = path.join(tempRoot, 'src');
     const expectedPath = path.join(projectSrcRoot, 'preloads', 'runtime', 'lite.bundle.js');
 
