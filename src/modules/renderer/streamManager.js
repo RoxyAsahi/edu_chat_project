@@ -1116,6 +1116,11 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
                 nameTimeBlock.appendChild(timestampDiv);
             }
 
+            messageItem.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                refs.showContextMenu(e, messageItem, message);
+            });
+
             uiHelper.scrollToBottom();
         }
 
@@ -1140,3 +1145,20 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
         viewContextCache.delete(messageId);
     }, 5000);
 }
+
+// Expose to global scope for classic scripts
+window.streamManager = {
+    initStreamManager,
+    startStreamingMessage,
+    appendStreamChunk,
+    finalizeStreamedMessage,
+    getActiveStreamingMessageId: () => activeStreamingMessageId,
+    getActiveStreamingContext: () => {
+        if (!activeStreamingMessageId) return null;
+        return messageContextMap.get(activeStreamingMessageId) || null;
+    },
+    isMessageInitialized: (messageId) => {
+        // Check if message is being tracked by streamManager
+        return messageInitializationStatus.has(messageId);
+    }
+};

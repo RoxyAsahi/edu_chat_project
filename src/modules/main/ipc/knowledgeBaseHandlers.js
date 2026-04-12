@@ -1,15 +1,7 @@
 const { ipcMain } = require('electron');
 const knowledgeBase = require('../knowledge-base');
-const { ok, fail } = require('./ipcResult');
 
 let ipcHandlersRegistered = false;
-let ensureKnowledgeBaseReady = async () => {};
-
-function registerHandle(channels, handler) {
-    channels.forEach((channel) => {
-        ipcMain.handle(channel, handler);
-    });
-}
 
 async function updateTopicKnowledgeBase(agentConfigManager, agentId, topicId, knowledgeBaseId) {
     if (!agentConfigManager) {
@@ -22,128 +14,181 @@ async function updateTopicKnowledgeBase(agentConfigManager, agentId, topicId, kn
     }));
 }
 
-function withKnowledgeBaseReady(handler, fallbackPayload = {}) {
-    return async (...args) => {
-        try {
-            await ensureKnowledgeBaseReady();
-            return await handler(...args);
-        } catch (error) {
-            return fail(error, fallbackPayload);
-        }
-    };
-}
-
 function initialize(context = {}) {
-    ensureKnowledgeBaseReady = typeof context.ensureKnowledgeBaseReady === 'function'
-        ? context.ensureKnowledgeBaseReady
-        : (async () => {});
-
     if (ipcHandlersRegistered) {
         return;
     }
 
     const { agentConfigManager } = context;
 
-    registerHandle(['list-knowledge-bases', 'kb:list'], withKnowledgeBaseReady(async () => (
-        ok({ items: await knowledgeBase.listKnowledgeBases() })
-    ), { items: [] }));
+    ipcMain.handle('list-knowledge-bases', async () => {
+        try {
+            return { success: true, items: await knowledgeBase.listKnowledgeBases() };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
 
-    registerHandle(['create-knowledge-base', 'kb:create'], withKnowledgeBaseReady(async (_event, payload) => (
-        ok({ item: await knowledgeBase.createKnowledgeBase(payload) })
-    ), { item: null }));
+    ipcMain.handle('create-knowledge-base', async (_event, payload) => {
+        try {
+            return { success: true, item: await knowledgeBase.createKnowledgeBase(payload) };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
 
-    registerHandle(['update-knowledge-base', 'kb:update'], withKnowledgeBaseReady(async (_event, kbId, payload) => (
-        ok({ item: await knowledgeBase.updateKnowledgeBase(kbId, payload) })
-    ), { item: null }));
+    ipcMain.handle('update-knowledge-base', async (_event, kbId, payload) => {
+        try {
+            return { success: true, item: await knowledgeBase.updateKnowledgeBase(kbId, payload) };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
 
-    registerHandle(['delete-knowledge-base', 'kb:delete'], withKnowledgeBaseReady(async (_event, kbId) => {
-        await knowledgeBase.deleteKnowledgeBase(kbId);
-        return ok();
-    }));
+    ipcMain.handle('delete-knowledge-base', async (_event, kbId) => {
+        try {
+            await knowledgeBase.deleteKnowledgeBase(kbId);
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
 
-    registerHandle(['import-knowledge-base-files', 'kb:import-files'], withKnowledgeBaseReady(async (_event, kbId, files) => (
-        ok({ items: await knowledgeBase.importKnowledgeBaseFiles(kbId, files) })
-    ), { items: [] }));
+    ipcMain.handle('import-knowledge-base-files', async (_event, kbId, files) => {
+        try {
+            return { success: true, items: await knowledgeBase.importKnowledgeBaseFiles(kbId, files) };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
 
-    registerHandle(['list-knowledge-base-documents', 'kb:list-documents'], withKnowledgeBaseReady(async (_event, kbId) => (
-        ok({ items: await knowledgeBase.listKnowledgeBaseDocuments(kbId) })
-    ), { items: [] }));
+    ipcMain.handle('list-knowledge-base-documents', async (_event, kbId) => {
+        try {
+            return { success: true, items: await knowledgeBase.listKnowledgeBaseDocuments(kbId) };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
 
-    registerHandle(['retry-knowledge-base-document', 'kb:retry-document'], withKnowledgeBaseReady(async (_event, documentId) => (
-        ok({ item: await knowledgeBase.retryKnowledgeBaseDocument(documentId) })
-    ), { item: null }));
+    ipcMain.handle('retry-knowledge-base-document', async (_event, documentId) => {
+        try {
+            return { success: true, item: await knowledgeBase.retryKnowledgeBaseDocument(documentId) };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
 
-    registerHandle(['set-topic-knowledge-base', 'kb:set-topic-binding'], withKnowledgeBaseReady(async (_event, agentId, topicId, kbId) => {
-        if (kbId) {
-            const kb = await knowledgeBase.getKnowledgeBaseById(kbId);
-            if (!kb) {
-                throw new Error('Knowledge base not found.');
+    ipcMain.handle('set-topic-knowledge-base', async (_event, agentId, topicId, kbId) => {
+        try {
+            if (kbId) {
+                const kb = await knowledgeBase.getKnowledgeBaseById(kbId);
+                if (!kb) {
+                    throw new Error('Knowledge base not found.');
+                }
             }
+
+            await updateTopicKnowledgeBase(agentConfigManager, agentId, topicId, kbId);
+            return { success: true, knowledgeBaseId: kbId || null };
+        } catch (error) {
+            return { success: false, error: error.message };
         }
+    });
 
-        await updateTopicKnowledgeBase(agentConfigManager, agentId, topicId, kbId);
-        return ok({ knowledgeBaseId: kbId || null });
-    }, { knowledgeBaseId: null }));
+    ipcMain.handle('get-topic-knowledge-base', async (_event, agentId, topicId) => {
+        try {
+            if (!agentConfigManager) {
+                throw new Error('AgentConfigManager is unavailable.');
+            }
 
-    registerHandle(['get-topic-knowledge-base', 'kb:get-topic-binding'], withKnowledgeBaseReady(async (_event, agentId, topicId) => {
-        if (!agentConfigManager) {
-            throw new Error('AgentConfigManager is unavailable.');
+            const config = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
+            const topic = Array.isArray(config.topics)
+                ? config.topics.find((item) => item.id === topicId)
+                : null;
+            return {
+                success: true,
+                knowledgeBaseId: topic?.knowledgeBaseId || null,
+            };
+        } catch (error) {
+            return { success: false, error: error.message, knowledgeBaseId: null };
         }
+    });
 
-        const config = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
-        const topic = Array.isArray(config.topics)
-            ? config.topics.find((item) => item.id === topicId)
-            : null;
+    ipcMain.handle('retrieve-knowledge-base-context', async (_event, payload) => {
+        try {
+            return { success: true, ...(await knowledgeBase.retrieveKnowledgeBaseContext(payload)) };
+        } catch (error) {
+            return { success: false, error: error.message, refs: [], contextText: '', itemCount: 0 };
+        }
+    });
 
-        return ok({
-            knowledgeBaseId: topic?.knowledgeBaseId || null,
-        });
-    }, { knowledgeBaseId: null }));
+    ipcMain.handle('search-knowledge-base', async (_event, payload) => {
+        try {
+            return { success: true, ...(await knowledgeBase.searchKnowledgeBase(payload)) };
+        } catch (error) {
+            return { success: false, error: error.message, items: [], itemCount: 0 };
+        }
+    });
 
-    registerHandle(['retrieve-knowledge-base-context', 'kb:retrieve-context'], withKnowledgeBaseReady(async (_event, payload) => (
-        ok(await knowledgeBase.retrieveKnowledgeBaseContext(payload))
-    ), { refs: [], contextText: '', itemCount: 0 }));
+    ipcMain.handle('get-knowledge-base-retrieval-debug', async (_event, payload) => {
+        try {
+            return { success: true, ...(await knowledgeBase.getKnowledgeBaseRetrievalDebug(payload)) };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                query: String(payload?.query || ''),
+                vectorCandidates: [],
+                finalItems: [],
+                contextText: '',
+                itemCount: 0,
+            };
+        }
+    });
 
-    registerHandle(['search-knowledge-base', 'kb:search'], withKnowledgeBaseReady(async (_event, payload) => (
-        ok(await knowledgeBase.searchKnowledgeBase(payload))
-    ), { items: [], itemCount: 0 }));
+    ipcMain.handle('get-knowledge-base-document-view-data', async (_event, documentId) => {
+        try {
+            return { success: true, ...(await knowledgeBase.getKnowledgeBaseDocumentViewData(documentId)) };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                document: null,
+                view: null,
+            };
+        }
+    });
 
-    registerHandle(['get-knowledge-base-retrieval-debug', 'kb:get-retrieval-debug'], withKnowledgeBaseReady(async (_event, payload) => (
-        ok(await knowledgeBase.getKnowledgeBaseRetrievalDebug(payload))
-    ), {
-        query: '',
-        vectorCandidates: [],
-        finalItems: [],
-        contextText: '',
-        itemCount: 0,
-    }));
+    ipcMain.handle('get-knowledge-base-document-guide', async (_event, documentId) => {
+        try {
+            return { success: true, ...(await knowledgeBase.getKnowledgeBaseDocumentGuide(documentId)) };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                documentId,
+                guideStatus: 'failed',
+                guideMarkdown: '',
+                guideGeneratedAt: null,
+                guideError: error.message,
+            };
+        }
+    });
 
-    registerHandle(['get-knowledge-base-document-view-data', 'kb:get-document-view-data'], withKnowledgeBaseReady(async (_event, documentId) => (
-        ok(await knowledgeBase.getKnowledgeBaseDocumentViewData(documentId))
-    ), {
-        document: null,
-        view: null,
-    }));
-
-    registerHandle(['get-knowledge-base-document-guide', 'kb:get-document-guide'], withKnowledgeBaseReady(async (_event, documentId) => (
-        ok(await knowledgeBase.getKnowledgeBaseDocumentGuide(documentId))
-    ), {
-        documentId: null,
-        guideStatus: 'failed',
-        guideMarkdown: '',
-        guideGeneratedAt: null,
-        guideError: '',
-    }));
-
-    registerHandle(['generate-knowledge-base-document-guide', 'kb:generate-document-guide'], withKnowledgeBaseReady(async (_event, documentId, options) => (
-        ok(await knowledgeBase.generateKnowledgeBaseDocumentGuide(documentId, options))
-    ), {
-        documentId: null,
-        guideStatus: 'failed',
-        guideMarkdown: '',
-        guideGeneratedAt: null,
-        guideError: '',
-    }));
+    ipcMain.handle('generate-knowledge-base-document-guide', async (_event, documentId, options) => {
+        try {
+            return { success: true, ...(await knowledgeBase.generateKnowledgeBaseDocumentGuide(documentId, options)) };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                documentId,
+                guideStatus: 'failed',
+                guideMarkdown: '',
+                guideGeneratedAt: null,
+                guideError: error.message,
+            };
+        }
+    });
 
     ipcHandlersRegistered = true;
 }

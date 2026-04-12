@@ -2,6 +2,10 @@ import {
     normalizeFlashcardDeck,
     normalizeFlashcardProgress,
 } from '../flashcards/flashcardUtils.js';
+import {
+    normalizeQuizSet,
+    parseQuizSetFromMarkdown,
+} from '../quiz/quizUtils.js';
 
 function normalizeHistory(history) {
     return Array.isArray(history)
@@ -43,6 +47,12 @@ function removeDeletedNoteReferencesFromHistory(history, noteId) {
 function normalizeNote(note = {}, options = {}) {
     const sourceDocumentRefs = Array.isArray(note.sourceDocumentRefs) ? note.sourceDocumentRefs : [];
     const flashcardDeck = normalizeFlashcardDeck(note.flashcardDeck, sourceDocumentRefs);
+    const quizSet = note.kind === 'quiz'
+        ? (
+            normalizeQuizSet(note.quizSet, note.title || '选择题练习')
+            || parseQuizSetFromMarkdown(note.contentMarkdown, note.title || '选择题练习')
+        )
+        : null;
 
     return {
         ...note,
@@ -54,6 +64,7 @@ function normalizeNote(note = {}, options = {}) {
         sourceMessageIds: Array.isArray(note.sourceMessageIds) ? note.sourceMessageIds : [],
         sourceDocumentRefs,
         kind: String(note.kind || 'note'),
+        quizSet,
         flashcardDeck,
         flashcardProgress: normalizeFlashcardProgress(note.flashcardProgress, flashcardDeck),
         createdAt: Number(note.createdAt || Date.now()),
@@ -115,6 +126,7 @@ function buildNoteSaveRequest({
     currentTopicId = '',
     title = '',
     contentMarkdown = '',
+    quizSet = undefined,
 } = {}) {
     const resolvedTitle = String(title || '').trim();
     const resolvedContent = String(contentMarkdown || '');
@@ -131,6 +143,7 @@ function buildNoteSaveRequest({
             sourceMessageIds: Array.isArray(currentNote?.sourceMessageIds) ? currentNote.sourceMessageIds : [],
             sourceDocumentRefs: Array.isArray(currentNote?.sourceDocumentRefs) ? currentNote.sourceDocumentRefs : [],
             kind: currentNote?.kind || 'note',
+            quizSet: quizSet === undefined ? (currentNote?.quizSet || null) : quizSet,
             createdAt: currentNote?.createdAt,
         },
     };

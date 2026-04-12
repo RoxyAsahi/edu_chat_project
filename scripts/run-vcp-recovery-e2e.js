@@ -8,17 +8,9 @@ const {
     resolveFixtureDataRoot,
 } = require('./lib/runtime-data-roots');
 const { buildPreloadBundles } = require('./lib/preload-bundles');
+const { resolveElectronBinary } = require('./lib/electron-binary');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-
-function resolveElectronBinary(appDir) {
-    const electronPackagePath = require.resolve('electron/package.json', {
-        paths: [appDir],
-    });
-    const electronPackageDir = path.dirname(electronPackagePath);
-    const binaryName = process.platform === 'win32' ? 'electron.exe' : 'electron';
-    return path.join(electronPackageDir, 'dist', binaryName);
-}
 
 function flattenContent(content) {
     if (typeof content === 'string') {

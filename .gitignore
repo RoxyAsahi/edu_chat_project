@@ -4,9 +4,6 @@ AppData/
 node_modules/
 .tmp/
 tmp-*
-build/
-dist*/
-docs/test-reports/*.json
 
 .env
 .npmrc

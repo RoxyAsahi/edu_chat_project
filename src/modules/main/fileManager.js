@@ -3,6 +3,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto'); // 引入 crypto 模块
+const { spawn } = require('child_process');
 // const { exec } = require('child_process'); // For potential future use with textract or other CLI tools
 
 // Base directory for all user-specific data, including attachments.
@@ -272,40 +273,93 @@ async function _convertPdfToImages(pdfPath) {
     console.log(`[FileManager] Starting PDF to image conversion with Poppler for: ${pdfPath}`);
     const imageFrames = [];
     const tempDir = path.join(os.tmpdir(), `pdf-images-${crypto.randomBytes(16).toString('hex')}`);
+    const outPrefix = path.basename(pdfPath, path.extname(pdfPath));
     await fs.ensureDir(tempDir);
 
-    try {
-        let opts = {
-            format: 'jpeg',
-            out_dir: tempDir,
-            out_prefix: path.basename(pdfPath, path.extname(pdfPath)),
-            page: null // Convert all pages
-        };
-
-        const poppler = require('pdf-poppler'); // Lazy load
-        await poppler.convert(pdfPath, opts);
-
+    const readFramesFromTempDir = async () => {
         const files = await fs.readdir(tempDir);
-        // Sort files numerically if they follow a standard pattern like 'file-1.jpg', 'file-2.jpg'
         files.sort((a, b) => {
-            const numA = parseInt(a.match(/\d+/)[0], 10);
-            const numB = parseInt(b.match(/\d+/)[0], 10);
+            const numA = Number.parseInt((a.match(/\d+/) || ['0'])[0], 10);
+            const numB = Number.parseInt((b.match(/\d+/) || ['0'])[0], 10);
             return numA - numB;
         });
 
         for (const file of files) {
-            if (file.endsWith('.jpg') || file.endsWith('.jpeg')) {
-                const imagePath = path.join(tempDir, file);
-                const imageBuffer = await fs.readFile(imagePath);
-                imageFrames.push(imageBuffer.toString('base64'));
-                console.log(`[FileManager] Converted and encoded page: ${file}`);
+            if (!/\.(jpe?g|png)$/i.test(file)) {
+                continue;
+            }
+
+            const imagePath = path.join(tempDir, file);
+            const imageBuffer = await fs.readFile(imagePath);
+            imageFrames.push(imageBuffer.toString('base64'));
+            console.log(`[FileManager] Converted and encoded page: ${file}`);
+        }
+    };
+
+    const runProcess = (command, args, options = {}) => new Promise((resolve, reject) => {
+        const child = spawn(command, args, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            ...options,
+        });
+        let stderr = '';
+
+        child.stderr.on('data', (chunk) => {
+            stderr += chunk.toString();
+        });
+
+        child.on('error', (error) => {
+            reject(error);
+        });
+
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+
+            reject(new Error(stderr.trim() || `${command} exited with code ${code}`));
+        });
+    });
+
+    const convertWithBundledPoppler = async () => {
+        const poppler = require('pdf-poppler'); // Lazy load
+        await poppler.convert(pdfPath, {
+            format: 'jpeg',
+            out_dir: tempDir,
+            out_prefix: outPrefix,
+            page: null,
+        });
+    };
+
+    const convertWithSystemPdftoppm = async () => {
+        const outputPrefix = path.join(tempDir, outPrefix);
+        await runProcess('pdftoppm', ['-jpeg', pdfPath, outputPrefix]);
+    };
+
+    try {
+        if (process.platform === 'linux') {
+            await convertWithSystemPdftoppm();
+        } else {
+            try {
+                await convertWithBundledPoppler();
+            } catch (bundledError) {
+                console.warn(`[FileManager] Bundled Poppler conversion failed, falling back to system pdftoppm: ${bundledError.message}`);
+                await convertWithSystemPdftoppm();
             }
         }
+
+        await readFramesFromTempDir();
+        if (imageFrames.length === 0) {
+            throw new Error('PDF conversion completed without generating any preview images.');
+        }
+
         console.log(`[FileManager] Finished converting ${imageFrames.length} pages to images.`);
     } catch (error) {
         console.error(`[FileManager] Poppler PDF to image conversion failed:`, error);
-        // Re-throw the error to be caught by the calling function in getTextContent
-        throw new Error(`Poppler conversion failed: ${error.message}`);
+        const fallbackHint = process.platform === 'linux'
+            ? ' Install poppler-utils (pdftoppm) to enable PDF image previews on Linux.'
+            : '';
+        throw new Error(`Poppler conversion failed: ${error.message}${fallbackHint}`);
     } finally {
         // Clean up the temporary directory
         await fs.remove(tempDir);

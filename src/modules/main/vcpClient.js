@@ -42,6 +42,28 @@ function normalizeEndpoint(endpoint) {
     return new URL(endpoint.trim()).toString();
 }
 
+function buildSuggestedChatEndpoint(endpoint) {
+    const url = new URL(endpoint);
+    const normalizedPathname = url.pathname.replace(/\/+$/, '');
+    if (!/(^|\/)v1$/.test(normalizedPathname)) {
+        return null;
+    }
+
+    url.pathname = `${normalizedPathname}/chat/completions`;
+    url.search = '';
+    url.hash = '';
+    return url.toString();
+}
+
+function buildChatEndpointConfigurationError(endpoint) {
+    const suggestion = buildSuggestedChatEndpoint(endpoint);
+    if (!suggestion) {
+        return null;
+    }
+
+    return `VCP Server URL looks incomplete. Please use the full chat endpoint, for example: ${suggestion}`;
+}
+
 function normalizeMessage(message) {
     if (!message || typeof message !== 'object') {
         return { role: 'system', content: '[Invalid message]' };
@@ -397,6 +419,11 @@ async function send(request) {
         return { error: error.message };
     }
 
+    const endpointConfigurationError = buildChatEndpointConfigurationError(finalEndpoint);
+    if (endpointConfigurationError) {
+        return { error: endpointConfigurationError };
+    }
+
     const requestBody = {
         messages: normalizedMessages,
         ...modelConfig,
@@ -577,4 +604,6 @@ module.exports = {
     send,
     interrupt,
     getActiveRequestCount,
+    buildSuggestedChatEndpoint,
+    buildChatEndpointConfigurationError,
 };

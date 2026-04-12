@@ -9,7 +9,7 @@ const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
 
 /**
  * Initializes chat and topic related IPC handlers.
- * @param {BrowserWindow|function(): BrowserWindow|null} mainWindow The main window instance or getter.
+ * @param {BrowserWindow} mainWindow The main window instance.
  * @param {object} context - An object containing necessary context.
  * @param {string} context.AGENT_DIR - The path to the agents directory.
  * @param {string} context.USER_DATA_DIR - The path to the user data directory.
@@ -155,13 +155,7 @@ function initialize(mainWindow, context) {
         fileWatcher,
         settingsManager,
         agentConfigManager,
-        getSelectionListenerStatus = () => false,
-        stopSelectionListener = () => false,
-        startSelectionListener = () => false,
     } = context;
-    const getMainWindow = typeof context.getMainWindow === 'function'
-        ? context.getMainWindow
-        : (typeof mainWindow === 'function' ? mainWindow : () => mainWindow || null);
 
     vcpClient.initialize({ settingsManager });
 
@@ -515,19 +509,19 @@ function initialize(mainWindow, context) {
             return { error: "Agent ID and Topic ID are required to select files." };
         }
 
-        const listenerWasActive = getSelectionListenerStatus();
+        const listenerWasActive = context.getSelectionListenerStatus();
         if (listenerWasActive) {
-            stopSelectionListener();
+            context.stopSelectionListener();
             console.log('[Main] Temporarily stopped selection listener for file dialog.');
         }
 
-        const result = await dialog.showOpenDialog(getMainWindow(), {
+        const result = await dialog.showOpenDialog(mainWindow, {
             title: 'Select files to send',
             properties: ['openFile', 'multiSelections']
         });
 
         if (listenerWasActive) {
-            startSelectionListener();
+            context.startSelectionListener();
             console.log('[Main] Restarted selection listener after file dialog.');
         }
 

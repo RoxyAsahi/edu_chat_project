@@ -10,6 +10,12 @@ import {
     normalizeNote as normalizeStoredNote,
     removeDeletedNoteReferencesFromHistory,
 } from './notesUtils.js';
+import {
+    buildQuizSummaryMarkdown,
+    hasStructuredQuiz,
+    parseQuizSetFromMarkdown,
+    parseQuizSetFromResponse,
+} from '../quiz/quizUtils.js';
 
 const NOTE_DETAIL_META = Object.freeze({
     note: {
@@ -52,10 +58,11 @@ function stripMarkdown(text) {
 }
 
 function createNotesController(deps = {}) {
-    const store = deps.store;
+    const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
+    const renderMarkdownFragment = deps.renderMarkdownFragment || ((value) => value);
     const windowObj = deps.windowObj || window;
     const documentObj = deps.documentObj || document;
     const setSidePanelTab = deps.setSidePanelTab || (() => {});
@@ -79,81 +86,10 @@ function createNotesController(deps = {}) {
     };
     const closeTopicActionMenu = deps.closeTopicActionMenu || (() => {});
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
-    const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
-    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
-    const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
-    const getCurrentChatHistory = deps.getCurrentChatHistory || (() => store.getState().session.currentChatHistory);
 
     const HTMLElementCtor = windowObj.HTMLElement || globalThis.HTMLElement;
     const ElementCtor = windowObj.Element || globalThis.Element;
     let noteDetailTrigger = null;
-
-    function getNotesSlice() {
-        return store.getState().notes;
-    }
-
-    function patchNotes(patch) {
-        return store.patchState('notes', (current, rootState) => ({
-            ...current,
-            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-        }));
-    }
-
-    const state = {};
-    Object.defineProperties(state, {
-        topicNotes: {
-            get: () => getNotesSlice().topicNotes,
-            set: (value) => patchNotes({ topicNotes: value }),
-        },
-        agentNotes: {
-            get: () => getNotesSlice().agentNotes,
-            set: (value) => patchNotes({ agentNotes: value }),
-        },
-        notesScope: {
-            get: () => getNotesSlice().notesScope,
-            set: (value) => patchNotes({ notesScope: value }),
-        },
-        activeNoteId: {
-            get: () => getNotesSlice().activeNoteId,
-            set: (value) => patchNotes({ activeNoteId: value }),
-        },
-        selectedNoteIds: {
-            get: () => getNotesSlice().selectedNoteIds,
-            set: (value) => patchNotes({ selectedNoteIds: value }),
-        },
-        notesStudioView: {
-            get: () => getNotesSlice().notesStudioView,
-            set: (value) => patchNotes({ notesStudioView: value }),
-        },
-        noteDetailKind: {
-            get: () => getNotesSlice().noteDetailKind,
-            set: (value) => patchNotes({ noteDetailKind: value }),
-        },
-        activeNoteMenu: {
-            get: () => getNotesSlice().activeNoteMenu,
-            set: (value) => patchNotes({ activeNoteMenu: value }),
-        },
-        activeFlashcardNoteId: {
-            get: () => getNotesSlice().activeFlashcardNoteId,
-            set: (value) => patchNotes({ activeFlashcardNoteId: value }),
-        },
-        pendingFlashcardGeneration: {
-            get: () => getNotesSlice().pendingFlashcardGeneration,
-            set: (value) => patchNotes({ pendingFlashcardGeneration: value }),
-        },
-        currentSelectedItem: {
-            get: () => getCurrentSelectedItem() || { id: null, name: null, config: null },
-        },
-        currentTopicId: {
-            get: () => getCurrentTopicId(),
-        },
-        currentChatHistory: {
-            get: () => {
-                const history = getCurrentChatHistory();
-                return Array.isArray(history) ? history : [];
-            },
-        },
-    });
 
     function normalizeNote(note = {}) {
         return normalizeStoredNote(note, {
@@ -189,21 +125,260 @@ function createNotesController(deps = {}) {
             : (getActiveNote() ? normalizeNote(getActiveNote()) : null);
     }
 
-    function patchCurrentHistoryMessage(messageId, updater) {
-        let nextMessage = null;
-        updateCurrentChatHistory((history = []) => history.map((item) => {
-            if (item?.id !== messageId) {
-                return item;
-            }
+    function resetQuizPracticeState(noteId = null) {
+        state.quizPractice = {
+            noteId: noteId || null,
+            currentIndex: 0,
+            selectedOptionId: null,
+            revealed: false,
+        };
+    }
 
-            nextMessage = updater({ ...item });
-            return nextMessage;
-        }));
-        return nextMessage;
+    function ensureQuizPracticeState(note) {
+        if (!hasStructuredQuiz(note)) {
+            resetQuizPracticeState(null);
+            return null;
+        }
+
+        const itemCount = note.quizSet.items.length;
+        const noteId = note.id || null;
+        if (state.quizPractice.noteId !== noteId) {
+            resetQuizPracticeState(noteId);
+        }
+
+        state.quizPractice.currentIndex = Math.max(0, Math.min(Number(state.quizPractice.currentIndex || 0), itemCount - 1));
+        return {
+            currentIndex: state.quizPractice.currentIndex,
+            selectedOptionId: state.quizPractice.selectedOptionId || null,
+            revealed: state.quizPractice.revealed === true,
+        };
+    }
+
+    function renderQuizMarkdown(target, markdown) {
+        if (!target) {
+            return;
+        }
+
+        target.innerHTML = renderMarkdownFragment(markdown);
+    }
+
+    function buildAnalysisPreviewMeta(note = null) {
+        if (!note?.id) {
+            return '未保存的草稿预览。';
+        }
+
+        const sourceCount = Array.isArray(note.sourceMessageIds) ? note.sourceMessageIds.length : 0;
+        const refCount = Array.isArray(note.sourceDocumentRefs) ? note.sourceDocumentRefs.length : 0;
+        const topicLabel = note.topicId ? ` · 话题 ${note.topicId}` : '';
+        return `更新时间：${formatRelativeTime(note.updatedAt)}${topicLabel} · 来源消息 ${sourceCount} 条 · 来源资料 ${refCount} 条`;
+    }
+
+    function renderAnalysisPreview(note = getCurrentDetailNote()) {
+        const normalized = note ? normalizeNote(note) : null;
+        const draftTitle = String(el.noteTitleInput?.value || '').trim();
+        const draftMarkdown = String(el.noteContentInput?.value || '');
+        const title = draftTitle || normalized?.title || '深度分析报告';
+        const markdown = draftMarkdown || normalized?.contentMarkdown || '';
+
+        if (el.analysisPreviewTitle) {
+            el.analysisPreviewTitle.textContent = title;
+        }
+        if (el.analysisPreviewContent) {
+            el.analysisPreviewContent.innerHTML = markdown.trim()
+                ? renderMarkdownFragment(markdown)
+                : '<p>当前报告暂无内容。</p>';
+        }
+        if (el.analysisPreviewMeta) {
+            el.analysisPreviewMeta.textContent = buildAnalysisPreviewMeta(normalized);
+        }
+    }
+
+    function isWrongQuizAnswerState({ revealed = false, selectedOptionId = null, correctOptionId = '' } = {}) {
+        return revealed === true && Boolean(selectedOptionId) && selectedOptionId !== correctOptionId;
+    }
+
+    function renderQuizPractice(note = getCurrentDetailNote()) {
+        const normalized = note ? normalizeNote(note) : null;
+        const practiceState = ensureQuizPracticeState(normalized);
+
+        if (!hasStructuredQuiz(normalized) || !practiceState) {
+            el.quizPracticeTitle && (el.quizPracticeTitle.textContent = '选择题练习');
+            el.quizPracticeSummary && (el.quizPracticeSummary.textContent = '当前题目暂时无法解析，请切换到编辑原文。');
+            el.quizPracticeProgress && (el.quizPracticeProgress.textContent = '0 / 0');
+            el.quizPracticeQuestionIndex && (el.quizPracticeQuestionIndex.textContent = '第 0 题');
+            if (el.quizPracticeStem) {
+                el.quizPracticeStem.innerHTML = '<p>当前题目暂时无法解析，请切换到“编辑原文”检查格式。</p>';
+            }
+            if (el.quizPracticeOptions) {
+                el.quizPracticeOptions.innerHTML = '';
+            }
+            el.quizPracticeFeedback?.classList.add('hidden');
+            el.quizPracticePrevBtn?.toggleAttribute('disabled', true);
+            el.quizPracticeNextBtn?.toggleAttribute('disabled', true);
+            return;
+        }
+
+        const quizSet = normalized.quizSet;
+        const currentIndex = practiceState.currentIndex;
+        const item = quizSet.items[currentIndex];
+        const selectedOptionId = practiceState.selectedOptionId;
+        const revealed = practiceState.revealed;
+        const correctOption = item.options.find((option) => option.id === item.correctOptionId) || null;
+        const sourceCount = flashcardsApi.getFlashcardSourceCount(normalized);
+        const selectedOption = item.options.find((option) => option.id === selectedOptionId) || null;
+        const answeredCorrectly = revealed && selectedOptionId === item.correctOptionId;
+        const wrongAnswerRevealed = isWrongQuizAnswerState({
+            revealed,
+            selectedOptionId,
+            correctOptionId: item.correctOptionId,
+        });
+
+        if (el.quizPracticeTitle) {
+            el.quizPracticeTitle.textContent = quizSet.title || normalized.title || '选择题练习';
+        }
+        if (el.quizPracticeSummary) {
+            el.quizPracticeSummary.textContent = `${sourceCount > 0 ? `${sourceCount} 个来源` : '当前话题'} · 共 ${quizSet.items.length} 题`;
+        }
+        if (el.quizPracticeProgress) {
+            el.quizPracticeProgress.textContent = `${currentIndex + 1} / ${quizSet.items.length}`;
+        }
+        if (el.quizPracticeQuestionIndex) {
+            el.quizPracticeQuestionIndex.textContent = `第 ${currentIndex + 1} 题`;
+        }
+        renderQuizMarkdown(el.quizPracticeStem, item.stem);
+
+        if (el.quizPracticeOptions) {
+            el.quizPracticeOptions.innerHTML = item.options.map((option) => {
+                const classes = ['quiz-practice__option'];
+                if (selectedOptionId === option.id) {
+                    classes.push('quiz-practice__option--selected');
+                }
+                if (revealed && option.id === item.correctOptionId) {
+                    classes.push('quiz-practice__option--correct');
+                } else if (revealed && selectedOptionId === option.id && option.id !== item.correctOptionId) {
+                    classes.push('quiz-practice__option--incorrect');
+                }
+
+                const statusIcon = revealed
+                    ? (
+                        option.id === item.correctOptionId
+                            ? 'check_circle'
+                            : (selectedOptionId === option.id ? 'cancel' : 'radio_button_unchecked')
+                    )
+                    : 'radio_button_unchecked';
+
+                return `
+                    <button
+                        type="button"
+                        class="${classes.join(' ')}"
+                        data-quiz-option-id="${escapeHtml(option.id)}"
+                        ${revealed ? 'disabled' : ''}
+                    >
+                        <span class="quiz-practice__option-label">${escapeHtml(option.label)}</span>
+                        <div class="quiz-practice__option-text">${renderMarkdownFragment(option.text)}</div>
+                        <span class="quiz-practice__option-status material-symbols-outlined" aria-hidden="true">${statusIcon}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        if (el.quizPracticeFeedback) {
+            el.quizPracticeFeedback.classList.toggle('hidden', !revealed);
+            el.quizPracticeFeedback.classList.toggle('quiz-practice__feedback--correct', answeredCorrectly);
+            el.quizPracticeFeedback.classList.toggle('quiz-practice__feedback--incorrect', revealed && !answeredCorrectly);
+        }
+        if (el.quizPracticeResult) {
+            el.quizPracticeResult.textContent = !revealed
+                ? '请选择答案'
+                : (answeredCorrectly ? '回答正确' : '回答错误');
+        }
+        if (el.quizPracticeAnswer) {
+            el.quizPracticeAnswer.textContent = revealed
+                ? `正确答案：${correctOption?.label || ''}${selectedOption && !answeredCorrectly ? ` · 你选择了 ${selectedOption.label}` : ''}`
+                : '';
+        }
+        renderQuizMarkdown(el.quizPracticeExplanation, revealed ? item.explanation : '');
+        if (el.quizPracticePrevBtn) {
+            el.quizPracticePrevBtn.innerHTML = wrongAnswerRevealed
+                ? '<span class="material-symbols-outlined">replay</span> 重新答题'
+                : '<span class="material-symbols-outlined">arrow_back</span> 上一题';
+        }
+        el.quizPracticePrevBtn?.toggleAttribute('disabled', wrongAnswerRevealed ? false : currentIndex <= 0);
+        el.quizPracticeNextBtn?.toggleAttribute('disabled', currentIndex >= quizSet.items.length - 1 || !answeredCorrectly);
+    }
+
+    function setQuizPracticeIndex(nextIndex) {
+        const note = getCurrentDetailNote();
+        if (!hasStructuredQuiz(note)) {
+            return;
+        }
+
+        const maxIndex = note.quizSet.items.length - 1;
+        state.quizPractice = {
+            noteId: note.id,
+            currentIndex: Math.max(0, Math.min(Number(nextIndex || 0), maxIndex)),
+            selectedOptionId: null,
+            revealed: false,
+        };
+        renderQuizPractice(note);
+    }
+
+    function resetCurrentQuizAttempt() {
+        const note = getCurrentDetailNote();
+        if (!hasStructuredQuiz(note)) {
+            return;
+        }
+
+        state.quizPractice = {
+            ...state.quizPractice,
+            noteId: note.id,
+            selectedOptionId: null,
+            revealed: false,
+        };
+        renderQuizPractice(note);
+    }
+
+    function revealQuizOption(optionId) {
+        const note = getCurrentDetailNote();
+        if (!hasStructuredQuiz(note) || state.noteDetailMode !== 'practice' || state.quizPractice.revealed) {
+            return;
+        }
+
+        state.quizPractice = {
+            ...state.quizPractice,
+            noteId: note.id,
+            selectedOptionId: String(optionId || ''),
+            revealed: true,
+        };
+        renderQuizPractice(note);
+    }
+
+    function setNoteDetailMode(mode) {
+        const note = getCurrentDetailNote();
+        if (state.noteDetailKind === 'quiz') {
+            if (mode === 'practice' && !hasStructuredQuiz(note)) {
+                state.noteDetailMode = 'edit';
+            } else {
+                state.noteDetailMode = mode === 'practice' ? 'practice' : 'edit';
+            }
+        } else if (state.noteDetailKind === 'analysis') {
+            state.noteDetailMode = mode === 'view' ? 'view' : 'edit';
+        } else {
+            state.noteDetailMode = 'edit';
+        }
+
+        syncNoteDetailChrome(note);
+        if (state.noteDetailKind === 'quiz' && state.noteDetailMode === 'practice') {
+            renderQuizPractice(note);
+        }
+        if (state.noteDetailKind === 'analysis' && state.noteDetailMode === 'view') {
+            renderAnalysisPreview(note);
+        }
     }
 
     function clearNoteEditor() {
         state.activeNoteId = null;
+        resetQuizPracticeState(null);
         if (el.noteTitleInput) {
             el.noteTitleInput.value = '';
         }
@@ -287,10 +462,18 @@ function createNotesController(deps = {}) {
         const kind = state.noteDetailKind || 'note';
         const meta = NOTE_DETAIL_META[kind] || NOTE_DETAIL_META.note;
         const flashcards = kind === 'flashcards';
-        const editable = !flashcards;
+        const structuredQuiz = kind === 'quiz' && hasStructuredQuiz(note);
+        const analysisPreviewMode = kind === 'analysis' && state.noteDetailMode === 'view';
+        if (kind === 'quiz' && !structuredQuiz) {
+            state.noteDetailMode = 'edit';
+        }
+        const practiceMode = kind === 'quiz' && structuredQuiz && state.noteDetailMode === 'practice';
+        const editable = !flashcards && !analysisPreviewMode && (!structuredQuiz || state.noteDetailMode === 'edit');
         const noteTitle = flashcards
             ? (note?.flashcardDeck?.title || note?.title || '闪卡练习')
-            : (note?.title || '新建笔记');
+            : structuredQuiz
+                ? (note?.quizSet?.title || note?.title || '选择题练习')
+                : (note?.title || '新建笔记');
         const subtitle = note
             ? buildNoteDetailSubtitle(note, meta.subtitle)
             : (state.currentTopicId
@@ -307,8 +490,14 @@ function createNotesController(deps = {}) {
             el.noteDetailSubtitle.textContent = subtitle;
         }
         el.saveNoteBtn?.classList.toggle('hidden', !editable);
+        el.analysisEditMarkdownBtn?.classList.toggle('hidden', !(kind === 'analysis' && analysisPreviewMode));
+        el.analysisViewReportBtn?.classList.toggle('hidden', !(kind === 'analysis' && !analysisPreviewMode && Boolean(note?.id)));
+        el.quizEditSourceBtn?.classList.toggle('hidden', !(kind === 'quiz' && structuredQuiz && practiceMode));
+        el.quizViewPracticeBtn?.classList.toggle('hidden', !(kind === 'quiz' && structuredQuiz && !practiceMode));
         el.deleteNoteBtn?.classList.toggle('hidden', !note?.id);
-        el.noteEditorCard?.classList.toggle('hidden', !editable);
+        el.analysisPreviewCard?.classList.toggle('hidden', !analysisPreviewMode);
+        el.noteEditorCard?.classList.toggle('hidden', flashcards || practiceMode || analysisPreviewMode);
+        el.quizPracticeCard?.classList.toggle('hidden', !practiceMode);
         el.flashcardsPracticeCard?.classList.toggle('hidden', !flashcards);
     }
 
@@ -321,6 +510,10 @@ function createNotesController(deps = {}) {
 
         state.notesStudioView = 'detail';
         state.noteDetailKind = requestedKind;
+        state.noteDetailMode = requestedKind === 'quiz' && hasStructuredQuiz(normalized)
+            ? 'practice'
+            : (requestedKind === 'analysis' && normalized?.id ? 'view' : 'edit');
+        resetQuizPracticeState(normalized?.id || null);
         el.noteDetailModal?.classList.remove('hidden');
         el.noteDetailModal?.classList.add('note-detail-modal--open');
         el.noteDetailModal?.setAttribute('aria-hidden', 'false');
@@ -352,6 +545,12 @@ function createNotesController(deps = {}) {
                     el.noteMetaSummary.textContent = '新建笔记将保存到当前话题，并自动归档到当前学科汇总。';
                 }
             }
+            if (requestedKind === 'analysis') {
+                renderAnalysisPreview(normalized);
+            }
+            if (requestedKind === 'quiz') {
+                renderQuizPractice(normalized);
+            }
             syncNoteDetailChrome(normalized);
         }
 
@@ -362,6 +561,8 @@ function createNotesController(deps = {}) {
     function closeNoteDetail(options = {}) {
         state.notesStudioView = 'overview';
         state.noteDetailKind = null;
+        state.noteDetailMode = 'edit';
+        resetQuizPracticeState(null);
         setRightPanelMode('notes');
         el.noteDetailModal?.classList.add('hidden');
         el.noteDetailModal?.classList.remove('note-detail-modal--open');
@@ -698,11 +899,31 @@ function createNotesController(deps = {}) {
             return;
         }
 
+        const currentNote = getActiveNote() ? normalizeNote(getActiveNote()) : null;
+        const currentKind = state.noteDetailKind || getNormalizedNoteKind(currentNote);
+        const rawTitle = el.noteTitleInput?.value.trim() || '';
+        const rawContent = el.noteContentInput?.value || '';
+        let nextQuizSet = undefined;
+        let nextContentMarkdown = rawContent;
+        let nextTitle = rawTitle;
+
+        if (currentKind === 'quiz') {
+            nextQuizSet = parseQuizSetFromMarkdown(rawContent, rawTitle || currentNote?.title || '选择题练习');
+            if (!nextQuizSet) {
+                ui.showToastNotification('选择题格式缺少题干/选项/正确答案/解析，无法同步到练习页。', 'warning');
+                return;
+            }
+
+            nextContentMarkdown = buildQuizSummaryMarkdown(nextQuizSet);
+            nextTitle = rawTitle || nextQuizSet.title || currentNote?.title || '选择题练习';
+        }
+
         const request = buildNoteSaveRequest({
-            currentNote: getActiveNote(),
+            currentNote,
             currentTopicId: state.currentTopicId,
-            title: el.noteTitleInput?.value.trim() || '',
-            contentMarkdown: el.noteContentInput?.value || '',
+            title: nextTitle,
+            contentMarkdown: nextContentMarkdown,
+            quizSet: nextQuizSet,
         });
 
         if (!request) {
@@ -723,7 +944,9 @@ function createNotesController(deps = {}) {
 
         state.activeNoteId = result.item?.id || null;
         await refreshNotesData();
-        openNoteDetail(normalizeNote(result.item || {}));
+        openNoteDetail(normalizeNote(result.item || {}), {
+            kind: getNormalizedNoteKind(result.item || {}),
+        });
         ui.showToastNotification('笔记已保存。', 'success');
     }
 
@@ -765,7 +988,7 @@ function createNotesController(deps = {}) {
         }
 
         if (isCurrentTopic) {
-            updateCurrentChatHistory(nextHistory);
+            state.currentChatHistory = nextHistory;
             decorateChatMessages();
         }
 
@@ -852,14 +1075,11 @@ function createNotesController(deps = {}) {
             return null;
         }
 
-        patchCurrentHistoryMessage(messageId, (entry) => ({
-            ...entry,
-            favorited: true,
-            favoriteAt: Date.now(),
-            noteRefs: Array.isArray(entry.noteRefs)
-                ? [...new Set([...entry.noteRefs, result.item.id])]
-                : [result.item.id],
-        }));
+        message.favorited = true;
+        message.favoriteAt = Date.now();
+        message.noteRefs = Array.isArray(message.noteRefs)
+            ? [...new Set([...message.noteRefs, result.item.id])]
+            : [result.item.id];
         await persistHistory();
         await refreshNotesData();
         revealNote(result.item);
@@ -875,11 +1095,8 @@ function createNotesController(deps = {}) {
         }
 
         if (message.favorited) {
-            patchCurrentHistoryMessage(messageId, (entry) => ({
-                ...entry,
-                favorited: false,
-                favoriteAt: null,
-            }));
+            message.favorited = false;
+            message.favoriteAt = null;
             await persistHistory();
             decorateChatMessages();
             ui.showToastNotification('已取消收藏，已生成的笔记会继续保留。', 'info');
@@ -899,11 +1116,8 @@ function createNotesController(deps = {}) {
                 return null;
             }
         } else {
-            patchCurrentHistoryMessage(messageId, (entry) => ({
-                ...entry,
-                favorited: true,
-                favoriteAt: Date.now(),
-            }));
+            message.favorited = true;
+            message.favoriteAt = Date.now();
             await persistHistory();
             revealNote(favoriteNote);
             decorateChatMessages();
@@ -1020,6 +1234,10 @@ function createNotesController(deps = {}) {
             return;
         }
 
+        const topicDisplayName = String(getCurrentTopicDisplayName() || '').trim();
+        const fallbackQuizTitle = topicDisplayName && topicDisplayName !== '请选择一个话题'
+            ? `${topicDisplayName} 测验`
+            : '选择题练习';
         const prompts = {
             analysis: {
                 title: `深度分析报告 ${new Date().toLocaleString()}`,
@@ -1027,8 +1245,36 @@ function createNotesController(deps = {}) {
                 kind: 'analysis',
             },
             quiz: {
-                title: `选择题练习 ${new Date().toLocaleString()}`,
-                instruction: '请基于以下学习材料生成 8 道选择题。每题包含题干、4 个选项、正确答案、简短解析。使用简体中文 Markdown。',
+                title: fallbackQuizTitle,
+                instruction: [
+                    '请基于以下学习材料生成一组结构化选择题练习。',
+                    '你必须只返回严格 JSON，不要输出 JSON 之外的任何文字。',
+                    '禁止输出寒暄、前言、分隔线、时间戳标题、Markdown 标题或额外说明。',
+                    'JSON 结构如下：',
+                    '{',
+                    '  "title": "测验标题",',
+                    '  "items": [',
+                    '    {',
+                    '      "id": "quiz_1",',
+                    '      "stem": "题干",',
+                    '      "options": [',
+                    '        { "id": "option_a", "label": "A", "text": "选项内容" },',
+                    '        { "id": "option_b", "label": "B", "text": "选项内容" },',
+                    '        { "id": "option_c", "label": "C", "text": "选项内容" },',
+                    '        { "id": "option_d", "label": "D", "text": "选项内容" }',
+                    '      ],',
+                    '      "correctOptionId": "option_a",',
+                    '      "explanation": "简明解析"',
+                    '    }',
+                    '  ]',
+                    '}',
+                    '要求：',
+                    '1. 生成 8 道题。',
+                    '2. 每题必须且只能有 4 个选项，label 必须严格为 A/B/C/D。',
+                    '3. correctOptionId 必须严格对应某个 option.id。',
+                    '4. 题干、选项、答案、解析全部使用简体中文。',
+                    `5. title 采用“${fallbackQuizTitle}”这种简洁命名风格，不要带时间戳。`,
+                ].join('\n'),
                 kind: 'quiz',
             },
             flashcards: {
@@ -1072,7 +1318,12 @@ function createNotesController(deps = {}) {
             endpoint: state.settings.vcpServerUrl,
             apiKey: state.settings.vcpApiKey,
             messages: [
-                { role: 'system', content: '你是 UniStudy 的学习助手，请输出结构清晰、适合学习沉淀的 Markdown。' },
+                {
+                    role: 'system',
+                    content: prompt.kind === 'quiz' || prompt.kind === 'flashcards'
+                        ? '你是 UniStudy 的学习助手。请严格遵守输出格式要求，不要输出任何额外说明。'
+                        : '你是 UniStudy 的学习助手，请输出结构清晰、适合学习沉淀的 Markdown。',
+                },
                 { role: 'user', content: `${prompt.instruction}\n\n学习材料如下：\n\n${studyInput.text}` },
             ],
             modelConfig: {
@@ -1107,10 +1358,19 @@ function createNotesController(deps = {}) {
         }
 
         let contentMarkdown = responseContent;
+        let quizSet = null;
         let flashcardDeck = null;
         let flashcardProgress = null;
 
-        if (prompt.kind === 'flashcards') {
+        if (prompt.kind === 'quiz') {
+            quizSet = parseQuizSetFromResponse(responseContent, prompt.title);
+            if (!quizSet) {
+                ui.showToastNotification('选择题生成结果格式无效，请重试。', 'error');
+                return;
+            }
+
+            contentMarkdown = buildQuizSummaryMarkdown(quizSet);
+        } else if (prompt.kind === 'flashcards') {
             const generated = flashcardsApi.buildGeneratedFlashcardContent(
                 responseContent,
                 prompt.title,
@@ -1131,11 +1391,14 @@ function createNotesController(deps = {}) {
         }
 
         const saveResult = await chatAPI.saveTopicNote(state.currentSelectedItem.id, state.currentTopicId, {
-            title: prompt.title,
+            title: prompt.kind === 'quiz'
+                ? (quizSet?.title || prompt.title)
+                : (prompt.kind === 'flashcards' ? (flashcardDeck?.title || prompt.title) : prompt.title),
             contentMarkdown,
             sourceMessageIds: studyInput.sourceMessageIds,
             sourceDocumentRefs: studyInput.sourceDocumentRefs,
             kind: prompt.kind,
+            quizSet,
             flashcardDeck,
             flashcardProgress,
         });
@@ -1198,6 +1461,8 @@ function createNotesController(deps = {}) {
         if (clearFlashcards) {
             flashcardsApi.resetState();
         }
+        state.noteDetailMode = 'edit';
+        resetQuizPracticeState(null);
 
         renderNotesPanel();
     }
@@ -1249,6 +1514,18 @@ function createNotesController(deps = {}) {
         el.saveNoteBtn?.addEventListener('click', () => {
             void saveActiveNote();
         });
+        el.analysisEditMarkdownBtn?.addEventListener('click', () => {
+            setNoteDetailMode('edit');
+        });
+        el.analysisViewReportBtn?.addEventListener('click', () => {
+            setNoteDetailMode('view');
+        });
+        el.quizEditSourceBtn?.addEventListener('click', () => {
+            setNoteDetailMode('edit');
+        });
+        el.quizViewPracticeBtn?.addEventListener('click', () => {
+            setNoteDetailMode('practice');
+        });
         el.deleteNoteBtn?.addEventListener('click', () => {
             void deleteActiveNote();
         });
@@ -1260,6 +1537,50 @@ function createNotesController(deps = {}) {
         });
         el.generateFlashcardsBtn?.addEventListener('click', () => {
             void runNotesTool('flashcards');
+        });
+        el.quizPracticeOptions?.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof ElementCtor)) {
+                return;
+            }
+
+            const optionButton = target.closest('[data-quiz-option-id]');
+            if (!(optionButton instanceof ElementCtor)) {
+                return;
+            }
+
+            revealQuizOption(optionButton.getAttribute('data-quiz-option-id'));
+        });
+        el.quizPracticePrevBtn?.addEventListener('click', () => {
+            const note = getCurrentDetailNote();
+            const currentItem = hasStructuredQuiz(note)
+                ? note.quizSet.items[state.quizPractice.currentIndex || 0]
+                : null;
+            if (currentItem && isWrongQuizAnswerState({
+                revealed: state.quizPractice.revealed,
+                selectedOptionId: state.quizPractice.selectedOptionId,
+                correctOptionId: currentItem.correctOptionId,
+            })) {
+                resetCurrentQuizAttempt();
+                return;
+            }
+            setQuizPracticeIndex((state.quizPractice.currentIndex || 0) - 1);
+        });
+        el.quizPracticeNextBtn?.addEventListener('click', () => {
+            const note = getCurrentDetailNote();
+            const currentItem = hasStructuredQuiz(note)
+                ? note.quizSet.items[state.quizPractice.currentIndex || 0]
+                : null;
+            const answeredCorrectly = Boolean(
+                currentItem
+                && state.quizPractice.revealed === true
+                && state.quizPractice.selectedOptionId
+                && state.quizPractice.selectedOptionId === currentItem.correctOptionId
+            );
+            if (!answeredCorrectly) {
+                return;
+            }
+            setQuizPracticeIndex((state.quizPractice.currentIndex || 0) + 1);
         });
         el.noteDetailCloseBtn?.addEventListener('click', () => closeNoteDetail());
         el.noteDetailModalBackdrop?.addEventListener('click', () => closeNoteDetail());

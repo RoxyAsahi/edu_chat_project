@@ -127,6 +127,160 @@ function normalizeFlashcardProgress(progress, deck) {
     };
 }
 
+function normalizeQuizOption(option, index) {
+    if (!option) {
+        return null;
+    }
+
+    const label = String(option.label || String.fromCharCode(65 + index)).trim().toUpperCase();
+    const text = typeof option === 'string'
+        ? String(option).trim()
+        : String(option.text || option.content || option.value || '').trim();
+
+    if (!text || !/^[A-D]$/.test(label)) {
+        return null;
+    }
+
+    return {
+        id: String(option.id || `option_${label.toLowerCase()}`),
+        label,
+        text,
+    };
+}
+
+function resolveCorrectOptionId(rawValue, options = []) {
+    const candidate = String(rawValue || '').trim();
+    if (!candidate) {
+        return '';
+    }
+
+    const byId = options.find((option) => option.id === candidate);
+    if (byId) {
+        return byId.id;
+    }
+
+    const byLabel = options.find((option) => option.label === candidate.toUpperCase());
+    return byLabel ? byLabel.id : '';
+}
+
+function normalizeQuizItem(item, index) {
+    if (!item || typeof item !== 'object') {
+        return null;
+    }
+
+    const stem = String(item.stem || item.question || '').trim();
+    const options = Array.isArray(item.options)
+        ? item.options.map((option, optionIndex) => normalizeQuizOption(option, optionIndex)).filter(Boolean)
+        : [];
+    const explanation = String(item.explanation || item.analysis || '').trim();
+    const correctOptionId = resolveCorrectOptionId(
+        item.correctOptionId || item.correctAnswer || item.answer,
+        options
+    );
+
+    if (!stem || options.length !== 4 || !correctOptionId || !explanation) {
+        return null;
+    }
+
+    return {
+        id: String(item.id || `quiz_${index + 1}`),
+        stem,
+        options,
+        correctOptionId,
+        explanation,
+    };
+}
+
+function normalizeQuizSet(quizSet, fallbackTitle = '选择题练习') {
+    if (!quizSet || typeof quizSet !== 'object') {
+        return null;
+    }
+
+    const items = Array.isArray(quizSet.items)
+        ? quizSet.items.map((item, index) => normalizeQuizItem(item, index)).filter(Boolean)
+        : [];
+
+    if (items.length === 0) {
+        return null;
+    }
+
+    return {
+        title: String(quizSet.title || fallbackTitle).trim() || fallbackTitle,
+        items,
+    };
+}
+
+function parseQuizSetFromMarkdown(markdown, fallbackTitle = '选择题练习') {
+    const rawText = String(markdown || '').trim();
+    if (!rawText) {
+        return null;
+    }
+
+    const titleMatch = rawText.match(/^#\s+(.+)$/m);
+    const title = String(titleMatch?.[1] || fallbackTitle).trim() || fallbackTitle;
+    const questionMatches = [...rawText.matchAll(/(?:^|\n)(?:#{1,6}\s*)?(\d+)[\.\u3001、]\s+([\s\S]*?)(?=(?:\n(?:#{1,6}\s*)?\d+[\.\u3001、]\s+)|$)/g)];
+    const items = questionMatches.map((match, index) => {
+        const block = String(match[2] || '').trim();
+        const lines = block.split(/\r?\n/).map((line) => String(line || '').trim()).filter(Boolean);
+        const options = [];
+        let correctLabel = '';
+        let explanation = '';
+        let collectingExplanation = false;
+        const explanationParts = [];
+
+        lines.forEach((line) => {
+            const optionMatch = line.match(/^([A-D])[\.\u3001、:：]\s+(.+)$/i);
+            if (optionMatch) {
+                options.push({
+                    id: `option_${optionMatch[1].toLowerCase()}`,
+                    label: optionMatch[1].toUpperCase(),
+                    text: optionMatch[2].trim(),
+                });
+                collectingExplanation = false;
+                return;
+            }
+
+            const answerMatch = line.match(/^(?:正确答案|答案)\s*[:：]\s*([A-D])/i);
+            if (answerMatch) {
+                correctLabel = answerMatch[1].toUpperCase();
+                collectingExplanation = false;
+                return;
+            }
+
+            const explanationMatch = line.match(/^(?:解析|解释)\s*[:：]\s*(.*)$/i);
+            if (explanationMatch) {
+                const firstLine = explanationMatch[1].trim();
+                if (firstLine) {
+                    explanationParts.push(firstLine);
+                }
+                collectingExplanation = true;
+                return;
+            }
+
+            if (collectingExplanation) {
+                explanationParts.push(line);
+            }
+        });
+
+        explanation = explanationParts.join('\n').trim();
+        const correctOption = options.find((option) => option.label === correctLabel);
+
+        if (!match[2] || options.length !== 4 || !correctOption || !explanation) {
+            return null;
+        }
+
+        return {
+            id: `quiz_${index + 1}`,
+            stem: lines[0] || '',
+            options,
+            correctOptionId: correctOption.id,
+            explanation,
+        };
+    }).filter(Boolean);
+
+    return items.length > 0 ? normalizeQuizSet({ title, items }, fallbackTitle) : null;
+}
+
 async function readTopicNotes(agentId, topicId) {
     if (!agentId || !topicId) {
         return [];
@@ -342,6 +496,16 @@ function normalizeNote(agentId, topicId, payload = {}, existing = null) {
         payload.flashcardDeck ?? existing?.flashcardDeck ?? null,
         sourceDocumentRefs
     );
+    const kind = String(payload.kind || existing?.kind || 'note');
+    const quizSet = kind === 'quiz'
+        ? (
+            normalizeQuizSet(payload.quizSet ?? existing?.quizSet ?? null, payload.title || existing?.title || '选择题练习')
+            || parseQuizSetFromMarkdown(
+                payload.contentMarkdown || existing?.contentMarkdown || '',
+                payload.title || existing?.title || '选择题练习'
+            )
+        )
+        : null;
 
     return {
         id: String(payload.id || existing?.id || makeId('note')),
@@ -353,7 +517,8 @@ function normalizeNote(agentId, topicId, payload = {}, existing = null) {
             ? payload.sourceMessageIds.filter(Boolean)
             : (existing?.sourceMessageIds || []),
         sourceDocumentRefs,
-        kind: String(payload.kind || existing?.kind || 'note'),
+        kind,
+        quizSet,
         flashcardDeck,
         flashcardProgress: normalizeFlashcardProgress(
             payload.flashcardProgress ?? existing?.flashcardProgress ?? null,

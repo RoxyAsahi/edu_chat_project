@@ -2,16 +2,11 @@
 
 let mainRefs = {};
 let contextMenuDependencies = {};
-let isInitialized = false;
 
 function initializeContextMenu(refs, dependencies) {
     mainRefs = refs;
     contextMenuDependencies = dependencies;
-    if (isInitialized) {
-        return;
-    }
     document.addEventListener('click', closeContextMenuOnClickOutside, true);
-    isInitialized = true;
 }
 
 function closeContextMenu() {
@@ -489,7 +484,7 @@ async function handleRegenerateResponse(originalAssistantMessage) {
             contextMenuDependencies.startStreamingMessage({ ...regenerationThinkingMessage, content: '' });
         }
 
-        contextMenuDependencies.setActiveRequestId?.(regenerationThinkingMessage.id);
+        window.setLiteActiveRequestId?.(regenerationThinkingMessage.id);
 
         const vcpResult = await electronAPI.sendToVCP({
             requestId: regenerationThinkingMessage.id,
@@ -503,7 +498,7 @@ async function handleRegenerateResponse(originalAssistantMessage) {
         if (modelConfigForVCP.stream) {
             if (vcpResult?.error || !vcpResult?.streamingStarted) {
                 const detailedError = vcpResult?.error || 'Unable to start streaming regeneration.';
-                contextMenuDependencies.setActiveRequestId?.(null);
+                window.setLiteActiveRequestId?.(null);
                 await contextMenuDependencies.finalizeStreamedMessage(regenerationThinkingMessage.id, 'error', context, {
                     error: detailedError,
                 });
@@ -536,10 +531,10 @@ async function handleRegenerateResponse(originalAssistantMessage) {
         await electronAPI.saveChatHistory(currentSelectedItemVal.id, currentTopicIdVal, finalHistory);
         contextMenuDependencies.removeMessageById(regenerationThinkingMessage.id, false);
         contextMenuDependencies.renderMessage(assistantMessage);
-        contextMenuDependencies.setActiveRequestId?.(null);
+        window.setLiteActiveRequestId?.(null);
         uiHelper.scrollToBottom();
     } catch (error) {
-        contextMenuDependencies.setActiveRequestId?.(null);
+        window.setLiteActiveRequestId?.(null);
         await contextMenuDependencies.finalizeStreamedMessage(regenerationThinkingMessage.id, 'error', context, {
             error: `Regenerate failed: ${error.message}`,
         });

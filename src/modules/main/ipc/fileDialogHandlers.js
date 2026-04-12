@@ -21,40 +21,8 @@ function isNonEmptyString(value) {
     return typeof value === 'string' && value.trim() !== '';
 }
 
-function resolveMainWindowGetter(mainWindow, context) {
-    if (typeof context?.getMainWindow === 'function') {
-        return context.getMainWindow;
-    }
-
-    if (typeof mainWindow === 'function') {
-        return mainWindow;
-    }
-
-    return () => mainWindow || null;
-}
-
-function resolveChildWindowsGetter(context) {
-    if (typeof context?.getOpenChildWindows === 'function') {
-        return context.getOpenChildWindows;
-    }
-
-    return () => context?.openChildWindows || [];
-}
-
-function removeChildWindow(openChildWindows, childWindow) {
-    if (!Array.isArray(openChildWindows)) {
-        return;
-    }
-
-    const index = openChildWindows.indexOf(childWindow);
-    if (index !== -1) {
-        openChildWindows.splice(index, 1);
-    }
-}
-
 function initialize(mainWindow, context) {
-    const getMainWindow = resolveMainWindowGetter(mainWindow, context);
-    const getOpenChildWindows = resolveChildWindowsGetter(context);
+    let { openChildWindows } = context;
     const appRoot = app.getAppPath();
     const iconPath = path.join(appRoot, 'src', 'assets', 'icon.png');
     const imageViewerPath = path.join(appRoot, 'src', 'modules', 'renderer', 'image-viewer.html');
@@ -71,7 +39,7 @@ function initialize(mainWindow, context) {
             console.log('[Main] Temporarily stopped selection listener for avatar dialog.');
         }
 
-        const result = await dialog.showOpenDialog(getMainWindow(), {
+        const result = await dialog.showOpenDialog(mainWindow, {
             title: '选择头像文件',
             properties: ['openFile'],
             filters: [
@@ -331,20 +299,16 @@ function initialize(mainWindow, context) {
             }
         ];
         const menu = Menu.buildFromTemplate(template);
-        const currentMainWindow = getMainWindow();
-        if (currentMainWindow && !currentMainWindow.isDestroyed()) {
-            menu.popup({ window: currentMainWindow });
+        if (mainWindow) {
+            menu.popup({ window: mainWindow });
         }
     });
 
     async function openImageViewerWindow(imageUrl, imageTitle) {
-        const currentMainWindow = getMainWindow();
         const imageViewerWindow = new BrowserWindow({
             width: 800, height: 600, minWidth: 400, minHeight: 300,
             title: imageTitle || 'Image Viewer',
-            parent: currentMainWindow && !currentMainWindow.isDestroyed() ? currentMainWindow : undefined,
-            modal: false,
-            show: false,
+            parent: mainWindow, modal: false, show: false,
             backgroundColor: '#28282c',
             icon: iconPath,
             webPreferences: {
@@ -358,19 +322,13 @@ function initialize(mainWindow, context) {
 
         const viewerUrl = `file://${imageViewerPath}?src=${encodeURIComponent(imageUrl)}&title=${encodeURIComponent(imageTitle || 'Image Viewer')}`;
         imageViewerWindow.loadURL(viewerUrl);
-        const openChildWindows = getOpenChildWindows();
-        if (Array.isArray(openChildWindows)) {
-            openChildWindows.push(imageViewerWindow);
-        }
+        openChildWindows.push(imageViewerWindow);
 
         imageViewerWindow.setMenu(null);
         imageViewerWindow.once('ready-to-show', () => imageViewerWindow.show());
         imageViewerWindow.on('closed', () => {
-            removeChildWindow(getOpenChildWindows(), imageViewerWindow);
-            const latestMainWindow = getMainWindow();
-            if (latestMainWindow && !latestMainWindow.isDestroyed()) {
-                latestMainWindow.focus();
-            }
+            context.openChildWindows = openChildWindows.filter((win) => win !== imageViewerWindow);
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
         });
     }
 
@@ -395,7 +353,6 @@ function initialize(mainWindow, context) {
             return { success: false, error: 'display-text-content-in-viewer expects non-empty textContent.' };
         }
 
-        const currentMainWindow = getMainWindow();
         const textViewerWindow = new BrowserWindow({
             width: 800,
             height: 700,
@@ -407,7 +364,6 @@ function initialize(mainWindow, context) {
             frame: false,
             ...(process.platform === 'darwin' ? {} : { titleBarStyle: 'hidden' }),
             minimizable: true,
-            parent: currentMainWindow && !currentMainWindow.isDestroyed() ? currentMainWindow : undefined,
             icon: iconPath,
             webPreferences: {
                 preload: resolveAppPreload(appRoot, PRELOAD_ROLES.VIEWER),
@@ -423,19 +379,13 @@ function initialize(mainWindow, context) {
 
         textViewerWindow.loadURL(viewerUrl).catch((err) => console.error('[Main Process] textViewerWindow failed to initiate URL loading', err));
 
-        const openChildWindows = getOpenChildWindows();
-        if (Array.isArray(openChildWindows)) {
-            openChildWindows.push(textViewerWindow);
-        }
+        openChildWindows.push(textViewerWindow);
 
         textViewerWindow.setMenu(null);
         textViewerWindow.once('ready-to-show', () => textViewerWindow.show());
         textViewerWindow.on('closed', () => {
-            removeChildWindow(getOpenChildWindows(), textViewerWindow);
-            const latestMainWindow = getMainWindow();
-            if (latestMainWindow && !latestMainWindow.isDestroyed()) {
-                latestMainWindow.focus();
-            }
+            context.openChildWindows = openChildWindows.filter((win) => win !== textViewerWindow);
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
         });
 
         return { success: true };

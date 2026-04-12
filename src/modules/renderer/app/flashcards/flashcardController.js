@@ -12,7 +12,7 @@ import {
 } from './flashcardUtils.js';
 
 function createFlashcardController(deps = {}) {
-    const store = deps.store;
+    const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -24,33 +24,6 @@ function createFlashcardController(deps = {}) {
     const openNoteDetail = deps.openNoteDetail || (() => {});
     const closeNoteDetail = deps.closeNoteDetail || (() => {});
     const renderNotesPanel = deps.renderNotesPanel || (() => {});
-
-    function getNotesSlice() {
-        return store.getState().notes;
-    }
-
-    function patchNotes(patch) {
-        return store.patchState('notes', (current, rootState) => ({
-            ...current,
-            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-        }));
-    }
-
-    const state = {};
-    Object.defineProperties(state, {
-        activeNoteId: {
-            get: () => getNotesSlice().activeNoteId,
-            set: (value) => patchNotes({ activeNoteId: value }),
-        },
-        activeFlashcardNoteId: {
-            get: () => getNotesSlice().activeFlashcardNoteId,
-            set: (value) => patchNotes({ activeFlashcardNoteId: value }),
-        },
-        pendingFlashcardGeneration: {
-            get: () => getNotesSlice().pendingFlashcardGeneration,
-            set: (value) => patchNotes({ pendingFlashcardGeneration: value }),
-        },
-    });
 
     function getActiveFlashcardNote() {
         const note = getNoteById(state.activeFlashcardNoteId);

@@ -19,7 +19,7 @@ function escapeHtml(text) {
 }
 
 function createComposerController(deps = {}) {
-    const store = deps.store;
+    const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -36,59 +36,12 @@ function createComposerController(deps = {}) {
     const resolveLivePrompt = deps.resolveLivePrompt || (async () => '');
     const autoResizeTextarea = deps.autoResizeTextarea || (() => {});
     const decorateChatMessages = deps.decorateChatMessages || (() => {});
-    const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
-    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
-    const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
-    const getCurrentChatHistory = deps.getCurrentChatHistory || (() => store.getState().session.currentChatHistory);
-    const getGlobalSettings = deps.getGlobalSettings || (() => store.getState().settings.settings);
     const defaultSendButtonHtml = deps.defaultSendButtonHtml ?? (el.sendMessageBtn?.innerHTML || '');
     const interruptSendButtonHtml = deps.interruptSendButtonHtml || `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="none" aria-hidden="true">
         <rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor"></rect>
     </svg>
 `;
-
-    function getComposerSlice() {
-        return store.getState().composer;
-    }
-
-    function patchComposer(patch) {
-        return store.patchState('composer', (current, rootState) => ({
-            ...current,
-            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-        }));
-    }
-
-    const state = {};
-    Object.defineProperties(state, {
-        pendingAttachments: {
-            get: () => getComposerSlice().pendingAttachments,
-            set: (value) => patchComposer({ pendingAttachments: value }),
-        },
-        pendingSelectionContextRefs: {
-            get: () => getComposerSlice().pendingSelectionContextRefs,
-            set: (value) => patchComposer({ pendingSelectionContextRefs: value }),
-        },
-        activeRequestId: {
-            get: () => getComposerSlice().activeRequestId,
-            set: (value) => patchComposer({ activeRequestId: value }),
-        },
-        currentSelectedItem: {
-            get: () => getCurrentSelectedItem() || { id: null, name: null, avatarUrl: null, config: null },
-        },
-        currentTopicId: {
-            get: () => getCurrentTopicId(),
-        },
-        currentChatHistory: {
-            get: () => {
-                const history = getCurrentChatHistory();
-                return Array.isArray(history) ? history : [];
-            },
-        },
-        settings: {
-            get: () => getGlobalSettings() || {},
-        },
-    });
 
     function refreshAttachmentPreview() {
         ui.updateAttachmentPreview(state.pendingAttachments, el.attachmentPreviewArea);
@@ -168,7 +121,7 @@ function createComposerController(deps = {}) {
             return;
         }
 
-        state.pendingAttachments = [...state.pendingAttachments, ...normalized];
+        state.pendingAttachments.push(...normalized);
         refreshAttachmentPreview();
     }
 
@@ -406,19 +359,6 @@ function createComposerController(deps = {}) {
         updateSendButtonState();
     }
 
-    function patchCurrentHistoryMessage(messageId, updater) {
-        let nextMessage = null;
-        updateCurrentChatHistory((history = []) => history.map((item) => {
-            if (item?.id !== messageId) {
-                return item;
-            }
-
-            nextMessage = updater({ ...item });
-            return nextMessage;
-        }));
-        return nextMessage;
-    }
-
     async function sendMessage(prefillText) {
         if (typeof prefillText === 'string') {
             el.messageInput.value = prefillText;
@@ -476,7 +416,7 @@ function createComposerController(deps = {}) {
             selectionContextRefs: selectionContextRefsForTurn,
         };
 
-        updateCurrentChatHistory((history = []) => [...history, userMessage]);
+        state.currentChatHistory.push(userMessage);
         await persistHistory();
         await messageRendererApi.renderMessage(userMessage, false, true);
         decorateChatMessages();
@@ -514,7 +454,7 @@ function createComposerController(deps = {}) {
             assistantMessage.kbContextRefs = combinedRefs;
         }
 
-        updateCurrentChatHistory((history = []) => [...history, assistantMessage]);
+        state.currentChatHistory.push(assistantMessage);
         await persistHistory();
         messageRendererApi.startStreamingMessage(assistantMessage);
         decorateChatMessages();
@@ -557,11 +497,11 @@ function createComposerController(deps = {}) {
 
         if (!modelConfig.stream && response?.response) {
             const content = response.response?.choices?.[0]?.message?.content || '';
-            patchCurrentHistoryMessage(assistantMessage.id, (entry) => ({
-                ...entry,
-                isThinking: false,
-                content,
-            }));
+            const assistantEntry = state.currentChatHistory.find((item) => item.id === assistantMessage.id);
+            if (assistantEntry) {
+                assistantEntry.isThinking = false;
+                assistantEntry.content = content;
+            }
             await persistHistory();
             await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'completed', buildTopicContext(), {
                 fullResponse: content,

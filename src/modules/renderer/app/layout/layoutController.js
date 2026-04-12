@@ -137,26 +137,13 @@ function resolveLeftSidebarHeights({
 }
 
 function createLayoutController(deps = {}) {
-    const store = deps.store;
+    const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
     const windowObj = deps.windowObj || window;
     const documentObj = deps.documentObj || document;
-    const mergeSettingsPatch = deps.mergeSettingsPatch || (() => {});
-    const getPersistedLayoutSettings = deps.getPersistedLayoutSettings || (() => store.getState().settings.settings);
     let layoutResizeFrame = 0;
-
-    function getLayoutSlice() {
-        return store.getState().layout;
-    }
-
-    function patchLayout(patch) {
-        return store.patchState('layout', (current, rootState) => ({
-            ...current,
-            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-        }));
-    }
 
     function isDesktopResizableLayout() {
         return windowObj.innerWidth > LAYOUT_DEFAULTS.desktopBreakpoint;
@@ -195,8 +182,7 @@ function createLayoutController(deps = {}) {
     }
 
     function applyLayoutWidths() {
-        const layout = getLayoutSlice();
-        if (!el.layout || !layout.layoutInitialized) {
+        if (!el.layout || !state.layoutInitialized) {
             return;
         }
 
@@ -211,21 +197,18 @@ function createLayoutController(deps = {}) {
         }
 
         const resolved = resolveLayoutWidths({
-            desiredLeft: layout.layoutLeftWidth,
-            desiredRight: layout.layoutRightWidth,
+            desiredLeft: state.layoutLeftWidth,
+            desiredRight: state.layoutRightWidth,
             contentWidth: getLayoutContentWidth(),
             collapsed: isRightPanelCollapsed(),
         });
-        const nextPatch = {
-            layoutLeftWidth: resolved.left,
-        };
+        state.layoutLeftWidth = resolved.left;
         if (!resolved.collapsed) {
-            nextPatch.layoutRightWidth = resolved.right;
+            state.layoutRightWidth = resolved.right;
         }
-        patchLayout(nextPatch);
 
         el.layout.style.setProperty('--unistudy-left-width', `${resolved.left}px`);
-        el.layout.style.setProperty('--unistudy-right-width', `${resolved.collapsed ? layout.layoutRightWidth : resolved.right}px`);
+        el.layout.style.setProperty('--unistudy-right-width', `${state.layoutRightWidth}px`);
         el.layout.style.setProperty('--unistudy-effective-right-width', `${resolved.collapsed ? 0 : resolved.right}px`);
         el.layout.style.setProperty('--unistudy-center-min', `${LAYOUT_DEFAULTS.centerMin}px`);
         el.layout.style.setProperty('--unistudy-divider-width', `${resolved.dividerWidth}px`);
@@ -235,8 +218,7 @@ function createLayoutController(deps = {}) {
     }
 
     function applyLeftSidebarHeights() {
-        const layout = getLayoutSlice();
-        if (!el.workspaceSidebar || !layout.layoutInitialized) {
+        if (!el.workspaceSidebar || !state.layoutInitialized) {
             return;
         }
 
@@ -248,12 +230,10 @@ function createLayoutController(deps = {}) {
         }
 
         const resolved = resolveLeftSidebarHeights({
-            desiredTop: layout.layoutLeftTopHeight,
+            desiredTop: state.layoutLeftTopHeight,
             contentHeight: getLeftSidebarContentHeight(),
         });
-        patchLayout({
-            layoutLeftTopHeight: resolved.top,
-        });
+        state.layoutLeftTopHeight = resolved.top;
         el.workspaceSidebar.style.setProperty('--unistudy-left-top-height', `${resolved.top}px`);
         el.workspaceSidebar.style.setProperty('--unistudy-left-vertical-divider-height', `${resolved.dividerHeight}px`);
         syncLayoutHandleVisibility();
@@ -271,18 +251,16 @@ function createLayoutController(deps = {}) {
     }
 
     async function persistLayoutWidths() {
-        const layout = getLayoutSlice();
-        const settings = getPersistedLayoutSettings();
         const patch = {
-            layoutLeftWidth: Math.round(layout.layoutLeftWidth),
-            layoutRightWidth: Math.round(layout.layoutRightWidth),
-            layoutLeftTopHeight: Math.round(layout.layoutLeftTopHeight),
+            layoutLeftWidth: Math.round(state.layoutLeftWidth),
+            layoutRightWidth: Math.round(state.layoutRightWidth),
+            layoutLeftTopHeight: Math.round(state.layoutLeftTopHeight),
         };
 
         if (
-            patch.layoutLeftWidth === settings.layoutLeftWidth
-            && patch.layoutRightWidth === settings.layoutRightWidth
-            && patch.layoutLeftTopHeight === settings.layoutLeftTopHeight
+            patch.layoutLeftWidth === state.settings.layoutLeftWidth
+            && patch.layoutRightWidth === state.settings.layoutRightWidth
+            && patch.layoutLeftTopHeight === state.settings.layoutLeftTopHeight
         ) {
             return;
         }
@@ -293,24 +271,21 @@ function createLayoutController(deps = {}) {
             return;
         }
 
-        mergeSettingsPatch(patch);
+        state.settings = { ...state.settings, ...patch };
+        windowObj.globalSettings = state.settings;
     }
 
     function initializeResizableLayout() {
-        const layout = getLayoutSlice();
-        if (layout.layoutInitialized) {
+        if (state.layoutInitialized) {
             applyLayoutWidths();
             applyLeftSidebarHeights();
             return;
         }
 
-        const settings = getPersistedLayoutSettings();
-        patchLayout({
-            layoutLeftWidth: normalizeStoredLayoutWidth(settings.layoutLeftWidth, LAYOUT_DEFAULTS.leftWidth),
-            layoutRightWidth: normalizeStoredLayoutWidth(settings.layoutRightWidth, LAYOUT_DEFAULTS.rightWidth),
-            layoutLeftTopHeight: normalizeStoredLayoutHeight(settings.layoutLeftTopHeight, LAYOUT_DEFAULTS.leftTopHeight),
-            layoutInitialized: true,
-        });
+        state.layoutLeftWidth = normalizeStoredLayoutWidth(state.settings.layoutLeftWidth, LAYOUT_DEFAULTS.leftWidth);
+        state.layoutRightWidth = normalizeStoredLayoutWidth(state.settings.layoutRightWidth, LAYOUT_DEFAULTS.rightWidth);
+        state.layoutLeftTopHeight = normalizeStoredLayoutHeight(state.settings.layoutLeftTopHeight, LAYOUT_DEFAULTS.leftTopHeight);
+        state.layoutInitialized = true;
         applyLayoutWidths();
         applyLeftSidebarHeights();
     }
@@ -320,16 +295,13 @@ function createLayoutController(deps = {}) {
             return;
         }
 
-        patchLayout({
-            activeResizeHandle: handle,
-        });
+        state.activeResizeHandle = handle;
         documentObj.body.classList.add('layout-resizing');
         event.preventDefault();
     }
 
     function updateLayoutResize(event) {
-        const layout = getLayoutSlice();
-        if (!layout.activeResizeHandle || !isDesktopResizableLayout() || !el.layout) {
+        if (!state.activeResizeHandle || !isDesktopResizableLayout() || !el.layout) {
             return;
         }
 
@@ -341,27 +313,21 @@ function createLayoutController(deps = {}) {
         const offsetX = clamp(event.clientX - contentLeft, 0, contentWidth);
         const handleOffset = LAYOUT_DEFAULTS.dividerWidth / 2;
 
-        if (layout.activeResizeHandle === 'left') {
-            patchLayout({
-                layoutLeftWidth: Math.round(offsetX - handleOffset),
-            });
-        } else if (layout.activeResizeHandle === 'right') {
-            patchLayout({
-                layoutRightWidth: Math.round(contentWidth - offsetX - handleOffset),
-            });
+        if (state.activeResizeHandle === 'left') {
+            state.layoutLeftWidth = Math.round(offsetX - handleOffset);
+        } else if (state.activeResizeHandle === 'right') {
+            state.layoutRightWidth = Math.round(contentWidth - offsetX - handleOffset);
         }
 
         applyLayoutWidths();
     }
 
     function endLayoutResize() {
-        if (!getLayoutSlice().activeResizeHandle) {
+        if (!state.activeResizeHandle) {
             return;
         }
 
-        patchLayout({
-            activeResizeHandle: null,
-        });
+        state.activeResizeHandle = null;
         documentObj.body.classList.remove('layout-resizing');
         void persistLayoutWidths();
     }
@@ -371,35 +337,29 @@ function createLayoutController(deps = {}) {
             return;
         }
 
-        patchLayout({
-            activeVerticalResizeHandle: 'workspace',
-        });
+        state.activeVerticalResizeHandle = 'workspace';
         documentObj.body.classList.add('layout-resizing-vertical');
         event.preventDefault();
     }
 
     function updateVerticalLayoutResize(event) {
-        if (!getLayoutSlice().activeVerticalResizeHandle || !isDesktopResizableLayout() || !el.workspaceSidebar) {
+        if (!state.activeVerticalResizeHandle || !isDesktopResizableLayout() || !el.workspaceSidebar) {
             return;
         }
 
         const sidebarRect = el.workspaceSidebar.getBoundingClientRect();
         const offsetY = clamp(event.clientY - sidebarRect.top, 0, sidebarRect.height);
         const handleOffset = LAYOUT_DEFAULTS.leftVerticalDividerHeight / 2;
-        patchLayout({
-            layoutLeftTopHeight: Math.round(offsetY - handleOffset),
-        });
+        state.layoutLeftTopHeight = Math.round(offsetY - handleOffset);
         applyLeftSidebarHeights();
     }
 
     function endVerticalLayoutResize() {
-        if (!getLayoutSlice().activeVerticalResizeHandle) {
+        if (!state.activeVerticalResizeHandle) {
             return;
         }
 
-        patchLayout({
-            activeVerticalResizeHandle: null,
-        });
+        state.activeVerticalResizeHandle = null;
         documentObj.body.classList.remove('layout-resizing-vertical');
         void persistLayoutWidths();
     }

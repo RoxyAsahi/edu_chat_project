@@ -16,7 +16,7 @@ function shouldPersistTopicSelection(options = {}) {
 }
 
 function createWorkspaceController(deps = {}) {
-    const store = deps.store;
+    const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -46,57 +46,6 @@ function createWorkspaceController(deps = {}) {
     const defaultAgentAvatar = deps.defaultAgentAvatar || DEFAULT_AGENT_AVATAR;
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
-    const clearTopicKnowledgeBaseDocuments = deps.clearTopicKnowledgeBaseDocuments || (() => {});
-    const getGlobalSettings = deps.getGlobalSettings || (() => store.getState().settings.settings);
-
-    function getSessionSlice() {
-        return store.getState().session;
-    }
-
-    function patchSession(patch) {
-        return store.patchState('session', (current, rootState) => ({
-            ...current,
-            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-        }));
-    }
-
-    function updateTopicInSession(topicId, updater) {
-        patchSession((current) => ({
-            topics: current.topics.map((topic) => (
-                topic.id === topicId
-                    ? { ...topic, ...(typeof updater === 'function' ? updater(topic) : updater) }
-                    : topic
-            )),
-        }));
-    }
-
-    const state = {};
-    Object.defineProperties(state, {
-        agents: {
-            get: () => getSessionSlice().agents,
-            set: (value) => patchSession({ agents: value }),
-        },
-        topics: {
-            get: () => getSessionSlice().topics,
-            set: (value) => patchSession({ topics: value }),
-        },
-        currentSelectedItem: {
-            get: () => getSessionSlice().currentSelectedItem,
-            set: (value) => patchSession({ currentSelectedItem: value }),
-        },
-        currentTopicId: {
-            get: () => getSessionSlice().currentTopicId,
-            set: (value) => patchSession({ currentTopicId: value }),
-        },
-        currentChatHistory: {
-            get: () => getSessionSlice().currentChatHistory,
-            set: (value) => patchSession({ currentChatHistory: value }),
-        },
-        activeTopicMenu: {
-            get: () => getSessionSlice().activeTopicMenu,
-            set: (value) => patchSession({ activeTopicMenu: value }),
-        },
-    });
 
     function getCurrentTopic() {
         return state.topics.find((topic) => topic.id === state.currentTopicId) || null;
@@ -359,7 +308,7 @@ function createWorkspaceController(deps = {}) {
         if (!state.currentSelectedItem.id) {
             state.topics = [];
             state.currentTopicId = null;
-            clearTopicKnowledgeBaseDocuments();
+            state.topicKnowledgeBaseDocuments = [];
             syncWorkspaceContext();
             renderTopics();
             renderTopicKnowledgeBaseFiles();
@@ -406,9 +355,7 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        updateTopicInSession(topic.id, {
-            name: nextName.trim(),
-        });
+        topic.name = nextName.trim();
         renderTopics();
     }
 
@@ -419,9 +366,7 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        updateTopicInSession(topic.id, {
-            unread,
-        });
+        topic.unread = unread;
         renderTopics();
         await loadAgents();
     }
@@ -433,9 +378,7 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        updateTopicInSession(topic.id, {
-            locked: result.locked,
-        });
+        topic.locked = result.locked;
         renderTopics();
     }
 
@@ -447,24 +390,11 @@ function createWorkspaceController(deps = {}) {
         return `${base}\\topics\\${state.currentTopicId}\\history.json`;
     }
 
-    async function stopHistoryWatcher() {
-        if (typeof chatAPI.watcherStop !== 'function') {
-            return;
-        }
-
-        try {
-            await chatAPI.watcherStop();
-        } catch (error) {
-            console.warn('[LiteRenderer] watcherStop failed:', error);
-        }
-    }
-
     async function clearCurrentConversationView() {
         closeTopicActionMenu();
-        await stopHistoryWatcher();
         state.currentTopicId = null;
         state.currentChatHistory = [];
-        clearTopicKnowledgeBaseDocuments();
+        state.topicKnowledgeBaseDocuments = [];
         resetNotesState({
             clearTopicNotes: true,
             clearSelection: true,
@@ -491,10 +421,6 @@ function createWorkspaceController(deps = {}) {
         const confirmed = await ui.showConfirmDialog(`确定删除话题 "${label}" 吗？`, '删除话题', '删除', '取消', true);
         if (!confirmed) {
             return;
-        }
-
-        if (state.currentTopicId === topic.id) {
-            await stopHistoryWatcher();
         }
 
         const result = await chatAPI.deleteTopic(state.currentSelectedItem.id, topic.id);
@@ -527,9 +453,8 @@ function createWorkspaceController(deps = {}) {
         }
 
         closeTopicActionMenu();
-        await stopHistoryWatcher();
         state.currentTopicId = topicId;
-        clearTopicKnowledgeBaseDocuments();
+        state.topicKnowledgeBaseDocuments = [];
         resetNotesState({
             clearTopicNotes: true,
             clearSelection: true,
@@ -580,7 +505,6 @@ function createWorkspaceController(deps = {}) {
 
     async function selectAgent(agentId, options = {}) {
         closeTopicActionMenu();
-        await stopHistoryWatcher();
         const config = await chatAPI.getAgentConfig(agentId);
         if (!config || config.error) {
             ui.showToastNotification(`加载智能体失败：${config?.error || '未知错误'}`, 'error');
@@ -637,7 +561,7 @@ function createWorkspaceController(deps = {}) {
 
         state.currentTopicId = null;
         state.currentChatHistory = [];
-        clearTopicKnowledgeBaseDocuments();
+        state.topicKnowledgeBaseDocuments = [];
         resetReaderState();
         renderReaderPanel();
         syncCurrentTopicKnowledgeBaseControls();
@@ -647,12 +571,11 @@ function createWorkspaceController(deps = {}) {
     }
 
     function buildMarkdownExport() {
-        const settings = getGlobalSettings();
         return state.currentChatHistory.map((message) => {
             const title = message.role === 'assistant'
                 ? (message.name || state.currentSelectedItem.name || 'Assistant')
                 : message.role === 'user'
-                    ? (settings.userName || 'User')
+                    ? (state.settings.userName || 'User')
                     : 'System';
             const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2);
             const attachments = Array.isArray(message.attachments) && message.attachments.length > 0
@@ -747,7 +670,6 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        await stopHistoryWatcher();
         const result = await chatAPI.deleteAgent(state.currentSelectedItem.id);
         if (result?.error) {
             ui.showToastNotification(result.error, 'error');
@@ -757,7 +679,6 @@ function createWorkspaceController(deps = {}) {
         state.currentSelectedItem = { id: null, type: 'agent', name: null, avatarUrl: null, config: null };
         state.currentTopicId = null;
         state.currentChatHistory = [];
-        clearTopicKnowledgeBaseDocuments();
         resetNotesState({
             clearTopicNotes: true,
             clearAgentNotes: true,

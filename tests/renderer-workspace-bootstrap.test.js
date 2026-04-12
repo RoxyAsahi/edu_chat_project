@@ -10,10 +10,6 @@ async function loadModule(relativePath) {
         source = source.replace(/^import\s.+?;\r?\n/gm, '');
     } else if (relativePath.endsWith('app/workspace/workspaceController.js')) {
         source = source.replace(
-            /^import\s+\{\s*createStoreView\s*\}\s+from\s+['"].+?['"];\r?\n/m,
-            'const createStoreView = (store) => store.view;\n'
-        );
-        source = source.replace(
             /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
             'const positionFloatingElement = () => {};\n'
         );
@@ -93,79 +89,4 @@ test('shouldPersistTopicSelection skips last-open writes for watcher refreshes',
     assert.equal(shouldPersistTopicSelection(), true);
     assert.equal(shouldPersistTopicSelection({ fromWatcher: false }), true);
     assert.equal(shouldPersistTopicSelection({ fromWatcher: true }), false);
-});
-
-test('createAppBootstrap cleans up IPC subscriptions before re-registering them', async () => {
-    const { createAppBootstrap } = await loadModule('src/modules/renderer/app/bootstrap.js');
-    let themeUnsubscribed = 0;
-    let streamUnsubscribed = 0;
-    let historyUnsubscribed = 0;
-    let bindFeatureEventsCalls = 0;
-
-    const chatAPI = {
-        getCurrentTheme: async () => 'light',
-        onThemeUpdated: () => () => {
-            themeUnsubscribed += 1;
-        },
-        onVCPStreamEvent: () => () => {
-            streamUnsubscribed += 1;
-        },
-        onHistoryFileUpdated: () => () => {
-            historyUnsubscribed += 1;
-        },
-    };
-
-    const bootstrapApi = createAppBootstrap({
-        store: {
-            getState: () => ({
-                session: {
-                    currentSelectedItem: { id: 'agent-1' },
-                    currentTopicId: 'topic-1',
-                    agents: [{ id: 'agent-1' }],
-                },
-                settings: {
-                    settings: {},
-                },
-            }),
-        },
-        chatAPI,
-        ui: {},
-        windowObj: {
-            chatAPI: {},
-            electronAPI: {},
-            electronPath: {},
-        },
-        applyTheme: () => {},
-        loadSettings: async () => {},
-        initializeResizableLayout: () => {},
-        loadKnowledgeBases: async () => {},
-        initializeAppRuntime: async () => {},
-        workspaceController: {
-            syncWorkspaceContext() {},
-            async loadAgents() {},
-            async selectAgent() {},
-            async selectTopic() {},
-        },
-        handleStreamEvent: () => {},
-        bindFeatureEvents: () => {
-            bindFeatureEventsCalls += 1;
-        },
-        renderReaderPanel: () => {},
-        renderSelectionContextPreview: () => {},
-        renderNotesPanel: () => {},
-        renderCurrentHistory: async () => {},
-        finalizeBootstrap: () => {},
-        setLeftSidebarMode: () => {},
-        setLeftReaderTab: () => {},
-        setRightPanelMode: () => {},
-        setPromptVisible: () => {},
-    });
-
-    await bootstrapApi.bootstrap();
-    await bootstrapApi.bootstrap();
-
-    assert.equal(themeUnsubscribed, 1);
-    assert.equal(streamUnsubscribed, 1);
-    assert.equal(historyUnsubscribed, 1);
-    assert.equal(bindFeatureEventsCalls, 1);
 });

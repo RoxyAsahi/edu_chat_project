@@ -17,7 +17,7 @@ function escapeHtml(text) {
 }
 
 function createReaderController(deps = {}) {
-    const store = deps.store;
+    const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -31,8 +31,6 @@ function createReaderController(deps = {}) {
     const syncKnowledgeBasePolling = deps.syncKnowledgeBasePolling || (() => {});
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const onInjectSelection = deps.onInjectSelection || (() => {});
-    const patchDocumentGuideStateInSource = deps.patchDocumentGuideStateInSource || (() => {});
-    const getLeftReaderActiveTab = deps.getLeftReaderActiveTab || (() => store.getState().layout.leftReaderActiveTab);
 
     const scheduleFrame = typeof windowObj.requestAnimationFrame === 'function'
         ? windowObj.requestAnimationFrame.bind(windowObj)
@@ -41,51 +39,6 @@ function createReaderController(deps = {}) {
         ? windowObj.getSelection.bind(windowObj)
         : () => null;
     const NodeCtor = windowObj.Node || globalThis.Node;
-
-    function getReaderSlice() {
-        return store.getState().reader;
-    }
-
-    function patchReader(patch) {
-        return store.patchState('reader', (current, rootState) => ({
-            ...current,
-            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-        }));
-    }
-
-    const readerProxy = new Proxy({}, {
-        get(_target, prop) {
-            return getReaderSlice()[prop];
-        },
-        set(_target, prop, value) {
-            patchReader({
-                [prop]: value,
-            });
-            return true;
-        },
-        ownKeys() {
-            return Reflect.ownKeys(getReaderSlice());
-        },
-        getOwnPropertyDescriptor(_target, prop) {
-            return {
-                configurable: true,
-                enumerable: true,
-                writable: true,
-                value: getReaderSlice()[prop],
-            };
-        },
-    });
-
-    const state = {};
-    Object.defineProperties(state, {
-        reader: {
-            get: () => readerProxy,
-            set: (value) => patchReader(value),
-        },
-        leftReaderActiveTab: {
-            get: () => getLeftReaderActiveTab(),
-        },
-    });
 
     function resetReaderState() {
         state.reader = createInitialReaderState();
@@ -97,7 +50,14 @@ function createReaderController(deps = {}) {
     }
 
     function patchDocumentGuideState(documentId, patch = {}) {
-        patchDocumentGuideStateInSource(documentId, patch);
+        const applyPatch = (items = []) => items.map((item) => (
+            item.id === documentId
+                ? { ...item, ...patch }
+                : item
+        ));
+
+        state.knowledgeBaseDocuments = applyPatch(state.knowledgeBaseDocuments);
+        state.topicKnowledgeBaseDocuments = applyPatch(state.topicKnowledgeBaseDocuments);
     }
 
     function mergeActiveDocumentIntoReader(documentItem = {}) {

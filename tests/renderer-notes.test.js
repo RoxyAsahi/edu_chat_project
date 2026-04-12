@@ -1,24 +1,11 @@
 const test = require('node:test');
 const assert = require('assert/strict');
-const fs = require('fs/promises');
 const path = require('path');
-
-function stripModuleExports(source) {
-    return source.replace(/export\s*\{[\s\S]*?\};?\s*$/m, '');
-}
+const { pathToFileURL } = require('url');
 
 async function loadNotesUtilsModule() {
     const notesPath = path.resolve(__dirname, '../src/modules/renderer/app/notes/notesUtils.js');
-    const flashcardsPath = path.resolve(__dirname, '../src/modules/renderer/app/flashcards/flashcardUtils.js');
-    let source = await fs.readFile(notesPath, 'utf8');
-    const flashcardSource = stripModuleExports(await fs.readFile(flashcardsPath, 'utf8'));
-
-    source = source.replace(
-        /^import\s+\{[\s\S]*?\}\s+from\s+['"].+flashcardUtils\.js['"];\r?\n/m,
-        `${flashcardSource}\n`
-    );
-
-    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+    return import(pathToFileURL(notesPath).href);
 }
 
 test('normalizeNote fills default ids and normalizes embedded flashcards', async () => {
@@ -65,6 +52,30 @@ test('buildNotesSelectionSummary matches topic and agent scope wording', async (
         buildNotesSelectionSummary({ notesScope: 'topic', selectedCount: 0, visibleCount: 0 }),
         '当前话题 · 暂无笔记，可直接从当前来源开始生成'
     );
+});
+
+test('normalizeNote derives structured quiz data from legacy markdown content', async () => {
+    const { normalizeNote } = await loadNotesUtilsModule();
+
+    const note = normalizeNote({
+        kind: 'quiz',
+        title: '函数测验',
+        contentMarkdown: [
+            '# 函数测验',
+            '',
+            '## 1. 导数的几何意义是什么？',
+            'A. 曲线在该点的切线斜率',
+            'B. 曲线与坐标轴围成的面积',
+            'C. 函数的定义域',
+            'D. 函数的最小值',
+            '正确答案：A',
+            '解析：导数描述函数在某点的瞬时变化率，对应切线斜率。',
+        ].join('\n'),
+    });
+
+    assert.equal(note.quizSet.title, '函数测验');
+    assert.equal(note.quizSet.items.length, 1);
+    assert.equal(note.quizSet.items[0].correctOptionId, 'option_a');
 });
 
 test('removeDeletedNoteReferencesFromHistory clears favorite state only when the last ref is removed', async () => {
@@ -128,6 +139,38 @@ test('note save and delete helpers cover blank drafts, save payloads, and delete
     assert.equal(request.targetTopicId, 'topic-old');
     assert.equal(request.payload.title, '旧标题');
     assert.equal(request.payload.contentMarkdown, '新的内容');
+
+    const quizRequest = buildNoteSaveRequest({
+        currentNote: {
+            id: 'quiz-1',
+            title: '函数测验',
+            topicId: 'topic-1',
+            kind: 'quiz',
+            quizSet: {
+                title: '函数测验',
+                items: [
+                    {
+                        id: 'quiz_1',
+                        stem: '题干',
+                        options: [
+                            { id: 'option_a', label: 'A', text: '甲' },
+                            { id: 'option_b', label: 'B', text: '乙' },
+                            { id: 'option_c', label: 'C', text: '丙' },
+                            { id: 'option_d', label: 'D', text: '丁' },
+                        ],
+                        correctOptionId: 'option_a',
+                        explanation: '解析',
+                    },
+                ],
+            },
+        },
+        currentTopicId: 'topic-1',
+        title: '函数测验',
+        contentMarkdown: '# 函数测验',
+    });
+
+    assert.equal(quizRequest.payload.kind, 'quiz');
+    assert.equal(quizRequest.payload.quizSet.title, '函数测验');
     assert.deepEqual(
         deriveDeletedNoteState({
             selectedNoteIds: ['note-1', 'note-2'],

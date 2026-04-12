@@ -1,28 +1,6 @@
 import { initialize as initializeInterruptHandler } from '../interruptHandler.js';
 import { initializeInputEnhancer } from '../inputEnhancerLite.js';
 
-function getSessionSlice(store) {
-    return store.getState().session;
-}
-
-function getSettingsSlice(store) {
-    return store.getState().settings;
-}
-
-function patchSession(store, patch) {
-    return store.patchState('session', (current, rootState) => ({
-        ...current,
-        ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-    }));
-}
-
-function patchSettingsSlice(store, patch) {
-    return store.patchState('settings', (current, rootState) => ({
-        ...current,
-        ...(typeof patch === 'function' ? patch(current, rootState) : patch),
-    }));
-}
-
 function resolveWorkspaceBootstrapPlan({ agents = [], settings = {} } = {}) {
     const normalizedAgents = Array.isArray(agents) ? agents.filter(Boolean) : [];
     if (normalizedAgents.length === 0) {
@@ -50,7 +28,7 @@ function resolveWorkspaceBootstrapPlan({ agents = [], settings = {} } = {}) {
 }
 
 async function initializeAppRuntime(deps = {}) {
-    const store = deps.store;
+    const state = deps.state;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -58,7 +36,6 @@ async function initializeAppRuntime(deps = {}) {
     const messageRendererApi = deps.messageRendererApi;
     const interruptRequest = deps.interruptRequest;
     const appendAttachments = deps.appendAttachments;
-    const setActiveRequestId = deps.setActiveRequestId || (() => {});
     const windowObj = deps.windowObj || window;
 
     const markedInstance = initMarked();
@@ -66,30 +43,29 @@ async function initializeAppRuntime(deps = {}) {
 
     messageRendererApi.initializeMessageRenderer({
         currentSelectedItemRef: {
-            get: () => getSessionSlice(store).currentSelectedItem,
+            get: () => state.currentSelectedItem,
             set: (value) => {
-                patchSession(store, { currentSelectedItem: value });
+                state.currentSelectedItem = value;
             },
         },
         currentTopicIdRef: {
-            get: () => getSessionSlice(store).currentTopicId,
+            get: () => state.currentTopicId,
             set: (value) => {
-                patchSession(store, { currentTopicId: value });
+                state.currentTopicId = value;
             },
         },
         currentChatHistoryRef: {
-            get: () => getSessionSlice(store).currentChatHistory,
+            get: () => state.currentChatHistory,
             set: (value) => {
-                patchSession(store, { currentChatHistory: value });
+                state.currentChatHistory = value;
             },
         },
         globalSettingsRef: {
-            get: () => getSettingsSlice(store).settings,
+            get: () => state.settings,
             set: (value) => {
-                patchSettingsSlice(store, { settings: value });
+                state.settings = value;
             },
         },
-        setActiveRequestId,
         chatMessagesDiv: el.chatMessages,
         electronAPI: chatAPI,
         markedInstance,
@@ -112,8 +88,8 @@ async function initializeAppRuntime(deps = {}) {
         electronPath: windowObj.electronPath,
         autoResizeTextarea: ui.autoResizeTextarea,
         appendAttachments,
-        getCurrentAgentId: () => getSessionSlice(store).currentSelectedItem.id,
-        getCurrentTopicId: () => getSessionSlice(store).currentTopicId,
+        getCurrentAgentId: () => state.currentSelectedItem.id,
+        getCurrentTopicId: () => state.currentTopicId,
         showToast: (message, type = 'info', duration = 3000) => ui.showToastNotification(message, type, duration),
     });
 }
@@ -122,7 +98,7 @@ function createAppBootstrap(deps = {}) {
     const windowObj = deps.windowObj || window;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
-    const store = deps.store;
+    const state = deps.state;
     const applyTheme = deps.applyTheme;
     const loadSettings = deps.loadSettings;
     const initializeResizableLayout = deps.initializeResizableLayout;
@@ -141,34 +117,6 @@ function createAppBootstrap(deps = {}) {
     const renderCurrentHistory = deps.renderCurrentHistory || (async () => {});
     const finalizeBootstrap = deps.finalizeBootstrap || (() => {});
     const defaultAgentName = deps.defaultAgentName || '我的学习';
-    let bootstrapSubscriptions = [];
-    let featureEventsBound = false;
-
-    function cleanupBootstrapSubscriptions() {
-        bootstrapSubscriptions.forEach((unsubscribe) => {
-            try {
-                unsubscribe();
-            } catch (error) {
-                console.warn('[LiteRenderer] bootstrap unsubscribe failed:', error);
-            }
-        });
-        bootstrapSubscriptions = [];
-    }
-
-    function registerBootstrapSubscriptions() {
-        cleanupBootstrapSubscriptions();
-
-        bootstrapSubscriptions = [
-            chatAPI.onThemeUpdated?.((nextTheme) => applyTheme(nextTheme)),
-            chatAPI.onVCPStreamEvent?.(handleStreamEvent),
-            chatAPI.onHistoryFileUpdated?.(async (payload) => {
-                const session = getSessionSlice(store);
-                if (payload?.agentId === session.currentSelectedItem.id && payload?.topicId === session.currentTopicId) {
-                    await workspaceController.selectTopic(session.currentTopicId, { fromWatcher: true });
-                }
-            }),
-        ].filter((unsubscribe) => typeof unsubscribe === 'function');
-    }
 
     async function bootstrap() {
         const bridgeDiagnostics = {
@@ -195,15 +143,18 @@ function createAppBootstrap(deps = {}) {
         const theme = await chatAPI.getCurrentTheme().catch(() => 'light');
         applyTheme(theme || 'light');
 
-        registerBootstrapSubscriptions();
+        chatAPI.onThemeUpdated((nextTheme) => applyTheme(nextTheme));
+        chatAPI.onVCPStreamEvent(handleStreamEvent);
+        chatAPI.onHistoryFileUpdated(async (payload) => {
+            if (payload?.agentId === state.currentSelectedItem.id && payload?.topicId === state.currentTopicId) {
+                await workspaceController.selectTopic(state.currentTopicId, { fromWatcher: true });
+            }
+        });
 
-        if (!featureEventsBound) {
-            bindFeatureEvents();
-            featureEventsBound = true;
-        }
+        bindFeatureEvents();
         await workspaceController.loadAgents();
 
-        if (getSessionSlice(store).agents.length === 0) {
+        if (state.agents.length === 0) {
             const createResult = await chatAPI.createAgent(defaultAgentName, null);
             if (createResult?.agentId) {
                 await workspaceController.loadAgents();
@@ -211,8 +162,8 @@ function createAppBootstrap(deps = {}) {
         }
 
         const plan = resolveWorkspaceBootstrapPlan({
-            agents: getSessionSlice(store).agents,
-            settings: getSettingsSlice(store).settings,
+            agents: state.agents,
+            settings: state.settings,
         });
 
         if (plan.agentId) {
@@ -230,7 +181,6 @@ function createAppBootstrap(deps = {}) {
 
     return {
         bootstrap,
-        destroy: cleanupBootstrapSubscriptions,
     };
 }
 

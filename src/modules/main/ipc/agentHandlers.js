@@ -9,7 +9,6 @@ let AVATAR_IMAGE_DIR; // Centralized avatar storage directory
 let agentConfigManagerInstance; // Cache the agentConfigManager instance
 let cachedAgents = null; // Memory cache for full agent list
 let cachedMetadata = null; // Memory cache for lightweight metadata list
-let initialized = false;
 
 const DEPRECATED_AGENT_CSS_FIELDS = ['cardCss', 'chatCss', 'customCss'];
 
@@ -233,10 +232,6 @@ function initialize(context) {
     USER_DATA_DIR_CACHE = USER_DATA_DIR; // Cache the user data directory path
     agentConfigManagerInstance = agentConfigManager; // Cache the manager instance
     AVATAR_IMAGE_DIR = nextAvatarImageDir || null;
-
-    if (initialized) {
-        return;
-    }
 
     ipcMain.handle('get-agents-metadata', async () => {
         return loadAgentMetadata(settingsManager);
@@ -531,8 +526,6 @@ function initialize(context) {
             if (listenerWasActive) context.startSelectionListener();
         }
     });
-
-    initialized = true;
 }
 
 function getAgentConfigManager() {

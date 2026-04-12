@@ -68,19 +68,3 @@ test('contentProcessor and text-viewer both depend on the shared scopedCss helpe
     assert.match(contentProcessorSource, /import\s+\{\s*scopeCss\s*\}\s+from\s+'\.\/scopedCss\.js';/);
     assert.match(textViewerSource, /import\s+\{\s*scopeCss\s*\}\s+from\s+'\.\/scopedCss\.js';/);
 });
-
-test('messageRenderer delegates extracted chat styles to the shared scopedCss pipeline', async () => {
-    const messageRendererSource = await fs.readFile(
-        path.resolve(__dirname, '../src/modules/renderer/messageRenderer.js'),
-        'utf8',
-    );
-
-    assert.match(
-        messageRendererSource,
-        /const\s+scopedCss\s*=\s*contentProcessor\.scopeCss\(cssContent,\s*scopeId\);/,
-    );
-    assert.match(
-        messageRendererSource,
-        /styleElement\.textContent\s*=\s*scopedCss;/,
-    );
-});

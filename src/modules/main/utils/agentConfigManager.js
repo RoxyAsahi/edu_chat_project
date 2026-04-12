@@ -12,7 +12,6 @@ class AgentConfigManager extends EventEmitter {
         this.locks = new Map(); // 每个agent的锁文件路径
         this.caches = new Map(); // 每个agent的缓存
         this.cacheTimestamps = new Map(); // 每个agent的缓存时间戳
-        this.cleanupTimer = null;
     }
 
     normalizeId(agentId) {
@@ -286,11 +285,7 @@ class AgentConfigManager extends EventEmitter {
 
     // 定期清理过期的锁文件
     startCleanupTimer() {
-        if (this.cleanupTimer) {
-            return this.cleanupTimer;
-        }
-
-        this.cleanupTimer = setInterval(async () => {
+        setInterval(async () => {
             for (const [agentId] of this.queues) {
                 const { lockFile } = this.getAgentPaths(agentId);
                 if (await fs.pathExists(lockFile)) {
@@ -309,8 +304,6 @@ class AgentConfigManager extends EventEmitter {
                 }
             }
         }, 30000); // 每30秒检查一次
-
-        return this.cleanupTimer;
     }
 
     // 清理指定agent的缓存
@@ -324,13 +317,6 @@ class AgentConfigManager extends EventEmitter {
     clearAllCaches() {
         this.caches.clear();
         this.cacheTimestamps.clear();
-    }
-
-    dispose() {
-        if (this.cleanupTimer) {
-            clearInterval(this.cleanupTimer);
-            this.cleanupTimer = null;
-        }
     }
 }
 

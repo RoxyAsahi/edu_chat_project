@@ -13,13 +13,7 @@
   <link rel="stylesheet" href="../styles/messageRenderer.css" />
   <link rel="stylesheet" href="../styles/notifications.css" />
   <link rel="stylesheet" href="../Promptmodules/prompt-modules.css" />
-  <link rel="stylesheet" href="styles/tokens.css" />
-  <link rel="stylesheet" href="styles/shell.css" />
-  <link rel="stylesheet" href="styles/workspace.css" />
-  <link rel="stylesheet" href="styles/reader.css" />
-  <link rel="stylesheet" href="styles/chat.css" />
-  <link rel="stylesheet" href="styles/sidepanel.css" />
-  <link rel="stylesheet" href="styles/responsive.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body class="light-theme lite-shell">
   <div class="window-shell">
@@ -341,6 +335,18 @@
             </div>
           </div>
           <div class="panel__actions note-detail-modal__actions">
+            <button id="analysisViewReportBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">preview</span> 查看报告
+            </button>
+            <button id="analysisEditMarkdownBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">edit_document</span> 编辑 Markdown
+            </button>
+            <button id="quizViewPracticeBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">school</span> 返回练习
+            </button>
+            <button id="quizEditSourceBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">edit_document</span> 编辑原文
+            </button>
             <button id="saveNoteBtn" class="accent-button icon-text-btn" type="button">
               <span class="material-symbols-outlined">save</span> 保存
             </button>
@@ -354,6 +360,17 @@
         </div>
 
         <div class="note-detail-modal__body">
+          <section id="analysisPreviewCard" class="settings-card analysis-preview-card hidden">
+            <div class="analysis-preview__header">
+              <div class="analysis-preview__title-block">
+                <p class="eyebrow">报告预览</p>
+                <h3 id="analysisPreviewTitle">深度分析报告</h3>
+              </div>
+            </div>
+            <article id="analysisPreviewContent" class="analysis-preview__content"></article>
+            <div id="analysisPreviewMeta" class="settings-caption analysis-preview__meta">当前没有可预览的报告。</div>
+          </section>
+
           <section id="noteEditorCard" class="settings-card note-detail-editor">
             <h3><span class="material-symbols-outlined bento-icon">edit_note</span> Markdown 编辑器</h3>
             <div class="field-grid" style="grid-template-columns: 1fr;">
@@ -416,6 +433,41 @@
               </button>
               <button id="flashcardsNextBtn" class="ghost-button flashcards-practice__action-btn" type="button" aria-label="下一张">
                 <span class="material-symbols-outlined">arrow_forward</span>
+              </button>
+            </div>
+          </section>
+
+          <section id="quizPracticeCard" class="settings-card quiz-practice-card hidden">
+            <div class="quiz-practice__header">
+              <div class="quiz-practice__title-block">
+                <p class="eyebrow">交互练习</p>
+                <h2 id="quizPracticeTitle">选择题练习</h2>
+                <p id="quizPracticeSummary" class="settings-caption">请选择一份测验开始练习。</p>
+              </div>
+              <span id="quizPracticeProgress" class="flashcards-practice__pill">0 / 0</span>
+            </div>
+
+            <div class="quiz-practice__question">
+              <span id="quizPracticeQuestionIndex" class="quiz-practice__question-index">第 1 题</span>
+              <div id="quizPracticeStem" class="quiz-practice__stem"></div>
+            </div>
+
+            <div id="quizPracticeOptions" class="quiz-practice__options" role="list"></div>
+
+            <div id="quizPracticeFeedback" class="quiz-practice__feedback hidden">
+              <div class="quiz-practice__feedback-top">
+                <strong id="quizPracticeResult">请选择答案</strong>
+                <span id="quizPracticeAnswer" class="quiz-practice__answer"></span>
+              </div>
+              <div id="quizPracticeExplanation" class="quiz-practice__explanation"></div>
+            </div>
+
+            <div class="quiz-practice__actions">
+              <button id="quizPracticePrevBtn" class="ghost-button quiz-practice__nav-btn" type="button">
+                <span class="material-symbols-outlined">arrow_back</span> 上一题
+              </button>
+              <button id="quizPracticeNextBtn" class="accent-button quiz-practice__nav-btn" type="button">
+                下一题 <span class="material-symbols-outlined">arrow_forward</span>
               </button>
             </div>
           </section>

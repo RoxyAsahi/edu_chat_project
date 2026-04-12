@@ -1,8 +1,8 @@
 ﻿// modules/ipc/settingsHandlers.js
-const { ipcMain } = require('electron');
+const { ipcMain, nativeTheme } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
-let initialized = false;
+const themeHandlers = require('./themeHandlers');
 
 /**
  * Initializes settings and theme related IPC handlers.
@@ -15,10 +15,6 @@ let initialized = false;
 function initialize(paths) {
     const { SETTINGS_FILE, USER_AVATAR_FILE, AGENT_DIR, settingsManager, agentConfigManager } = paths;
     const WEBINDEX_MODEL_FILE = path.join(path.dirname(SETTINGS_FILE), 'webindexmodel.json');
-
-    if (initialized) {
-        return;
-    }
 
     // Settings Management
     ipcMain.handle('load-settings', async () => {
@@ -189,9 +185,29 @@ function initialize(paths) {
         }
     });
 
+    // Theme control
+    ipcMain.on('set-theme', async (event, theme) => {
+        if (theme === 'light' || theme === 'dark') {
+            nativeTheme.themeSource = theme;
+            console.log(`[Main] Theme source explicitly set to: ${theme}`);
+            
+            try {
+                const result = await settingsManager.updateSettings(settings => ({
+                    ...settings,
+                    currentThemeMode: theme,
+                    themeLastUpdated: Date.now()
+                }));
+                console.log(`[Main] Settings.json safely updated: currentThemeMode=${theme}, themeLastUpdated=${Date.now()}`);
+                themeHandlers.broadcastThemeUpdate(theme);
+            } catch (error) {
+                console.error('[Main] Error updating settings.json for theme change:', error);
+                console.error('[Main] Theme change in nativeTheme was successful, but settings.json update failed');
+                themeHandlers.broadcastThemeUpdate(theme);
+            }
+        }
+    });
+    
     // Recovery is handled inside SettingsManager.
-
-    initialized = true;
 }
 
 module.exports = {

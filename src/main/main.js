@@ -83,7 +83,6 @@ const notesHandlers = require('../modules/main/ipc/notesHandlers');
 const promptHandlers = require('../modules/main/ipc/promptHandlers');
 const themeHandlers = require('../modules/main/ipc/themeHandlers');
 const emoticonHandlers = require('../modules/main/ipc/emoticonHandlers');
-const { ok, fail } = require('../modules/main/ipc/ipcResult');
 const fileManager = require('../modules/main/fileManager');
 const knowledgeBase = require('../modules/main/knowledge-base');
 const modelUsageTracker = require('../modules/main/modelUsageTracker');
@@ -112,13 +111,6 @@ let lastInternalSaveTime = 0;
 let internalSaveTimeout = null;
 let isEditingInProgress = false;
 const INTERNAL_SAVE_WINDOW_MS = 2000;
-let windowHandlersRegistered = false;
-let watcherHandlersRegistered = false;
-let exportHandlerRegistered = false;
-let coreServicesInitialized = false;
-let coreIpcRegistered = false;
-let domainIpcRegistered = false;
-let deferredServicesPromise = null;
 
 const fileWatcher = {
     watchFile(filePath, callback) {
@@ -197,31 +189,16 @@ function broadcastWindowState() {
     if (!mainWindow || mainWindow.isDestroyed()) {
         return;
     }
-    const channels = mainWindow.isMaximized()
-        ? ['window-maximized', 'window:maximized']
-        : ['window-unmaximized', 'window:unmaximized'];
-
-    channels.forEach((channel) => {
-        mainWindow.webContents.send(channel);
-    });
+    const channel = mainWindow.isMaximized() ? 'window-maximized' : 'window-unmaximized';
+    mainWindow.webContents.send(channel);
 }
 
 function registerWindowHandlers() {
-    if (windowHandlersRegistered) {
-        return;
-    }
-
-    const registerWindowEvent = (channels, handler) => {
-        channels.forEach((channel) => {
-            ipcMain.on(channel, handler);
-        });
-    };
-
-    registerWindowEvent(['minimize-window', 'window:minimize'], (event) => {
+    ipcMain.on('minimize-window', (event) => {
         BrowserWindow.fromWebContents(event.sender)?.minimize();
     });
 
-    registerWindowEvent(['maximize-window', 'window:maximize'], (event) => {
+    ipcMain.on('maximize-window', (event) => {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!win) return;
         if (win.isMaximized()) {
@@ -231,53 +208,41 @@ function registerWindowHandlers() {
         }
     });
 
-    registerWindowEvent(['unmaximize-window', 'window:unmaximize'], (event) => {
+    ipcMain.on('unmaximize-window', (event) => {
         BrowserWindow.fromWebContents(event.sender)?.unmaximize();
     });
 
-    registerWindowEvent(['close-window', 'window:close'], (event) => {
+    ipcMain.on('close-window', (event) => {
         BrowserWindow.fromWebContents(event.sender)?.close();
     });
 
-    registerWindowEvent(['open-dev-tools', 'window:open-dev-tools'], (event) => {
+    ipcMain.on('open-dev-tools', (event) => {
         BrowserWindow.fromWebContents(event.sender)?.webContents.openDevTools({ mode: 'detach' });
     });
 
-    ['get-platform', 'window:get-platform'].forEach((channel) => {
-        ipcMain.handle(channel, () => process.platform);
-    });
-
-    windowHandlersRegistered = true;
+    ipcMain.handle('get-platform', () => process.platform);
 }
 
 function registerWatcherHandlers() {
-    if (watcherHandlersRegistered) {
-        return;
-    }
-
     ipcMain.handle('watcher:start', (_event, filePath, agentId, topicId) => {
         if (typeof filePath !== 'string' || filePath.trim() === ''
             || typeof agentId !== 'string' || agentId.trim() === ''
             || typeof topicId !== 'string' || topicId.trim() === '') {
-            return fail('watcher:start expects non-empty filePath, agentId, and topicId.');
+            return { success: false, error: 'watcher:start expects non-empty filePath, agentId, and topicId.' };
         }
 
         fileWatcher.watchFile(filePath, (changedPath) => {
             if (mainWindow && !mainWindow.isDestroyed()) {
-                const payload = { path: changedPath, agentId, topicId };
-                mainWindow.webContents.send('history-file-updated', payload);
-                mainWindow.webContents.send('watcher:history-updated', payload);
+                mainWindow.webContents.send('history-file-updated', { path: changedPath, agentId, topicId });
             }
         });
-        return ok({ watching: filePath });
+        return { success: true, watching: filePath };
     });
 
     ipcMain.handle('watcher:stop', () => {
         fileWatcher.stopWatching();
-        return ok();
+        return { success: true };
     });
-
-    watcherHandlersRegistered = true;
 }
 
 function formatTimestampForFilename(timestamp) {
@@ -292,14 +257,10 @@ function formatTimestampForFilename(timestamp) {
 }
 
 function registerExportHandler() {
-    if (exportHandlerRegistered) {
-        return;
-    }
-
     ipcMain.handle('export-topic-as-markdown', async (_event, exportData) => {
         const { topicName, markdownContent } = exportData || {};
         if (!topicName || !markdownContent) {
-            return fail('Missing topicName or markdownContent.');
+            return { success: false, error: 'Missing topicName or markdownContent.' };
         }
 
         const safeTopicName = topicName.replace(/[/\\?%*:|"<>]/g, '-');
@@ -314,20 +275,18 @@ function registerExportHandler() {
         });
 
         if (canceled || !filePath) {
-            return fail('Export cancelled.');
+            return { success: false, error: 'Export cancelled.' };
         }
 
         try {
             await fs.writeFile(filePath, markdownContent, 'utf8');
             shell.showItemInFolder(filePath);
-            return ok({ path: filePath });
+            return { success: true, path: filePath };
         } catch (error) {
             console.error('[LiteExport] failed:', error);
-            return fail(error);
+            return { success: false, error: error.message };
         }
     });
-
-    exportHandlerRegistered = true;
 }
 
 function createWindow() {
@@ -386,19 +345,7 @@ function createWindow() {
     });
 }
 
-function getMainWindow() {
-    return mainWindow;
-}
-
-function getOpenChildWindows() {
-    return openChildWindows;
-}
-
-async function initializeCoreServices() {
-    if (coreServicesInitialized) {
-        return;
-    }
-
+async function bootstrap() {
     await bootstrapIndependentDataRoot();
     await fs.ensureDir(AGENT_DIR);
     await fs.ensureDir(USER_DATA_DIR);
@@ -412,26 +359,16 @@ async function initializeCoreServices() {
 
     fileManager.initializeFileManager(USER_DATA_DIR, AGENT_DIR);
     modelUsageTracker.initializeModelUsageTracker({ dataRoot: DATA_ROOT });
-
-    coreServicesInitialized = true;
-}
-
-function registerCoreIpc() {
-    if (coreIpcRegistered) {
-        return;
-    }
+    await knowledgeBase.initializeKnowledgeBase({
+        dataRoot: DATA_ROOT,
+        settingsManager,
+        agentConfigManager,
+        agentDir: AGENT_DIR,
+    });
 
     registerWindowHandlers();
     registerWatcherHandlers();
     registerExportHandler();
-
-    coreIpcRegistered = true;
-}
-
-async function registerDomainIpc() {
-    if (domainIpcRegistered) {
-        return;
-    }
 
     settingsHandlers.initialize({
         SETTINGS_FILE,
@@ -441,13 +378,11 @@ async function registerDomainIpc() {
         agentConfigManager,
     });
 
-    fileDialogHandlers.initialize(getMainWindow, {
-        getMainWindow,
+    fileDialogHandlers.initialize(mainWindow, {
         getSelectionListenerStatus,
         stopSelectionListener,
         startSelectionListener,
         openChildWindows,
-        getOpenChildWindows,
     });
 
     agentHandlers.initialize({
@@ -463,22 +398,17 @@ async function registerDomainIpc() {
         startSelectionListener,
     });
 
-    chatHandlers.initialize(getMainWindow, {
-        getMainWindow,
+    chatHandlers.initialize(mainWindow, {
         AGENT_DIR,
         USER_DATA_DIR,
         DATA_ROOT,
         fileWatcher,
         settingsManager,
         agentConfigManager,
-        getSelectionListenerStatus,
-        stopSelectionListener,
-        startSelectionListener,
     });
 
     knowledgeBaseHandlers.initialize({
         agentConfigManager,
-        ensureKnowledgeBaseReady,
     });
 
     notesHandlers.initialize({
@@ -492,8 +422,8 @@ async function registerDomainIpc() {
     });
 
     themeHandlers.initialize({
-        getMainWindow,
-        getOpenChildWindows,
+        mainWindow,
+        openChildWindows,
         projectRoot: REPO_ROOT,
         APP_DATA_ROOT_IN_PROJECT: DATA_ROOT,
         settingsManager,
@@ -504,66 +434,17 @@ async function registerDomainIpc() {
         DATA_ROOT,
     });
     emoticonHandlers.setupEmoticonHandlers();
-
-    domainIpcRegistered = true;
-}
-
-function startDeferredServices() {
-    if (deferredServicesPromise) {
-        return deferredServicesPromise;
-    }
-
-    deferredServicesPromise = (async () => {
-        try {
-            await knowledgeBase.initializeKnowledgeBase({
-                dataRoot: DATA_ROOT,
-                settingsManager,
-                agentConfigManager,
-                agentDir: AGENT_DIR,
-            });
-        } catch (error) {
-            deferredServicesPromise = null;
-            throw error;
-        }
-    })();
-
-    deferredServicesPromise.catch((error) => {
-        console.error('[LiteBootstrap] Deferred services failed to start:', error);
-    });
-
-    return deferredServicesPromise;
-}
-
-async function ensureKnowledgeBaseReady() {
-    return startDeferredServices();
-}
-
-async function bootstrap() {
-    await initializeCoreServices();
-    registerCoreIpc();
-    await registerDomainIpc();
-}
-
-async function loadMainWindow() {
-    const win = getMainWindow();
-    if (!win || win.isDestroyed()) {
-        return;
-    }
-
-    await win.loadFile(path.join(SRC_ROOT, 'renderer', 'index.html'));
 }
 
 app.whenReady().then(async () => {
     createWindow();
     await bootstrap();
-    const windowLoadPromise = loadMainWindow();
-    startDeferredServices();
-    await windowLoadPromise;
+    await mainWindow.loadFile(path.join(SRC_ROOT, 'renderer', 'index.html'));
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
-            void loadMainWindow();
+            mainWindow?.loadFile(path.join(SRC_ROOT, 'renderer', 'index.html'));
         }
     });
 });
@@ -576,8 +457,6 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     fileWatcher.stopWatching();
-    settingsManager?.dispose?.();
-    agentConfigManager?.dispose?.();
     void knowledgeBase.shutdownKnowledgeBase().catch((error) => {
         console.warn('[LiteBootstrap] Failed to shutdown knowledge base cleanly:', error?.message || error);
     });

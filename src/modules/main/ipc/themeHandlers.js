@@ -1,7 +1,7 @@
-const { ipcMain, nativeTheme } = require('electron');
+﻿const { ipcMain, nativeTheme } = require('electron');
 
-let getMainWindow = () => null;
-let getOpenChildWindows = () => [];
+let mainWindow = null;
+let openChildWindows = [];
 let settingsManager = null;
 let isInitialized = false;
 
@@ -22,14 +22,10 @@ async function persistThemeMode(themeMode) {
 }
 
 function broadcastThemeUpdate(theme) {
-    const mainWindow = getMainWindow();
-    const openChildWindows = getOpenChildWindows();
-    const windows = [mainWindow, ...(Array.isArray(openChildWindows) ? openChildWindows : [])];
-
-    new Set(windows.filter(Boolean)).forEach((win) => {
+    const windows = [mainWindow, ...openChildWindows];
+    windows.forEach((win) => {
         if (win && !win.isDestroyed()) {
             win.webContents.send('theme-updated', theme);
-            win.webContents.send('theme:updated', theme);
         }
     });
 }
@@ -45,33 +41,23 @@ async function handleThemeChange(themeMode) {
 }
 
 function initialize(options) {
-    getMainWindow = typeof options.getMainWindow === 'function'
-        ? options.getMainWindow
-        : (() => options.mainWindow || null);
-    getOpenChildWindows = typeof options.getOpenChildWindows === 'function'
-        ? options.getOpenChildWindows
-        : (() => options.openChildWindows || []);
+    mainWindow = options.mainWindow;
+    openChildWindows = options.openChildWindows;
     settingsManager = options.settingsManager;
 
     if (isInitialized) {
         return;
     }
 
-    ['set-theme-mode', 'theme:set-mode'].forEach((channel) => {
-        ipcMain.on(channel, (_event, themeMode) => {
-            handleThemeChange(themeMode);
-        });
+    ipcMain.on('set-theme-mode', (_event, themeMode) => {
+        handleThemeChange(themeMode);
     });
 
-    ['set-theme', 'theme:set'].forEach((channel) => {
-        ipcMain.on(channel, (_event, theme) => {
-            handleThemeChange(theme);
-        });
+    ipcMain.on('set-theme', (_event, theme) => {
+        handleThemeChange(theme);
     });
 
-    ['get-current-theme', 'theme:get-current'].forEach((channel) => {
-        ipcMain.handle(channel, () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
-    });
+    ipcMain.handle('get-current-theme', () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
 
     nativeTheme.on('updated', () => {
         broadcastThemeUpdate(nativeTheme.shouldUseDarkColors ? 'dark' : 'light');

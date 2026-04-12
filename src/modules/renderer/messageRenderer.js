@@ -15,9 +15,6 @@ import * as emoticonUrlFixer from './emoticonUrlFixer.js';
 import { createContentPipeline, PIPELINE_MODES } from './contentPipeline.js';
 
 const colorExtractionPromises = new Map();
-let delegatedClickHandler = null;
-let delegatedContextMenuHandler = null;
-let delegatedEventTarget = null;
 
 async function getDominantAvatarColorCached(url) {
     if (!colorExtractionPromises.has(url)) {
@@ -951,7 +948,6 @@ let mainRendererReferences = {
     currentSelectedItemRef: { get: () => ({ id: null, type: null, name: null, avatarUrl: null, config: null }), set: () => { } }, // Ref to object
     currentTopicIdRef: { get: () => null, set: () => { } }, // Ref to string/null
     globalSettingsRef: { get: () => ({ userName: 'User', userAvatarUrl: '../assets/default_user_avatar.png', userAvatarCalculatedColor: null }), set: () => { } }, // Ref to object
-    setActiveRequestId: () => { },
 
     chatMessagesDiv: null,
     electronAPI: null,
@@ -1055,13 +1051,6 @@ function clearChat(options = {}) {
 
 
 function initializeMessageRenderer(refs) {
-    if (delegatedEventTarget && delegatedClickHandler) {
-        delegatedEventTarget.removeEventListener('click', delegatedClickHandler);
-    }
-    if (delegatedEventTarget && delegatedContextMenuHandler) {
-        delegatedEventTarget.removeEventListener('contextmenu', delegatedContextMenuHandler);
-    }
-
     Object.assign(mainRendererReferences, refs);
 
     contentPipeline = createContentPipeline({
@@ -1107,12 +1096,10 @@ function initializeMessageRenderer(refs) {
 
     // Initialize the visibility optimizer with the scrollable chat container as root.
     const scrollContainer = mainRendererReferences.chatMessagesDiv.closest('.chat-messages-container');
-    visibilityOptimizer.destroyVisibilityOptimizer();
     visibilityOptimizer.initializeVisibilityOptimizer(scrollContainer || mainRendererReferences.chatMessagesDiv);
 
     // --- Event Delegation ---
-    delegatedEventTarget = mainRendererReferences.chatMessagesDiv;
-    delegatedClickHandler = (e) => {
+    mainRendererReferences.chatMessagesDiv.addEventListener('click', (e) => {
         // 1. Handle collapsible tool results and thought chains
         const toolHeader = e.target.closest('.vcp-tool-result-header');
         if (toolHeader) {
@@ -1131,11 +1118,10 @@ function initializeMessageRenderer(refs) {
             }
             return;
         }
-    };
-    mainRendererReferences.chatMessagesDiv.addEventListener('click', delegatedClickHandler);
+    });
 
     // Delegated context menu
-    delegatedContextMenuHandler = (e) => {
+    mainRendererReferences.chatMessagesDiv.addEventListener('contextmenu', (e) => {
         const messageItem = e.target.closest('.message-item');
         if (!messageItem) return;
 
@@ -1147,8 +1133,7 @@ function initializeMessageRenderer(refs) {
             e.preventDefault();
             contextMenu.showContextMenu(e, messageItem, message);
         }
-    };
-    mainRendererReferences.chatMessagesDiv.addEventListener('contextmenu', delegatedContextMenuHandler);
+    });
     // --- End Event Delegation ---
 
     // Create a new marked instance wrapper specifically for the stream manager.
@@ -1185,10 +1170,14 @@ function initializeMessageRenderer(refs) {
         preprocessFullContent: preprocessFullContent,
         renderAttachments: renderAttachments,
         interruptHandler: mainRendererReferences.interruptHandler,
-        setActiveRequestId: mainRendererReferences.setActiveRequestId,
         updateMessageContent: updateMessageContent, // Pass through updateMessageContent.
         extractSpeakableTextFromContentElement: extractSpeakableTextFromContentElement,
     });
+
+    if (typeof contextMenu.toggleEditMode === 'function') {
+        window.toggleEditMode = contextMenu.toggleEditMode;
+        window.messageContextMenu = contextMenu;
+    }
 
     streamManager.initStreamManager({
         globalSettingsRef: mainRendererReferences.globalSettingsRef,
@@ -2315,6 +2304,72 @@ async function renderHistoryLegacy(history, renderSessionId = getActiveRenderSes
     });
 }
 
+window.messageRenderer = {
+    initializeMessageRenderer,
+    setCurrentSelectedItem, // Keep for renderer.js to call
+    setCurrentTopicId,      // Keep for renderer.js to call
+    setCurrentItemAvatar,   // Renamed for clarity
+    setUserAvatar,
+    setCurrentItemAvatarColor, // Renamed
+    setUserAvatarColor,
+    renderMessage,
+    renderHistory, // Expose the new progressive batch rendering function
+    renderHistoryLegacy, // Expose the legacy rendering for compatibility
+    renderMessageBatch, // Expose batch rendering utility
+    startStreamingMessage,
+    appendStreamChunk,
+    finalizeStreamedMessage,
+    renderFullMessage,
+    clearChat,
+    removeMessageById,
+    updateMessageContent, // Expose the new function
+    extractSpeakableTextFromContentElement,
+    updateMessageUI: async (messageId, updatedMessage) => {
+        const { chatMessagesDiv } = mainRendererReferences;
+        const existingMessageDom = chatMessagesDiv.querySelector(`.message-item[data-message-id="${messageId}"]`);
+        if (!existingMessageDom) return;
+        const newMessageDom = await renderMessage(updatedMessage, true, false);
+        if (newMessageDom) {
+            existingMessageDom.replaceWith(newMessageDom);
+            // Re-observe the replaced message node.
+            visibilityOptimizer.observeMessage(newMessageDom);
+            // Run deferred post-processing once the new DOM is attached.
+            if (typeof newMessageDom._vcp_process === 'function') {
+                newMessageDom._vcp_process();
+                delete newMessageDom._vcp_process;
+            }
+        }
+    },
+    isMessageInitialized: (messageId) => {
+        // Check if message exists in DOM or is being tracked by streamManager
+        const messageInDom = mainRendererReferences.chatMessagesDiv?.querySelector(`.message-item[data-message-id="${messageId}"]`);
+        if (messageInDom) return true;
+
+        // Also check if streamManager is tracking this message
+        if (streamManager && typeof streamManager.isMessageInitialized === 'function') {
+            return streamManager.isMessageInitialized(messageId);
+        }
+
+        return false;
+    },
+    summarizeTopicFromMessages: async (history, agentName) => { // Example: Keep this if it's generic enough
+        // This function was passed in, so it's likely defined in renderer.js or another module.
+        // If it's meant to be internal to messageRenderer, its logic would go here.
+        // For now, assume it's an external utility.
+        if (mainRendererReferences.summarizeTopicFromMessages) {
+            return mainRendererReferences.summarizeTopicFromMessages(history, agentName);
+        }
+        return null;
+    },
+    setContextMenuDependencies: (deps) => {
+        if (contextMenu && typeof contextMenu.setContextMenuDependencies === 'function') {
+            contextMenu.setContextMenuDependencies(deps);
+        } else {
+            console.error("contextMenu or setContextMenuDependencies not available.");
+        }
+    }
+};
+
 export {
     initializeMessageRenderer,
     setCurrentSelectedItem,
@@ -2336,3 +2391,5 @@ export {
     updateMessageContent,
     extractSpeakableTextFromContentElement,
 };
+
+

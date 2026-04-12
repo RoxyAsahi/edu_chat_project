@@ -22,103 +22,83 @@ const DEFAULT_SETTINGS = Object.freeze({
     layoutLeftTopHeight: 360,
 });
 
-const SLICE_NAMES = Object.freeze([
-    'settings',
-    'layout',
-    'session',
-    'source',
-    'reader',
-    'notes',
-    'composer',
-]);
-
-function createInitialReaderState() {
-    return {
-        documentId: null,
-        documentName: '',
-        contentType: null,
-        status: 'idle',
-        isIndexed: false,
-        view: null,
-        activePageNumber: null,
-        activeParagraphIndex: null,
-        activeSectionTitle: null,
-        pendingSelection: null,
-        guideStatus: 'idle',
-        guideMarkdown: '',
-        guideGeneratedAt: null,
-        guideError: null,
-    };
-}
-
 function createInitialAppState() {
     return {
-        settings: {
-            settings: { ...DEFAULT_SETTINGS },
-            settingsModalSection: 'global',
-            promptModule: null,
+        settings: { ...DEFAULT_SETTINGS },
+        agents: [],
+        topics: [],
+        knowledgeBases: [],
+        knowledgeBaseDocuments: [],
+        topicKnowledgeBaseDocuments: [],
+        knowledgeBaseDebugResult: null,
+        selectedKnowledgeBaseId: null,
+        topicNotes: [],
+        agentNotes: [],
+        notesScope: 'topic',
+        activeNoteId: null,
+        selectedNoteIds: [],
+        notesStudioView: 'overview',
+        noteDetailKind: null,
+        noteDetailMode: 'edit',
+        layoutLeftWidth: DEFAULT_SETTINGS.layoutLeftWidth,
+        layoutRightWidth: DEFAULT_SETTINGS.layoutRightWidth,
+        layoutLeftTopHeight: DEFAULT_SETTINGS.layoutLeftTopHeight,
+        layoutInitialized: false,
+        activeResizeHandle: null,
+        activeVerticalResizeHandle: null,
+        activeTopicMenu: null,
+        activeSourceFileMenu: null,
+        activeNoteMenu: null,
+        sidePanelTab: 'notes',
+        rightPanelMode: 'notes',
+        settingsModalSection: 'global',
+        activeFlashcardNoteId: null,
+        pendingFlashcardGeneration: null,
+        quizPractice: {
+            noteId: null,
+            currentIndex: 0,
+            selectedOptionId: null,
+            revealed: false,
         },
-        layout: {
-            layoutLeftWidth: DEFAULT_SETTINGS.layoutLeftWidth,
-            layoutRightWidth: DEFAULT_SETTINGS.layoutRightWidth,
-            layoutLeftTopHeight: DEFAULT_SETTINGS.layoutLeftTopHeight,
-            layoutInitialized: false,
-            activeResizeHandle: null,
-            activeVerticalResizeHandle: null,
-            leftSidebarMode: 'source-list',
-            leftReaderActiveTab: 'guide',
-            sourceListScrollTop: 0,
-            sidePanelTab: 'notes',
-            rightPanelMode: 'notes',
+        leftSidebarMode: 'source-list',
+        leftReaderActiveTab: 'guide',
+        sourceListScrollTop: 0,
+        currentSelectedItem: { id: null, type: 'agent', name: null, avatarUrl: null, config: null },
+        currentTopicId: null,
+        currentChatHistory: [],
+        pendingAttachments: [],
+        pendingSelectionContextRefs: [],
+        reader: {
+            documentId: null,
+            documentName: '',
+            contentType: null,
+            status: 'idle',
+            isIndexed: false,
+            view: null,
+            activePageNumber: null,
+            activeParagraphIndex: null,
+            activeSectionTitle: null,
+            pendingSelection: null,
+            guideStatus: 'idle',
+            guideMarkdown: '',
+            guideGeneratedAt: null,
+            guideError: null,
         },
-        session: {
-            agents: [],
-            topics: [],
-            currentSelectedItem: { id: null, type: 'agent', name: null, avatarUrl: null, config: null },
-            currentTopicId: null,
-            currentChatHistory: [],
-            activeTopicMenu: null,
-        },
-        source: {
-            knowledgeBases: [],
-            knowledgeBaseDocuments: [],
-            topicKnowledgeBaseDocuments: [],
-            knowledgeBaseDebugResult: null,
-            selectedKnowledgeBaseId: null,
-            activeSourceFileMenu: null,
-        },
-        reader: createInitialReaderState(),
-        notes: {
-            topicNotes: [],
-            agentNotes: [],
-            notesScope: 'topic',
-            activeNoteId: null,
-            selectedNoteIds: [],
-            notesStudioView: 'overview',
-            noteDetailKind: null,
-            activeNoteMenu: null,
-            activeFlashcardNoteId: null,
-            pendingFlashcardGeneration: null,
-        },
-        composer: {
-            pendingAttachments: [],
-            pendingSelectionContextRefs: [],
-            activeRequestId: null,
-        },
+        promptModule: null,
+        activeRequestId: null,
     };
 }
 
 function createAppStore(initialState = createInitialAppState()) {
     const state = initialState;
     const sliceListeners = new Map();
-    const knownSlices = new Set(SLICE_NAMES);
 
     function getState() {
         return state;
     }
 
     function patchState(slice, patch) {
-        if (!knownSlices.has(slice)) {
+        if (!Object.prototype.hasOwnProperty.call(state, slice)) {
             throw new Error(`Unknown app store slice: ${slice}`);
         }
 
@@ -136,10 +116,6 @@ function createAppStore(initialState = createInitialAppState()) {
     }
 
     function subscribe(slice, listener) {
-        if (!knownSlices.has(slice)) {
-            throw new Error(`Unknown app store slice: ${slice}`);
-        }
-
         if (!sliceListeners.has(slice)) {
             sliceListeners.set(slice, new Set());
         }
@@ -163,8 +139,6 @@ function createAppStore(initialState = createInitialAppState()) {
 
 export {
     DEFAULT_SETTINGS,
-    SLICE_NAMES,
     createInitialAppState,
-    createInitialReaderState,
     createAppStore,
 };
