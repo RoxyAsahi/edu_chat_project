@@ -16,10 +16,6 @@ async function loadSourceModule() {
 
         let source = await fs.readFile(normalizedPath, 'utf8');
         source = source.replace(
-            /^import\s+\{\s*createStoreView\s*\}\s+from\s+['"].+?['"];\r?\n/m,
-            'const createStoreView = (store) => store.view;\n'
-        );
-        source = source.replace(
             /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
             'const positionFloatingElement = () => {};\n'
         );

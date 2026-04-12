@@ -5,8 +5,7 @@ const path = require('path');
 
 async function loadLayoutModule() {
     const modulePath = path.resolve(__dirname, '../src/modules/renderer/app/layout/layoutController.js');
-    const source = (await fs.readFile(modulePath, 'utf8'))
-        .replace(/^import\s+\{\s*createStoreView\s*\}\s+from\s+['"].+?['"];\r?\n/m, '');
+    const source = await fs.readFile(modulePath, 'utf8');
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 

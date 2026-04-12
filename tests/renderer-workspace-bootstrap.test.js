@@ -10,10 +10,6 @@ async function loadModule(relativePath) {
         source = source.replace(/^import\s.+?;\r?\n/gm, '');
     } else if (relativePath.endsWith('app/workspace/workspaceController.js')) {
         source = source.replace(
-            /^import\s+\{\s*createStoreView\s*\}\s+from\s+['"].+?['"];\r?\n/m,
-            'const createStoreView = (store) => store.view;\n'
-        );
-        source = source.replace(
             /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
             'const positionFloatingElement = () => {};\n'
         );
