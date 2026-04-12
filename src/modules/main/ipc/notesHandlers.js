@@ -167,7 +167,7 @@ async function searchLegacyNotes(appDataRoot, queryText) {
             entries = await fs.readdir(directory, { withFileTypes: true });
         } catch (error) {
             if (error?.code !== 'ENOENT') {
-                console.error(`[LiteNotes] Failed to read notes directory ${directory}:`, error);
+                console.error(`[UniStudyNotes] Failed to read notes directory ${directory}:`, error);
             }
             return;
         }

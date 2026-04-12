@@ -9,7 +9,7 @@ let moduleConfig = {
 };
 
 function initialize(config = {}) {
-    const envTimeoutMs = Number(process.env.VCPCHAT_VCP_TIMEOUT_MS);
+    const envTimeoutMs = Number(process.env.UNISTUDY_VCP_TIMEOUT_MS);
     moduleConfig = {
         settingsManager: config.settingsManager || null,
         defaultTimeoutMs: Number(config.defaultTimeoutMs) > 0

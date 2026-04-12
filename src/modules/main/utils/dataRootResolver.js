@@ -18,7 +18,7 @@ function hasMeaningfulDataRoot(rootPath) {
 }
 
 function resolveOverrideRoot(env = process.env, cwd = process.cwd()) {
-    const rawOverride = String(env.VCPCHAT_DATA_ROOT || '').trim();
+    const rawOverride = String(env.UNISTUDY_DATA_ROOT || '').trim();
     if (!rawOverride) {
         return null;
     }
