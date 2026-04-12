@@ -6,18 +6,26 @@ const { JSDOM } = require('jsdom');
 
 async function loadSourceModule() {
     const modulePath = path.resolve(__dirname, '../src/modules/renderer/app/source/sourceController.js');
-    let source = await fs.readFile(modulePath, 'utf8');
-    source = source.replace(
-        /^import\s+\{\s*createStoreView\s*\}\s+from\s+['"].+?['"];\r?\n/m,
-        'const createStoreView = (store) => store.view;\n'
-    );
-    source = source.replace(
-        /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
-        'const positionFloatingElement = () => {};\n'
-    );
-    source = source.replace(
-        /^import\s+\{\s*isReaderSupportedDocument\s*\}\s+from\s+['"].+?['"];\r?\n/m,
-        `const isReaderSupportedDocument = (documentItem = {}) => {
+    const moduleCache = new Map();
+
+    async function buildModuleDataUrl(filePath) {
+        const normalizedPath = path.resolve(filePath);
+        if (moduleCache.has(normalizedPath)) {
+            return moduleCache.get(normalizedPath);
+        }
+
+        let source = await fs.readFile(normalizedPath, 'utf8');
+        source = source.replace(
+            /^import\s+\{\s*createStoreView\s*\}\s+from\s+['"].+?['"];\r?\n/m,
+            'const createStoreView = (store) => store.view;\n'
+        );
+        source = source.replace(
+            /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
+            'const positionFloatingElement = () => {};\n'
+        );
+        source = source.replace(
+            /^import\s+\{\s*isReaderSupportedDocument\s*\}\s+from\s+['"].+?['"];\r?\n/m,
+            `const isReaderSupportedDocument = (documentItem = {}) => {
     const contentType = String(documentItem.contentType || '').trim();
     if (['pdf-text', 'docx-text', 'plain', 'markdown', 'html'].includes(contentType)) {
         return true;
@@ -30,8 +38,23 @@ async function loadSourceModule() {
         || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         || mimeType === 'application/xml';
 };\n`
-    );
-    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+        );
+
+        const importMatches = [...source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)];
+        for (const match of importMatches) {
+            const specifier = match[1];
+            const dependencyPath = path.resolve(path.dirname(normalizedPath), specifier);
+            const dependencyUrl = await buildModuleDataUrl(dependencyPath);
+            source = source.replace(`from '${specifier}'`, `from '${dependencyUrl}'`);
+            source = source.replace(`from "${specifier}"`, `from "${dependencyUrl}"`);
+        }
+
+        const dataUrl = `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+        moduleCache.set(normalizedPath, dataUrl);
+        return dataUrl;
+    }
+
+    return import(await buildModuleDataUrl(modulePath));
 }
 
 function createDomElements() {
@@ -68,6 +91,7 @@ function createDomElements() {
         callback();
         return 1;
     };
+    global.Element = window.Element;
 
     return {
         window,
@@ -437,4 +461,73 @@ test('loadKnowledgeBaseDocuments delegates reader synchronization through inject
         items: documents,
         options: { resetIfMissing: true },
     });
+});
+
+test('createSourceController keeps the public facade stable after source surface reduction', async () => {
+    const { createSourceController } = await loadSourceModule();
+    const { window, document, el } = createDomElements();
+    const controller = createSourceController({
+        store: createStore(createBaseState()),
+        el,
+        chatAPI: {},
+        ui: createUiStub(),
+        windowObj: window,
+        documentObj: document,
+    });
+
+    [
+        'ensureTopicSource',
+        'loadKnowledgeBaseDocuments',
+        'loadCurrentTopicKnowledgeBaseDocuments',
+        'renderTopicKnowledgeBaseFiles',
+        'syncCurrentTopicKnowledgeBaseControls',
+        'syncKnowledgeBasePolling',
+        'bindEvents',
+    ].forEach((key) => {
+        assert.equal(typeof controller[key], 'function');
+    });
+});
+
+test('bindEvents routes UI actions through the controller facade methods', async () => {
+    const { createSourceController } = await loadSourceModule();
+    const { window, document, el } = createDomElements();
+    const controller = createSourceController({
+        store: createStore(createBaseState()),
+        el,
+        chatAPI: {},
+        ui: createUiStub(),
+        windowObj: window,
+        documentObj: document,
+    });
+    const routedCalls = [];
+
+    controller.createKnowledgeBase = async () => {
+        routedCalls.push('createKnowledgeBase');
+    };
+    controller.runKnowledgeBaseSearch = async () => {
+        routedCalls.push('runKnowledgeBaseSearch');
+    };
+    controller.handleTopicKnowledgeBaseChange = async (value) => {
+        routedCalls.push(`handleTopicKnowledgeBaseChange:${value}`);
+    };
+
+    const option = document.createElement('option');
+    option.value = 'kb-2';
+    option.textContent = 'kb-2';
+    el.currentTopicKnowledgeBaseSelect.appendChild(option);
+
+    controller.bindEvents();
+
+    el.createKnowledgeBaseBtn.click();
+    el.runKnowledgeBaseSearchBtn.click();
+    el.currentTopicKnowledgeBaseSelect.value = 'kb-2';
+    el.currentTopicKnowledgeBaseSelect.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(routedCalls, [
+        'createKnowledgeBase',
+        'runKnowledgeBaseSearch',
+        'handleTopicKnowledgeBaseChange:kb-2',
+    ]);
 });
