@@ -96,9 +96,16 @@ function createInitialAppState() {
             selectedNoteIds: [],
             notesStudioView: 'overview',
             noteDetailKind: null,
+            noteDetailMode: 'edit',
             activeNoteMenu: null,
             activeFlashcardNoteId: null,
             pendingFlashcardGeneration: null,
+            quizPractice: {
+                noteId: null,
+                currentIndex: 0,
+                selectedOptionId: null,
+                revealed: false,
+            },
         },
         composer: {
             pendingAttachments: [],

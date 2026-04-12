@@ -4,6 +4,7 @@ import {
     formatRelativeTime,
     getNormalizedNoteKind,
 } from './notesUtils.js';
+import { hasStructuredQuiz } from '../quiz/quizUtils.js';
 
 const NOTE_DETAIL_META = Object.freeze({
     note: {
@@ -106,9 +107,17 @@ function createNotesDom(deps = {}) {
         const kind = state.noteDetailKind || 'note';
         const meta = NOTE_DETAIL_META[kind] || NOTE_DETAIL_META.note;
         const flashcards = kind === 'flashcards';
-        const editable = !flashcards;
+        const structuredQuiz = kind === 'quiz' && hasStructuredQuiz(note);
+        const analysisPreviewMode = kind === 'analysis' && state.noteDetailMode === 'view';
+        if (kind === 'quiz' && !structuredQuiz) {
+            state.noteDetailMode = 'edit';
+        }
+        const practiceMode = kind === 'quiz' && structuredQuiz && state.noteDetailMode === 'practice';
+        const editable = !flashcards && !analysisPreviewMode && (!structuredQuiz || state.noteDetailMode === 'edit');
         const noteTitle = flashcards
             ? (note?.flashcardDeck?.title || note?.title || '闪卡练习')
+            : structuredQuiz
+                ? (note?.quizSet?.title || note?.title || '选择题练习')
             : (note?.title || '新建笔记');
         const subtitle = note
             ? buildNoteDetailSubtitle(note, meta.subtitle)
@@ -126,8 +135,14 @@ function createNotesDom(deps = {}) {
             el.noteDetailSubtitle.textContent = subtitle;
         }
         el.saveNoteBtn?.classList.toggle('hidden', !editable);
+        el.analysisEditMarkdownBtn?.classList.toggle('hidden', !(kind === 'analysis' && analysisPreviewMode));
+        el.analysisViewReportBtn?.classList.toggle('hidden', !(kind === 'analysis' && !analysisPreviewMode && Boolean(note?.id)));
+        el.quizEditSourceBtn?.classList.toggle('hidden', !(kind === 'quiz' && structuredQuiz && practiceMode));
+        el.quizViewPracticeBtn?.classList.toggle('hidden', !(kind === 'quiz' && structuredQuiz && !practiceMode));
         el.deleteNoteBtn?.classList.toggle('hidden', !note?.id);
-        el.noteEditorCard?.classList.toggle('hidden', !editable);
+        el.analysisPreviewCard?.classList.toggle('hidden', !analysisPreviewMode);
+        el.noteEditorCard?.classList.toggle('hidden', flashcards || practiceMode || analysisPreviewMode);
+        el.quizPracticeCard?.classList.toggle('hidden', !practiceMode);
         el.flashcardsPracticeCard?.classList.toggle('hidden', !flashcards);
     }
 
