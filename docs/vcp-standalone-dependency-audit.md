@@ -1,7 +1,9 @@
-# VCPChatLite Standalone Dependency Audit
+# UniStudy（原 VCPChat Lite）Standalone Dependency Audit
 
-更新时间: 2026-04-11
+材料日期: 2026-04-11
 适用仓库: `C:\VCP\Eric\VCPChatLite`
+
+说明: 本文是依赖审计类历史材料。标题与导语统一按 UniStudy（原 VCPChat Lite）叙事整理，文中涉及的 VCP 协议、兼容字段与审计证据按原语义保留。
 
 ## 核心结论
 - 当前仓库没有发现对 `VCPToolBox` 源码目录的直接引用。
@@ -28,7 +30,7 @@
 ## 提示词语义接管
 ### 已接管
 - `{{VarDivRender}}`
-  - 现在由 Lite 本地解析成明确的渲染要求文本，不再把黑盒 token 直接交给上游。
+  - 现在由 UniStudy 本地解析成明确的渲染要求文本，不再把黑盒 token 直接交给上游。
 - `{{Nova}}` 这类 ASCII agent alias
   - 当前支持三类来源:
     - 显式变量: `promptVariables` / `variables` / `promptVariableEntries`

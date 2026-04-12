@@ -1,6 +1,6 @@
 # UniStudy Windows EXE 打包与内部试发布说明
 
-更新时间: 2026-04-11  
+更新时间: 2026-04-13  
 适用仓库: `C:\VCP\Eric\VCPChatLite`
 
 ## 当前目标
@@ -66,8 +66,8 @@
 
 ## 数据目录策略
 
-- 默认数据目录使用 Electron `app.getPath('userData')`
-- 如需复用指定目录，可设置环境变量 `VCPCHAT_DATA_ROOT`
+- 默认数据目录使用 Electron `app.getPath('userData')` 下的 UniStudy 名字空间
+- 如需复用指定目录，可设置环境变量 `UNISTUDY_DATA_ROOT`
 - 用户设置、Agent、Topic、历史记录、附件、头像等运行数据都应落在数据目录，不依赖源码仓库路径
 
 ## 当前联网依赖说明
