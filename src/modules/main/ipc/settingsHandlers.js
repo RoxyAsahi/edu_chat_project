@@ -2,6 +2,7 @@
 const { ipcMain } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
+let initialized = false;
 
 /**
  * Initializes settings and theme related IPC handlers.
@@ -14,6 +15,10 @@ const path = require('path');
 function initialize(paths) {
     const { SETTINGS_FILE, USER_AVATAR_FILE, AGENT_DIR, settingsManager, agentConfigManager } = paths;
     const WEBINDEX_MODEL_FILE = path.join(path.dirname(SETTINGS_FILE), 'webindexmodel.json');
+
+    if (initialized) {
+        return;
+    }
 
     // Settings Management
     ipcMain.handle('load-settings', async () => {
@@ -185,6 +190,8 @@ function initialize(paths) {
     });
 
     // Recovery is handled inside SettingsManager.
+
+    initialized = true;
 }
 
 module.exports = {

@@ -119,8 +119,10 @@ test('set-theme and set-theme-mode both persist and broadcast through the shared
 
     assert.equal(harness.nativeTheme.themeSource, 'light');
     assert.equal(harness.settingsUpdates[0].currentThemeMode, 'light');
-    assert.equal(firstMainWindow.sent.length, 1);
-    assert.deepEqual(firstMainWindow.sent[0], ['theme-updated', 'light']);
+    assert.deepEqual(firstMainWindow.sent, [
+        ['theme-updated', 'light'],
+        ['theme:updated', 'light'],
+    ]);
 
     const nextMainWindow = finalizeWindowStub(createWindowStub('main-2'));
     const childWindow = finalizeWindowStub(createWindowStub('child-1'));
@@ -132,9 +134,15 @@ test('set-theme and set-theme-mode both persist and broadcast through the shared
 
     assert.equal(harness.nativeTheme.themeSource, 'dark');
     assert.equal(harness.settingsUpdates[1].currentThemeMode, 'dark');
-    assert.equal(firstMainWindow.sent.length, 1);
-    assert.deepEqual(nextMainWindow.sent, [['theme-updated', 'dark']]);
-    assert.deepEqual(childWindow.sent, [['theme-updated', 'dark']]);
+    assert.equal(firstMainWindow.sent.length, 2);
+    assert.deepEqual(nextMainWindow.sent, [
+        ['theme-updated', 'dark'],
+        ['theme:updated', 'dark'],
+    ]);
+    assert.deepEqual(childWindow.sent, [
+        ['theme-updated', 'dark'],
+        ['theme:updated', 'dark'],
+    ]);
 });
 
 test('broadcastThemeUpdate uses the latest window getters and de-duplicates repeated windows', () => {
@@ -148,21 +156,35 @@ test('broadcastThemeUpdate uses the latest window getters and de-duplicates repe
 
     harness.themeHandlers.broadcastThemeUpdate('dark');
 
-    assert.deepEqual(sharedWindow.sent, [['theme-updated', 'dark']]);
-    assert.deepEqual(childWindow.sent, [['theme-updated', 'dark']]);
+    assert.deepEqual(sharedWindow.sent, [
+        ['theme-updated', 'dark'],
+        ['theme:updated', 'dark'],
+    ]);
+    assert.deepEqual(childWindow.sent, [
+        ['theme-updated', 'dark'],
+        ['theme:updated', 'dark'],
+    ]);
     assert.deepEqual(destroyedWindow.sent, []);
 });
 
 test('nativeTheme updated events broadcast the current derived theme and get-current-theme stays compatible', async () => {
     const harness = loadThemeHandlersHarness();
     const getCurrentTheme = harness.handleHandlers.get('get-current-theme');
+    const getCurrentThemeAlias = harness.handleHandlers.get('theme:get-current');
     const childWindow = finalizeWindowStub(createWindowStub('child-2'));
 
     harness.childWindowsRef.current = [childWindow];
     harness.nativeTheme.systemDark = true;
     harness.nativeTheme.emit('updated');
 
-    assert.deepEqual(harness.mainWindowRef.current.sent, [['theme-updated', 'dark']]);
-    assert.deepEqual(childWindow.sent, [['theme-updated', 'dark']]);
+    assert.deepEqual(harness.mainWindowRef.current.sent, [
+        ['theme-updated', 'dark'],
+        ['theme:updated', 'dark'],
+    ]);
+    assert.deepEqual(childWindow.sent, [
+        ['theme-updated', 'dark'],
+        ['theme:updated', 'dark'],
+    ]);
     assert.equal(await getCurrentTheme(), 'dark');
+    assert.equal(await getCurrentThemeAlias(), 'dark');
 });

@@ -11,6 +11,7 @@ let generatedListsPath;
 let emoticonLibraryPath;
 let degradedReason = null;
 let hasWarnedForCurrentReason = false;
+let handlersRegistered = false;
 
 function setDegradedState(reason) {
     emoticonLibrary = [];
@@ -102,7 +103,11 @@ async function generateEmoticonLibrary() {
 }
 
 function setupEmoticonHandlers() {
-    generateEmoticonLibrary();
+    if (handlersRegistered) {
+        return;
+    }
+
+    void generateEmoticonLibrary();
 
     ipcMain.handle('get-emoticon-library', async () => {
         if (degradedReason) {
@@ -125,6 +130,8 @@ function setupEmoticonHandlers() {
         clearDegradedState();
         await generateEmoticonLibrary();
     });
+
+    handlersRegistered = true;
 }
 
 module.exports = {

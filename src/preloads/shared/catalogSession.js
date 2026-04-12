@@ -38,7 +38,7 @@ function createSessionCatalog(ops) {
         onAddFileToInput: subscription(ops.subscribe('add-file-to-input', (_event, filePath) => filePath)),
         watcherStart: query((filePath, agentId, topicId) => ops.invoke('watcher:start', filePath, agentId, topicId)),
         watcherStop: query(() => ops.invoke('watcher:stop')),
-        onHistoryFileUpdated: subscription(ops.subscribe('history-file-updated', (_event, data) => data)),
+        onHistoryFileUpdated: subscription(ops.subscribe('watcher:history-updated', (_event, data) => data)),
     };
 }
 

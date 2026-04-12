@@ -83,6 +83,7 @@ const notesHandlers = require('../modules/main/ipc/notesHandlers');
 const promptHandlers = require('../modules/main/ipc/promptHandlers');
 const themeHandlers = require('../modules/main/ipc/themeHandlers');
 const emoticonHandlers = require('../modules/main/ipc/emoticonHandlers');
+const { ok, fail } = require('../modules/main/ipc/ipcResult');
 const fileManager = require('../modules/main/fileManager');
 const knowledgeBase = require('../modules/main/knowledge-base');
 const modelUsageTracker = require('../modules/main/modelUsageTracker');
@@ -111,6 +112,13 @@ let lastInternalSaveTime = 0;
 let internalSaveTimeout = null;
 let isEditingInProgress = false;
 const INTERNAL_SAVE_WINDOW_MS = 2000;
+let windowHandlersRegistered = false;
+let watcherHandlersRegistered = false;
+let exportHandlerRegistered = false;
+let coreServicesInitialized = false;
+let coreIpcRegistered = false;
+let domainIpcRegistered = false;
+let deferredServicesPromise = null;
 
 const fileWatcher = {
     watchFile(filePath, callback) {
@@ -189,16 +197,31 @@ function broadcastWindowState() {
     if (!mainWindow || mainWindow.isDestroyed()) {
         return;
     }
-    const channel = mainWindow.isMaximized() ? 'window-maximized' : 'window-unmaximized';
-    mainWindow.webContents.send(channel);
+    const channels = mainWindow.isMaximized()
+        ? ['window-maximized', 'window:maximized']
+        : ['window-unmaximized', 'window:unmaximized'];
+
+    channels.forEach((channel) => {
+        mainWindow.webContents.send(channel);
+    });
 }
 
 function registerWindowHandlers() {
-    ipcMain.on('minimize-window', (event) => {
+    if (windowHandlersRegistered) {
+        return;
+    }
+
+    const registerWindowEvent = (channels, handler) => {
+        channels.forEach((channel) => {
+            ipcMain.on(channel, handler);
+        });
+    };
+
+    registerWindowEvent(['minimize-window', 'window:minimize'], (event) => {
         BrowserWindow.fromWebContents(event.sender)?.minimize();
     });
 
-    ipcMain.on('maximize-window', (event) => {
+    registerWindowEvent(['maximize-window', 'window:maximize'], (event) => {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!win) return;
         if (win.isMaximized()) {
@@ -208,41 +231,53 @@ function registerWindowHandlers() {
         }
     });
 
-    ipcMain.on('unmaximize-window', (event) => {
+    registerWindowEvent(['unmaximize-window', 'window:unmaximize'], (event) => {
         BrowserWindow.fromWebContents(event.sender)?.unmaximize();
     });
 
-    ipcMain.on('close-window', (event) => {
+    registerWindowEvent(['close-window', 'window:close'], (event) => {
         BrowserWindow.fromWebContents(event.sender)?.close();
     });
 
-    ipcMain.on('open-dev-tools', (event) => {
+    registerWindowEvent(['open-dev-tools', 'window:open-dev-tools'], (event) => {
         BrowserWindow.fromWebContents(event.sender)?.webContents.openDevTools({ mode: 'detach' });
     });
 
-    ipcMain.handle('get-platform', () => process.platform);
+    ['get-platform', 'window:get-platform'].forEach((channel) => {
+        ipcMain.handle(channel, () => process.platform);
+    });
+
+    windowHandlersRegistered = true;
 }
 
 function registerWatcherHandlers() {
+    if (watcherHandlersRegistered) {
+        return;
+    }
+
     ipcMain.handle('watcher:start', (_event, filePath, agentId, topicId) => {
         if (typeof filePath !== 'string' || filePath.trim() === ''
             || typeof agentId !== 'string' || agentId.trim() === ''
             || typeof topicId !== 'string' || topicId.trim() === '') {
-            return { success: false, error: 'watcher:start expects non-empty filePath, agentId, and topicId.' };
+            return fail('watcher:start expects non-empty filePath, agentId, and topicId.');
         }
 
         fileWatcher.watchFile(filePath, (changedPath) => {
             if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('history-file-updated', { path: changedPath, agentId, topicId });
+                const payload = { path: changedPath, agentId, topicId };
+                mainWindow.webContents.send('history-file-updated', payload);
+                mainWindow.webContents.send('watcher:history-updated', payload);
             }
         });
-        return { success: true, watching: filePath };
+        return ok({ watching: filePath });
     });
 
     ipcMain.handle('watcher:stop', () => {
         fileWatcher.stopWatching();
-        return { success: true };
+        return ok();
     });
+
+    watcherHandlersRegistered = true;
 }
 
 function formatTimestampForFilename(timestamp) {
@@ -257,10 +292,14 @@ function formatTimestampForFilename(timestamp) {
 }
 
 function registerExportHandler() {
+    if (exportHandlerRegistered) {
+        return;
+    }
+
     ipcMain.handle('export-topic-as-markdown', async (_event, exportData) => {
         const { topicName, markdownContent } = exportData || {};
         if (!topicName || !markdownContent) {
-            return { success: false, error: 'Missing topicName or markdownContent.' };
+            return fail('Missing topicName or markdownContent.');
         }
 
         const safeTopicName = topicName.replace(/[/\\?%*:|"<>]/g, '-');
@@ -275,18 +314,20 @@ function registerExportHandler() {
         });
 
         if (canceled || !filePath) {
-            return { success: false, error: 'Export cancelled.' };
+            return fail('Export cancelled.');
         }
 
         try {
             await fs.writeFile(filePath, markdownContent, 'utf8');
             shell.showItemInFolder(filePath);
-            return { success: true, path: filePath };
+            return ok({ path: filePath });
         } catch (error) {
             console.error('[LiteExport] failed:', error);
-            return { success: false, error: error.message };
+            return fail(error);
         }
     });
+
+    exportHandlerRegistered = true;
 }
 
 function createWindow() {
@@ -353,7 +394,11 @@ function getOpenChildWindows() {
     return openChildWindows;
 }
 
-async function bootstrap() {
+async function initializeCoreServices() {
+    if (coreServicesInitialized) {
+        return;
+    }
+
     await bootstrapIndependentDataRoot();
     await fs.ensureDir(AGENT_DIR);
     await fs.ensureDir(USER_DATA_DIR);
@@ -367,16 +412,26 @@ async function bootstrap() {
 
     fileManager.initializeFileManager(USER_DATA_DIR, AGENT_DIR);
     modelUsageTracker.initializeModelUsageTracker({ dataRoot: DATA_ROOT });
-    await knowledgeBase.initializeKnowledgeBase({
-        dataRoot: DATA_ROOT,
-        settingsManager,
-        agentConfigManager,
-        agentDir: AGENT_DIR,
-    });
+
+    coreServicesInitialized = true;
+}
+
+function registerCoreIpc() {
+    if (coreIpcRegistered) {
+        return;
+    }
 
     registerWindowHandlers();
     registerWatcherHandlers();
     registerExportHandler();
+
+    coreIpcRegistered = true;
+}
+
+async function registerDomainIpc() {
+    if (domainIpcRegistered) {
+        return;
+    }
 
     settingsHandlers.initialize({
         SETTINGS_FILE,
@@ -423,6 +478,7 @@ async function bootstrap() {
 
     knowledgeBaseHandlers.initialize({
         agentConfigManager,
+        ensureKnowledgeBaseReady,
     });
 
     notesHandlers.initialize({
@@ -448,17 +504,66 @@ async function bootstrap() {
         DATA_ROOT,
     });
     emoticonHandlers.setupEmoticonHandlers();
+
+    domainIpcRegistered = true;
+}
+
+function startDeferredServices() {
+    if (deferredServicesPromise) {
+        return deferredServicesPromise;
+    }
+
+    deferredServicesPromise = (async () => {
+        try {
+            await knowledgeBase.initializeKnowledgeBase({
+                dataRoot: DATA_ROOT,
+                settingsManager,
+                agentConfigManager,
+                agentDir: AGENT_DIR,
+            });
+        } catch (error) {
+            deferredServicesPromise = null;
+            throw error;
+        }
+    })();
+
+    deferredServicesPromise.catch((error) => {
+        console.error('[LiteBootstrap] Deferred services failed to start:', error);
+    });
+
+    return deferredServicesPromise;
+}
+
+async function ensureKnowledgeBaseReady() {
+    return startDeferredServices();
+}
+
+async function bootstrap() {
+    await initializeCoreServices();
+    registerCoreIpc();
+    await registerDomainIpc();
+}
+
+async function loadMainWindow() {
+    const win = getMainWindow();
+    if (!win || win.isDestroyed()) {
+        return;
+    }
+
+    await win.loadFile(path.join(SRC_ROOT, 'renderer', 'index.html'));
 }
 
 app.whenReady().then(async () => {
     createWindow();
     await bootstrap();
-    await mainWindow.loadFile(path.join(SRC_ROOT, 'renderer', 'index.html'));
+    const windowLoadPromise = loadMainWindow();
+    startDeferredServices();
+    await windowLoadPromise;
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
-            mainWindow?.loadFile(path.join(SRC_ROOT, 'renderer', 'index.html'));
+            void loadMainWindow();
         }
     });
 });

@@ -86,8 +86,8 @@ test('lite preload exposes the shared catalog for chatAPI', async () => {
     await exposed.chatAPI.getPlatform();
     exposed.chatAPI.openDevTools();
 
-    assert.deepEqual(invokeCalls[0], ['get-platform']);
-    assert.deepEqual(sendCalls[0], ['open-dev-tools']);
+    assert.deepEqual(invokeCalls[0], ['window:get-platform']);
+    assert.deepEqual(sendCalls[0], ['window:open-dev-tools']);
 });
 
 test('viewer preload exposes only viewer keys and isolates blocked compat calls', async () => {
@@ -95,7 +95,7 @@ test('viewer preload exposes only viewer keys and isolates blocked compat calls'
 
     assert.deepEqual(Object.keys(exposed[ROLE_API_NAMES.viewer]).sort(), [...VIEWER_KEYS].sort());
     await exposed.utilityAPI.getCurrentTheme();
-    assert.deepEqual(invokeCalls[0], ['get-current-theme']);
+    assert.deepEqual(invokeCalls[0], ['theme:get-current']);
     await assert.rejects(
         exposed.electronAPI.getAgents(),
         /权限已隔离: getAgents/,

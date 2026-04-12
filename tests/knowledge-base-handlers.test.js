@@ -39,7 +39,7 @@ function loadKnowledgeBaseHandlers(knowledgeBaseStub) {
     }
 }
 
-async function createHarness(config) {
+async function createHarness(config, options = {}) {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-kb-handlers-'));
     const agentDir = path.join(tempRoot, 'agents');
     const agentId = 'fixture-agent';
@@ -95,7 +95,10 @@ async function createHarness(config) {
     const agentConfigManager = new AgentConfigManager(agentDir);
     const { knowledgeBaseHandlers, handlers } = loadKnowledgeBaseHandlers(knowledgeBaseStub);
 
-    knowledgeBaseHandlers.initialize({ agentConfigManager });
+    knowledgeBaseHandlers.initialize({
+        agentConfigManager,
+        ensureKnowledgeBaseReady: options.ensureKnowledgeBaseReady,
+    });
 
     return {
         agentConfigManager,
@@ -104,6 +107,25 @@ async function createHarness(config) {
         handlers,
     };
 }
+
+test('knowledge base handlers await deferred readiness before serving content requests', async () => {
+    const steps = [];
+    const harness = await createHarness(
+        { topics: [{ id: 'topic-1', name: 'Topic 1', knowledgeBaseId: null }] },
+        {
+            ensureKnowledgeBaseReady: async () => {
+                steps.push('ready');
+            },
+        },
+    );
+
+    const listKnowledgeBases = harness.handlers.get('kb:list');
+    const result = await listKnowledgeBases();
+
+    assert.equal(result.success, true);
+    assert.deepEqual(result.items, []);
+    assert.deepEqual(steps, ['ready']);
+});
 
 test('set-topic-knowledge-base fails when the topic does not exist', async (t) => {
     const harness = await createHarness({
@@ -117,6 +139,7 @@ test('set-topic-knowledge-base fails when the topic does not exist', async (t) =
     assert.deepEqual(result, {
         success: false,
         error: 'Topic not found: missing-topic',
+        knowledgeBaseId: null,
     });
 });
 
