@@ -16,7 +16,7 @@
 
 ### 1. 临时模式
 
-默认模式下，脚本会把专用 fixture 复制到临时数据目录，并通过当前 smoke 脚本使用的 `VCPCHAT_DATA_ROOT` 注入给 Electron 进程；这属于脚本现状，不是应用正式运行时命名。
+默认模式下，脚本会把专用 fixture 复制到临时数据目录，并通过当前 smoke 脚本使用的 `UNISTUDY_DATA_ROOT` 注入给 Electron 进程；这属于脚本现状，不是应用正式运行时命名。
 
 ```powershell
 node scripts/electron-unistudy-smoke.js
@@ -59,7 +59,7 @@ $env:VCP_API_KEY="your-chat-key"
   - 真实模式下复用的 Agent ID
 - `UNISTUDY_REAL_DATA_ROOT`
   - 必填，显式指定 smoke 脚本 real-data 模式的外部真实数据根，不等同于应用级 `UNISTUDY_DATA_ROOT`
-- `VCPCHAT_TEST_FIXTURE_ROOT`
+- `UNISTUDY_TEST_FIXTURE_ROOT`
   - 可选，覆盖默认测试 fixture 根；默认使用 `tests/fixtures/runtime-data-root`
 - `UNISTUDY_TEST_REPORT_DIR`
   - 可选，默认输出到 `docs/test-reports`
@@ -68,7 +68,7 @@ $env:VCP_API_KEY="your-chat-key"
 - `VCP_SERVER_URL` / `VCP_API_KEY`
   - 当前 smoke / 联调脚本使用的对话服务配置，不作为 UniStudy 应用级正式命名
 
-其中，`VCP_SERVER_URL`、`VCP_API_KEY`、`VCPCHAT_TEST_FIXTURE_ROOT` 只应在脚本、smoke、联调说明中保留，不能提升为通用产品或应用正式运行时契约。
+其中，`VCP_SERVER_URL`、`VCP_API_KEY` 只应在脚本、smoke、联调说明中保留，不能提升为通用产品或应用正式运行时契约。
 
 ## 真实模式会做什么
 

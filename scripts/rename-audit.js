@@ -1,8 +1,9 @@
 const fs = require('fs/promises');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const TARGET_ROOTS = [
+const DEFAULT_TARGET_ROOTS = [
     path.join(REPO_ROOT, 'tests'),
     path.join(REPO_ROOT, 'scripts'),
     path.join(REPO_ROOT, 'src', 'preloads', 'runtime'),
@@ -17,9 +18,16 @@ const BLOCKED_PATTERNS = [
     { id: 'brand-name-kebab', regex: /vcpchat-lite/g },
     { id: 'legacy-data-root-env', regex: /VCPCHAT_DATA_ROOT/g },
     { id: 'legacy-timeout-env', regex: /VCPCHAT_VCP_TIMEOUT_MS/g },
+    { id: 'legacy-debug-bridge', regex: /__liteDebugState/g },
 ];
 
 const WHITELIST_RULES = [
+    {
+        id: 'tracked-test-report-evidence',
+        matches(relativePath) {
+            return relativePath.startsWith(`docs${path.sep}test-reports${path.sep}`);
+        },
+    },
     {
         id: 'fixture-log-trace',
         matches(relativePath) {
@@ -32,6 +40,26 @@ const WHITELIST_RULES = [
         matches(_relativePath, line) {
             return line.includes('C:\\VCP\\Eric\\VCPChatLite')
                 || line.includes('/C:/VCP/Eric/VCPChatLite');
+        },
+    },
+    {
+        id: 'historical-doc-evidence',
+        matches(relativePath) {
+            return relativePath === path.join('docs', 'architecture-security-review-20260411.md')
+                || relativePath === path.join('docs', 'vcp-standalone-dependency-audit.md');
+        },
+    },
+    {
+        id: 'governance-old-name-example',
+        matches(relativePath) {
+            return relativePath === path.join('docs', 'unistudy-rename-governance.md')
+                || relativePath === path.join('docs', 'unistudy-rename-team-requirements.md');
+        },
+    },
+    {
+        id: 'historical-plan-material',
+        matches(relativePath) {
+            return relativePath.startsWith(`.kilo${path.sep}plans${path.sep}`);
         },
     },
 ];
@@ -57,6 +85,18 @@ async function listFiles(rootPath) {
     }));
 
     return nested.flat();
+}
+
+function listTrackedFiles() {
+    const output = execFileSync('git', ['ls-files', '-z'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+    });
+
+    return output
+        .split('\0')
+        .filter(Boolean)
+        .map((relativePath) => path.join(REPO_ROOT, relativePath));
 }
 
 async function readTextFile(filePath) {
@@ -101,9 +141,16 @@ function collectMatches(relativePath, text) {
 }
 
 async function run() {
-    const allFiles = (await Promise.all(TARGET_ROOTS.map((rootPath) => listFiles(rootPath)))).flat();
+    const mode = process.argv.includes('--mode=final') ? 'final' : 'scope';
+    const targetRoots = mode === 'final' ? [] : DEFAULT_TARGET_ROOTS;
+    const allFiles = mode === 'final'
+        ? listTrackedFiles()
+        : (await Promise.all(targetRoots.map((rootPath) => listFiles(rootPath)))).flat();
     const summary = {
-        scannedRoots: TARGET_ROOTS.map((rootPath) => toRelative(rootPath)),
+        mode,
+        scannedRoots: mode === 'final'
+            ? ['tracked-repo-files']
+            : targetRoots.map((rootPath) => toRelative(rootPath)),
         scannedFiles: 0,
         blockingMatches: [],
         allowlistedMatches: [],
@@ -153,7 +200,8 @@ if (require.main === module) {
 
 module.exports = {
     BLOCKED_PATTERNS,
-    TARGET_ROOTS,
+    DEFAULT_TARGET_ROOTS,
     WHITELIST_RULES,
     collectMatches,
+    listTrackedFiles,
 };
