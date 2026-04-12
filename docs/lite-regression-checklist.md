@@ -1,6 +1,6 @@
-# VCPChat Lite 回归测试清单
+# UniStudy 回归测试清单
 
-更新时间: 2026-04-11
+更新时间: 2026-04-13
 适用仓库: `C:\VCP\Eric\VCPChatLite`
 
 ## 自动化入口
@@ -16,7 +16,7 @@
 ## 仍需手工确认的体验项
 
 ### 1. 启动与视觉
-- [ ] 主窗口标题、品牌文案、图标与 Lite/UniStudy 视觉一致
+- [ ] 主窗口标题、品牌文案、图标与 UniStudy 当前视觉一致
 - [ ] 标题栏按钮 hover / active / danger 态正常
 - [ ] 桌面宽度变化时左右栏布局不抖动、不重叠
 
@@ -37,5 +37,5 @@
 
 ## 备注
 - 安全/持久化/IPC/快捷键等边界回归已转为自动化保护，不再重复写入手工 checklist
-- 当前回归以 Lite 自己的 `AppData` 为准，旧仓数据目录不再参与运行时读写
+- 当前回归以 UniStudy 运行时数据目录为准；默认使用 Electron `userData`，如需显式覆盖只使用 `UNISTUDY_DATA_ROOT`
 - 真实联通测试模型继续使用 `gemini-3.1-flash-lite-preview`

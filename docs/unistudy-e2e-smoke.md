@@ -10,11 +10,13 @@
 4. 聊天记录是否真的落进 `history.json`
 5. 左侧阅读模式下的“来源指南”是否真的成功生成并缓存
 
+说明: 本页描述的是 `scripts/electron-unistudy-smoke.js` 的当前脚本行为与联调方法。UniStudy 应用级正式运行时的 data root override 仍以 `UNISTUDY_DATA_ROOT` 为准，本页里的脚本变量不应视为产品正式命名。
+
 ## 两种模式
 
 ### 1. 临时模式
 
-默认模式，会把专用 fixture 复制到临时 `VCPCHAT_DATA_ROOT`，不会污染真实聊天记录，也不会依赖仓库根 `AppData`。
+默认模式下，脚本会把专用 fixture 复制到临时数据目录，并通过当前 smoke 脚本使用的 `VCPCHAT_DATA_ROOT` 注入给 Electron 进程；这属于脚本现状，不是应用正式运行时命名。
 
 ```powershell
 node scripts/electron-unistudy-smoke.js
@@ -39,14 +41,16 @@ $env:KB_API_KEY="your-kb-key"
 node scripts/electron-unistudy-smoke.js
 ```
 
-如果聊天服务也需要显式覆盖，可以再补：
+如果当前 smoke / 联调环境也需要显式覆盖聊天服务，可以再补：
 
 ```powershell
 $env:VCP_SERVER_URL="http://your-chat-endpoint/v1/chat/completions"
 $env:VCP_API_KEY="your-chat-key"
 ```
 
-## 环境变量
+## 脚本环境变量
+
+以下变量仅用于当前 smoke 脚本与联调场景，不作为 UniStudy 应用级正式运行时命名。
 
 - `UNISTUDY_TEST_MODE`
   - `temp`：临时目录 smoke
@@ -54,7 +58,7 @@ $env:VCP_API_KEY="your-chat-key"
 - `UNISTUDY_REAL_AGENT_ID`
   - 真实模式下复用的 Agent ID
 - `UNISTUDY_REAL_DATA_ROOT`
-  - 必填，显式指定外部真实数据根
+  - 必填，显式指定 smoke 脚本 real-data 模式的外部真实数据根，不等同于应用级 `UNISTUDY_DATA_ROOT`
 - `VCPCHAT_TEST_FIXTURE_ROOT`
   - 可选，覆盖默认测试 fixture 根；默认使用 `tests/fixtures/runtime-data-root`
 - `UNISTUDY_TEST_REPORT_DIR`
@@ -62,7 +66,9 @@ $env:VCP_API_KEY="your-chat-key"
 - `KB_BASE_URL` / `KB_API_KEY`
   - Source 检索服务配置
 - `VCP_SERVER_URL` / `VCP_API_KEY`
-  - 对话服务配置
+  - 当前 smoke / 联调脚本使用的对话服务配置，不作为 UniStudy 应用级正式命名
+
+其中，`VCP_SERVER_URL`、`VCP_API_KEY`、`VCPCHAT_TEST_FIXTURE_ROOT` 只应在脚本、smoke、联调说明中保留，不能提升为通用产品或应用正式运行时契约。
 
 ## 真实模式会做什么
 

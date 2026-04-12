@@ -11,7 +11,7 @@
   `reader -> reader`
   `notes/flashcards -> notes`
   `composer -> composer`
-- Renderer global bridges are limited to `window.sendMessage`, `window.updateSendButtonState`, and `window.__liteDebugState`.
+- Renderer global bridges are limited to `window.sendMessage`, `window.updateSendButtonState`, and `window.__unistudyDebugState`.
 - `sourceController` surface reduction and main-process lifecycle hardening are part of the current mainline shape.
 
 ## Guardrails

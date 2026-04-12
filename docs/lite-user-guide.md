@@ -1,10 +1,10 @@
 # UniStudy 使用说明
 
-更新时间: 2026-04-10
+更新时间: 2026-04-13
 适用仓库: `C:\VCP\Eric\VCPChatLite`
 
 ## 产品定位
-UniStudy 是在 VCPChat Lite 基础上继续演进的个人 AI 学习终端。
+UniStudy 是面向个人学习场景持续演进的 AI 学习终端。
 
 当前版本固定保留这些能力:
 - 多学科入口
@@ -14,7 +14,7 @@ UniStudy 是在 VCPChat Lite 基础上继续演进的个人 AI 学习终端。
 - Notes 笔记沉淀
 - 集中式附件存储
 - 文本 Prompt 模式
-- Lite 独立数据目录
+- UniStudy 独立运行时数据目录
 
 ## 当前源码结构
 正式源码已统一迁入 `src/`。
@@ -43,10 +43,10 @@ UniStudy 是在 VCPChat Lite 基础上继续演进的个人 AI 学习终端。
 - `Ctrl+Shift+I`
 
 ## 数据目录策略
-当前版本正式运行时默认使用 Electron `app.getPath('userData')` 作为数据根。
-如需复用现有外部数据目录，可显式设置 `VCPCHAT_DATA_ROOT` 覆盖默认值。
+当前版本正式运行时默认使用 Electron `app.getPath('userData')` 作为数据根，并落在 UniStudy 名字空间。
+如需显式覆盖应用级数据目录，只使用 `UNISTUDY_DATA_ROOT`。
 
-兼容读取范围:
+数据目录包含:
 - `settings.json`
 - agent 配置
 - topic 列表

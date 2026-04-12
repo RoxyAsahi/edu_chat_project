@@ -1,17 +1,18 @@
 # UniStudy 当前开发状态
 
-更新时间: 2026-04-10
+更新时间: 2026-04-13
 仓库路径: `C:\VCP\Eric\VCPChatLite`
 
 ## 当前结论
-UniStudy 继续沿用 VCPChat Lite 的稳定主链，并开始向“个人 AI 学习终端”演进。
+UniStudy 当前已完成运行时身份收口，并继续向“个人 AI 学习终端”演进。
 
 当前正式边界如下:
 - 保留多学科入口、多话题历史、高保真渲染
 - 保留流式请求、中断、Markdown 导出、附件集中存储、图片 / 文本 viewer
 - 新增 Source 面板、Notes 面板、消息收藏与学习工具入口
 - Prompt 在当前版本中固定为单文本模式
-- 正式运行时继续使用 Lite 现有 `AppData`
+- 正式运行时默认使用 Electron `app.getPath('userData')` 下的 UniStudy 数据目录
+- 应用级显式 override 统一使用 `UNISTUDY_DATA_ROOT`
 
 ## 当前架构边界
 ### 主运行链
