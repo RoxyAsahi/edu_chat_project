@@ -1,8 +1,7 @@
 ﻿// modules/ipc/settingsHandlers.js
-const { ipcMain, nativeTheme } = require('electron');
+const { ipcMain } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
-const themeHandlers = require('./themeHandlers');
 
 /**
  * Initializes settings and theme related IPC handlers.
@@ -185,28 +184,6 @@ function initialize(paths) {
         }
     });
 
-    // Theme control
-    ipcMain.on('set-theme', async (event, theme) => {
-        if (theme === 'light' || theme === 'dark') {
-            nativeTheme.themeSource = theme;
-            console.log(`[Main] Theme source explicitly set to: ${theme}`);
-            
-            try {
-                const result = await settingsManager.updateSettings(settings => ({
-                    ...settings,
-                    currentThemeMode: theme,
-                    themeLastUpdated: Date.now()
-                }));
-                console.log(`[Main] Settings.json safely updated: currentThemeMode=${theme}, themeLastUpdated=${Date.now()}`);
-                themeHandlers.broadcastThemeUpdate(theme);
-            } catch (error) {
-                console.error('[Main] Error updating settings.json for theme change:', error);
-                console.error('[Main] Theme change in nativeTheme was successful, but settings.json update failed');
-                themeHandlers.broadcastThemeUpdate(theme);
-            }
-        }
-    });
-    
     // Recovery is handled inside SettingsManager.
 }
 

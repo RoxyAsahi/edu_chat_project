@@ -16,6 +16,8 @@ class SettingsManager extends EventEmitter {
         this.cache = null;
         this.cacheTimestamp = 0;
         this.lockFile = settingsPath + '.lock';
+        this.cleanupTimer = null;
+        this.autoBackupTimer = null;
         
         this.defaultSettings = cloneDefaultSettings();
     }
@@ -177,7 +179,11 @@ class SettingsManager extends EventEmitter {
 
     // 定期清理过期的锁文件
     startCleanupTimer() {
-        setInterval(async () => {
+        if (this.cleanupTimer) {
+            return this.cleanupTimer;
+        }
+
+        this.cleanupTimer = setInterval(async () => {
             if (await fs.pathExists(this.lockFile)) {
                 try {
                     const lockContent = await fs.readFile(this.lockFile, 'utf8');
@@ -193,11 +199,17 @@ class SettingsManager extends EventEmitter {
                 }
             }
         }, 30000); // 每30秒检查一次
+
+        return this.cleanupTimer;
     }
 
     // 自动备份机制
     startAutoBackup(userDataDir) {
-        setInterval(async () => {
+        if (this.autoBackupTimer) {
+            return this.autoBackupTimer;
+        }
+
+        this.autoBackupTimer = setInterval(async () => {
             try {
                 if (await fs.pathExists(this.settingsPath)) {
                     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -221,6 +233,8 @@ class SettingsManager extends EventEmitter {
                 console.error('Auto backup failed:', error);
             }
         }, 24 * 60 * 60 * 1000); // 每天备份一次
+
+        return this.autoBackupTimer;
     }
 
     // 清理缓存
@@ -233,6 +247,18 @@ class SettingsManager extends EventEmitter {
     async refreshCache() {
         this.clearCache();
         return await this.readSettings();
+    }
+
+    dispose() {
+        if (this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
+        }
+
+        if (this.autoBackupTimer) {
+            clearInterval(this.autoBackupTimer);
+            this.autoBackupTimer = null;
+        }
     }
 }
 module.exports = SettingsManager;

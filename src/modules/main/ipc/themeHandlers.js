@@ -1,7 +1,7 @@
-﻿const { ipcMain, nativeTheme } = require('electron');
+const { ipcMain, nativeTheme } = require('electron');
 
-let mainWindow = null;
-let openChildWindows = [];
+let getMainWindow = () => null;
+let getOpenChildWindows = () => [];
 let settingsManager = null;
 let isInitialized = false;
 
@@ -22,8 +22,11 @@ async function persistThemeMode(themeMode) {
 }
 
 function broadcastThemeUpdate(theme) {
-    const windows = [mainWindow, ...openChildWindows];
-    windows.forEach((win) => {
+    const mainWindow = getMainWindow();
+    const openChildWindows = getOpenChildWindows();
+    const windows = [mainWindow, ...(Array.isArray(openChildWindows) ? openChildWindows : [])];
+
+    new Set(windows.filter(Boolean)).forEach((win) => {
         if (win && !win.isDestroyed()) {
             win.webContents.send('theme-updated', theme);
         }
@@ -41,8 +44,12 @@ async function handleThemeChange(themeMode) {
 }
 
 function initialize(options) {
-    mainWindow = options.mainWindow;
-    openChildWindows = options.openChildWindows;
+    getMainWindow = typeof options.getMainWindow === 'function'
+        ? options.getMainWindow
+        : (() => options.mainWindow || null);
+    getOpenChildWindows = typeof options.getOpenChildWindows === 'function'
+        ? options.getOpenChildWindows
+        : (() => options.openChildWindows || []);
     settingsManager = options.settingsManager;
 
     if (isInitialized) {

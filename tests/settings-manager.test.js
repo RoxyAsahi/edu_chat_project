@@ -107,3 +107,23 @@ test('queued updateSettings calls do not lose concurrent changes', async (t) => 
     assert.equal(updated.userName, 'Queued User');
     assert.equal(updated.guideModel, 'guide-model-1');
 });
+
+test('dispose clears recurring timers created by cleanup and backup tasks', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-settings-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    const cleanupTimer = manager.startCleanupTimer();
+    const backupTimer = manager.startAutoBackup(tempRoot);
+
+    assert.ok(cleanupTimer);
+    assert.ok(backupTimer);
+    assert.equal(manager.cleanupTimer, cleanupTimer);
+    assert.equal(manager.autoBackupTimer, backupTimer);
+
+    manager.dispose();
+
+    assert.equal(manager.cleanupTimer, null);
+    assert.equal(manager.autoBackupTimer, null);
+});

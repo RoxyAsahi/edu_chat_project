@@ -345,6 +345,14 @@ function createWindow() {
     });
 }
 
+function getMainWindow() {
+    return mainWindow;
+}
+
+function getOpenChildWindows() {
+    return openChildWindows;
+}
+
 async function bootstrap() {
     await bootstrapIndependentDataRoot();
     await fs.ensureDir(AGENT_DIR);
@@ -378,11 +386,13 @@ async function bootstrap() {
         agentConfigManager,
     });
 
-    fileDialogHandlers.initialize(mainWindow, {
+    fileDialogHandlers.initialize(getMainWindow, {
+        getMainWindow,
         getSelectionListenerStatus,
         stopSelectionListener,
         startSelectionListener,
         openChildWindows,
+        getOpenChildWindows,
     });
 
     agentHandlers.initialize({
@@ -398,13 +408,17 @@ async function bootstrap() {
         startSelectionListener,
     });
 
-    chatHandlers.initialize(mainWindow, {
+    chatHandlers.initialize(getMainWindow, {
+        getMainWindow,
         AGENT_DIR,
         USER_DATA_DIR,
         DATA_ROOT,
         fileWatcher,
         settingsManager,
         agentConfigManager,
+        getSelectionListenerStatus,
+        stopSelectionListener,
+        startSelectionListener,
     });
 
     knowledgeBaseHandlers.initialize({
@@ -422,8 +436,8 @@ async function bootstrap() {
     });
 
     themeHandlers.initialize({
-        mainWindow,
-        openChildWindows,
+        getMainWindow,
+        getOpenChildWindows,
         projectRoot: REPO_ROOT,
         APP_DATA_ROOT_IN_PROJECT: DATA_ROOT,
         settingsManager,
@@ -457,6 +471,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     fileWatcher.stopWatching();
+    settingsManager?.dispose?.();
+    agentConfigManager?.dispose?.();
     void knowledgeBase.shutdownKnowledgeBase().catch((error) => {
         console.warn('[LiteBootstrap] Failed to shutdown knowledge base cleanly:', error?.message || error);
     });
