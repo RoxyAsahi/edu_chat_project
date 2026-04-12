@@ -65,9 +65,9 @@ function createSettingsController(deps = {}) {
             consolas: '"Cascadia Code", "Consolas", monospace',
         };
 
-        documentObj.documentElement.style.setProperty('--lite-chat-max-width', `${Number(settings.chatBubbleMaxWidthWideDefault || 92)}%`);
-        documentObj.documentElement.style.setProperty('--lite-chat-font', chatFonts[settings.chatFontPreset] || chatFonts.system);
-        documentObj.documentElement.style.setProperty('--lite-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.consolas);
+        documentObj.documentElement.style.setProperty('--unistudy-chat-max-width', `${Number(settings.chatBubbleMaxWidthWideDefault || 92)}%`);
+        documentObj.documentElement.style.setProperty('--unistudy-chat-font', chatFonts[settings.chatFontPreset] || chatFonts.system);
+        documentObj.documentElement.style.setProperty('--unistudy-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.consolas);
         documentObj.body.classList.toggle('wide-chat-layout', settings.enableWideChatLayout === true);
     }
 

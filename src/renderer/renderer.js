@@ -57,7 +57,7 @@ const settingsController = createSettingsController({
     resolvePromptText: async () => (
         getPromptModule()
             ? await getPromptModule().getPrompt().catch(() => '')
-            : (document.getElementById('litePromptFallback')?.value || '').trim()
+            : (document.getElementById('unistudyPromptFallback')?.value || '').trim()
     ),
     reloadSelectedAgent: async (agentId) => {
         await workspaceController?.loadAgents?.();
@@ -95,7 +95,7 @@ composerController = createComposerController({
     resolveLivePrompt: async () => (
         getPromptModule()
             ? await getPromptModule().getPrompt().catch(() => '')
-            : (document.getElementById('litePromptFallback')?.value || '').trim()
+            : (document.getElementById('unistudyPromptFallback')?.value || '').trim()
     ),
     autoResizeTextarea: (node) => ui.autoResizeTextarea(node),
     decorateChatMessages: (...args) => notesController?.decorateChatMessages?.(...args),
@@ -609,7 +609,7 @@ async function syncPromptModule(agentId, config) {
     if (!promptModule) {
         el.systemPromptContainer.innerHTML = `
             <p class="prompt-text-mode-note">UniStudy 当前仅保留单文本提示词编辑器，旧版模块化提示词会在这里按纯文本展示。</p>
-            <textarea id="litePromptFallback" rows="6" placeholder="输入系统提示词...">${resolvedPrompt}</textarea>
+            <textarea id="unistudyPromptFallback" rows="6" placeholder="输入系统提示词...">${resolvedPrompt}</textarea>
         `;
         return;
     }
@@ -684,7 +684,7 @@ async function persistHistory() {
 
 window.sendMessage = async (prefillText) => composerController?.sendMessage?.(prefillText);
 
-window.__liteDebugState = () => {
+window.__unistudyDebugState = () => {
     const session = getSessionSlice();
     const composer = getComposerSlice();
     return {
@@ -759,6 +759,6 @@ function bindShellEvents() {
 }
 
 bootstrap().catch((error) => {
-    console.error('[LiteRenderer] bootstrap failed:', error);
+    console.error('[UniStudyRenderer] bootstrap failed:', error);
     ui?.showToastNotification?.(error.message || 'Bootstrap failed', 'error', 5000);
 });

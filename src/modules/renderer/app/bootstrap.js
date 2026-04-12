@@ -149,7 +149,7 @@ function createAppBootstrap(deps = {}) {
             try {
                 unsubscribe();
             } catch (error) {
-                console.warn('[LiteRenderer] bootstrap unsubscribe failed:', error);
+                console.warn('[UniStudyRenderer] bootstrap unsubscribe failed:', error);
             }
         });
         bootstrapSubscriptions = [];

@@ -31,9 +31,9 @@
   --macaron-purple: #f3e8fd;
   --macaron-yellow: #fef7e0;
 
-  --lite-chat-max-width: 92%;
-  --lite-chat-font: 'Segoe UI', 'PingFang SC', sans-serif;
-  --lite-code-font: 'Cascadia Code', 'Consolas', monospace;
+  --unistudy-chat-max-width: 92%;
+  --unistudy-chat-font: 'Segoe UI', 'PingFang SC', sans-serif;
+  --unistudy-code-font: 'Cascadia Code', 'Consolas', monospace;
   --unistudy-left-width: 410px;
   --unistudy-right-width: 400px;
   --unistudy-effective-right-width: 400px;
