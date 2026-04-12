@@ -139,6 +139,34 @@ function createAppBootstrap(deps = {}) {
     const renderCurrentHistory = deps.renderCurrentHistory || (async () => {});
     const finalizeBootstrap = deps.finalizeBootstrap || (() => {});
     const defaultAgentName = deps.defaultAgentName || '我的学习';
+    let bootstrapSubscriptions = [];
+    let featureEventsBound = false;
+
+    function cleanupBootstrapSubscriptions() {
+        bootstrapSubscriptions.forEach((unsubscribe) => {
+            try {
+                unsubscribe();
+            } catch (error) {
+                console.warn('[LiteRenderer] bootstrap unsubscribe failed:', error);
+            }
+        });
+        bootstrapSubscriptions = [];
+    }
+
+    function registerBootstrapSubscriptions() {
+        cleanupBootstrapSubscriptions();
+
+        bootstrapSubscriptions = [
+            chatAPI.onThemeUpdated?.((nextTheme) => applyTheme(nextTheme)),
+            chatAPI.onVCPStreamEvent?.(handleStreamEvent),
+            chatAPI.onHistoryFileUpdated?.(async (payload) => {
+                const session = getSessionSlice(store);
+                if (payload?.agentId === session.currentSelectedItem.id && payload?.topicId === session.currentTopicId) {
+                    await workspaceController.selectTopic(session.currentTopicId, { fromWatcher: true });
+                }
+            }),
+        ].filter((unsubscribe) => typeof unsubscribe === 'function');
+    }
 
     async function bootstrap() {
         const bridgeDiagnostics = {
@@ -165,16 +193,12 @@ function createAppBootstrap(deps = {}) {
         const theme = await chatAPI.getCurrentTheme().catch(() => 'light');
         applyTheme(theme || 'light');
 
-        chatAPI.onThemeUpdated((nextTheme) => applyTheme(nextTheme));
-        chatAPI.onVCPStreamEvent(handleStreamEvent);
-        chatAPI.onHistoryFileUpdated(async (payload) => {
-            const session = getSessionSlice(store);
-            if (payload?.agentId === session.currentSelectedItem.id && payload?.topicId === session.currentTopicId) {
-                await workspaceController.selectTopic(session.currentTopicId, { fromWatcher: true });
-            }
-        });
+        registerBootstrapSubscriptions();
 
-        bindFeatureEvents();
+        if (!featureEventsBound) {
+            bindFeatureEvents();
+            featureEventsBound = true;
+        }
         await workspaceController.loadAgents();
 
         if (getSessionSlice(store).agents.length === 0) {
@@ -204,6 +228,7 @@ function createAppBootstrap(deps = {}) {
 
     return {
         bootstrap,
+        destroy: cleanupBootstrapSubscriptions,
     };
 }
 

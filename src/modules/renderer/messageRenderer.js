@@ -15,6 +15,9 @@ import * as emoticonUrlFixer from './emoticonUrlFixer.js';
 import { createContentPipeline, PIPELINE_MODES } from './contentPipeline.js';
 
 const colorExtractionPromises = new Map();
+let delegatedClickHandler = null;
+let delegatedContextMenuHandler = null;
+let delegatedEventTarget = null;
 
 async function getDominantAvatarColorCached(url) {
     if (!colorExtractionPromises.has(url)) {
@@ -1051,6 +1054,13 @@ function clearChat(options = {}) {
 
 
 function initializeMessageRenderer(refs) {
+    if (delegatedEventTarget && delegatedClickHandler) {
+        delegatedEventTarget.removeEventListener('click', delegatedClickHandler);
+    }
+    if (delegatedEventTarget && delegatedContextMenuHandler) {
+        delegatedEventTarget.removeEventListener('contextmenu', delegatedContextMenuHandler);
+    }
+
     Object.assign(mainRendererReferences, refs);
 
     contentPipeline = createContentPipeline({
@@ -1096,10 +1106,12 @@ function initializeMessageRenderer(refs) {
 
     // Initialize the visibility optimizer with the scrollable chat container as root.
     const scrollContainer = mainRendererReferences.chatMessagesDiv.closest('.chat-messages-container');
+    visibilityOptimizer.destroyVisibilityOptimizer();
     visibilityOptimizer.initializeVisibilityOptimizer(scrollContainer || mainRendererReferences.chatMessagesDiv);
 
     // --- Event Delegation ---
-    mainRendererReferences.chatMessagesDiv.addEventListener('click', (e) => {
+    delegatedEventTarget = mainRendererReferences.chatMessagesDiv;
+    delegatedClickHandler = (e) => {
         // 1. Handle collapsible tool results and thought chains
         const toolHeader = e.target.closest('.vcp-tool-result-header');
         if (toolHeader) {
@@ -1118,10 +1130,11 @@ function initializeMessageRenderer(refs) {
             }
             return;
         }
-    });
+    };
+    mainRendererReferences.chatMessagesDiv.addEventListener('click', delegatedClickHandler);
 
     // Delegated context menu
-    mainRendererReferences.chatMessagesDiv.addEventListener('contextmenu', (e) => {
+    delegatedContextMenuHandler = (e) => {
         const messageItem = e.target.closest('.message-item');
         if (!messageItem) return;
 
@@ -1133,7 +1146,8 @@ function initializeMessageRenderer(refs) {
             e.preventDefault();
             contextMenu.showContextMenu(e, messageItem, message);
         }
-    });
+    };
+    mainRendererReferences.chatMessagesDiv.addEventListener('contextmenu', delegatedContextMenuHandler);
     // --- End Event Delegation ---
 
     // Create a new marked instance wrapper specifically for the stream manager.
@@ -2391,5 +2405,4 @@ export {
     updateMessageContent,
     extractSpeakableTextFromContentElement,
 };
-
 

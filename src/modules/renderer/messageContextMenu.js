@@ -2,11 +2,16 @@
 
 let mainRefs = {};
 let contextMenuDependencies = {};
+let isInitialized = false;
 
 function initializeContextMenu(refs, dependencies) {
     mainRefs = refs;
     contextMenuDependencies = dependencies;
+    if (isInitialized) {
+        return;
+    }
     document.addEventListener('click', closeContextMenuOnClickOutside, true);
+    isInitialized = true;
 }
 
 function closeContextMenu() {

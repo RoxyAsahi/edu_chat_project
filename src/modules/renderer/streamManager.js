@@ -1116,11 +1116,6 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
                 nameTimeBlock.appendChild(timestampDiv);
             }
 
-            messageItem.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                refs.showContextMenu(e, messageItem, message);
-            });
-
             uiHelper.scrollToBottom();
         }
 
