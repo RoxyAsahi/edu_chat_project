@@ -119,7 +119,7 @@ const DESKTOP_PUSH_PARTIAL_REGEX = /(?<!`)<<<\[DESKTOP_PUSH\]>>>([\s\S]*)$/s; //
 function injectEnhancedStyles() {
     try {
         // Skip injection if the stylesheet is already present.
-        const existingStyleElement = document.getElementById('vcp-enhanced-ui-styles');
+        const existingStyleElement = document.getElementById('unistudy-enhanced-ui-styles');
         if (existingStyleElement) return;
 
         const links = document.getElementsByTagName('link');
@@ -131,13 +131,13 @@ function injectEnhancedStyles() {
 
         // Fallback for root-level HTML entrypoints that did not preload the stylesheet.
         const linkElement = document.createElement('link');
-        linkElement.id = 'vcp-enhanced-ui-styles';
+        linkElement.id = 'unistudy-enhanced-ui-styles';
         linkElement.rel = 'stylesheet';
         linkElement.type = 'text/css';
         linkElement.href = '../styles/messageRenderer.css';
         document.head.appendChild(linkElement);
     } catch (error) {
-        console.error('VCPSub Enhanced UI: Failed to load external styles:', error);
+        console.error('UniStudy Enhanced UI: Failed to load external styles:', error);
     }
 }
 
@@ -154,13 +154,13 @@ function escapeHtml(text) {
 
 /**
  * Generates a unique ID for scoping CSS.
- * @returns {string} A unique ID string (e.g., 'vcp-bubble-1a2b3c4d').
+ * @returns {string} A unique ID string (e.g., 'unistudy-bubble-1a2b3c4d').
  */
 function generateUniqueId() {
     // Use a combination of timestamp and random string for uniqueness
     const timestampPart = Date.now().toString(36);
     const randomPart = Math.random().toString(36).substring(2, 9);
-    return `vcp-bubble-${timestampPart}${randomPart}`;
+    return `unistudy-bubble-${timestampPart}${randomPart}`;
 }
 
 /**
@@ -382,16 +382,16 @@ function transformSpecialBlocks(text, codeBlockMap) {
 
         commitField();
 
-        let html = `<div class="vcp-tool-result-bubble collapsible">`;
-        html += `<div class="vcp-tool-result-header">`;
-        html += `<span class="vcp-tool-result-label">VCP-ToolResult</span>`;
-        html += `<span class="vcp-tool-result-name">${escapeHtml(toolName)}</span>`;
-        html += `<span class="vcp-tool-result-status">${escapeHtml(status)}</span>`;
-        html += `<span class="vcp-result-toggle-icon"></span>`;
+        let html = `<div class="unistudy-tool-result-bubble collapsible">`;
+        html += `<div class="unistudy-tool-result-header">`;
+        html += `<span class="unistudy-tool-result-label">Tool Result</span>`;
+        html += `<span class="unistudy-tool-result-name">${escapeHtml(toolName)}</span>`;
+        html += `<span class="unistudy-tool-result-status">${escapeHtml(status)}</span>`;
+        html += `<span class="unistudy-result-toggle-icon"></span>`;
         html += `</div>`;
 
-        html += `<div class="vcp-tool-result-collapsible-content">`;
-        html += `<div class="vcp-tool-result-details">`;
+        html += `<div class="unistudy-tool-result-collapsible-content">`;
+        html += `<div class="unistudy-tool-result-details">`;
 
         details.forEach(({ key, value }) => {
             const isMarkdownField = key === '返回内容';
@@ -400,7 +400,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
             let processedValue;
 
             if (isImageUrl && isPreviewField) {
-                processedValue = `<a href="${value}" target="_blank" rel="noopener noreferrer" title="打开预览"><img src="${value}" class="vcp-tool-result-image" alt="生成图片"></a>`;
+                processedValue = `<a href="${value}" target="_blank" rel="noopener noreferrer" title="打开预览"><img src="${value}" class="unistudy-tool-result-image" alt="生成图片"></a>`;
             } else if (isMarkdownField && mainRendererReferences.markedInstance) {
                 try {
                     // Tool-result markdown is untrusted input, so escape it before parsing.
@@ -419,10 +419,10 @@ function transformSpecialBlocks(text, codeBlockMap) {
                 }
             }
 
-            html += `<div class="vcp-tool-result-item">`;
-            html += `<span class="vcp-tool-result-item-key">${escapeHtml(key)}:</span> `;
+            html += `<div class="unistudy-tool-result-item">`;
+            html += `<span class="unistudy-tool-result-item-key">${escapeHtml(key)}:</span> `;
             const valueTag = (isMarkdownField && !isImageUrl) ? 'div' : 'span';
-            html += `<${valueTag} class="vcp-tool-result-item-value">${processedValue}</${valueTag}>`;
+            html += `<${valueTag} class="unistudy-tool-result-item-value">${processedValue}</${valueTag}>`;
             html += `</div>`;
         });
 
@@ -442,7 +442,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
             } else {
                 processedFooter = `<pre>${escapeHtml(restoreBlocks(footerText))}</pre>`;
             }
-            html += `<div class="vcp-tool-result-footer">${processedFooter}</div>`;
+            html += `<div class="unistudy-tool-result-footer">${processedFooter}</div>`;
         }
 
         html += `</div>`;
@@ -532,11 +532,11 @@ function transformSpecialBlocks(text, codeBlockMap) {
 
             const escapedFullContent = escapeHtml(restoreBlocks(content));
             return `<div class="vcp-tool-use-bubble">` +
-                `<div class="vcp-tool-summary">` +
-                `<span class="vcp-tool-label">VCP-ToolUse:</span> ` +
-                `<span class="vcp-tool-name-highlight">${escapeHtml(toolName)}</span>` +
+                `<div class="unistudy-tool-summary">` +
+                `<span class="unistudy-tool-label">Tool Use:</span> ` +
+                `<span class="unistudy-tool-name-highlight">${escapeHtml(toolName)}</span>` +
                 `</div>` +
-                `<div class="vcp-tool-details"><pre>${escapedFullContent}</pre></div>` +
+                `<div class="unistudy-tool-details"><pre>${escapedFullContent}</pre></div>` +
                 `</div>`;
         }
     });
@@ -595,13 +595,13 @@ function transformSpecialBlocks(text, codeBlockMap) {
         const escapedContent = escapeHtml(restoreBlocks(content));
 
         let html = `<div class="vcp-thought-chain-bubble collapsible">`;
-        html += `<div class="vcp-thought-chain-header">`;
-        html += `<span class="vcp-thought-chain-icon">?</span>`;
-        html += `<span class="vcp-thought-chain-label">${escapeHtml(displayTheme)}</span>`;
-        html += `<span class="vcp-result-toggle-icon"></span>`;
+        html += `<div class="unistudy-thought-chain-header">`;
+        html += `<span class="unistudy-thought-chain-icon">?</span>`;
+        html += `<span class="unistudy-thought-chain-label">${escapeHtml(displayTheme)}</span>`;
+        html += `<span class="unistudy-result-toggle-icon"></span>`;
         html += `</div>`;
 
-        html += `<div class="vcp-thought-chain-collapsible-content">`;
+        html += `<div class="unistudy-thought-chain-collapsible-content">`;
 
         let processedContent;
         if (mainRendererReferences.markedInstance) {
@@ -614,8 +614,8 @@ function transformSpecialBlocks(text, codeBlockMap) {
             processedContent = `<pre>${escapedContent}</pre>`;
         }
 
-        html += `<div class="vcp-thought-chain-body">${processedContent}</div>`;
-        html += `</div>`; // End of vcp-thought-chain-collapsible-content
+        html += `<div class="unistudy-thought-chain-body">${processedContent}</div>`;
+        html += `</div>`; // End of unistudy-thought-chain-collapsible-content
         html += `</div>`; // End of vcp-thought-chain-bubble
 
         return html;
@@ -645,7 +645,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
 
         const actionText = isEndMarker ? '\u7ed3\u675f' : '\u5f00\u59cb';
 
-        return `<div class="vcp-role-divider role-${roleLower} type-${isEndMarker ? 'end' : 'start'}"><span class="divider-text">\u89d2\u8272\u5206\u9694: ${label} [${actionText}]</span></div>`;
+        return `<div class="unistudy-role-divider role-${roleLower} type-${isEndMarker ? 'end' : 'start'}"><span class="divider-text">\u89d2\u8272\u5206\u9694: ${label} [${actionText}]</span></div>`;
     });
 
     return processed;
@@ -663,10 +663,10 @@ function transformUserButtonClick(text) {
     });
 }
 
-function transformVCPChatCanvas(text) {
+function transformUniStudyChatCanvas(text) {
     return text.replace(CANVAS_PLACEHOLDER_REGEX, () => {
         // Use a div for better block-level layout and margin behavior
-        return `<div class="vcp-chat-canvas-placeholder">Canvas content is not supported in Lite.</div>`;
+        return `<div class="unistudy-chat-canvas-placeholder">Canvas content is not supported in UniStudy.</div>`;
     });
 }
 
@@ -675,7 +675,7 @@ function extractSpeakableTextFromContentElement(contentElement) {
 
     const contentClone = contentElement.cloneNode(true);
     contentClone.querySelectorAll(
-        '.vcp-tool-use-bubble, .vcp-tool-result-bubble, .maid-diary-bubble, .vcp-role-divider, .vcp-thought-chain-bubble, style, script'
+        '.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .maid-diary-bubble, .unistudy-role-divider, .vcp-thought-chain-bubble, style, script'
     ).forEach(el => el.remove());
 
     return (contentClone.innerText || '')
@@ -704,7 +704,7 @@ function processAndInjectScopedCss(content, scopeId) {
 
             const styleElement = document.createElement('style');
             styleElement.type = 'text/css';
-            styleElement.setAttribute('data-vcp-scope-id', scopeId);
+            styleElement.setAttribute('data-unistudy-scope-id', scopeId);
             styleElement.textContent = scopedCss;
             document.head.appendChild(styleElement);
             styleInjected = true;
@@ -1039,7 +1039,7 @@ function clearChat(options = {}) {
         });
 
         // Remove all injected scoped CSS blocks.
-        document.querySelectorAll('style[data-vcp-scope-id]').forEach(el => el.remove());
+        document.querySelectorAll('style[data-unistudy-scope-id]').forEach(el => el.remove());
         // Clear cached Pretext heights when the whole chat view resets.
         if (window.pretextBridge && window.pretextBridge.clearAll) {
             window.pretextBridge.clearAll();
@@ -1114,16 +1114,16 @@ function initializeMessageRenderer(refs) {
     delegatedEventTarget = mainRendererReferences.chatMessagesDiv;
     delegatedClickHandler = (e) => {
         // 1. Handle collapsible tool results and thought chains
-        const toolHeader = e.target.closest('.vcp-tool-result-header');
+        const toolHeader = e.target.closest('.unistudy-tool-result-header');
         if (toolHeader) {
-            const bubble = toolHeader.closest('.vcp-tool-result-bubble.collapsible');
+            const bubble = toolHeader.closest('.unistudy-tool-result-bubble.collapsible');
             if (bubble) {
                 bubble.classList.toggle('expanded');
             }
             return;
         }
 
-        const thoughtHeader = e.target.closest('.vcp-thought-chain-header');
+        const thoughtHeader = e.target.closest('.unistudy-thought-chain-header');
         if (thoughtHeader) {
             const bubble = thoughtHeader.closest('.vcp-thought-chain-bubble.collapsible');
             if (bubble) {
@@ -1234,9 +1234,9 @@ function setCurrentTopicId(topicId) {
     // console.log("[MessageRenderer] setCurrentTopicId called with:", topicId);
 }
 
-// These are for the current Lite chat context avatar state.
+// These are for the current UniStudy chat context avatar state.
 function setCurrentItemAvatar(avatarUrl) { // Renamed from setCurrentAgentAvatar
-    // This updates the avatar for the main selected Lite agent.
+// This updates the avatar for the main selected UniStudy agent.
     // The currentSelectedItemRef should hold the correct avatar for the overall context.
 }
 
@@ -1250,7 +1250,7 @@ function setUserAvatar(avatarUrl) { // For the user's global avatar
 }
 
 function setCurrentItemAvatarColor(color) { // Renamed from setCurrentAgentAvatarColor
-    // For the main selected Lite agent
+// For the main selected UniStudy agent
 }
 
 function setUserAvatarColor(color) { // For the user's global avatar
@@ -2033,7 +2033,7 @@ function prepareUserMessageText(text) {
     });
 
     processedText = transformUserButtonClick(processedText);
-    processedText = transformVCPChatCanvas(processedText);
+    processedText = transformUniStudyChatCanvas(processedText);
 
     return processedText;
 }

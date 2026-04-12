@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -9,7 +9,7 @@
     >
     <title>阅读模式</title>
     <link rel="stylesheet" href="../../styles/themes.css"> <!-- Theme styles -->
-    <link rel="stylesheet" href="../../renderer/style.css"> <!-- Reuse Lite renderer styles -->
+    <link rel="stylesheet" href="../../renderer/style.css"> <!-- Reuse UniStudy renderer styles -->
     <link rel="stylesheet" href="../../../vendor/katex.min.css" crossorigin="anonymous">
     <script defer src="../../../vendor/katex.min.js" crossorigin="anonymous"></script>
     <script defer src="../../../vendor/auto-render.min.js" crossorigin="anonymous"></script>
@@ -592,7 +592,7 @@
         .vcp-tool-use-bubble {
             background: linear-gradient(145deg, #3a7bd5 0%, #00d2ff 100%) !important;
             background-size: 200% 200% !important;
-            animation: vcp-bubble-background-flow-kf 20s ease-in-out infinite;
+            animation: unistudy-bubble-background-flow-kf 20s ease-in-out infinite;
             border-radius: 10px !important;
             padding: 8px 15px 8px 35px !important;
             color: #ffffff !important;
@@ -616,15 +616,15 @@
             font-size: 14px;
             color: rgba(255, 255, 255, 0.75);
             z-index: 2;
-            animation: vcp-icon-rotate 4s linear infinite;
+            animation: unistudy-icon-rotate 4s linear infinite;
             transform-origin: center center;
         }
-        .vcp-tool-use-bubble .vcp-tool-label {
+        .vcp-tool-use-bubble .unistudy-tool-label {
             font-weight: bold;
             color: #f1c40f;
             margin-right: 6px;
         }
-        .vcp-tool-use-bubble .vcp-tool-name-highlight {
+        .vcp-tool-use-bubble .unistudy-tool-name-highlight {
             background: linear-gradient(90deg, #f1c40f, #ffffff, #00d2ff, #f1c40f) !important;
             background-size: 300% 100% !important;
             -webkit-background-clip: text !important;
@@ -635,7 +635,7 @@
             font-weight: bold !important;
             padding: 1px 3px !important;
             border-radius: 4px !important;
-            animation: vcp-toolname-color-flow-kf 4s linear infinite;
+            animation: unistudy-toolname-color-flow-kf 4s linear infinite;
             margin-left: 2px;
         }
 
@@ -740,16 +740,16 @@
         }
 
         /* Keyframes needed for animations */
-        @keyframes vcp-bubble-background-flow-kf {
+        @keyframes unistudy-bubble-background-flow-kf {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
-        @keyframes vcp-icon-rotate {
+        @keyframes unistudy-icon-rotate {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        @keyframes vcp-toolname-color-flow-kf {
+        @keyframes unistudy-toolname-color-flow-kf {
             0% { background-position: 0% 50%; }
             50% { background-position: 150% 50%; }
             100% { background-position: 0% 50%; }
@@ -757,7 +757,7 @@
         /* --- End: Ported Styles --- */
 
         /* --- VCP Tool Result Bubble --- */
-        .vcp-tool-result-bubble {
+        .unistudy-tool-result-bubble {
             display: block !important;
             background: var(--tool-result-bg, linear-gradient(145deg, #f4f6f8, #e8eaf0)) !important;
             border-radius: 10px !important;
@@ -775,7 +775,7 @@
             max-width: 95%;
             transition: background 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s;
         }
-        .vcp-tool-result-bubble::before {
+        .unistudy-tool-result-bubble::before {
             content: "馃搳";
             position: absolute;
             top: 12px;
@@ -783,7 +783,7 @@
             font-size: 16px;
             opacity: 0.7;
         }
-        .vcp-tool-result-header {
+        .unistudy-tool-result-header {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
@@ -793,70 +793,70 @@
             padding-bottom: 8px;
             margin-bottom: 10px;
         }
-        .vcp-tool-result-label {
+        .unistudy-tool-result-label {
             font-weight: bold;
             color: #4caf50;
             font-size: 1.05em;
         }
-        .vcp-tool-result-name {
+        .unistudy-tool-result-name {
             font-weight: bold;
             color: var(--tool-result-name-color, #0277bd);
             background-color: var(--tool-result-name-bg, rgba(2, 119, 189, 0.1));
             padding: 2px 6px;
             border-radius: 4px;
         }
-        .vcp-tool-result-status {
+        .unistudy-tool-result-status {
             font-weight: bold;
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.9em;
         }
-        .vcp-tool-result-status.status-success {
+        .unistudy-tool-result-status.status-success {
             color: #1b5e20;
             background-color: rgba(76, 175, 80, 0.15);
         }
-        body:not(.light-theme) .vcp-tool-result-status.status-success {
+        body:not(.light-theme) .unistudy-tool-result-status.status-success {
             color: #c8e6c9;
             background-color: rgba(76, 175, 80, 0.2);
         }
-        .vcp-tool-result-status.status-failure {
+        .unistudy-tool-result-status.status-failure {
             color: #b71c1c;
             background-color: rgba(211, 47, 47, 0.15);
         }
-        body:not(.light-theme) .vcp-tool-result-status.status-failure {
+        body:not(.light-theme) .unistudy-tool-result-status.status-failure {
             color: #ffcdd2;
             background-color: rgba(211, 47, 47, 0.2);
         }
-        .vcp-tool-result-details {
+        .unistudy-tool-result-details {
             padding-left: 28px;
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
-        .vcp-tool-result-item {
+        .unistudy-tool-result-item {
             display: flex;
             flex-direction: row;
             align-items: flex-start;
         }
-        .vcp-tool-result-item-key {
+        .unistudy-tool-result-item-key {
             font-weight: bold;
             color: var(--tool-result-item-key-color, #546e7a);
             margin-right: 8px;
             white-space: nowrap;
         }
-        .vcp-tool-result-item-value {
+        .unistudy-tool-result-item-value {
             color: var(--tool-result-item-value-color, #263238);
             word-break: break-all;
         }
-        .vcp-tool-result-item-value a {
+        .unistudy-tool-result-item-value a {
             color: var(--tool-result-item-link-color, #1976d2) !important;
             text-decoration: underline !important;
         }
-        .vcp-tool-result-item-value strong {
+        .unistudy-tool-result-item-value strong {
             color: var(--tool-result-item-strong-color, #b8860b);
             font-weight: bold;
         }
-        .vcp-tool-result-image {
+        .unistudy-tool-result-image {
             max-width: 100%;
             max-height: 250px;
             border-radius: 6px;
@@ -865,17 +865,17 @@
             cursor: pointer;
             transition: transform 0.2s ease;
         }
-        .vcp-tool-result-image:hover {
+        .unistudy-tool-result-image:hover {
             transform: scale(1.05);
         }
-        .vcp-tool-result-footer {
+        .unistudy-tool-result-footer {
             margin-top: 10px;
             padding-top: 8px;
             border-top: 1px solid var(--tool-result-header-border-color, rgba(0, 0, 0, 0.1));
             font-size: 0.9em;
             color: var(--tool-result-footer-color, #78909c);
         }
-        .vcp-tool-result-footer pre {
+        .unistudy-tool-result-footer pre {
             margin: 0;
             padding: 0;
             white-space: pre-wrap;

@@ -1,4 +1,4 @@
-﻿import * as emoticonFixer from './emoticonUrlFixer.js';
+import * as emoticonFixer from './emoticonUrlFixer.js';
 
 import { renderMarkdownToSafeHtml, sanitizeHtml } from './safeHtml.js';
 import { scopeCss } from './scopedCss.js';
@@ -36,12 +36,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Generates a unique ID for scoping CSS.
-     * @returns {string} A unique ID string (e.g., 'vcp-viewer-1a2b3c4d').
+     * @returns {string} A unique ID string (e.g., 'unistudy-viewer-1a2b3c4d').
      */
     function generateUniqueId() {
         const timestampPart = Date.now().toString(36);
         const randomPart = Math.random().toString(36).substring(2, 9);
-        return `vcp-viewer-${timestampPart}${randomPart}`;
+        return `unistudy-viewer-${timestampPart}${randomPart}`;
     }
 
     /**
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const scopedCss = scopeCss(cssContent, scopeId);
                 const styleElement = document.createElement('style');
                 styleElement.type = 'text/css';
-                styleElement.setAttribute('data-vcp-scope-id', scopeId);
+                styleElement.setAttribute('data-unistudy-scope-id', scopeId);
                 styleElement.textContent = scopedCss;
                 document.head.appendChild(styleElement);
                 styleInjected = true;
@@ -171,20 +171,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            let html = `<div class="vcp-tool-result-bubble">`;
-            html += `<div class="vcp-tool-result-header">`;
-            html += `<span class="vcp-tool-result-label">VCP-ToolResult</span>`;
-            html += `<span class="vcp-tool-result-name">${escapeHtml(toolName)}</span>`;
-            html += `<span class="vcp-tool-result-status">${escapeHtml(status)}</span>`;
+            let html = `<div class="unistudy-tool-result-bubble">`;
+            html += `<div class="unistudy-tool-result-header">`;
+            html += `<span class="unistudy-tool-result-label">Tool Result</span>`;
+            html += `<span class="unistudy-tool-result-name">${escapeHtml(toolName)}</span>`;
+            html += `<span class="unistudy-tool-result-status">${escapeHtml(status)}</span>`;
             html += `</div>`;
 
-            html += `<div class="vcp-tool-result-details">`;
+            html += `<div class="unistudy-tool-result-details">`;
             details.forEach(({ key, value }) => {
                 const urlRegex = /(https?:\/\/[^\s]+)/g;
                 let processedValue = escapeHtml(value);
                 
                 if ((key === 'imageUrl' || key === 'image') && value.match(/\.(jpeg|jpg|png|gif)$/i)) {
-                     processedValue = `<a href="${value}" target="_blank" rel="noopener noreferrer" title="Open generated image"><img src="${value}" class="vcp-tool-result-image" alt="Generated Image"></a>`;
+                     processedValue = `<a href="${value}" target="_blank" rel="noopener noreferrer" title="Open generated image"><img src="${value}" class="unistudy-tool-result-image" alt="Generated Image"></a>`;
                 } else {
                     processedValue = processedValue.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
                 }
@@ -200,15 +200,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
                 const renderedKey = displayKeyMap[key] || key;
 
-                html += `<div class="vcp-tool-result-item">`;
-                html += `<span class="vcp-tool-result-item-key">${escapeHtml(renderedKey)}:</span> `;
-                html += `<span class="vcp-tool-result-item-value">${processedValue}</span>`;
+                html += `<div class="unistudy-tool-result-item">`;
+                html += `<span class="unistudy-tool-result-item-key">${escapeHtml(renderedKey)}:</span> `;
+                html += `<span class="unistudy-tool-result-item-value">${processedValue}</span>`;
                 html += `</div>`;
             });
             html += `</div>`;
 
             if (otherContent.length > 0) {
-                html += `<div class="vcp-tool-result-footer"><pre>${escapeHtml(otherContent.join('\n'))}</pre></div>`;
+                html += `<div class="unistudy-tool-result-footer"><pre>${escapeHtml(otherContent.join('\n'))}</pre></div>`;
             }
 
             html += `</div>`;
@@ -227,12 +227,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (toolName) {
                  finalContent = finalContent.replace(
                     escapeHtml(toolName),
-                    `<span class="vcp-tool-name-highlight">${escapeHtml(toolName)}</span>`
+                    `<span class="unistudy-tool-name-highlight">${escapeHtml(toolName)}</span>`
                 );
             }
             
             return `<div class="vcp-tool-use-bubble">` +
-                   `<span class="vcp-tool-label">VCP-ToolUse:</span> ` +
+                   `<span class="unistudy-tool-label">Tool Use:</span> ` +
                    finalContent +
                    `</div>`;
         });
@@ -352,7 +352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         processed = processed.replace(/^(\s*```)(?![\r\n])/gm, '$1\n'); // ensureNewlineAfterCodeBlock
         processed = processed.replace(/~(?![\s~])/g, '~ '); // ensureSpaceAfterTilde
         processed = processed.replace(/^(\s*)(```.*)/gm, '$2'); // removeIndentationFromCodeBlockMarkers
-        processed = processed.replace(/(<img[^>]+>)\s*(```)/g, '$1\n\n<!-- VCP-Renderer-Separator -->\n\n$2'); // ensureSeparatorBetweenImgAndCode
+        processed = processed.replace(/(<img[^>]+>)\s*(```)/g, '$1\n\n<!-- UniStudy-Renderer-Separator -->\n\n$2'); // ensureSeparatorBetweenImgAndCode
 
         // Step 5: Restore the protected code blocks.
         if (codeBlockMap.size > 0) {
@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             NodeFilter.SHOW_TEXT,
             { acceptNode: (node) => {
                 // Skip nodes inside code, scripts, styles, links, and special bubbles.
-                if (node.parentElement.closest('pre, code, script, style, .vcp-tool-use-bubble, .vcp-tool-result-bubble, a')) {
+                if (node.parentElement.closest('pre, code, script, style, .vcp-tool-use-bubble, .unistudy-tool-result-bubble, a')) {
                     return NodeFilter.FILTER_REJECT;
                 }
                 // Only keep nodes that still contain bold markers.
@@ -915,7 +915,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await fixEmoticonImagesInContainer(container);
 
         // Style status bubbles based on content
-        container.querySelectorAll('.vcp-tool-result-status').forEach(statusEl => {
+        container.querySelectorAll('.unistudy-tool-result-status').forEach(statusEl => {
             const statusText = statusEl.textContent.toUpperCase();
             if (statusText.includes('SUCCESS')) {
                 statusEl.classList.add('status-success');
@@ -1553,4 +1553,3 @@ ${codeContent}
         }
     });
 });
-

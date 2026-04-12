@@ -1,7 +1,7 @@
 /* Enhanced Rendering Styles for Message Renderer */
 
 /* Keyframes for animations */
-@keyframes vcp-bubble-background-flow-kf {
+@keyframes unistudy-bubble-background-flow-kf {
     0% {
         background-position: 0% 50%;
     }
@@ -15,7 +15,7 @@
     }
 }
 
-@keyframes vcp-bubble-border-flow-kf {
+@keyframes unistudy-bubble-border-flow-kf {
     0% {
         background-position: 0% 50%;
     }
@@ -30,7 +30,7 @@
     }
 }
 
-@keyframes vcp-icon-rotate {
+@keyframes unistudy-icon-rotate {
     0% {
         transform: rotate(0deg);
     }
@@ -40,7 +40,7 @@
     }
 }
 
-@keyframes vcp-icon-heartbeat {
+@keyframes unistudy-icon-heartbeat {
     0% {
         transform: scale(1);
         opacity: 0.6;
@@ -57,7 +57,7 @@
     }
 }
 
-@keyframes vcp-toolname-color-flow-kf {
+@keyframes unistudy-toolname-color-flow-kf {
     0% {
         background-position: 0% 50%;
     }
@@ -73,7 +73,7 @@
 }
 
 /* Loading dots animation */
-@keyframes vcp-loading-dots {
+@keyframes unistudy-loading-dots {
 
     0%,
     20% {
@@ -116,14 +116,14 @@
     /* Ensure it doesn't add extra height */
     vertical-align: baseline;
     /* Align with the text */
-    animation: vcp-loading-dots 1.4s infinite;
+    animation: unistudy-loading-dots 1.4s infinite;
 }
 
 /* 主气泡样式 - VCP ToolUse */
 .vcp-tool-use-bubble {
     background: linear-gradient(145deg, #3a7bd5 0%, #00d2ff 100%) !important;
     background-size: 200% 200% !important;
-    animation: vcp-bubble-background-flow-kf 20s ease-in-out infinite;
+    animation: unistudy-bubble-background-flow-kf 20s ease-in-out infinite;
     border-radius: 10px !important;
     padding: 8px 15px 8px 35px !important;
     color: #ffffff !important;
@@ -164,7 +164,7 @@
     /* Border thickness */
     background: linear-gradient(60deg, #76c4f7, #00d2ff, #3a7bd5, #ffffff, #3a7bd5, #00d2ff, #76c4f7);
     background-size: 300% 300%;
-    animation: vcp-bubble-border-flow-kf 7s linear infinite;
+    animation: unistudy-bubble-border-flow-kf 7s linear infinite;
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -181,13 +181,13 @@
 }
 
 /* New styles for summary and details sections */
-.vcp-tool-summary {
+.unistudy-tool-summary {
     display: flex;
     align-items: center;
     cursor: pointer;
 }
 
-.vcp-tool-details {
+.unistudy-tool-details {
     max-height: 0;
     opacity: 0;
     overflow: hidden;
@@ -199,7 +199,7 @@
     margin-top: 0;
 }
 
-.vcp-tool-use-bubble:hover .vcp-tool-details {
+.vcp-tool-use-bubble:hover .unistudy-tool-details {
     max-height: 500px;
     /* Allow space for content to show */
     opacity: 1;
@@ -209,7 +209,7 @@
     /* Restore font-size on hover */
 }
 
-.vcp-tool-details pre {
+.unistudy-tool-details pre {
     margin: 0;
     padding: 10px;
     color: #f0f0f0;
@@ -221,8 +221,8 @@
 
 
 /* 内部 span 的重置 - VCP ToolUse */
-.vcp-tool-use-bubble .vcp-tool-label,
-.vcp-tool-use-bubble .vcp-tool-name-highlight {
+.vcp-tool-use-bubble .unistudy-tool-label,
+.vcp-tool-use-bubble .unistudy-tool-name-highlight {
     background: none !important;
     border: none !important;
     padding: 0 !important;
@@ -239,15 +239,15 @@
     z-index: 1;
 }
 
-/* "VCP-ToolUse:" 标签 */
-.vcp-tool-use-bubble .vcp-tool-label {
+/* "Tool Use:" 标签 */
+.vcp-tool-use-bubble .unistudy-tool-label {
     font-weight: bold;
     color: #f1c40f;
     margin-right: 6px;
 }
 
 /* 工具名高亮 - VCP ToolUse */
-.vcp-tool-use-bubble .vcp-tool-name-highlight {
+.vcp-tool-use-bubble .unistudy-tool-name-highlight {
     background: linear-gradient(90deg, #f1c40f, #ffffff, #00d2ff, #f1c40f) !important;
     background-size: 300% 100% !important;
     -webkit-background-clip: text !important;
@@ -258,7 +258,7 @@
     font-weight: bold !important;
     padding: 1px 3px !important;
     border-radius: 4px !important;
-    animation: vcp-toolname-color-flow-kf 4s linear infinite;
+    animation: unistudy-toolname-color-flow-kf 4s linear infinite;
     margin-left: 2px;
 }
 
@@ -271,7 +271,7 @@
     font-size: 14px;
     color: rgba(255, 255, 255, 0.75);
     z-index: 2;
-    animation: vcp-icon-rotate 4s linear infinite;
+    animation: unistudy-icon-rotate 4s linear infinite;
     transform-origin: center center;
 }
 
@@ -489,7 +489,7 @@ audio[controls]::after {
     background: linear-gradient(60deg, #76c4f7, #00d2ff, #3a7bd5, #ffffff, #3a7bd5, #00d2ff, #76c4f7);
     /* Same gradient as VCP ToolUse bubble */
     background-size: 300% 300%;
-    animation: vcp-bubble-border-flow-kf 7s linear infinite;
+    animation: unistudy-bubble-border-flow-kf 7s linear infinite;
     /* Same animation as VCP ToolUse bubble */
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -720,10 +720,10 @@ body:not(.light-theme) {
     --tool-result-item-link-color: #0a84ff;
     --tool-result-item-strong-color: #ffd60a;
     --tool-result-footer-color: #8e8e93;
-    --vcp-canvas-bg: #2d3748;
-    --vcp-canvas-text-color: #e2e8f0;
-    --vcp-canvas-border-color: #4a5568;
-    --vcp-canvas-dots-color: #48bb78;
+    --unistudy-canvas-bg: #2d3748;
+    --unistudy-canvas-text-color: #e2e8f0;
+    --unistudy-canvas-border-color: #4a5568;
+    --unistudy-canvas-dots-color: #48bb78;
 }
 
 body.light-theme {
@@ -749,10 +749,10 @@ body.light-theme {
     --tool-result-item-strong-color: #b8860b;
     /* DarkGoldenRod */
     --tool-result-footer-color: #78909c;
-    --vcp-canvas-bg: #f7fafc;
-    --vcp-canvas-text-color: #2d3748;
-    --vcp-canvas-border-color: #e2e8f0;
-    --vcp-canvas-dots-color: #38a169;
+    --unistudy-canvas-bg: #f7fafc;
+    --unistudy-canvas-text-color: #2d3748;
+    --unistudy-canvas-border-color: #e2e8f0;
+    --unistudy-canvas-dots-color: #38a169;
 }
 
 .md-content table {
@@ -810,11 +810,11 @@ body.light-theme {
     border: 3px solid rgba(128, 128, 128, 0.3);
     border-top-color: #888;
     border-radius: 50%;
-    animation: vcp-icon-rotate 1s linear infinite;
+    animation: unistudy-icon-rotate 1s linear infinite;
 }
 
 /* --- VCP Tool Result Bubble --- */
-.vcp-tool-result-bubble {
+.unistudy-tool-result-bubble {
     display: block !important;
     background: var(--tool-result-bg) !important;
     border-radius: 10px !important;
@@ -837,7 +837,7 @@ body.light-theme {
     /* 优化：结果气泡提升为独立层 */
 }
 
-.vcp-tool-result-bubble::before {
+.unistudy-tool-result-bubble::before {
     content: "📊";
     position: absolute;
     top: 12px;
@@ -846,7 +846,7 @@ body.light-theme {
     opacity: 0.7;
 }
 
-.vcp-tool-result-header {
+.unistudy-tool-result-header {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -858,14 +858,14 @@ body.light-theme {
     margin-bottom: 10px;
 }
 
-.vcp-tool-result-label {
+.unistudy-tool-result-label {
     font-weight: bold;
     color: #4caf50;
     /* Green for success */
     font-size: 1.05em;
 }
 
-.vcp-tool-result-name {
+.unistudy-tool-result-name {
     font-weight: bold;
     color: var(--tool-result-name-color);
     background-color: var(--tool-result-name-bg);
@@ -873,7 +873,7 @@ body.light-theme {
     border-radius: 4px;
 }
 
-.vcp-tool-result-status {
+.unistudy-tool-result-status {
     font-weight: bold;
     padding: 2px 6px;
     border-radius: 4px;
@@ -881,7 +881,7 @@ body.light-theme {
 }
 
 /* NEW: Toggle Icon for Collapsible Result Bubble */
-.vcp-result-toggle-icon {
+.unistudy-result-toggle-icon {
     margin-left: auto;
     /* Pushes the icon to the far right */
     width: 16px;
@@ -891,8 +891,8 @@ body.light-theme {
     transition: transform 0.3s ease;
 }
 
-.vcp-result-toggle-icon::before,
-.vcp-result-toggle-icon::after {
+.unistudy-result-toggle-icon::before,
+.unistudy-result-toggle-icon::after {
     content: '';
     position: absolute;
     background-color: var(--tool-result-item-key-color);
@@ -904,41 +904,41 @@ body.light-theme {
 }
 
 /* Default state (collapsed): show + */
-.vcp-result-toggle-icon::before {
+.unistudy-result-toggle-icon::before {
     width: 12px;
     height: 3px;
     transform: translate(-50%, -50%) rotateZ(0deg);
 }
 
-.vcp-result-toggle-icon::after {
+.unistudy-result-toggle-icon::after {
     width: 3px;
     height: 12px;
     transform: translate(-50%, -50%) rotateZ(0deg);
 }
 
 /* Expanded state: rotate vertical line 90° to hide it, leaving horizontal line as - */
-.vcp-tool-result-bubble.expanded .vcp-result-toggle-icon::before {
+.unistudy-tool-result-bubble.expanded .unistudy-result-toggle-icon::before {
     transform: translate(-50%, -50%) rotateZ(0deg);
 }
 
-.vcp-tool-result-bubble.expanded .vcp-result-toggle-icon::after {
+.unistudy-tool-result-bubble.expanded .unistudy-result-toggle-icon::after {
     transform: translate(-50%, -50%) rotateZ(90deg);
 }
 
-.vcp-tool-result-status:containing("SUCCESS") {
+.unistudy-tool-result-status:containing("SUCCESS") {
     /* This is a pseudo-selector, might not work directly in CSS */
     color: #c8e6c9;
     background-color: rgba(76, 175, 80, 0.2);
 }
 
 /* Specific style for SUCCESS status in light theme */
-body.light-theme .vcp-tool-result-status:containing("SUCCESS") {
+body.light-theme .unistudy-tool-result-status:containing("SUCCESS") {
     color: #1b5e20;
     /* Dark green text */
     background-color: rgba(76, 175, 80, 0.15);
 }
 
-.vcp-tool-result-details {
+.unistudy-tool-result-details {
     padding-left: 28px;
     /* Align with header content */
     display: flex;
@@ -946,76 +946,76 @@ body.light-theme .vcp-tool-result-status:containing("SUCCESS") {
     gap: 6px;
 }
 
-.vcp-tool-result-item {
+.unistudy-tool-result-item {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
 }
 
-.vcp-tool-result-item-key {
+.unistudy-tool-result-item-key {
     font-weight: bold;
     color: var(--tool-result-item-key-color);
     margin-right: 8px;
     white-space: nowrap;
 }
 
-.vcp-tool-result-item-value {
+.unistudy-tool-result-item-value {
     color: var(--tool-result-item-value-color);
     word-break: break-word;
 }
 
-.vcp-tool-result-bubble pre,
-.vcp-tool-result-bubble code {
+.unistudy-tool-result-bubble pre,
+.unistudy-tool-result-bubble code {
     font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace) !important;
 }
 
 /* Markdown support inside tool result bubble */
-.vcp-tool-result-item-value>p:first-child,
-.vcp-tool-result-footer>p:first-child {
+.unistudy-tool-result-item-value>p:first-child,
+.unistudy-tool-result-footer>p:first-child {
     margin-top: 0;
 }
 
-.vcp-tool-result-item-value>p:last-child,
-.vcp-tool-result-footer>p:last-child {
+.unistudy-tool-result-item-value>p:last-child,
+.unistudy-tool-result-footer>p:last-child {
     margin-bottom: 0;
 }
 
-.vcp-tool-result-bubble table {
+.unistudy-tool-result-bubble table {
     margin: 0.5em 0;
     border-color: var(--tool-result-border-color);
     background-color: rgba(0, 0, 0, 0.05);
     width: 100%;
 }
 
-body:not(.light-theme) .vcp-tool-result-bubble table {
+body:not(.light-theme) .unistudy-tool-result-bubble table {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
-.vcp-tool-result-bubble th,
-.vcp-tool-result-bubble td {
+.unistudy-tool-result-bubble th,
+.unistudy-tool-result-bubble td {
     border-color: var(--tool-result-border-color);
     padding: 6px 10px;
 }
 
-.vcp-tool-result-bubble th {
+.unistudy-tool-result-bubble th {
     background-color: rgba(0, 0, 0, 0.1);
 }
 
-body:not(.light-theme) .vcp-tool-result-bubble th {
+body:not(.light-theme) .unistudy-tool-result-bubble th {
     background-color: rgba(255, 255, 255, 0.1);
 }
 
-.vcp-tool-result-item-value a {
+.unistudy-tool-result-item-value a {
     color: var(--tool-result-item-link-color) !important;
     text-decoration: underline !important;
 }
 
-.vcp-tool-result-item-value strong {
+.unistudy-tool-result-item-value strong {
     color: var(--tool-result-item-strong-color);
     font-weight: bold;
 }
 
-.vcp-tool-result-image {
+.unistudy-tool-result-image {
     max-width: 100%;
     max-height: 250px;
     border-radius: 6px;
@@ -1025,11 +1025,11 @@ body:not(.light-theme) .vcp-tool-result-bubble th {
     transition: transform 0.2s ease;
 }
 
-.vcp-tool-result-image:hover {
+.unistudy-tool-result-image:hover {
     transform: scale(1.05);
 }
 
-.vcp-tool-result-footer {
+.unistudy-tool-result-footer {
     margin-top: 10px;
     padding-top: 8px;
     border-top: 1px solid var(--tool-result-header-border-color);
@@ -1037,7 +1037,7 @@ body:not(.light-theme) .vcp-tool-result-bubble th {
     color: var(--tool-result-footer-color);
 }
 
-.vcp-tool-result-footer pre {
+.unistudy-tool-result-footer pre {
     margin: 0;
     padding: 0;
     white-space: pre-wrap;
@@ -1047,7 +1047,7 @@ body:not(.light-theme) .vcp-tool-result-bubble th {
 }
 
 /* NEW: Styles for Collapsible Content */
-.vcp-tool-result-collapsible-content {
+.unistudy-tool-result-collapsible-content {
     max-height: 0;
     opacity: 0;
     overflow-x: hidden;
@@ -1061,21 +1061,21 @@ body:not(.light-theme) .vcp-tool-result-bubble th {
 }
 
 /* Custom scrollbar for Webkit */
-.vcp-tool-result-collapsible-content::-webkit-scrollbar {
+.unistudy-tool-result-collapsible-content::-webkit-scrollbar {
     width: 4px;
 }
 
-.vcp-tool-result-collapsible-content::-webkit-scrollbar-track {
+.unistudy-tool-result-collapsible-content::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.vcp-tool-result-collapsible-content::-webkit-scrollbar-thumb {
+.unistudy-tool-result-collapsible-content::-webkit-scrollbar-thumb {
     background-color: var(--tool-result-item-key-color);
     border-radius: 10px;
     opacity: 0.5;
 }
 
-.vcp-tool-result-bubble.expanded .vcp-tool-result-collapsible-content {
+.unistudy-tool-result-bubble.expanded .unistudy-tool-result-collapsible-content {
     max-height: 500px;
     /* Set a reasonable max height for scrolling */
     opacity: 1;
@@ -1088,7 +1088,7 @@ body:not(.light-theme) .vcp-tool-result-bubble th {
     display: inline-block;
     background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
     background-size: 200% 200%;
-    animation: vcp-bubble-background-flow-kf 10s ease-in-out infinite;
+    animation: unistudy-bubble-background-flow-kf 10s ease-in-out infinite;
     color: #ffffff;
     padding: 5px 12px;
     border-radius: 16px;
@@ -1114,28 +1114,28 @@ body:not(.light-theme) .vcp-tool-result-bubble th {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* --- VCPChatCanvas Placeholder (Mini IDE Style) --- */
-@keyframes vcp-canvas-border-pulse {
+/* --- UniStudy Chat Canvas Placeholder (Mini IDE Style) --- */
+@keyframes unistudy-canvas-border-pulse {
     0% {
-        border-color: var(--vcp-canvas-border-color);
+        border-color: var(--unistudy-canvas-border-color);
     }
 
     50% {
-        border-color: var(--vcp-canvas-dots-color);
+        border-color: var(--unistudy-canvas-dots-color);
     }
 
     100% {
-        border-color: var(--vcp-canvas-border-color);
+        border-color: var(--unistudy-canvas-border-color);
     }
 }
 
-.vcp-chat-canvas-placeholder {
+.unistudy-chat-canvas-placeholder {
     display: block;
     width: -moz-fit-content;
     width: fit-content;
-    background-color: var(--vcp-canvas-bg);
-    color: var(--vcp-canvas-text-color);
-    border: 1px solid var(--vcp-canvas-border-color);
+    background-color: var(--unistudy-canvas-bg);
+    color: var(--unistudy-canvas-text-color);
+    border: 1px solid var(--unistudy-canvas-border-color);
     padding: 8px 15px;
     border-radius: 6px;
     /* More rectangular */
@@ -1146,14 +1146,14 @@ body:not(.light-theme) .vcp-tool-result-bubble th {
     position: relative;
     margin-bottom: 10px;
     transition: background-color 0.3s, color 0.3s, border-color 0.3s;
-    animation: vcp-canvas-border-pulse 4s infinite;
+    animation: unistudy-canvas-border-pulse 4s infinite;
 }
 
-.vcp-chat-canvas-placeholder .thinking-indicator-dots {
-    color: var(--vcp-canvas-dots-color);
+.unistudy-chat-canvas-placeholder .thinking-indicator-dots {
+    color: var(--unistudy-canvas-dots-color);
     font-size: 1.2em;
     text-shadow: none;
-    /* The original vcp-loading-dots animation is reused */
+    /* The original unistudy-loading-dots animation is reused */
 }
 
 /* --- Mermaid Diagram Styles --- */
@@ -1224,7 +1224,7 @@ body:not(.light-theme) .mermaid-error {
  * 统一 AI 内容块流式渐入动画
  * 使用 translateX(20px) 实现你记忆中的横向滑入感
  */
-@keyframes vcp-stream-fade-in {
+@keyframes unistudy-stream-fade-in {
     from {
         opacity: 0;
         transform: translateX(20px);
@@ -1236,7 +1236,7 @@ body:not(.light-theme) .mermaid-error {
     }
 }
 
-@keyframes vcp-content-pulse {
+@keyframes unistudy-content-pulse {
     0% {
         background-color: transparent;
     }
@@ -1250,13 +1250,13 @@ body:not(.light-theme) .mermaid-error {
     }
 }
 
-.vcp-stream-element-fade-in {
-    animation: vcp-stream-fade-in 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
+.unistudy-stream-element-fade-in {
+    animation: unistudy-stream-fade-in 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
     will-change: opacity, transform;
 }
 
-.vcp-stream-content-pulse {
-    animation: vcp-content-pulse 0.3s ease-out;
+.unistudy-stream-content-pulse {
+    animation: unistudy-content-pulse 0.3s ease-out;
 }
 
 
@@ -1275,7 +1275,7 @@ body:not(.light-theme) .mermaid-error {
 }
 
 /* --- HTML Preview Container & Toggle --- */
-.vcp-html-preview-container {
+.unistudy-html-preview-container {
     position: relative;
     margin: 10px 0;
     border-radius: 8px;
@@ -1286,7 +1286,7 @@ body:not(.light-theme) .mermaid-error {
     /* 🟢 添加最小高度过渡，防止高度塌陷导致的滚动跳动 */
 }
 
-.vcp-html-preview-toggle {
+.unistudy-html-preview-toggle {
     position: absolute;
     top: 8px;
     right: 8px;
@@ -1306,16 +1306,16 @@ body:not(.light-theme) .mermaid-error {
     transition: all 0.2s ease;
 }
 
-.vcp-html-preview-toggle:hover {
+.unistudy-html-preview-toggle:hover {
     background: rgba(0, 0, 0, 0.7);
     transform: scale(1.05);
 }
 
-.vcp-html-preview-toggle span {
+.unistudy-html-preview-toggle span {
     pointer-events: none;
 }
 
-.vcp-html-preview-frame {
+.unistudy-html-preview-frame {
     width: 100%;
     min-height: 100px;
     max-height: 100vh;
@@ -1328,35 +1328,35 @@ body:not(.light-theme) .mermaid-error {
 }
 
 /* 确保预览模式下容器不会因为内容切换而剧烈跳动 */
-.vcp-html-preview-container.preview-mode {
+.unistudy-html-preview-container.preview-mode {
     background: white;
     /* 🟢 预览模式下保持稳定的背景 */
 }
 
 /* 🟢 新增：代码块的平滑过渡 */
-.vcp-html-preview-container pre {
+.unistudy-html-preview-container pre {
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 /* 🟢 新增：当iframe正在加载时的平滑过渡状态 */
-.vcp-html-preview-container.preview-mode pre {
+.unistudy-html-preview-container.preview-mode pre {
     opacity: 0;
     transform: translateY(-10px);
 }
 
 /* Ensure the pre block inside container doesn't have extra margins */
-.vcp-html-preview-container pre {
+.unistudy-html-preview-container pre {
     margin: 0 !important;
     border: none !important;
     border-radius: 0 !important;
 }
 
 /* Dark theme adjustments for the container */
-body:not(.light-theme) .vcp-html-preview-container {
+body:not(.light-theme) .unistudy-html-preview-container {
     border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* --- VCP Thought Chain Bubble --- */
+/* --- UniStudy Thought Chain Bubble --- */
 .vcp-thought-chain-bubble {
     display: block !important;
     background: rgba(120, 120, 128, 0.05) !important;
@@ -1378,7 +1378,7 @@ body.light-theme .vcp-thought-chain-bubble {
     border-color: rgba(0, 0, 0, 0.1);
 }
 
-.vcp-thought-chain-header {
+.unistudy-thought-chain-header {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1388,29 +1388,29 @@ body.light-theme .vcp-thought-chain-bubble {
     transition: opacity 0.2s;
 }
 
-.vcp-thought-chain-header:hover {
+.unistudy-thought-chain-header:hover {
     opacity: 1;
 }
 
-.vcp-thought-chain-icon {
+.unistudy-thought-chain-icon {
     font-size: 1.1em;
     filter: grayscale(0.5);
 }
 
-.vcp-thought-chain-label {
+.unistudy-thought-chain-label {
     font-weight: 600;
     color: var(--primary-text);
     font-size: 0.95em;
 }
 
-.vcp-thought-chain-collapsible-content {
+.unistudy-thought-chain-collapsible-content {
     max-height: 0;
     opacity: 0;
     overflow: hidden;
     transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
-.vcp-thought-chain-bubble.expanded .vcp-thought-chain-collapsible-content {
+.vcp-thought-chain-bubble.expanded .unistudy-thought-chain-collapsible-content {
     max-height: 2000px;
     opacity: 1;
     margin-top: 10px;
@@ -1418,12 +1418,12 @@ body.light-theme .vcp-thought-chain-bubble {
     border-top: 1px dashed rgba(120, 120, 128, 0.2);
 }
 
-.vcp-thought-chain-body {
+.unistudy-thought-chain-body {
     color: var(--primary-text);
     font-style: italic;
 }
 
-.vcp-thought-chain-body pre {
+.unistudy-thought-chain-body pre {
     background: rgba(0, 0, 0, 0.05);
     padding: 8px;
     border-radius: 6px;
@@ -1431,17 +1431,17 @@ body.light-theme .vcp-thought-chain-bubble {
     font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
 }
 
-.vcp-thought-chain-body code {
+.unistudy-thought-chain-body code {
     font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
 }
 
 /* Reuse the toggle icon from tool results */
-.vcp-thought-chain-bubble .vcp-result-toggle-icon {
+.vcp-thought-chain-bubble .unistudy-result-toggle-icon {
     margin-left: 10px;
 }
 
 /* --- Role Divider --- */
-.vcp-role-divider {
+.unistudy-role-divider {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1453,32 +1453,32 @@ body.light-theme .vcp-thought-chain-bubble {
     clear: both;
 }
 
-.vcp-role-divider::before,
-.vcp-role-divider::after {
+.unistudy-role-divider::before,
+.unistudy-role-divider::after {
     content: "";
     flex: 1;
     border-bottom: 1px dashed var(--border-color, #ccc);
     margin: 0 15px;
 }
 
-.vcp-role-divider.role-system {
+.unistudy-role-divider.role-system {
     color: #e67e22;
 }
 
-.vcp-role-divider.role-assistant {
+.unistudy-role-divider.role-assistant {
     color: #3498db;
 }
 
-.vcp-role-divider.role-user {
+.unistudy-role-divider.role-user {
     color: #2ecc71;
 }
 
-.vcp-role-divider.type-end {
+.unistudy-role-divider.type-end {
     opacity: 0.5;
 }
 
 /* --- VCPdesktop Push Placeholder --- */
-.vcp-desktop-push-placeholder {
+.unistudy-desktop-push-placeholder {
     display: block !important;
     background: linear-gradient(145deg, rgba(30, 60, 90, 0.15), rgba(20, 40, 70, 0.25)) !important;
     border-radius: 10px !important;
@@ -1495,40 +1495,40 @@ body.light-theme .vcp-thought-chain-bubble {
     backdrop-filter: blur(4px);
 }
 
-.vcp-desktop-push-placeholder.constructing {
+.unistudy-desktop-push-placeholder.constructing {
     border-color: rgba(100, 180, 255, 0.4);
-    animation: vcp-desktop-push-breathe 2s ease-in-out infinite;
+    animation: unistudy-desktop-push-breathe 2s ease-in-out infinite;
 }
 
-@keyframes vcp-desktop-push-breathe {
+@keyframes unistudy-desktop-push-breathe {
     0% { border-color: rgba(100, 180, 255, 0.2); box-shadow: 0 0 0 rgba(100, 180, 255, 0); }
     50% { border-color: rgba(100, 180, 255, 0.5); box-shadow: 0 0 12px rgba(100, 180, 255, 0.15); }
     100% { border-color: rgba(100, 180, 255, 0.2); box-shadow: 0 0 0 rgba(100, 180, 255, 0); }
 }
 
-.vcp-desktop-push-header {
+.unistudy-desktop-push-header {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 8px;
 }
 
-.vcp-desktop-push-icon {
+.unistudy-desktop-push-icon {
     font-size: 1.1em;
 }
 
-.vcp-desktop-push-label {
+.unistudy-desktop-push-label {
     font-weight: 600;
     color: rgba(100, 180, 255, 0.9);
     font-size: 0.95em;
 }
 
-.vcp-desktop-push-preview {
+.unistudy-desktop-push-preview {
     opacity: 0.5;
     font-size: 0.85em;
 }
 
-.vcp-desktop-push-preview pre {
+.unistudy-desktop-push-preview pre {
     margin: 0;
     padding: 6px 10px;
     background: rgba(0, 0, 0, 0.15);
@@ -1542,16 +1542,16 @@ body.light-theme .vcp-thought-chain-bubble {
     overflow: hidden;
 }
 
-body.light-theme .vcp-desktop-push-placeholder {
+body.light-theme .unistudy-desktop-push-placeholder {
     background: linear-gradient(145deg, rgba(200, 220, 240, 0.3), rgba(180, 210, 240, 0.2)) !important;
     border-color: rgba(50, 120, 200, 0.2);
 }
 
-body.light-theme .vcp-desktop-push-label {
+body.light-theme .unistudy-desktop-push-label {
     color: rgba(30, 100, 180, 0.9);
 }
 
-body.light-theme .vcp-desktop-push-preview pre {
+body.light-theme .unistudy-desktop-push-preview pre {
     background: rgba(0, 0, 0, 0.05);
     color: rgba(0, 0, 0, 0.5);
 }

@@ -1,4 +1,4 @@
-﻿// modules/renderer/streamManager.js
+// modules/renderer/streamManager.js
 import { formatMessageTimestamp } from './domBuilder.js';
 import { createContentPipeline, PIPELINE_MODES } from './contentPipeline.js';
 
@@ -235,15 +235,15 @@ function applyStreamingPreprocessors(text) {
 }
 
 function ensureStreamingRoots(contentDiv) {
-    let stableRoot = contentDiv.querySelector('.vcp-stream-stable-root');
-    let tailRoot = contentDiv.querySelector('.vcp-stream-tail-root');
+    let stableRoot = contentDiv.querySelector('.unistudy-stream-stable-root');
+    let tailRoot = contentDiv.querySelector('.unistudy-stream-tail-root');
 
     if (!stableRoot || !tailRoot) {
         contentDiv.innerHTML = '';
         stableRoot = document.createElement('div');
-        stableRoot.className = 'vcp-stream-stable-root';
+        stableRoot.className = 'unistudy-stream-stable-root';
         tailRoot = document.createElement('div');
-        tailRoot.className = 'vcp-stream-tail-root';
+        tailRoot.className = 'unistudy-stream-tail-root';
         contentDiv.appendChild(stableRoot);
         contentDiv.appendChild(tailRoot);
     }
@@ -481,11 +481,11 @@ function renderStreamFrame(messageId) {
                 }
                 
                 // Preserve runtime animation classes that do not exist in marked output.
-                if (fromEl.classList.contains('vcp-stream-element-fade-in')) {
-                    toEl.classList.add('vcp-stream-element-fade-in');
+                if (fromEl.classList.contains('unistudy-stream-element-fade-in')) {
+                    toEl.classList.add('unistudy-stream-element-fade-in');
                 }
-                if (fromEl.classList.contains('vcp-stream-content-pulse')) {
-                    toEl.classList.add('vcp-stream-content-pulse');
+                if (fromEl.classList.contains('unistudy-stream-content-pulse')) {
+                    toEl.classList.add('unistudy-stream-content-pulse');
                 }
 
                 // Detect meaningful block-level growth and pulse the element once.
@@ -497,9 +497,9 @@ function renderStreamFrame(messageId) {
                     // Trigger a pulse when content grows significantly.
                     if (lengthDiff > 20) {
                         // Use a pulse instead of a slide animation.
-                        fromEl.classList.add('vcp-stream-content-pulse');
+                        fromEl.classList.add('unistudy-stream-content-pulse');
                         setTimeout(() => {
-                            fromEl.classList.remove('vcp-stream-content-pulse');
+                            fromEl.classList.remove('unistudy-stream-content-pulse');
                         }, 300);
                     }
                     
@@ -570,7 +570,7 @@ function renderStreamFrame(messageId) {
                 // Animate common block elements so list and table updates stay smooth.
                 if (node.nodeType === 1 && /^(P|DIV|UL|OL|LI|PRE|BLOCKQUOTE|H[1-6]|TABLE|TR|FIGURE)$/.test(node.tagName)) {
                     // Mark new nodes for entry animation.
-                    node.classList.add('vcp-stream-element-fade-in');
+                    node.classList.add('unistudy-stream-element-fade-in');
                     
                     // Cache initial text length for later pulse detection.
                     elementContentLengthCache.set(node, node.textContent.length);
@@ -578,7 +578,7 @@ function renderStreamFrame(messageId) {
                     // Remove the animation class after the DOM has settled.
                     setTimeout(() => {
                         if (node && node.classList) {
-                            node.classList.remove('vcp-stream-element-fade-in');
+                            node.classList.remove('unistudy-stream-element-fade-in');
                         }
                     }, 1000);
                 }
@@ -1081,7 +1081,7 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
 
             const contentDiv = messageItem.querySelector('.md-content');
             if (contentDiv) {
-                contentDiv.querySelectorAll('.vcp-stream-stable-root, .vcp-stream-tail-root').forEach((el) => el.remove());
+                contentDiv.querySelectorAll('.unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
 
                 const globalSettings = refs.globalSettingsRef.get();
                 // Use the more thorough preprocessFullContent for the final render

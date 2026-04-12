@@ -1,4 +1,4 @@
-﻿// modules/renderer/messageContextMenu.js
+// modules/renderer/messageContextMenu.js
 
 let mainRefs = {};
 let contextMenuDependencies = {};
@@ -109,7 +109,7 @@ function showContextMenu(event, messageItem, message) {
             let textToCopy = normalizeTextContent(message.content);
             if (contentDiv) {
                 const contentClone = contentDiv.cloneNode(true);
-                contentClone.querySelectorAll('.vcp-tool-use-bubble, .vcp-tool-result-bubble, style, script').forEach((el) => el.remove());
+                contentClone.querySelectorAll('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, style, script').forEach((el) => el.remove());
                 textToCopy = contentClone.innerText.replace(/\n{3,}/g, '\n\n').trim();
             }
             await navigator.clipboard.writeText(textToCopy);
