@@ -5,6 +5,10 @@ import {
     getNormalizedNoteKind,
     removeDeletedNoteReferencesFromHistory,
 } from './notesUtils.js';
+import {
+    buildQuizSummaryMarkdown,
+    parseQuizSetFromResponse,
+} from '../quiz/quizUtils.js';
 
 function createNotesOperations(deps = {}) {
     const state = deps.state || {};
@@ -373,8 +377,36 @@ function createNotesOperations(deps = {}) {
                 kind: 'analysis',
             },
             quiz: {
-                title: `选择题练习 ${new Date().toLocaleString()}`,
-                instruction: '请基于以下学习材料生成 8 道选择题。每题包含题干、4 个选项、正确答案、简短解析。使用简体中文 Markdown。',
+                title: '选择题练习',
+                instruction: [
+                    '请基于以下学习材料生成一组结构化选择题练习。',
+                    '你必须只返回严格 JSON，不要输出 JSON 之外的任何文字。',
+                    '禁止输出寒暄、前言、分隔线、时间戳标题、Markdown 标题或额外说明。',
+                    'JSON 结构如下：',
+                    '{',
+                    '  "title": "测验标题",',
+                    '  "items": [',
+                    '    {',
+                    '      "id": "quiz_1",',
+                    '      "stem": "题干",',
+                    '      "options": [',
+                    '        { "id": "option_a", "label": "A", "text": "选项内容" },',
+                    '        { "id": "option_b", "label": "B", "text": "选项内容" },',
+                    '        { "id": "option_c", "label": "C", "text": "选项内容" },',
+                    '        { "id": "option_d", "label": "D", "text": "选项内容" }',
+                    '      ],',
+                    '      "correctOptionId": "option_a",',
+                    '      "explanation": "简明解析"',
+                    '    }',
+                    '  ]',
+                    '}',
+                    '要求：',
+                    '1. 生成 8 道题。',
+                    '2. 每题必须且只能有 4 个选项，label 必须严格为 A/B/C/D。',
+                    '3. correctOptionId 必须严格对应某个 option.id。',
+                    '4. 题干、选项、答案、解析全部使用简体中文。',
+                    '5. title 使用简洁的练习名称，不要带时间戳。',
+                ].join('\n'),
                 kind: 'quiz',
             },
             flashcards: {
@@ -418,7 +450,12 @@ function createNotesOperations(deps = {}) {
             endpoint: state.settings.vcpServerUrl,
             apiKey: state.settings.vcpApiKey,
             messages: [
-                { role: 'system', content: '你是 UniStudy 的学习助手，请输出结构清晰、适合学习沉淀的 Markdown。' },
+                {
+                    role: 'system',
+                    content: prompt.kind === 'quiz' || prompt.kind === 'flashcards'
+                        ? '你是 UniStudy 的学习助手。请严格遵守输出格式要求，不要输出任何额外说明。'
+                        : '你是 UniStudy 的学习助手，请输出结构清晰、适合学习沉淀的 Markdown。',
+                },
                 { role: 'user', content: `${prompt.instruction}\n\n学习材料如下：\n\n${studyInput.text}` },
             ],
             modelConfig: {
@@ -453,10 +490,19 @@ function createNotesOperations(deps = {}) {
         }
 
         let contentMarkdown = responseContent;
+        let quizSet = null;
         let flashcardDeck = null;
         let flashcardProgress = null;
 
-        if (prompt.kind === 'flashcards') {
+        if (prompt.kind === 'quiz') {
+            quizSet = parseQuizSetFromResponse(responseContent, prompt.title);
+            if (!quizSet) {
+                ui.showToastNotification('选择题生成结果格式无效，请重试。', 'error');
+                return;
+            }
+
+            contentMarkdown = buildQuizSummaryMarkdown(quizSet);
+        } else if (prompt.kind === 'flashcards') {
             const generated = flashcardsApi.buildGeneratedFlashcardContent(
                 responseContent,
                 prompt.title,
@@ -477,11 +523,14 @@ function createNotesOperations(deps = {}) {
         }
 
         const saveResult = await chatAPI.saveTopicNote(state.currentSelectedItem.id, state.currentTopicId, {
-            title: prompt.title,
+            title: prompt.kind === 'quiz'
+                ? (quizSet?.title || prompt.title)
+                : prompt.title,
             contentMarkdown,
             sourceMessageIds: studyInput.sourceMessageIds,
             sourceDocumentRefs: studyInput.sourceDocumentRefs,
             kind: prompt.kind,
+            quizSet,
             flashcardDeck,
             flashcardProgress,
         });

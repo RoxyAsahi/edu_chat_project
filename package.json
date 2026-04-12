@@ -7,10 +7,16 @@
     "build:preloads": "node scripts/build-preloads.js",
     "migrate:legacy-data": "node scripts/migrate-legacy-data-root.js",
     "start": "node scripts/launch-electron.js .",
+    "pack": "node scripts/package-electron.js pack",
+    "dist": "node scripts/package-electron.js dist",
     "pack:win": "electron-builder --win dir",
     "dist:win": "electron-builder --win nsis portable",
+    "pack:mac": "electron-builder --mac dir",
+    "dist:mac": "electron-builder --mac",
+    "pack:linux": "electron-builder --linux dir",
+    "dist:linux": "electron-builder --linux",
     "test": "npm run test:main && npm run test:renderer && npm run test:e2e:controlled",
-    "test:main": "node --test tests/agent-handlers.test.js tests/chat-prompt-resolution.test.js tests/chat-window-getter.test.js tests/data-root-resolver.test.js tests/file-dialog-handlers.test.js tests/kb-guide.test.js tests/kb-reader-view.test.js tests/kb-retrieval.test.js tests/knowledge-base-facade.test.js tests/knowledge-base-handlers.test.js tests/legacy-data-migration.test.js tests/model-usage-tracker.test.js tests/preload-contract.test.js tests/preload-paths.test.js tests/prompt-variable-resolver.test.js tests/runtime-data-roots.test.js tests/settings-manager.test.js tests/theme-handlers.test.js tests/upstream-capabilities.test.js",
+    "test:main": "node --test tests/agent-handlers.test.js tests/chat-prompt-resolution.test.js tests/chat-window-getter.test.js tests/data-root-resolver.test.js tests/electron-binary-path.test.js tests/file-dialog-handlers.test.js tests/kb-guide.test.js tests/kb-reader-view.test.js tests/kb-retrieval.test.js tests/knowledge-base-facade.test.js tests/knowledge-base-handlers.test.js tests/legacy-data-migration.test.js tests/model-usage-tracker.test.js tests/preload-contract.test.js tests/preload-paths.test.js tests/prompt-variable-resolver.test.js tests/runtime-data-roots.test.js tests/settings-manager.test.js tests/theme-handlers.test.js tests/upstream-capabilities.test.js",
     "test:renderer": "npm run test:renderer:logic && npm run test:renderer:dom",
     "test:renderer:logic": "node --test tests/renderer-*.test.js",
     "test:renderer:dom": "vitest run --environment jsdom tests/renderer/safe-html.test.js",
@@ -52,6 +58,7 @@
   "build": {
     "appId": "com.unistudy.desktop",
     "productName": "UniStudy",
+    "icon": "src/assets/icon.png",
     "directories": {
       "output": "dist"
     },
@@ -66,7 +73,6 @@
     ],
     "npmRebuild": false,
     "win": {
-      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         {
@@ -81,6 +87,20 @@
             "x64"
           ]
         }
+      ]
+    },
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Education",
+      "target": [
+        "AppImage",
+        "tar.gz"
       ]
     },
     "nsis": {

@@ -172,6 +172,7 @@ notesController = createNotesController({
     el,
     chatAPI,
     ui,
+    renderMarkdownFragment,
     windowObj: window,
     documentObj: document,
     setSidePanelTab,

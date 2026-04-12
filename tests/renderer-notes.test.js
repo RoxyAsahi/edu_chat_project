@@ -4,54 +4,34 @@ const fs = require('fs/promises');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
-function stripModuleExports(source) {
-    return source.replace(/export\s*\{[\s\S]*?\};?\s*$/m, '');
-}
+async function buildModuleDataUrl(filePath, moduleCache = new Map()) {
+    const normalizedPath = path.resolve(filePath);
+    if (moduleCache.has(normalizedPath)) {
+        return moduleCache.get(normalizedPath);
+    }
 
-async function buildNotesUtilsSource() {
-    const notesPath = path.resolve(__dirname, '../src/modules/renderer/app/notes/notesUtils.js');
-    const flashcardsPath = path.resolve(__dirname, '../src/modules/renderer/app/flashcards/flashcardUtils.js');
-    let source = await fs.readFile(notesPath, 'utf8');
-    const flashcardSource = stripModuleExports(await fs.readFile(flashcardsPath, 'utf8'));
+    let source = await fs.readFile(normalizedPath, 'utf8');
+    const importMatches = [...source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)];
+    for (const match of importMatches) {
+        const specifier = match[1];
+        const dependencyPath = path.resolve(path.dirname(normalizedPath), specifier);
+        const dependencyUrl = await buildModuleDataUrl(dependencyPath, moduleCache);
+        source = source.replace(`from '${specifier}'`, `from '${dependencyUrl}'`);
+        source = source.replace(`from "${specifier}"`, `from "${dependencyUrl}"`);
+    }
 
-    source = source.replace(
-        /^import\s+\{[\s\S]*?\}\s+from\s+['"].+flashcardUtils\.js['"];\r?\n/m,
-        `${flashcardSource}\n`
-    );
-
-    return source;
+    const dataUrl = `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+    moduleCache.set(normalizedPath, dataUrl);
+    return dataUrl;
 }
 
 async function loadNotesUtilsModule() {
-    const source = await buildNotesUtilsSource();
-    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+    const notesPath = path.resolve(__dirname, '../src/modules/renderer/app/notes/notesUtils.js');
+    return import(await buildModuleDataUrl(notesPath));
 }
 
 async function loadNotesControllerModule() {
     const controllerPath = path.resolve(__dirname, '../src/modules/renderer/app/notes/notesController.js');
-    const moduleCache = new Map();
-
-    async function buildModuleDataUrl(filePath) {
-        const normalizedPath = path.resolve(filePath);
-        if (moduleCache.has(normalizedPath)) {
-            return moduleCache.get(normalizedPath);
-        }
-
-        let source = await fs.readFile(normalizedPath, 'utf8');
-        const importMatches = [...source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)];
-        for (const match of importMatches) {
-            const specifier = match[1];
-            const dependencyPath = path.resolve(path.dirname(normalizedPath), specifier);
-            const dependencyUrl = await buildModuleDataUrl(dependencyPath);
-            source = source.replace(`from '${specifier}'`, `from '${dependencyUrl}'`);
-            source = source.replace(`from "${specifier}"`, `from "${dependencyUrl}"`);
-        }
-
-        const dataUrl = `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
-        moduleCache.set(normalizedPath, dataUrl);
-        return dataUrl;
-    }
-
     return import(await buildModuleDataUrl(controllerPath));
 }
 
@@ -90,9 +70,16 @@ function createBaseState(overrides = {}) {
             selectedNoteIds: [],
             notesStudioView: 'overview',
             noteDetailKind: null,
+            noteDetailMode: 'edit',
             activeNoteMenu: null,
             activeFlashcardNoteId: null,
             pendingFlashcardGeneration: null,
+            quizPractice: {
+                noteId: null,
+                currentIndex: 0,
+                selectedOptionId: null,
+                revealed: false,
+            },
         },
         composer: {},
     };
@@ -163,6 +150,10 @@ function createNotesDom() {
             <button id="analyzeNotesBtn"></button>
             <button id="generateQuizBtn"></button>
             <button id="generateFlashcardsBtn"></button>
+            <button id="analysisViewReportBtn"></button>
+            <button id="analysisEditMarkdownBtn"></button>
+            <button id="quizViewPracticeBtn"></button>
+            <button id="quizEditSourceBtn"></button>
             <div id="noteDetailModal" class="hidden"></div>
             <button id="noteDetailCloseBtn"></button>
             <div id="noteDetailModalBackdrop"></div>
@@ -173,8 +164,25 @@ function createNotesDom() {
             <div id="noteDetailEyebrow"></div>
             <div id="noteDetailTitle"></div>
             <div id="noteDetailSubtitle"></div>
+            <div id="analysisPreviewCard"></div>
+            <div id="analysisPreviewTitle"></div>
+            <div id="analysisPreviewContent"></div>
+            <div id="analysisPreviewMeta"></div>
             <div id="noteEditorCard"></div>
             <div id="flashcardsPracticeCard"></div>
+            <div id="quizPracticeCard"></div>
+            <div id="quizPracticeTitle"></div>
+            <div id="quizPracticeSummary"></div>
+            <div id="quizPracticeProgress"></div>
+            <div id="quizPracticeQuestionIndex"></div>
+            <div id="quizPracticeStem"></div>
+            <div id="quizPracticeOptions"></div>
+            <div id="quizPracticeFeedback"></div>
+            <div id="quizPracticeResult"></div>
+            <div id="quizPracticeAnswer"></div>
+            <div id="quizPracticeExplanation"></div>
+            <button id="quizPracticePrevBtn"></button>
+            <button id="quizPracticeNextBtn"></button>
             <div id="chatMessages"></div>
         </body>
     `, { pretendToBeVisual: true });
@@ -199,6 +207,10 @@ function createNotesDom() {
             analyzeNotesBtn: window.document.getElementById('analyzeNotesBtn'),
             generateQuizBtn: window.document.getElementById('generateQuizBtn'),
             generateFlashcardsBtn: window.document.getElementById('generateFlashcardsBtn'),
+            analysisViewReportBtn: window.document.getElementById('analysisViewReportBtn'),
+            analysisEditMarkdownBtn: window.document.getElementById('analysisEditMarkdownBtn'),
+            quizViewPracticeBtn: window.document.getElementById('quizViewPracticeBtn'),
+            quizEditSourceBtn: window.document.getElementById('quizEditSourceBtn'),
             noteDetailModal: window.document.getElementById('noteDetailModal'),
             noteDetailCloseBtn: window.document.getElementById('noteDetailCloseBtn'),
             noteDetailModalBackdrop: window.document.getElementById('noteDetailModalBackdrop'),
@@ -209,8 +221,25 @@ function createNotesDom() {
             noteDetailEyebrow: window.document.getElementById('noteDetailEyebrow'),
             noteDetailTitle: window.document.getElementById('noteDetailTitle'),
             noteDetailSubtitle: window.document.getElementById('noteDetailSubtitle'),
+            analysisPreviewCard: window.document.getElementById('analysisPreviewCard'),
+            analysisPreviewTitle: window.document.getElementById('analysisPreviewTitle'),
+            analysisPreviewContent: window.document.getElementById('analysisPreviewContent'),
+            analysisPreviewMeta: window.document.getElementById('analysisPreviewMeta'),
             noteEditorCard: window.document.getElementById('noteEditorCard'),
             flashcardsPracticeCard: window.document.getElementById('flashcardsPracticeCard'),
+            quizPracticeCard: window.document.getElementById('quizPracticeCard'),
+            quizPracticeTitle: window.document.getElementById('quizPracticeTitle'),
+            quizPracticeSummary: window.document.getElementById('quizPracticeSummary'),
+            quizPracticeProgress: window.document.getElementById('quizPracticeProgress'),
+            quizPracticeQuestionIndex: window.document.getElementById('quizPracticeQuestionIndex'),
+            quizPracticeStem: window.document.getElementById('quizPracticeStem'),
+            quizPracticeOptions: window.document.getElementById('quizPracticeOptions'),
+            quizPracticeFeedback: window.document.getElementById('quizPracticeFeedback'),
+            quizPracticeResult: window.document.getElementById('quizPracticeResult'),
+            quizPracticeAnswer: window.document.getElementById('quizPracticeAnswer'),
+            quizPracticeExplanation: window.document.getElementById('quizPracticeExplanation'),
+            quizPracticePrevBtn: window.document.getElementById('quizPracticePrevBtn'),
+            quizPracticeNextBtn: window.document.getElementById('quizPracticeNextBtn'),
             chatMessages: window.document.getElementById('chatMessages'),
         },
     };
@@ -365,6 +394,30 @@ test('removeDeletedNoteReferencesFromHistory clears favorite state only when the
     assert.equal(nextHistory[1].favoriteAt, 456);
 });
 
+test('normalizeNote derives structured quiz data from legacy markdown content', async () => {
+    const { normalizeNote } = await loadNotesUtilsModule();
+
+    const note = normalizeNote({
+        kind: 'quiz',
+        title: '函数测验',
+        contentMarkdown: [
+            '# 函数测验',
+            '',
+            '## 1. 导数的几何意义是什么？',
+            'A. 曲线在该点的切线斜率',
+            'B. 曲线与坐标轴围成的面积',
+            'C. 函数的定义域',
+            'D. 函数的最小值',
+            '正确答案：A',
+            '解析：导数描述函数在某点的瞬时变化率，对应切线斜率。',
+        ].join('\n'),
+    });
+
+    assert.equal(note.quizSet.title, '函数测验');
+    assert.equal(note.quizSet.items.length, 1);
+    assert.equal(note.quizSet.items[0].correctOptionId, 'option_a');
+});
+
 test('note save and delete helpers cover blank drafts, save payloads, and deleted state cleanup', async () => {
     const {
         buildBlankNoteTitle,
@@ -399,6 +452,31 @@ test('note save and delete helpers cover blank drafts, save payloads, and delete
     assert.equal(request.targetTopicId, 'topic-old');
     assert.equal(request.payload.title, '旧标题');
     assert.equal(request.payload.contentMarkdown, '新的内容');
+
+    const quizRequest = buildNoteSaveRequest({
+        currentNote: {
+            id: 'quiz-1',
+            title: '函数测验',
+            topicId: 'topic-1',
+            kind: 'quiz',
+        },
+        currentTopicId: 'topic-1',
+        title: '函数测验',
+        contentMarkdown: [
+            '# 函数测验',
+            '',
+            '1. 导数的几何意义是什么？',
+            'A. 曲线在该点的切线斜率',
+            'B. 曲线与坐标轴围成的面积',
+            'C. 函数的定义域',
+            'D. 函数的最小值',
+            '正确答案：A',
+            '解析：导数描述函数在某点的瞬时变化率，对应切线斜率。',
+        ].join('\n'),
+    });
+
+    assert.equal(quizRequest.payload.kind, 'quiz');
+    assert.equal(quizRequest.payload.quizSet.title, '函数测验');
     assert.deepEqual(
         deriveDeletedNoteState({
             selectedNoteIds: ['note-1', 'note-2'],
