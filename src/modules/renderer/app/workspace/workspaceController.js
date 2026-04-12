@@ -273,7 +273,7 @@ function createWorkspaceController(deps = {}) {
     async function loadAgents() {
         const agents = await chatAPI.getAgents();
         if (agents?.error) {
-            console.error('[LiteRenderer] getAgents failed:', agents.error);
+            console.error('[UniStudyRenderer] getAgents failed:', agents.error);
             ui.showToastNotification(`加载智能体失败：${agents.error}`, 'error');
             state.agents = [];
             renderAgentList({});
@@ -455,7 +455,7 @@ function createWorkspaceController(deps = {}) {
         try {
             await chatAPI.watcherStop();
         } catch (error) {
-            console.warn('[LiteRenderer] watcherStop failed:', error);
+            console.warn('[UniStudyRenderer] watcherStop failed:', error);
         }
     }
 

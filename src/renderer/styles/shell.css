@@ -9,7 +9,7 @@ html, body {
   min-height: 100%;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--lite-chat-font);
+  font-family: var(--unistudy-chat-font);
 }
 
 body { overflow: hidden; }

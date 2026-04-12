@@ -716,7 +716,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .workspace-card__title {
   margin: 0;
   color: var(--ink);
-  font-family: var(--lite-chat-font);
+  font-family: var(--unistudy-chat-font);
   font-size: 15px;
   font-weight: 600;
   line-height: 1.2;
