@@ -101,7 +101,6 @@ function createSettingsController(deps = {}) {
     async function loadSettings() {
         const loaded = await chatAPI.loadSettings();
         patchGlobalSettings(loaded || {});
-        windowObj.globalSettings = getGlobalSettings();
         syncGlobalSettingsForm();
         applyRendererSettings();
         syncLayoutSettings(getGlobalSettings());
@@ -138,7 +137,6 @@ function createSettingsController(deps = {}) {
         }
 
         patchGlobalSettings(patch);
-        windowObj.globalSettings = getGlobalSettings();
         applyRendererSettings();
         chatAPI.setThemeMode(themeMode);
         windowObj.emoticonManager?.reload?.();

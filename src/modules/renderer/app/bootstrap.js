@@ -58,6 +58,7 @@ async function initializeAppRuntime(deps = {}) {
     const messageRendererApi = deps.messageRendererApi;
     const interruptRequest = deps.interruptRequest;
     const appendAttachments = deps.appendAttachments;
+    const setActiveRequestId = deps.setActiveRequestId || (() => {});
     const windowObj = deps.windowObj || window;
 
     const markedInstance = initMarked();
@@ -88,6 +89,7 @@ async function initializeAppRuntime(deps = {}) {
                 patchSettingsSlice(store, { settings: value });
             },
         },
+        setActiveRequestId,
         chatMessagesDiv: el.chatMessages,
         electronAPI: chatAPI,
         markedInstance,

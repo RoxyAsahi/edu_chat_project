@@ -6,7 +6,6 @@ import {
     resolveReaderInitialLocation,
     shouldRefreshReaderGuide,
 } from './readerUtils.js';
-import { createStoreView } from '../store/storeView.js';
 
 function escapeHtml(text) {
     return String(text || '')
@@ -19,9 +18,6 @@ function escapeHtml(text) {
 
 function createReaderController(deps = {}) {
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: ['reader'],
-    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -36,6 +32,7 @@ function createReaderController(deps = {}) {
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const onInjectSelection = deps.onInjectSelection || (() => {});
     const patchDocumentGuideStateInSource = deps.patchDocumentGuideStateInSource || (() => {});
+    const getLeftReaderActiveTab = deps.getLeftReaderActiveTab || (() => store.getState().layout.leftReaderActiveTab);
 
     const scheduleFrame = typeof windowObj.requestAnimationFrame === 'function'
         ? windowObj.requestAnimationFrame.bind(windowObj)
@@ -44,6 +41,51 @@ function createReaderController(deps = {}) {
         ? windowObj.getSelection.bind(windowObj)
         : () => null;
     const NodeCtor = windowObj.Node || globalThis.Node;
+
+    function getReaderSlice() {
+        return store.getState().reader;
+    }
+
+    function patchReader(patch) {
+        return store.patchState('reader', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
+    const readerProxy = new Proxy({}, {
+        get(_target, prop) {
+            return getReaderSlice()[prop];
+        },
+        set(_target, prop, value) {
+            patchReader({
+                [prop]: value,
+            });
+            return true;
+        },
+        ownKeys() {
+            return Reflect.ownKeys(getReaderSlice());
+        },
+        getOwnPropertyDescriptor(_target, prop) {
+            return {
+                configurable: true,
+                enumerable: true,
+                writable: true,
+                value: getReaderSlice()[prop],
+            };
+        },
+    });
+
+    const state = {};
+    Object.defineProperties(state, {
+        reader: {
+            get: () => readerProxy,
+            set: (value) => patchReader(value),
+        },
+        leftReaderActiveTab: {
+            get: () => getLeftReaderActiveTab(),
+        },
+    });
 
     function resetReaderState() {
         state.reader = createInitialReaderState();

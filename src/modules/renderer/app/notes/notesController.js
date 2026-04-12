@@ -10,7 +10,6 @@ import {
     normalizeNote as normalizeStoredNote,
     removeDeletedNoteReferencesFromHistory,
 } from './notesUtils.js';
-import { createStoreView } from '../store/storeView.js';
 
 const NOTE_DETAIL_META = Object.freeze({
     note: {
@@ -54,9 +53,6 @@ function stripMarkdown(text) {
 
 function createNotesController(deps = {}) {
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: ['notes'],
-    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -84,10 +80,80 @@ function createNotesController(deps = {}) {
     const closeTopicActionMenu = deps.closeTopicActionMenu || (() => {});
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
+    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
+    const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
+    const getCurrentChatHistory = deps.getCurrentChatHistory || (() => store.getState().session.currentChatHistory);
 
     const HTMLElementCtor = windowObj.HTMLElement || globalThis.HTMLElement;
     const ElementCtor = windowObj.Element || globalThis.Element;
     let noteDetailTrigger = null;
+
+    function getNotesSlice() {
+        return store.getState().notes;
+    }
+
+    function patchNotes(patch) {
+        return store.patchState('notes', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
+    const state = {};
+    Object.defineProperties(state, {
+        topicNotes: {
+            get: () => getNotesSlice().topicNotes,
+            set: (value) => patchNotes({ topicNotes: value }),
+        },
+        agentNotes: {
+            get: () => getNotesSlice().agentNotes,
+            set: (value) => patchNotes({ agentNotes: value }),
+        },
+        notesScope: {
+            get: () => getNotesSlice().notesScope,
+            set: (value) => patchNotes({ notesScope: value }),
+        },
+        activeNoteId: {
+            get: () => getNotesSlice().activeNoteId,
+            set: (value) => patchNotes({ activeNoteId: value }),
+        },
+        selectedNoteIds: {
+            get: () => getNotesSlice().selectedNoteIds,
+            set: (value) => patchNotes({ selectedNoteIds: value }),
+        },
+        notesStudioView: {
+            get: () => getNotesSlice().notesStudioView,
+            set: (value) => patchNotes({ notesStudioView: value }),
+        },
+        noteDetailKind: {
+            get: () => getNotesSlice().noteDetailKind,
+            set: (value) => patchNotes({ noteDetailKind: value }),
+        },
+        activeNoteMenu: {
+            get: () => getNotesSlice().activeNoteMenu,
+            set: (value) => patchNotes({ activeNoteMenu: value }),
+        },
+        activeFlashcardNoteId: {
+            get: () => getNotesSlice().activeFlashcardNoteId,
+            set: (value) => patchNotes({ activeFlashcardNoteId: value }),
+        },
+        pendingFlashcardGeneration: {
+            get: () => getNotesSlice().pendingFlashcardGeneration,
+            set: (value) => patchNotes({ pendingFlashcardGeneration: value }),
+        },
+        currentSelectedItem: {
+            get: () => getCurrentSelectedItem() || { id: null, name: null, config: null },
+        },
+        currentTopicId: {
+            get: () => getCurrentTopicId(),
+        },
+        currentChatHistory: {
+            get: () => {
+                const history = getCurrentChatHistory();
+                return Array.isArray(history) ? history : [];
+            },
+        },
+    });
 
     function normalizeNote(note = {}) {
         return normalizeStoredNote(note, {

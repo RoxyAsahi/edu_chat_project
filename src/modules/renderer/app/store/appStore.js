@@ -32,55 +32,6 @@ const SLICE_NAMES = Object.freeze([
     'composer',
 ]);
 
-const FLAT_STATE_PROPERTY_PATHS = Object.freeze({
-    settings: ['settings', 'settings'],
-    settingsModalSection: ['settings', 'settingsModalSection'],
-    promptModule: ['settings', 'promptModule'],
-
-    layoutLeftWidth: ['layout', 'layoutLeftWidth'],
-    layoutRightWidth: ['layout', 'layoutRightWidth'],
-    layoutLeftTopHeight: ['layout', 'layoutLeftTopHeight'],
-    layoutInitialized: ['layout', 'layoutInitialized'],
-    activeResizeHandle: ['layout', 'activeResizeHandle'],
-    activeVerticalResizeHandle: ['layout', 'activeVerticalResizeHandle'],
-    leftSidebarMode: ['layout', 'leftSidebarMode'],
-    leftReaderActiveTab: ['layout', 'leftReaderActiveTab'],
-    sourceListScrollTop: ['layout', 'sourceListScrollTop'],
-    sidePanelTab: ['layout', 'sidePanelTab'],
-    rightPanelMode: ['layout', 'rightPanelMode'],
-
-    agents: ['session', 'agents'],
-    topics: ['session', 'topics'],
-    currentSelectedItem: ['session', 'currentSelectedItem'],
-    currentTopicId: ['session', 'currentTopicId'],
-    currentChatHistory: ['session', 'currentChatHistory'],
-    activeTopicMenu: ['session', 'activeTopicMenu'],
-
-    knowledgeBases: ['source', 'knowledgeBases'],
-    knowledgeBaseDocuments: ['source', 'knowledgeBaseDocuments'],
-    topicKnowledgeBaseDocuments: ['source', 'topicKnowledgeBaseDocuments'],
-    knowledgeBaseDebugResult: ['source', 'knowledgeBaseDebugResult'],
-    selectedKnowledgeBaseId: ['source', 'selectedKnowledgeBaseId'],
-    activeSourceFileMenu: ['source', 'activeSourceFileMenu'],
-
-    reader: ['reader'],
-
-    topicNotes: ['notes', 'topicNotes'],
-    agentNotes: ['notes', 'agentNotes'],
-    notesScope: ['notes', 'notesScope'],
-    activeNoteId: ['notes', 'activeNoteId'],
-    selectedNoteIds: ['notes', 'selectedNoteIds'],
-    notesStudioView: ['notes', 'notesStudioView'],
-    noteDetailKind: ['notes', 'noteDetailKind'],
-    activeNoteMenu: ['notes', 'activeNoteMenu'],
-    activeFlashcardNoteId: ['notes', 'activeFlashcardNoteId'],
-    pendingFlashcardGeneration: ['notes', 'pendingFlashcardGeneration'],
-
-    pendingAttachments: ['composer', 'pendingAttachments'],
-    pendingSelectionContextRefs: ['composer', 'pendingSelectionContextRefs'],
-    activeRequestId: ['composer', 'activeRequestId'],
-});
-
 function createInitialReaderState() {
     return {
         documentId: null,
@@ -160,13 +111,14 @@ function createInitialAppState() {
 function createAppStore(initialState = createInitialAppState()) {
     const state = initialState;
     const sliceListeners = new Map();
+    const knownSlices = new Set(SLICE_NAMES);
 
     function getState() {
         return state;
     }
 
     function patchState(slice, patch) {
-        if (!Object.prototype.hasOwnProperty.call(state, slice)) {
+        if (!knownSlices.has(slice)) {
             throw new Error(`Unknown app store slice: ${slice}`);
         }
 
@@ -184,7 +136,7 @@ function createAppStore(initialState = createInitialAppState()) {
     }
 
     function subscribe(slice, listener) {
-        if (!Object.prototype.hasOwnProperty.call(state, slice)) {
+        if (!knownSlices.has(slice)) {
             throw new Error(`Unknown app store slice: ${slice}`);
         }
 
@@ -211,7 +163,6 @@ function createAppStore(initialState = createInitialAppState()) {
 
 export {
     DEFAULT_SETTINGS,
-    FLAT_STATE_PROPERTY_PATHS,
     SLICE_NAMES,
     createInitialAppState,
     createInitialReaderState,

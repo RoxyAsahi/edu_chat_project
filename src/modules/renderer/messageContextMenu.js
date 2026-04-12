@@ -489,7 +489,7 @@ async function handleRegenerateResponse(originalAssistantMessage) {
             contextMenuDependencies.startStreamingMessage({ ...regenerationThinkingMessage, content: '' });
         }
 
-        window.setLiteActiveRequestId?.(regenerationThinkingMessage.id);
+        contextMenuDependencies.setActiveRequestId?.(regenerationThinkingMessage.id);
 
         const vcpResult = await electronAPI.sendToVCP({
             requestId: regenerationThinkingMessage.id,
@@ -503,7 +503,7 @@ async function handleRegenerateResponse(originalAssistantMessage) {
         if (modelConfigForVCP.stream) {
             if (vcpResult?.error || !vcpResult?.streamingStarted) {
                 const detailedError = vcpResult?.error || 'Unable to start streaming regeneration.';
-                window.setLiteActiveRequestId?.(null);
+                contextMenuDependencies.setActiveRequestId?.(null);
                 await contextMenuDependencies.finalizeStreamedMessage(regenerationThinkingMessage.id, 'error', context, {
                     error: detailedError,
                 });
@@ -536,10 +536,10 @@ async function handleRegenerateResponse(originalAssistantMessage) {
         await electronAPI.saveChatHistory(currentSelectedItemVal.id, currentTopicIdVal, finalHistory);
         contextMenuDependencies.removeMessageById(regenerationThinkingMessage.id, false);
         contextMenuDependencies.renderMessage(assistantMessage);
-        window.setLiteActiveRequestId?.(null);
+        contextMenuDependencies.setActiveRequestId?.(null);
         uiHelper.scrollToBottom();
     } catch (error) {
-        window.setLiteActiveRequestId?.(null);
+        contextMenuDependencies.setActiveRequestId?.(null);
         await contextMenuDependencies.finalizeStreamedMessage(regenerationThinkingMessage.id, 'error', context, {
             error: `Regenerate failed: ${error.message}`,
         });

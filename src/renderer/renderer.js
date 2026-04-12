@@ -83,6 +83,10 @@ composerController = createComposerController({
     interruptRequest,
     messageRendererApi: messageRenderer,
     createId: makeId,
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+    getCurrentTopicId: () => getSessionSlice().currentTopicId,
+    getCurrentChatHistory: () => getSessionSlice().currentChatHistory,
+    getGlobalSettings: () => getSettingsSlice().settings,
     getCurrentTopic: (...args) => workspaceController?.getCurrentTopic?.(...args),
     loadTopics: (...args) => workspaceController?.loadTopics?.(...args),
     loadAgents: (...args) => workspaceController?.loadAgents?.(...args),
@@ -108,6 +112,7 @@ readerController = createReaderController({
     getMarkedInstance: () => markedInstance,
     setLeftSidebarMode,
     setLeftReaderTab,
+    getLeftReaderActiveTab: () => getLayoutSlice().leftReaderActiveTab,
     renderTopicKnowledgeBaseFiles: (...args) => sourceController?.renderTopicKnowledgeBaseFiles?.(...args),
     syncKnowledgeBasePolling: (...args) => sourceController?.syncKnowledgeBasePolling?.(...args),
     hideSourceFileTooltip: (...args) => sourceController?.hideSourceFileTooltip?.(...args),
@@ -129,6 +134,9 @@ sourceController = createSourceController({
     syncReaderFromDocuments: (...args) => readerController?.syncFromSourceDocuments?.(...args),
     getNativePathForFile: (...args) => composerController?.getNativePathForFile?.(...args),
     loadTopics: (...args) => workspaceController?.loadTopics?.(...args),
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+    getCurrentTopicId: () => getSessionSlice().currentTopicId,
+    getTopics: () => getSessionSlice().topics,
     getLeftSidebarMode: () => getLayoutSlice().leftSidebarMode,
     getSourceListScrollTop,
     setSourceListScrollTop,
@@ -168,6 +176,9 @@ notesController = createNotesController({
     documentObj: document,
     setSidePanelTab,
     setRightPanelMode,
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+    getCurrentTopicId: () => getSessionSlice().currentTopicId,
+    getCurrentChatHistory: () => getSessionSlice().currentChatHistory,
     getCurrentTopic: (...args) => workspaceController?.getCurrentTopic?.(...args),
     getCurrentTopicDisplayName: (...args) => workspaceController?.getCurrentTopicDisplayName?.(...args),
     persistHistory,
@@ -265,6 +276,7 @@ const { bootstrap } = createAppBootstrap({
         messageRendererApi: messageRenderer,
         interruptRequest,
         appendAttachments: (...args) => composerController?.appendStoredAttachments?.(...args),
+        setActiveRequestId: (...args) => composerController?.setActiveRequestId?.(...args),
         windowObj: window,
     }),
     workspaceController,
@@ -684,7 +696,6 @@ window.__liteDebugState = () => {
 };
 
 window.updateSendButtonState = (...args) => composerController?.updateSendButtonState?.(...args);
-window.setLiteActiveRequestId = (requestId = null) => composerController?.setActiveRequestId?.(requestId);
 
 let storeSubscriptionsBound = false;
 
@@ -696,7 +707,6 @@ function bindStoreSubscriptions() {
     storeSubscriptionsBound = true;
 
     store.subscribe('settings', (nextSettingsSlice) => {
-        window.globalSettings = nextSettingsSlice.settings;
         applyRendererSettings();
     });
 

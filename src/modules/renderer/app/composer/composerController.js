@@ -1,5 +1,4 @@
 import { getReaderLocatorLabel } from '../reader/readerUtils.js';
-import { createStoreView } from '../store/storeView.js';
 import {
     buildAttachmentTransferPayload,
     buildKnowledgeBaseQuery,
@@ -21,9 +20,6 @@ function escapeHtml(text) {
 
 function createComposerController(deps = {}) {
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: ['composer'],
-    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -41,12 +37,58 @@ function createComposerController(deps = {}) {
     const autoResizeTextarea = deps.autoResizeTextarea || (() => {});
     const decorateChatMessages = deps.decorateChatMessages || (() => {});
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
+    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
+    const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
+    const getCurrentChatHistory = deps.getCurrentChatHistory || (() => store.getState().session.currentChatHistory);
+    const getGlobalSettings = deps.getGlobalSettings || (() => store.getState().settings.settings);
     const defaultSendButtonHtml = deps.defaultSendButtonHtml ?? (el.sendMessageBtn?.innerHTML || '');
     const interruptSendButtonHtml = deps.interruptSendButtonHtml || `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="none" aria-hidden="true">
         <rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor"></rect>
     </svg>
 `;
+
+    function getComposerSlice() {
+        return store.getState().composer;
+    }
+
+    function patchComposer(patch) {
+        return store.patchState('composer', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
+    const state = {};
+    Object.defineProperties(state, {
+        pendingAttachments: {
+            get: () => getComposerSlice().pendingAttachments,
+            set: (value) => patchComposer({ pendingAttachments: value }),
+        },
+        pendingSelectionContextRefs: {
+            get: () => getComposerSlice().pendingSelectionContextRefs,
+            set: (value) => patchComposer({ pendingSelectionContextRefs: value }),
+        },
+        activeRequestId: {
+            get: () => getComposerSlice().activeRequestId,
+            set: (value) => patchComposer({ activeRequestId: value }),
+        },
+        currentSelectedItem: {
+            get: () => getCurrentSelectedItem() || { id: null, name: null, avatarUrl: null, config: null },
+        },
+        currentTopicId: {
+            get: () => getCurrentTopicId(),
+        },
+        currentChatHistory: {
+            get: () => {
+                const history = getCurrentChatHistory();
+                return Array.isArray(history) ? history : [];
+            },
+        },
+        settings: {
+            get: () => getGlobalSettings() || {},
+        },
+    });
 
     function refreshAttachmentPreview() {
         ui.updateAttachmentPreview(state.pendingAttachments, el.attachmentPreviewArea);
@@ -126,7 +168,7 @@ function createComposerController(deps = {}) {
             return;
         }
 
-        state.pendingAttachments.push(...normalized);
+        state.pendingAttachments = [...state.pendingAttachments, ...normalized];
         refreshAttachmentPreview();
     }
 

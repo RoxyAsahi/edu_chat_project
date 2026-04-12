@@ -1,5 +1,4 @@
 import { isReaderSupportedDocument } from '../reader/readerUtils.js';
-import { createStoreView } from '../store/storeView.js';
 import { createSourceDom } from './sourceDom.js';
 import {
     TOPIC_SOURCE_FILE_LIMIT,
@@ -13,9 +12,6 @@ import { createSourceOperations } from './sourceOperations.js';
 
 function createSourceController(deps = {}) {
     const store = deps.store;
-    const state = createStoreView(store, {
-        writableSlices: ['source'],
-    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -33,6 +29,9 @@ function createSourceController(deps = {}) {
     const getSourceListScrollTop = deps.getSourceListScrollTop || (() => 0);
     const setSourceListScrollTop = deps.setSourceListScrollTop || (() => {});
     const updateTopicKnowledgeBaseBinding = deps.updateTopicKnowledgeBaseBinding || (() => {});
+    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
+    const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
+    const getTopics = deps.getTopics || (() => store.getState().session.topics);
 
     const scheduleFrame = typeof windowObj.requestAnimationFrame === 'function'
         ? windowObj.requestAnimationFrame.bind(windowObj)
@@ -46,6 +45,57 @@ function createSourceController(deps = {}) {
 
     let knowledgeBasePollTimer = null;
     let knowledgeBasePollInFlight = false;
+
+    function getSourceSlice() {
+        return store.getState().source;
+    }
+
+    function patchSource(patch) {
+        return store.patchState('source', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
+    const state = {};
+    Object.defineProperties(state, {
+        knowledgeBases: {
+            get: () => getSourceSlice().knowledgeBases,
+            set: (value) => patchSource({ knowledgeBases: value }),
+        },
+        knowledgeBaseDocuments: {
+            get: () => getSourceSlice().knowledgeBaseDocuments,
+            set: (value) => patchSource({ knowledgeBaseDocuments: value }),
+        },
+        topicKnowledgeBaseDocuments: {
+            get: () => getSourceSlice().topicKnowledgeBaseDocuments,
+            set: (value) => patchSource({ topicKnowledgeBaseDocuments: value }),
+        },
+        knowledgeBaseDebugResult: {
+            get: () => getSourceSlice().knowledgeBaseDebugResult,
+            set: (value) => patchSource({ knowledgeBaseDebugResult: value }),
+        },
+        selectedKnowledgeBaseId: {
+            get: () => getSourceSlice().selectedKnowledgeBaseId,
+            set: (value) => patchSource({ selectedKnowledgeBaseId: value }),
+        },
+        activeSourceFileMenu: {
+            get: () => getSourceSlice().activeSourceFileMenu,
+            set: (value) => patchSource({ activeSourceFileMenu: value }),
+        },
+        currentSelectedItem: {
+            get: () => getCurrentSelectedItem() || { id: null, name: null },
+        },
+        currentTopicId: {
+            get: () => getCurrentTopicId(),
+        },
+        topics: {
+            get: () => {
+                const topics = getTopics();
+                return Array.isArray(topics) ? topics : [];
+            },
+        },
+    });
 
     function getCurrentTopic() {
         return state.topics.find((topic) => topic.id === state.currentTopicId) || null;

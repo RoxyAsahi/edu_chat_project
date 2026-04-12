@@ -7,12 +7,6 @@ async function readRepoFile(relativePath) {
     return fs.readFile(path.resolve(__dirname, '..', relativePath), 'utf8');
 }
 
-async function loadAppStoreModule() {
-    const modulePath = path.resolve(__dirname, '../src/modules/renderer/app/store/appStore.js');
-    const source = await fs.readFile(modulePath, 'utf8');
-    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
-}
-
 test('renderer entry stays within PR4 guardrails and does not cache mutable app state', async () => {
     const rendererSource = await readRepoFile('src/renderer/renderer.js');
     const rendererLines = rendererSource.split(/\r?\n/).length;
@@ -27,91 +21,50 @@ test('renderer entry stays within PR4 guardrails and does not cache mutable app 
     assert.match(rendererSource, /store\.subscribe\('composer'/);
 });
 
-test('renderer controllers keep shell convergence and remaining feature slice ownership stable', async () => {
-    const shellConvergedControllers = [
+test('renderer controllers stay off the retired storeView compatibility path', async () => {
+    const convergedControllers = [
         'src/modules/renderer/app/layout/layoutController.js',
         'src/modules/renderer/app/settings/settingsController.js',
         'src/modules/renderer/app/workspace/workspaceController.js',
+        'src/modules/renderer/app/composer/composerController.js',
+        'src/modules/renderer/app/flashcards/flashcardController.js',
+        'src/modules/renderer/app/notes/notesController.js',
+        'src/modules/renderer/app/reader/readerController.js',
+        'src/modules/renderer/app/source/sourceController.js',
     ];
-    const featureControllersWithStoreView = new Map([
-        ['src/modules/renderer/app/composer/composerController.js', 'composer'],
-        ['src/modules/renderer/app/flashcards/flashcardController.js', 'notes'],
-        ['src/modules/renderer/app/notes/notesController.js', 'notes'],
-        ['src/modules/renderer/app/reader/readerController.js', 'reader'],
-        ['src/modules/renderer/app/source/sourceController.js', 'source'],
-    ]);
 
-    for (const relativePath of shellConvergedControllers) {
+    for (const relativePath of convergedControllers) {
         const source = await readRepoFile(relativePath);
         assert.doesNotMatch(
             source,
             /createStoreView\s*\(/,
-            `${relativePath} should stay off the transitional storeView path`,
-        );
-    }
-
-    for (const [relativePath, expectedSlice] of featureControllersWithStoreView.entries()) {
-        const source = await readRepoFile(relativePath);
-        const match = source.match(/writableSlices:\s*\[([^\]]*)\]/);
-        assert.ok(match, `${relativePath} should declare writableSlices while it still depends on storeView`);
-
-        const slices = Array.from(match[1].matchAll(/'([^']+)'/g), (entry) => entry[1]);
-        assert.deepEqual(
-            slices,
-            [expectedSlice],
-            `${relativePath} should only write the ${expectedSlice} slice`,
+            `${relativePath} should stay off the retired storeView path`,
         );
     }
 });
 
-test('flat-state storeView mapping stays frozen until the compatibility layer is retired', async () => {
-    const { FLAT_STATE_PROPERTY_PATHS } = await loadAppStoreModule();
-
-    assert.deepEqual(
-        Object.keys(FLAT_STATE_PROPERTY_PATHS).sort(),
-        [
-            'activeFlashcardNoteId',
-            'activeNoteId',
-            'activeNoteMenu',
-            'activeRequestId',
-            'activeResizeHandle',
-            'activeSourceFileMenu',
-            'activeTopicMenu',
-            'activeVerticalResizeHandle',
-            'agents',
-            'currentChatHistory',
-            'currentSelectedItem',
-            'currentTopicId',
-            'knowledgeBaseDebugResult',
-            'knowledgeBaseDocuments',
-            'knowledgeBases',
-            'layoutInitialized',
-            'layoutLeftTopHeight',
-            'layoutLeftWidth',
-            'layoutRightWidth',
-            'leftReaderActiveTab',
-            'leftSidebarMode',
-            'noteDetailKind',
-            'notesScope',
-            'notesStudioView',
-            'pendingAttachments',
-            'pendingFlashcardGeneration',
-            'pendingSelectionContextRefs',
-            'promptModule',
-            'reader',
-            'rightPanelMode',
-            'selectedKnowledgeBaseId',
-            'selectedNoteIds',
-            'settings',
-            'settingsModalSection',
-            'sidePanelTab',
-            'sourceListScrollTop',
-            'topicKnowledgeBaseDocuments',
-            'topicNotes',
-            'topics',
-            'agentNotes',
-        ].sort(),
+test('storeView compatibility files stay retired once ownership convergence lands', async () => {
+    await assert.rejects(
+        () => fs.access(path.resolve(__dirname, '../src/modules/renderer/app/store/storeView.js')),
+        /ENOENT/,
     );
+});
+
+test('renderer global surface stays within the three approved bridges', async () => {
+    const rendererSource = await readRepoFile('src/renderer/renderer.js');
+    const messageRendererSource = await readRepoFile('src/modules/renderer/messageRenderer.js');
+    const streamManagerSource = await readRepoFile('src/modules/renderer/streamManager.js');
+
+    assert.match(rendererSource, /window\.sendMessage\s*=/);
+    assert.match(rendererSource, /window\.updateSendButtonState\s*=/);
+    assert.match(rendererSource, /window\.__liteDebugState\s*=/);
+    assert.doesNotMatch(rendererSource, /window\.setLiteActiveRequestId\s*=/);
+    assert.doesNotMatch(rendererSource, /window\.globalSettings\s*=/);
+
+    assert.doesNotMatch(messageRendererSource, /window\.toggleEditMode\s*=/);
+    assert.doesNotMatch(messageRendererSource, /window\.messageContextMenu\s*=/);
+    assert.doesNotMatch(messageRendererSource, /window\.messageRenderer\s*=/);
+    assert.doesNotMatch(streamManagerSource, /window\.streamManager\s*=/);
 });
 
 test('package scripts expose renderer logic and dom checks under renderer-specific names', async () => {
@@ -130,3 +83,4 @@ test('package scripts expose renderer logic and dom checks under renderer-specif
         'vitest run --environment jsdom tests/renderer/safe-html.test.js',
     );
 });
+
