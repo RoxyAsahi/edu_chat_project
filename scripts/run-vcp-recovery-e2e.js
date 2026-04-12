@@ -220,7 +220,7 @@ function createMockServer() {
 async function prepareTempDataRoot(port) {
     const fixtureRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot: PROJECT_ROOT }));
     const tempRoot = await createTempDataRootFromFixture({
-        prefix: 'vcpchat-lite-recovery-',
+        prefix: 'unistudy-recovery-',
         fixtureRoot,
     });
 
@@ -297,7 +297,7 @@ async function waitForFinalAssistant(historyPath, previousMessageId, matcher, la
 async function ensureLoaded(page) {
     await page.waitForSelector('#sendMessageBtn');
     await page.waitForFunction(() => {
-        const debugState = window.__liteDebugState ? window.__liteDebugState() : null;
+        const debugState = window.__unistudyDebugState ? window.__unistudyDebugState() : null;
         const agentItems = document.querySelectorAll('#agentList .list-item');
         const activeTopic = document.querySelector('#topicList .topic-item.active');
         const activeAgentName = document.getElementById('currentChatAgentName')?.textContent?.trim();
@@ -318,7 +318,7 @@ async function ensureLoaded(page) {
 
 async function resolveCurrentContext(page, tempRoot) {
     const viewState = await page.evaluate(() => ({
-        debugState: window.__liteDebugState ? window.__liteDebugState() : null,
+        debugState: window.__unistudyDebugState ? window.__unistudyDebugState() : null,
         agentId: document.querySelector('#agentList .list-item.active')?.dataset?.agentId || '',
         topicId: document.querySelector('#topicList .topic-item.active')?.dataset?.topicId || '',
         agentName: document.getElementById('currentChatAgentName')?.textContent?.trim() || '',
@@ -395,8 +395,8 @@ async function run() {
             cwd: PROJECT_ROOT,
             env: {
                 ...process.env,
-                VCPCHAT_DATA_ROOT: tempData.tempRoot,
-                VCPCHAT_VCP_TIMEOUT_MS: '1200',
+                UNISTUDY_DATA_ROOT: tempData.tempRoot,
+                UNISTUDY_VCP_TIMEOUT_MS: '1200',
             },
         });
 

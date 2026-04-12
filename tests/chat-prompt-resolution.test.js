@@ -52,7 +52,7 @@ function loadChatHandlers(vcpClientStub) {
 }
 
 test('send-to-vcp resolves local prompt variables before calling the upstream client', async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-prompt-resolution-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
     const agentDir = path.join(tempRoot, 'agents');

@@ -6,7 +6,7 @@ const path = require('path');
 
 const { migrateLegacyProjectData } = require('../scripts/lib/legacy-data-migration');
 
-test('migrateLegacyProjectData backs up target managed data and replaces it with legacy source data', async () => {
+test('manual legacy migration utility only mutates data roots when explicitly invoked', async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'legacy-migration-test-'));
     const sourceRoot = path.join(tempRoot, 'source');
     const targetRoot = path.join(tempRoot, 'target');
@@ -27,6 +27,9 @@ test('migrateLegacyProjectData backs up target managed data and replaces it with
             userName: 'new-user',
         });
         await fs.outputFile(path.join(targetRoot, 'Agents', 'new-agent', 'config.json'), '{"name":"new"}');
+
+        const settingsBeforeManualRun = await fs.readJson(path.join(targetRoot, 'settings.json'));
+        assert.equal(settingsBeforeManualRun.lastOpenItemId, 'new-agent');
 
         const report = await migrateLegacyProjectData({
             sourceRoot,

@@ -2,7 +2,7 @@ const fs = require('fs-extra');
 const os = require('os');
 const path = require('path');
 
-function resolveFixtureDataRoot({ repoRoot, env = process.env, envName = 'VCPCHAT_TEST_FIXTURE_ROOT' } = {}) {
+function resolveFixtureDataRoot({ repoRoot, env = process.env, envName = 'UNISTUDY_TEST_FIXTURE_ROOT' } = {}) {
     const normalizedRepoRoot = repoRoot ? path.resolve(repoRoot) : path.resolve(__dirname, '..', '..');
     const rawOverride = String(env[envName] || '').trim();
     if (rawOverride) {

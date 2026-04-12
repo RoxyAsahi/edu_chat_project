@@ -40,7 +40,7 @@ function loadKnowledgeBaseHandlers(knowledgeBaseStub) {
 }
 
 async function createHarness(config, options = {}) {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-kb-handlers-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-kb-handlers-'));
     const agentDir = path.join(tempRoot, 'agents');
     const agentId = 'fixture-agent';
 

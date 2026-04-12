@@ -54,7 +54,7 @@ async function chooseTopicWithAssistantMessages(dataRoot) {
 async function prepareDataRoot(repoRoot) {
     const sourceRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot }));
 
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchat-css-removal-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-css-removal-'));
     await fs.copy(sourceRoot, tempRoot);
 
     const targetTopic = await chooseTopicWithAssistantMessages(tempRoot);
@@ -78,7 +78,7 @@ async function launchApp(repoRoot, dataRoot) {
         cwd: repoRoot,
         env: {
             ...process.env,
-            VCPCHAT_DATA_ROOT: dataRoot,
+            UNISTUDY_DATA_ROOT: dataRoot,
             ELECTRON_ENABLE_LOGGING: '1',
         },
     });

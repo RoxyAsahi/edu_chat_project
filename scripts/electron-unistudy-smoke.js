@@ -332,7 +332,7 @@ async function launchApp(dataRoot) {
         cwd: path.resolve(__dirname, '..'),
         env: {
             ...process.env,
-            VCPCHAT_DATA_ROOT: dataRoot,
+            UNISTUDY_DATA_ROOT: dataRoot,
             ELECTRON_ENABLE_LOGGING: '1',
         },
     });
@@ -447,6 +447,43 @@ async function closeViewerWindow(viewerWindow, app) {
     await waitForWindowCount(app, 1, 15000);
 }
 
+function buildRichRenderingSmokeMessage() {
+    return [
+        '<<<[TOOL_REQUEST]>>>',
+        'tool_name: smoke_lookup',
+        'content: UI smoke payload',
+        '<<<[END_TOOL_REQUEST]>>>',
+        '',
+        '[[VCP调用结果信息汇总',
+        '附加尾注：用于校验 footer 命名迁移。',
+        '- 工具名称: smoke_lookup',
+        '- 执行状态: SUCCESS',
+        '- 返回内容: **smoke ok**',
+        '- 可访问URL: https://example.com/smoke.png',
+        'VCP调用结果结束]]',
+        '',
+        '[--- VCP元思考链: "UI Smoke" ---]',
+        '这里是 thought chain 冒烟内容。',
+        '[--- 元思考链结束 ---]',
+        '',
+        '```html',
+        '<!DOCTYPE html>',
+        '<html>',
+        '  <body>',
+        '    <div id="preview-smoke">preview smoke ok</div>',
+        '  </body>',
+        '</html>',
+        '```',
+        '',
+        '<style>',
+        '.smoke-scoped-card { color: rgb(0, 128, 0); font-weight: 700; }',
+        '</style>',
+        '<div class="smoke-scoped-card">Scoped CSS Smoke</div>',
+        '',
+        '<<<[DESKTOP_PUSH]>>><section>Desktop Push Smoke</section><<<[DESKTOP_PUSH_END]>>>',
+    ].join('\n');
+}
+
 async function runViewerSmoke(dataRoot) {
     let lastResult = null;
 
@@ -532,6 +569,175 @@ async function runViewerSmoke(dataRoot) {
         textViewer: {},
         imageViewer: {},
         error: 'Viewer smoke failed before producing a result.',
+    };
+}
+
+async function runRichRenderingSmoke(dataRoot, config, runStamp) {
+    const prepared = await prepareScenarioWorkspace(dataRoot, config, {
+        topicName: `富渲染 UI 冒烟-${runStamp}`,
+    });
+    const historyFilePath = buildHistoryFilePath(dataRoot, prepared.agentId, prepared.topicId);
+    const smokeMessage = buildRichRenderingSmokeMessage();
+    const baseTimestamp = Date.now();
+
+    await fs.ensureDir(path.dirname(historyFilePath));
+    await fs.writeJson(historyFilePath, [
+        {
+            id: `user_${baseTimestamp}_smoke`,
+            role: 'user',
+            content: '请展示富渲染 UI 冒烟样例。',
+            timestamp: baseTimestamp,
+            attachments: [],
+        },
+        {
+            id: `assistant_${baseTimestamp + 1}_smoke`,
+            role: 'assistant',
+            name: config.tempAgentName,
+            agentId: prepared.agentId,
+            avatarUrl: '../assets/default_avatar.png',
+            avatarColor: null,
+            content: smokeMessage,
+            timestamp: baseTimestamp + 1,
+            isThinking: false,
+            topicId: prepared.topicId,
+            finishReason: 'stop',
+        },
+    ], { spaces: 2 });
+
+    let lastResult = null;
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const app = await launchApp(dataRoot);
+        const result = {
+            passed: false,
+            attempt,
+            topicId: prepared.topicId,
+            topicName: prepared.topicName,
+            historyFilePath,
+            initial: {},
+            afterInteractions: {},
+            error: null,
+        };
+
+        try {
+            const page = await waitForFirstWindow(app, 30000);
+            await page.waitForLoadState('domcontentloaded');
+            await waitForMainBridge(page, 30000);
+            await page.waitForFunction(
+                (topicName) => document.getElementById('currentChatTopicName')?.textContent?.includes(topicName),
+                prepared.topicName,
+                { timeout: 30000 }
+            );
+            await page.waitForFunction(() => {
+                const assistantMessages = document.querySelectorAll('.message-item.assistant .md-content');
+                if (assistantMessages.length === 0) return false;
+                const lastContent = assistantMessages[assistantMessages.length - 1];
+                return Boolean(
+                    lastContent.querySelector('.vcp-tool-use-bubble')
+                    && lastContent.querySelector('.unistudy-tool-result-bubble')
+                    && lastContent.querySelector('.vcp-thought-chain-bubble')
+                    && lastContent.querySelector('.unistudy-html-preview-toggle')
+                    && lastContent.querySelector('.unistudy-desktop-push-placeholder')
+                );
+            }, null, { timeout: 30000 });
+
+            result.initial = await page.evaluate(() => {
+                const assistantMessages = Array.from(document.querySelectorAll('.message-item.assistant .md-content'));
+                const lastContent = assistantMessages[assistantMessages.length - 1];
+                const scopedCard = lastContent?.querySelector('.smoke-scoped-card');
+                const scopedColor = scopedCard ? window.getComputedStyle(scopedCard).color : null;
+
+                return {
+                    toolUseBubble: Boolean(lastContent?.querySelector('.vcp-tool-use-bubble')),
+                    toolUseLabel: lastContent?.querySelector('.unistudy-tool-label')?.textContent?.trim() || '',
+                    toolResultBubble: Boolean(lastContent?.querySelector('.unistudy-tool-result-bubble')),
+                    legacyToolResultBubble: Boolean(lastContent?.querySelector('.vcp-tool-result-bubble')),
+                    toolResultImage: Boolean(lastContent?.querySelector('.unistudy-tool-result-image')),
+                    toolResultFooter: Boolean(lastContent?.querySelector('.unistudy-tool-result-footer')),
+                    thoughtChainBubble: Boolean(lastContent?.querySelector('.vcp-thought-chain-bubble')),
+                    thoughtChainHeader: Boolean(lastContent?.querySelector('.unistudy-thought-chain-header')),
+                    toggleIconCount: lastContent?.querySelectorAll('.unistudy-result-toggle-icon').length || 0,
+                    legacyToggleIconCount: lastContent?.querySelectorAll('.vcp-result-toggle-icon').length || 0,
+                    htmlPreviewToggle: Boolean(lastContent?.querySelector('.unistudy-html-preview-toggle')),
+                    htmlPreviewFrame: Boolean(lastContent?.querySelector('.unistudy-html-preview-frame')),
+                    desktopPushPlaceholder: Boolean(lastContent?.querySelector('.unistudy-desktop-push-placeholder')),
+                    scopedStyleCount: document.querySelectorAll('style[data-unistudy-scope-id]').length,
+                    scopedCardColor: scopedColor,
+                    legacyScopedStyleCount: document.querySelectorAll('style[data-vcp-scope-id]').length,
+                    toolResultExpanded: lastContent?.querySelector('.unistudy-tool-result-bubble')?.classList.contains('expanded') || false,
+                    thoughtChainExpanded: lastContent?.querySelector('.vcp-thought-chain-bubble')?.classList.contains('expanded') || false,
+                };
+            });
+
+            const lastAssistant = page.locator('.message-item.assistant').last();
+            await lastAssistant.locator('.unistudy-tool-result-header').click();
+            await page.waitForFunction(() => {
+                const lastMessage = document.querySelectorAll('.message-item.assistant')[document.querySelectorAll('.message-item.assistant').length - 1];
+                return lastMessage?.querySelector('.unistudy-tool-result-bubble')?.classList.contains('expanded') === true;
+            }, null, { timeout: 10000 });
+
+            await lastAssistant.locator('.unistudy-thought-chain-header').click();
+            await page.waitForFunction(() => {
+                const lastMessage = document.querySelectorAll('.message-item.assistant')[document.querySelectorAll('.message-item.assistant').length - 1];
+                return lastMessage?.querySelector('.vcp-thought-chain-bubble')?.classList.contains('expanded') === true;
+            }, null, { timeout: 10000 });
+
+            await lastAssistant.locator('.unistudy-html-preview-toggle').click();
+            await page.waitForFunction(() => {
+                const lastMessage = document.querySelectorAll('.message-item.assistant')[document.querySelectorAll('.message-item.assistant').length - 1];
+                return Boolean(lastMessage?.querySelector('.unistudy-html-preview-frame'));
+            }, null, { timeout: 15000 });
+
+            result.afterInteractions = await page.evaluate(() => {
+                const assistantMessages = Array.from(document.querySelectorAll('.message-item.assistant .md-content'));
+                const lastContent = assistantMessages[assistantMessages.length - 1];
+                return {
+                    toolResultExpanded: lastContent?.querySelector('.unistudy-tool-result-bubble')?.classList.contains('expanded') || false,
+                    thoughtChainExpanded: lastContent?.querySelector('.vcp-thought-chain-bubble')?.classList.contains('expanded') || false,
+                    htmlPreviewFrame: Boolean(lastContent?.querySelector('.unistudy-html-preview-frame')),
+                    htmlPreviewMode: Boolean(lastContent?.querySelector('.unistudy-html-preview-container.preview-mode')),
+                };
+            });
+
+            result.passed = Boolean(
+                result.initial.toolUseBubble
+                && result.initial.toolUseLabel === 'Tool Use:'
+                && result.initial.toolResultBubble
+                && !result.initial.legacyToolResultBubble
+                && result.initial.toolResultImage
+                && result.initial.toolResultFooter
+                && result.initial.thoughtChainBubble
+                && result.initial.thoughtChainHeader
+                && result.initial.toggleIconCount >= 2
+                && result.initial.legacyToggleIconCount === 0
+                && result.initial.htmlPreviewToggle
+                && result.initial.desktopPushPlaceholder
+                && result.initial.scopedStyleCount >= 1
+                && result.initial.legacyScopedStyleCount === 0
+                && result.initial.scopedCardColor === 'rgb(0, 128, 0)'
+                && result.afterInteractions.toolResultExpanded
+                && result.afterInteractions.thoughtChainExpanded
+                && result.afterInteractions.htmlPreviewFrame
+                && result.afterInteractions.htmlPreviewMode
+            );
+
+            return result;
+        } catch (error) {
+            result.error = error && error.stack ? error.stack : String(error);
+            lastResult = result;
+        } finally {
+            await app.close();
+        }
+    }
+
+    return lastResult || {
+        passed: false,
+        topicId: prepared.topicId,
+        topicName: prepared.topicName,
+        historyFilePath,
+        initial: {},
+        afterInteractions: {},
+        error: 'Rich rendering smoke failed before producing a result.',
     };
 }
 
@@ -1124,6 +1330,7 @@ async function run() {
         });
     const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-fixtures-'));
     const viewerSmokeDataRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-viewer-smoke-'));
+    const richRenderingSmokeDataRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-rich-rendering-smoke-'));
     const reportDir = path.resolve(readOptionalEnv('UNISTUDY_TEST_REPORT_DIR', path.join(repoRoot, 'docs', 'test-reports')));
     await fs.ensureDir(reportDir);
     const reportPath = path.join(reportDir, `unistudy-${mode}-${runStamp}.json`);
@@ -1167,6 +1374,7 @@ async function run() {
         reportPath,
         targetAgentId: mode === 'real-data' ? config.realAgentId : null,
         viewerSmokeDataRoot,
+        richRenderingSmokeDataRoot,
         settings: {
             vcpServerUrl: settings.vcpServerUrl,
             kbBaseUrl: settings.kbBaseUrl,
@@ -1190,6 +1398,10 @@ async function run() {
     summary.viewerSmoke = await runViewerSmoke(viewerSmokeDataRoot);
     if (!summary.viewerSmoke.passed) {
         summary.errors.push(`viewer smoke 失败：${summary.viewerSmoke.error || '未知错误'}`);
+    }
+    summary.richRenderingSmoke = await runRichRenderingSmoke(richRenderingSmokeDataRoot, config, runStamp);
+    if (!summary.richRenderingSmoke.passed) {
+        summary.errors.push(`rich rendering smoke 失败：${summary.richRenderingSmoke.error || '未知错误'}`);
     }
 
     if (!settings.vcpServerUrl || !settings.vcpApiKey) {
@@ -1238,6 +1450,7 @@ async function run() {
     summary.finishedAt = new Date().toISOString();
     summary.success = summary.errors.length === 0
         && summary.viewerSmoke?.passed === true
+        && summary.richRenderingSmoke?.passed === true
         && (summary.scenarios.length === 0 || summary.scenarios.every((item) => item.passed));
     await fs.writeJson(reportPath, summary, { spaces: 2 });
     return summary;

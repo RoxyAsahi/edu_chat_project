@@ -32,7 +32,7 @@ test('validateSettings normalizes unknown keys, types, and bounds', () => {
   });
 
 test('readSettings falls back to defaults when the file is missing', async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-settings-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
     t.after(() => fs.remove(tempRoot));
@@ -44,7 +44,7 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
 });
 
 test('readSettings recovers from a valid backup when the primary file is corrupted', async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-settings-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
     t.after(() => fs.remove(tempRoot));
@@ -62,7 +62,7 @@ test('readSettings recovers from a valid backup when the primary file is corrupt
 });
 
 test('writeSettings persists normalized content and refreshes the cache', async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-settings-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
     t.after(() => fs.remove(tempRoot));
@@ -85,7 +85,7 @@ test('writeSettings persists normalized content and refreshes the cache', async 
 });
 
 test('queued updateSettings calls do not lose concurrent changes', async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-settings-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
     t.after(() => fs.remove(tempRoot));
@@ -109,7 +109,7 @@ test('queued updateSettings calls do not lose concurrent changes', async (t) => 
 });
 
 test('dispose clears recurring timers created by cleanup and backup tasks', async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'vcpchatlite-settings-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
     t.after(() => fs.remove(tempRoot));
