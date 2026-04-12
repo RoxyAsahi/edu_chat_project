@@ -106,7 +106,7 @@ function exposeRoleApis(roleApiName, roleApi, compatApi, ops) {
     contextBridge.exposeInMainWorld('electronAPI', compatApi);
 }
 
-function createCatalog(ops) {
+function createShellCatalog(ops) {
     return {
         loadSettings: query(() => ops.invoke('load-settings')),
         saveSettings: query((settings) => ops.invoke('save-settings', settings)),
@@ -139,6 +139,11 @@ function createCatalog(ops) {
         setTheme: command((theme) => ops.send('set-theme', theme)),
         setThemeMode: command((themeMode) => ops.send('set-theme-mode', themeMode)),
         getPlatform: query(() => ops.invoke('get-platform')),
+    };
+}
+
+function createSessionCatalog(ops) {
+    return {
         getAgents: query(() => ops.invoke('get-agents')),
         getAgentConfig: query((agentId) => ops.invoke('get-agent-config', agentId)),
         saveAgentConfig: query((agentId, config) => ops.invoke('save-agent-config', agentId, config)),
@@ -164,7 +169,6 @@ function createCatalog(ops) {
         getTextContent: query((filePath, fileType) => ops.invoke('get-text-content', filePath, fileType)),
         handleTextPasteAsFile: query((agentId, topicId, textContent) => ops.invoke('handle-text-paste-as-file', agentId, topicId, textContent)),
         handleFileDrop: query((agentId, topicId, droppedFilesData) => ops.invoke('handle-file-drop', agentId, topicId, droppedFilesData)),
-        searchNotes: query((queryText) => ops.invoke('search-notes', queryText)),
         sendToVCP: query((request) => ops.invoke('send-to-vcp', request)),
         onVCPStreamEvent: subscription(ops.subscribe('vcp-stream-event', (_event, eventData) => eventData)),
         interruptVcpRequest: query((request) => ops.invoke('interrupt-vcp-request', request)),
@@ -174,6 +178,12 @@ function createCatalog(ops) {
         watcherStart: query((filePath, agentId, topicId) => ops.invoke('watcher:start', filePath, agentId, topicId)),
         watcherStop: query(() => ops.invoke('watcher:stop')),
         onHistoryFileUpdated: subscription(ops.subscribe('history-file-updated', (_event, data) => data)),
+    };
+}
+
+function createContentCatalog(ops) {
+    return {
+        searchNotes: query((queryText) => ops.invoke('search-notes', queryText)),
         listKnowledgeBases: query(() => ops.invoke('list-knowledge-bases')),
         createKnowledgeBase: query((payload) => ops.invoke('create-knowledge-base', payload)),
         updateKnowledgeBase: query((kbId, payload) => ops.invoke('update-knowledge-base', kbId, payload)),
@@ -196,6 +206,14 @@ function createCatalog(ops) {
         createNoteFromMessage: query((payload) => ops.invoke('create-note-from-message', payload)),
         createNoteFromSelection: query((payload) => ops.invoke('create-note-from-selection', payload)),
         exportNoteAsAttachment: query((payload) => ops.invoke('export-note-as-attachment', payload)),
+    };
+}
+
+function createCatalog(ops) {
+    return {
+        ...createShellCatalog(ops),
+        ...createSessionCatalog(ops),
+        ...createContentCatalog(ops),
     };
 }
 
@@ -264,7 +282,6 @@ const ALLOWED_KEYS = [
     "getTextContent",
     "handleTextPasteAsFile",
     "handleFileDrop",
-    "searchNotes",
     "sendToVCP",
     "onVCPStreamEvent",
     "interruptVcpRequest",
@@ -274,6 +291,7 @@ const ALLOWED_KEYS = [
     "watcherStart",
     "watcherStop",
     "onHistoryFileUpdated",
+    "searchNotes",
     "listKnowledgeBases",
     "createKnowledgeBase",
     "updateKnowledgeBase",

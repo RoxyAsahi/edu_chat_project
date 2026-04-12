@@ -12,7 +12,12 @@ const {
     createCompatApi,
     exposeRoleApis,
 } = require('../../src/preloads/shared/apiFactory');
-const { createCatalog } = require('../../src/preloads/shared/catalog');
+const {
+    createCatalog,
+    createShellCatalog,
+    createSessionCatalog,
+    createContentCatalog,
+} = require('../../src/preloads/shared/catalog');
 const { bootstrapPreload } = require('../../src/preloads/shared/bootstrap');
 const { LITE_KEYS, ROLE_API_NAMES, VIEWER_KEYS } = require('../../src/preloads/shared/roles');
 
@@ -44,6 +49,12 @@ ${serializeFunction(createIsolationStub)}
 ${serializeFunction(createCompatApi)}
 
 ${serializeFunction(exposeRoleApis)}
+
+${serializeFunction(createShellCatalog)}
+
+${serializeFunction(createSessionCatalog)}
+
+${serializeFunction(createContentCatalog)}
 
 ${serializeFunction(createCatalog)}
 

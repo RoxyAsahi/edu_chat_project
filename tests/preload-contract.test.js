@@ -3,7 +3,14 @@ const assert = require('assert/strict');
 const Module = require('module');
 const path = require('path');
 
-const { LITE_KEYS, ROLE_API_NAMES, VIEWER_KEYS } = require('../src/preloads/shared/roles');
+const {
+    CONTENT_KEYS,
+    LITE_KEYS,
+    ROLE_API_NAMES,
+    SESSION_KEYS,
+    SHELL_KEYS,
+    VIEWER_KEYS,
+} = require('../src/preloads/shared/roles');
 
 const LITE_PRELOAD_PATH = path.resolve(__dirname, '../src/preloads/lite.js');
 const VIEWER_PRELOAD_PATH = path.resolve(__dirname, '../src/preloads/viewer.js');
@@ -69,6 +76,10 @@ test('lite preload exposes the shared catalog for chatAPI', async () => {
     const { exposed, invokeCalls, sendCalls } = loadPreload(LITE_PRELOAD_PATH);
 
     assert.deepEqual(Object.keys(exposed[ROLE_API_NAMES.lite]).sort(), [...LITE_KEYS].sort());
+    assert.deepEqual(
+        [...new Set([...SHELL_KEYS, ...SESSION_KEYS, ...CONTENT_KEYS])].sort(),
+        [...LITE_KEYS].sort(),
+    );
     assert.ok(exposed.electronPath);
     assert.ok(exposed.electronAPI);
 

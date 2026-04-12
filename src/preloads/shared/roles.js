@@ -1,4 +1,4 @@
-﻿const SHARED_KEYS = [
+const SHELL_KEYS = [
     'loadSettings',
     'saveSettings',
     'saveAvatarColor',
@@ -23,8 +23,7 @@
     'getPlatform',
 ];
 
-const LITE_KEYS = [
-    ...SHARED_KEYS,
+const SESSION_KEYS = [
     'getAgents',
     'getAgentConfig',
     'saveAgentConfig',
@@ -50,7 +49,6 @@ const LITE_KEYS = [
     'getTextContent',
     'handleTextPasteAsFile',
     'handleFileDrop',
-    'searchNotes',
     'sendToVCP',
     'onVCPStreamEvent',
     'interruptVcpRequest',
@@ -60,6 +58,10 @@ const LITE_KEYS = [
     'watcherStart',
     'watcherStop',
     'onHistoryFileUpdated',
+];
+
+const CONTENT_KEYS = [
+    'searchNotes',
     'listKnowledgeBases',
     'createKnowledgeBase',
     'updateKnowledgeBase',
@@ -84,6 +86,12 @@ const LITE_KEYS = [
     'exportNoteAsAttachment',
 ];
 
+const LITE_KEYS = Array.from(new Set([
+    ...SHELL_KEYS,
+    ...SESSION_KEYS,
+    ...CONTENT_KEYS,
+]));
+
 const VIEWER_KEYS = [
     'minimizeWindow',
     'maximizeWindow',
@@ -97,6 +105,9 @@ const VIEWER_KEYS = [
 ];
 
 module.exports = {
+    SHELL_KEYS,
+    SESSION_KEYS,
+    CONTENT_KEYS,
     LITE_KEYS,
     VIEWER_KEYS,
     ROLE_API_NAMES: Object.freeze({

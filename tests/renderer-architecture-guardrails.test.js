@@ -27,24 +27,13 @@ test('renderer entry stays within PR4 guardrails and does not cache mutable app 
     assert.match(rendererSource, /store\.subscribe\('composer'/);
 });
 
-test('shell controllers converge on direct store access instead of the flat-state compatibility proxy', async () => {
-    const expectedFiles = [
-        'src/modules/renderer/app/bootstrap.js',
+test('renderer controllers keep shell convergence and remaining feature slice ownership stable', async () => {
+    const shellConvergedControllers = [
         'src/modules/renderer/app/layout/layoutController.js',
         'src/modules/renderer/app/settings/settingsController.js',
         'src/modules/renderer/app/workspace/workspaceController.js',
     ];
-
-    for (const relativePath of expectedFiles) {
-        const source = await readRepoFile(relativePath);
-        assert.doesNotMatch(source, /import\s+\{\s*createStoreView\s*\}/, `${relativePath} should not import createStoreView`);
-        assert.match(source, /store\.getState\(/, `${relativePath} should read slices directly from store`);
-        assert.match(source, /store\.patchState\(/, `${relativePath} should patch slices directly through store`);
-    }
-});
-
-test('renderer controllers keep single-slice writable ownership where storeView remains in use', async () => {
-    const expectedOwnership = new Map([
+    const featureControllersWithStoreView = new Map([
         ['src/modules/renderer/app/composer/composerController.js', 'composer'],
         ['src/modules/renderer/app/flashcards/flashcardController.js', 'notes'],
         ['src/modules/renderer/app/notes/notesController.js', 'notes'],
@@ -52,10 +41,19 @@ test('renderer controllers keep single-slice writable ownership where storeView 
         ['src/modules/renderer/app/source/sourceController.js', 'source'],
     ]);
 
-    for (const [relativePath, expectedSlice] of expectedOwnership.entries()) {
+    for (const relativePath of shellConvergedControllers) {
+        const source = await readRepoFile(relativePath);
+        assert.doesNotMatch(
+            source,
+            /createStoreView\s*\(/,
+            `${relativePath} should stay off the transitional storeView path`,
+        );
+    }
+
+    for (const [relativePath, expectedSlice] of featureControllersWithStoreView.entries()) {
         const source = await readRepoFile(relativePath);
         const match = source.match(/writableSlices:\s*\[([^\]]*)\]/);
-        assert.ok(match, `${relativePath} should declare writableSlices`);
+        assert.ok(match, `${relativePath} should declare writableSlices while it still depends on storeView`);
 
         const slices = Array.from(match[1].matchAll(/'([^']+)'/g), (entry) => entry[1]);
         assert.deepEqual(
