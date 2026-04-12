@@ -6,6 +6,7 @@ import {
     resolveReaderInitialLocation,
     shouldRefreshReaderGuide,
 } from './readerUtils.js';
+import { createStoreView } from '../store/storeView.js';
 
 function escapeHtml(text) {
     return String(text || '')
@@ -17,7 +18,10 @@ function escapeHtml(text) {
 }
 
 function createReaderController(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: ['reader'],
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -31,6 +35,7 @@ function createReaderController(deps = {}) {
     const syncKnowledgeBasePolling = deps.syncKnowledgeBasePolling || (() => {});
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const onInjectSelection = deps.onInjectSelection || (() => {});
+    const patchDocumentGuideStateInSource = deps.patchDocumentGuideStateInSource || (() => {});
 
     const scheduleFrame = typeof windowObj.requestAnimationFrame === 'function'
         ? windowObj.requestAnimationFrame.bind(windowObj)
@@ -50,14 +55,7 @@ function createReaderController(deps = {}) {
     }
 
     function patchDocumentGuideState(documentId, patch = {}) {
-        const applyPatch = (items = []) => items.map((item) => (
-            item.id === documentId
-                ? { ...item, ...patch }
-                : item
-        ));
-
-        state.knowledgeBaseDocuments = applyPatch(state.knowledgeBaseDocuments);
-        state.topicKnowledgeBaseDocuments = applyPatch(state.topicKnowledgeBaseDocuments);
+        patchDocumentGuideStateInSource(documentId, patch);
     }
 
     function mergeActiveDocumentIntoReader(documentItem = {}) {

@@ -1,3 +1,5 @@
+import { createStoreView } from '../store/storeView.js';
+
 const LAYOUT_DEFAULTS = Object.freeze({
     leftWidth: 410,
     rightWidth: 400,
@@ -137,12 +139,16 @@ function resolveLeftSidebarHeights({
 }
 
 function createLayoutController(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: ['layout'],
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
     const windowObj = deps.windowObj || window;
     const documentObj = deps.documentObj || document;
+    const mergeSettingsPatch = deps.mergeSettingsPatch || (() => {});
     let layoutResizeFrame = 0;
 
     function isDesktopResizableLayout() {
@@ -271,8 +277,7 @@ function createLayoutController(deps = {}) {
             return;
         }
 
-        state.settings = { ...state.settings, ...patch };
-        windowObj.globalSettings = state.settings;
+        mergeSettingsPatch(patch);
     }
 
     function initializeResizableLayout() {

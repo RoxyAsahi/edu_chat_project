@@ -11,8 +11,13 @@ import {
     toggleFlashcardProgressFlipped,
 } from './flashcardUtils.js';
 
+import { createStoreView } from '../store/storeView.js';
+
 function createFlashcardController(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: ['notes'],
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;

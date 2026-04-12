@@ -1,5 +1,6 @@
 import { positionFloatingElement } from '../dom/positionFloatingElement.js';
 import { isReaderSupportedDocument } from '../reader/readerUtils.js';
+import { createStoreView } from '../store/storeView.js';
 
 const TOPIC_SOURCE_FILE_LIMIT = 50;
 
@@ -108,7 +109,10 @@ function shouldPollKnowledgeBaseItems({
 }
 
 function createSourceController(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: ['source'],
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -122,6 +126,10 @@ function createSourceController(deps = {}) {
     const syncReaderFromDocuments = deps.syncReaderFromDocuments || (() => {});
     const getNativePathForFile = deps.getNativePathForFile || (async () => '');
     const loadTopics = deps.loadTopics || (async () => {});
+    const getLeftSidebarMode = deps.getLeftSidebarMode || (() => 'source-list');
+    const getSourceListScrollTop = deps.getSourceListScrollTop || (() => 0);
+    const setSourceListScrollTop = deps.setSourceListScrollTop || (() => {});
+    const updateTopicKnowledgeBaseBinding = deps.updateTopicKnowledgeBaseBinding || (() => {});
 
     const scheduleFrame = typeof windowObj.requestAnimationFrame === 'function'
         ? windowObj.requestAnimationFrame.bind(windowObj)
@@ -181,17 +189,17 @@ function createSourceController(deps = {}) {
 
     function rememberSourceListScrollPosition() {
         if (el.topicKnowledgeBaseFiles) {
-            state.sourceListScrollTop = el.topicKnowledgeBaseFiles.scrollTop;
+            setSourceListScrollTop(el.topicKnowledgeBaseFiles.scrollTop);
         }
     }
 
     function restoreSourceListScrollPosition() {
-        if (!el.topicKnowledgeBaseFiles || state.leftSidebarMode !== 'source-list') {
+        if (!el.topicKnowledgeBaseFiles || getLeftSidebarMode() !== 'source-list') {
             return;
         }
         scheduleFrame(() => {
             if (el.topicKnowledgeBaseFiles) {
-                el.topicKnowledgeBaseFiles.scrollTop = state.sourceListScrollTop || 0;
+                el.topicKnowledgeBaseFiles.scrollTop = getSourceListScrollTop() || 0;
             }
         });
     }
@@ -738,11 +746,7 @@ function createSourceController(deps = {}) {
             return null;
         }
 
-        state.topics = state.topics.map((topic) => (
-            topic.id === state.currentTopicId
-                ? { ...topic, knowledgeBaseId: nextKbId }
-                : topic
-        ));
+        updateTopicKnowledgeBaseBinding(nextKbId);
         state.selectedKnowledgeBaseId = nextKbId;
         await loadKnowledgeBases({ silent: true });
         syncCurrentTopicKnowledgeBaseControls();
@@ -1008,11 +1012,7 @@ function createSourceController(deps = {}) {
             return;
         }
 
-        state.topics = state.topics.map((topic) => (
-            topic.id === state.currentTopicId
-                ? { ...topic, knowledgeBaseId: kbId }
-                : topic
-        ));
+        updateTopicKnowledgeBaseBinding(kbId);
         renderTopics();
         syncCurrentTopicKnowledgeBaseControls();
         await loadCurrentTopicKnowledgeBaseDocuments({ silent: true, reuseSelected: false });

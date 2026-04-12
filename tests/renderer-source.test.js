@@ -8,6 +8,10 @@ async function loadSourceModule() {
     const modulePath = path.resolve(__dirname, '../src/modules/renderer/app/source/sourceController.js');
     let source = await fs.readFile(modulePath, 'utf8');
     source = source.replace(
+        /^import\s+\{\s*createStoreView\s*\}\s+from\s+['"].+?['"];\r?\n/m,
+        'const createStoreView = (store) => store.view;\n'
+    );
+    source = source.replace(
         /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
         'const positionFloatingElement = () => {};\n'
     );
@@ -98,26 +102,37 @@ function createDomElements() {
 
 function createBaseState(overrides = {}) {
     return {
-        currentSelectedItem: {
-            id: 'agent-1',
-            name: '数学',
+        settings: {
+            settings: {},
+            settingsModalSection: 'global',
+            promptModule: null,
         },
-        currentTopicId: 'topic-1',
-        topics: [
-            {
-                id: 'topic-1',
-                name: '函数',
-                knowledgeBaseId: null,
+        layout: {
+            sourceListScrollTop: 0,
+            leftSidebarMode: 'source-list',
+        },
+        session: {
+            currentSelectedItem: {
+                id: 'agent-1',
+                name: '数学',
             },
-        ],
-        knowledgeBases: [],
-        knowledgeBaseDocuments: [],
-        topicKnowledgeBaseDocuments: [],
-        knowledgeBaseDebugResult: null,
-        selectedKnowledgeBaseId: null,
-        activeSourceFileMenu: null,
-        sourceListScrollTop: 0,
-        leftSidebarMode: 'source-list',
+            currentTopicId: 'topic-1',
+            topics: [
+                {
+                    id: 'topic-1',
+                    name: '函数',
+                    knowledgeBaseId: null,
+                },
+            ],
+        },
+        source: {
+            knowledgeBases: [],
+            knowledgeBaseDocuments: [],
+            topicKnowledgeBaseDocuments: [],
+            knowledgeBaseDebugResult: null,
+            selectedKnowledgeBaseId: null,
+            activeSourceFileMenu: null,
+        },
         reader: {
             documentId: null,
             status: 'idle',
@@ -128,7 +143,66 @@ function createBaseState(overrides = {}) {
             guideGeneratedAt: null,
             guideError: null,
         },
+        notes: {},
+        composer: {},
         ...overrides,
+    };
+}
+
+function createStore(initialState) {
+    const state = initialState;
+    const propertyMap = {
+        currentSelectedItem: ['session', 'currentSelectedItem'],
+        currentTopicId: ['session', 'currentTopicId'],
+        topics: ['session', 'topics'],
+        knowledgeBases: ['source', 'knowledgeBases'],
+        knowledgeBaseDocuments: ['source', 'knowledgeBaseDocuments'],
+        topicKnowledgeBaseDocuments: ['source', 'topicKnowledgeBaseDocuments'],
+        knowledgeBaseDebugResult: ['source', 'knowledgeBaseDebugResult'],
+        selectedKnowledgeBaseId: ['source', 'selectedKnowledgeBaseId'],
+        activeSourceFileMenu: ['source', 'activeSourceFileMenu'],
+        sourceListScrollTop: ['layout', 'sourceListScrollTop'],
+        leftSidebarMode: ['layout', 'leftSidebarMode'],
+        reader: ['reader'],
+    };
+    const view = new Proxy({}, {
+        get(_target, prop) {
+            const mapping = propertyMap[prop];
+            if (!mapping) {
+                return undefined;
+            }
+            const [slice, key] = mapping;
+            return key ? state[slice][key] : state[slice];
+        },
+        set(_target, prop, value) {
+            const mapping = propertyMap[prop];
+            if (!mapping) {
+                throw new Error(`Unknown test state prop: ${String(prop)}`);
+            }
+            const [slice, key] = mapping;
+            if (key) {
+                state[slice][key] = value;
+            } else {
+                state[slice] = value;
+            }
+            return true;
+        },
+    });
+    return {
+        getState() {
+            return state;
+        },
+        view,
+        patchState(slice, patch) {
+            const currentSlice = state[slice];
+            state[slice] = typeof patch === 'function'
+                ? patch(currentSlice, state)
+                : { ...currentSlice, ...patch };
+            return state[slice];
+        },
+        subscribe() {
+            return () => {};
+        },
     };
 }
 
@@ -219,11 +293,12 @@ test('ensureTopicSource creates, binds, and hydrates a topic-scoped source', asy
     const { createSourceController } = await loadSourceModule();
     const { window, document, el } = createDomElements();
     const state = createBaseState();
+    const store = createStore(state);
     const ui = createUiStub();
     const calls = [];
 
     const controller = createSourceController({
-        state,
+        store,
         el,
         chatAPI: {
             async createKnowledgeBase(payload) {
@@ -253,13 +328,20 @@ test('ensureTopicSource creates, binds, and hydrates a topic-scoped source', asy
         windowObj: window,
         documentObj: document,
         renderTopics: () => calls.push(['renderTopics']),
+        updateTopicKnowledgeBaseBinding(kbId) {
+            state.session.topics = state.session.topics.map((topic) => (
+                topic.id === state.session.currentTopicId
+                    ? { ...topic, knowledgeBaseId: kbId }
+                    : topic
+            ));
+        },
     });
 
     const kbId = await controller.ensureTopicSource({ silent: true });
 
     assert.equal(kbId, 'kb-topic');
-    assert.equal(state.topics[0].knowledgeBaseId, 'kb-topic');
-    assert.equal(state.selectedKnowledgeBaseId, 'kb-topic');
+    assert.equal(state.session.topics[0].knowledgeBaseId, 'kb-topic');
+    assert.equal(state.source.selectedKnowledgeBaseId, 'kb-topic');
     assert.deepEqual(calls.slice(0, 4), [
         ['createKnowledgeBase', { name: '数学 · 函数' }],
         ['setTopicKnowledgeBase', 'agent-1', 'topic-1', 'kb-topic'],
@@ -276,14 +358,25 @@ test('loadCurrentTopicKnowledgeBaseDocuments reuses selected docs when topic and
         { id: 'doc-1', name: '函数极限.md', status: 'done', contentType: 'markdown' },
     ];
     const state = createBaseState({
-        topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-1' }],
-        selectedKnowledgeBaseId: 'kb-1',
-        knowledgeBaseDocuments: documents,
+        session: {
+            currentSelectedItem: { id: 'agent-1', name: '数学' },
+            currentTopicId: 'topic-1',
+            topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-1' }],
+        },
+        source: {
+            knowledgeBases: [],
+            knowledgeBaseDocuments: documents,
+            topicKnowledgeBaseDocuments: [],
+            knowledgeBaseDebugResult: null,
+            selectedKnowledgeBaseId: 'kb-1',
+            activeSourceFileMenu: null,
+        },
     });
+    const store = createStore(state);
     let listCalls = 0;
 
     const controller = createSourceController({
-        state,
+        store,
         el,
         chatAPI: {
             async listKnowledgeBaseDocuments() {
@@ -301,7 +394,7 @@ test('loadCurrentTopicKnowledgeBaseDocuments reuses selected docs when topic and
     assert.equal(listCalls, 0);
     assert.deepEqual(result, documents);
     assert.notEqual(result, documents);
-    assert.deepEqual(state.topicKnowledgeBaseDocuments, documents);
+    assert.deepEqual(state.source.topicKnowledgeBaseDocuments, documents);
 });
 
 test('loadKnowledgeBaseDocuments delegates reader synchronization through injected adapters', async () => {
@@ -311,12 +404,17 @@ test('loadKnowledgeBaseDocuments delegates reader synchronization through inject
         { id: 'doc-1', name: 'lecture.pdf', status: 'done', contentType: 'pdf-text' },
     ];
     const state = createBaseState({
-        topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-topic' }],
+        session: {
+            currentSelectedItem: { id: 'agent-1', name: '数学' },
+            currentTopicId: 'topic-1',
+            topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-topic' }],
+        },
     });
+    const store = createStore(state);
     const syncCalls = [];
 
     const controller = createSourceController({
-        state,
+        store,
         el,
         chatAPI: {
             async listKnowledgeBaseDocuments() {
@@ -333,7 +431,7 @@ test('loadKnowledgeBaseDocuments delegates reader synchronization through inject
 
     await controller.loadKnowledgeBaseDocuments('kb-topic', { target: 'topic' });
 
-    assert.deepEqual(state.topicKnowledgeBaseDocuments, documents);
+    assert.deepEqual(state.source.topicKnowledgeBaseDocuments, documents);
     assert.equal(syncCalls.length, 1);
     assert.deepEqual(syncCalls[0], {
         items: documents,

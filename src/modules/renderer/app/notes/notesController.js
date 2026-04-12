@@ -10,6 +10,7 @@ import {
     normalizeNote as normalizeStoredNote,
     removeDeletedNoteReferencesFromHistory,
 } from './notesUtils.js';
+import { createStoreView } from '../store/storeView.js';
 
 const NOTE_DETAIL_META = Object.freeze({
     note: {
@@ -52,7 +53,10 @@ function stripMarkdown(text) {
 }
 
 function createNotesController(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: ['notes'],
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -79,6 +83,7 @@ function createNotesController(deps = {}) {
     };
     const closeTopicActionMenu = deps.closeTopicActionMenu || (() => {});
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
+    const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
 
     const HTMLElementCtor = windowObj.HTMLElement || globalThis.HTMLElement;
     const ElementCtor = windowObj.Element || globalThis.Element;
@@ -116,6 +121,19 @@ function createNotesController(deps = {}) {
         return state.activeFlashcardNoteId
             ? normalizeNote(findNoteById(state.activeFlashcardNoteId) || {})
             : (getActiveNote() ? normalizeNote(getActiveNote()) : null);
+    }
+
+    function patchCurrentHistoryMessage(messageId, updater) {
+        let nextMessage = null;
+        updateCurrentChatHistory((history = []) => history.map((item) => {
+            if (item?.id !== messageId) {
+                return item;
+            }
+
+            nextMessage = updater({ ...item });
+            return nextMessage;
+        }));
+        return nextMessage;
     }
 
     function clearNoteEditor() {
@@ -681,7 +699,7 @@ function createNotesController(deps = {}) {
         }
 
         if (isCurrentTopic) {
-            state.currentChatHistory = nextHistory;
+            updateCurrentChatHistory(nextHistory);
             decorateChatMessages();
         }
 
@@ -768,11 +786,14 @@ function createNotesController(deps = {}) {
             return null;
         }
 
-        message.favorited = true;
-        message.favoriteAt = Date.now();
-        message.noteRefs = Array.isArray(message.noteRefs)
-            ? [...new Set([...message.noteRefs, result.item.id])]
-            : [result.item.id];
+        patchCurrentHistoryMessage(messageId, (entry) => ({
+            ...entry,
+            favorited: true,
+            favoriteAt: Date.now(),
+            noteRefs: Array.isArray(entry.noteRefs)
+                ? [...new Set([...entry.noteRefs, result.item.id])]
+                : [result.item.id],
+        }));
         await persistHistory();
         await refreshNotesData();
         revealNote(result.item);
@@ -788,8 +809,11 @@ function createNotesController(deps = {}) {
         }
 
         if (message.favorited) {
-            message.favorited = false;
-            message.favoriteAt = null;
+            patchCurrentHistoryMessage(messageId, (entry) => ({
+                ...entry,
+                favorited: false,
+                favoriteAt: null,
+            }));
             await persistHistory();
             decorateChatMessages();
             ui.showToastNotification('已取消收藏，已生成的笔记会继续保留。', 'info');
@@ -809,8 +833,11 @@ function createNotesController(deps = {}) {
                 return null;
             }
         } else {
-            message.favorited = true;
-            message.favoriteAt = Date.now();
+            patchCurrentHistoryMessage(messageId, (entry) => ({
+                ...entry,
+                favorited: true,
+                favoriteAt: Date.now(),
+            }));
             await persistHistory();
             revealNote(favoriteNote);
             decorateChatMessages();

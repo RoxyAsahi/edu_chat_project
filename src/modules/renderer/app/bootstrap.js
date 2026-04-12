@@ -1,5 +1,6 @@
 import { initialize as initializeInterruptHandler } from '../interruptHandler.js';
 import { initializeInputEnhancer } from '../inputEnhancerLite.js';
+import { createStoreView, RENDERER_WRITABLE_SLICES } from './store/storeView.js';
 
 function resolveWorkspaceBootstrapPlan({ agents = [], settings = {} } = {}) {
     const normalizedAgents = Array.isArray(agents) ? agents.filter(Boolean) : [];
@@ -28,7 +29,10 @@ function resolveWorkspaceBootstrapPlan({ agents = [], settings = {} } = {}) {
 }
 
 async function initializeAppRuntime(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: RENDERER_WRITABLE_SLICES,
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -98,7 +102,10 @@ function createAppBootstrap(deps = {}) {
     const windowObj = deps.windowObj || window;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: RENDERER_WRITABLE_SLICES,
+    });
     const applyTheme = deps.applyTheme;
     const loadSettings = deps.loadSettings;
     const initializeResizableLayout = deps.initializeResizableLayout;

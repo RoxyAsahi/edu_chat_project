@@ -1,4 +1,5 @@
 import { getReaderLocatorLabel } from '../reader/readerUtils.js';
+import { createStoreView } from '../store/storeView.js';
 import {
     buildAttachmentTransferPayload,
     buildKnowledgeBaseQuery,
@@ -19,7 +20,10 @@ function escapeHtml(text) {
 }
 
 function createComposerController(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: ['composer'],
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
@@ -36,6 +40,7 @@ function createComposerController(deps = {}) {
     const resolveLivePrompt = deps.resolveLivePrompt || (async () => '');
     const autoResizeTextarea = deps.autoResizeTextarea || (() => {});
     const decorateChatMessages = deps.decorateChatMessages || (() => {});
+    const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
     const defaultSendButtonHtml = deps.defaultSendButtonHtml ?? (el.sendMessageBtn?.innerHTML || '');
     const interruptSendButtonHtml = deps.interruptSendButtonHtml || `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="none" aria-hidden="true">
@@ -359,6 +364,19 @@ function createComposerController(deps = {}) {
         updateSendButtonState();
     }
 
+    function patchCurrentHistoryMessage(messageId, updater) {
+        let nextMessage = null;
+        updateCurrentChatHistory((history = []) => history.map((item) => {
+            if (item?.id !== messageId) {
+                return item;
+            }
+
+            nextMessage = updater({ ...item });
+            return nextMessage;
+        }));
+        return nextMessage;
+    }
+
     async function sendMessage(prefillText) {
         if (typeof prefillText === 'string') {
             el.messageInput.value = prefillText;
@@ -416,7 +434,7 @@ function createComposerController(deps = {}) {
             selectionContextRefs: selectionContextRefsForTurn,
         };
 
-        state.currentChatHistory.push(userMessage);
+        updateCurrentChatHistory((history = []) => [...history, userMessage]);
         await persistHistory();
         await messageRendererApi.renderMessage(userMessage, false, true);
         decorateChatMessages();
@@ -454,7 +472,7 @@ function createComposerController(deps = {}) {
             assistantMessage.kbContextRefs = combinedRefs;
         }
 
-        state.currentChatHistory.push(assistantMessage);
+        updateCurrentChatHistory((history = []) => [...history, assistantMessage]);
         await persistHistory();
         messageRendererApi.startStreamingMessage(assistantMessage);
         decorateChatMessages();
@@ -497,11 +515,11 @@ function createComposerController(deps = {}) {
 
         if (!modelConfig.stream && response?.response) {
             const content = response.response?.choices?.[0]?.message?.content || '';
-            const assistantEntry = state.currentChatHistory.find((item) => item.id === assistantMessage.id);
-            if (assistantEntry) {
-                assistantEntry.isThinking = false;
-                assistantEntry.content = content;
-            }
+            patchCurrentHistoryMessage(assistantMessage.id, (entry) => ({
+                ...entry,
+                isThinking: false,
+                content,
+            }));
             await persistHistory();
             await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'completed', buildTopicContext(), {
                 fullResponse: content,

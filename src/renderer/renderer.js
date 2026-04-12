@@ -17,8 +17,7 @@ import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime 
 
 const chatAPI = window.chatAPI || window.electronAPI;
 const ui = window.uiHelperFunctions;
-const appStore = createAppStore(createInitialAppState());
-const state = appStore.getState();
+const store = createAppStore(createInitialAppState());
 
 const el = collectRootElements(document);
 let sourceController = null;
@@ -28,12 +27,13 @@ let flashcardController = null;
 let notesController = null;
 let composerController = null;
 const layoutController = createLayoutController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
     windowObj: window,
     documentObj: document,
+    mergeSettingsPatch,
 });
 const {
     normalizeStoredLayoutWidth,
@@ -44,20 +44,17 @@ const {
     bindEvents: bindLayoutEvents,
 } = layoutController;
 const settingsController = createSettingsController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
     windowObj: window,
     documentObj: document,
     messageRendererApi: messageRenderer,
-    normalizeStoredLayoutWidth,
-    normalizeStoredLayoutHeight,
-    applyLayoutWidths,
-    applyLeftSidebarHeights,
+    syncLayoutSettings: applyStoredLayoutSettings,
     resolvePromptText: async () => (
-        state.promptModule
-            ? await state.promptModule.getPrompt().catch(() => '')
+        getPromptModule()
+            ? await getPromptModule().getPrompt().catch(() => '')
             : (document.getElementById('litePromptFallback')?.value || '').trim()
     ),
     reloadSelectedAgent: async (agentId) => {
@@ -75,7 +72,7 @@ const {
     bindEvents: bindSettingsEvents,
 } = settingsController;
 composerController = createComposerController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
@@ -90,15 +87,16 @@ composerController = createComposerController({
     buildTopicContext,
     persistHistory,
     resolveLivePrompt: async () => (
-        state.promptModule
-            ? await state.promptModule.getPrompt().catch(() => '')
+        getPromptModule()
+            ? await getPromptModule().getPrompt().catch(() => '')
             : (document.getElementById('litePromptFallback')?.value || '').trim()
     ),
     autoResizeTextarea: (node) => ui.autoResizeTextarea(node),
     decorateChatMessages: (...args) => notesController?.decorateChatMessages?.(...args),
+    updateCurrentChatHistory,
 });
 readerController = createReaderController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
@@ -112,9 +110,10 @@ readerController = createReaderController({
     syncKnowledgeBasePolling: (...args) => sourceController?.syncKnowledgeBasePolling?.(...args),
     hideSourceFileTooltip: (...args) => sourceController?.hideSourceFileTooltip?.(...args),
     onInjectSelection: (selection) => composerController?.injectSelection?.(selection),
+    patchDocumentGuideStateInSource,
 });
 sourceController = createSourceController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
@@ -128,6 +127,10 @@ sourceController = createSourceController({
     syncReaderFromDocuments: (...args) => readerController?.syncFromSourceDocuments?.(...args),
     getNativePathForFile: (...args) => composerController?.getNativePathForFile?.(...args),
     loadTopics: (...args) => workspaceController?.loadTopics?.(...args),
+    getLeftSidebarMode: () => getLayoutSlice().leftSidebarMode,
+    getSourceListScrollTop,
+    setSourceListScrollTop,
+    updateTopicKnowledgeBaseBinding,
 });
 const {
     closeSourceFileActionMenu,
@@ -141,7 +144,7 @@ const {
     bindEvents: bindSourceEvents,
 } = sourceController;
 flashcardController = createFlashcardController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
@@ -155,7 +158,7 @@ flashcardController = createFlashcardController({
     renderNotesPanel: (...args) => notesController?.renderNotesPanel?.(...args),
 });
 notesController = createNotesController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
@@ -171,9 +174,10 @@ notesController = createNotesController({
     flashcardsApi: flashcardController,
     closeTopicActionMenu: (...args) => workspaceController?.closeTopicActionMenu?.(...args),
     closeSourceFileActionMenu,
+    updateCurrentChatHistory,
 });
 workspaceController = createWorkspaceController({
-    state,
+    store,
     el,
     chatAPI,
     ui,
@@ -202,6 +206,7 @@ workspaceController = createWorkspaceController({
     messageRendererApi: messageRenderer,
     closeSourceFileActionMenu,
     hideSourceFileTooltip,
+    clearTopicKnowledgeBaseDocuments,
 });
 const {
     getCurrentTopic,
@@ -241,7 +246,7 @@ const {
     bindEvents: bindReaderEvents,
 } = readerController;
 const { bootstrap } = createAppBootstrap({
-    state,
+    store,
     chatAPI,
     ui,
     applyTheme,
@@ -249,7 +254,7 @@ const { bootstrap } = createAppBootstrap({
     initializeResizableLayout,
     loadKnowledgeBases,
     initializeAppRuntime: () => initializeBootstrapRuntime({
-        state,
+        store,
         el,
         chatAPI,
         ui,
@@ -283,6 +288,112 @@ const INTERRUPT_SEND_BUTTON_HTML = `
         <rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor"></rect>
     </svg>
 `;
+
+function getAppState() {
+    return store.getState();
+}
+
+function getSettingsSlice() {
+    return getAppState().settings;
+}
+
+function getLayoutSlice() {
+    return getAppState().layout;
+}
+
+function getSessionSlice() {
+    return getAppState().session;
+}
+
+function getComposerSlice() {
+    return getAppState().composer;
+}
+
+function getPromptModule() {
+    return getSettingsSlice().promptModule;
+}
+
+function mergeSettingsPatch(patch = {}) {
+    store.patchState('settings', (current) => ({
+        ...current,
+        settings: {
+            ...current.settings,
+            ...patch,
+        },
+    }));
+}
+
+function applyStoredLayoutSettings(settings = {}) {
+    if (!getLayoutSlice().layoutInitialized) {
+        return;
+    }
+
+    store.patchState('layout', (current) => ({
+        ...current,
+        layoutLeftWidth: normalizeStoredLayoutWidth(settings.layoutLeftWidth, current.layoutLeftWidth),
+        layoutRightWidth: normalizeStoredLayoutWidth(settings.layoutRightWidth, current.layoutRightWidth),
+        layoutLeftTopHeight: normalizeStoredLayoutHeight(settings.layoutLeftTopHeight, current.layoutLeftTopHeight),
+    }));
+    applyLayoutWidths();
+    applyLeftSidebarHeights();
+}
+
+function getSourceListScrollTop() {
+    return getLayoutSlice().sourceListScrollTop || 0;
+}
+
+function setSourceListScrollTop(scrollTop = 0) {
+    const nextScrollTop = Number.isFinite(Number(scrollTop)) ? Number(scrollTop) : 0;
+    store.patchState('layout', {
+        sourceListScrollTop: nextScrollTop,
+    });
+}
+
+function updateTopicKnowledgeBaseBinding(knowledgeBaseId = null) {
+    const session = getSessionSlice();
+    if (!session.currentTopicId) {
+        return;
+    }
+
+    store.patchState('session', (current) => ({
+        ...current,
+        topics: current.topics.map((topic) => (
+            topic.id === current.currentTopicId
+                ? { ...topic, knowledgeBaseId }
+                : topic
+        )),
+    }));
+}
+
+function clearTopicKnowledgeBaseDocuments() {
+    store.patchState('source', {
+        topicKnowledgeBaseDocuments: [],
+    });
+}
+
+function patchDocumentGuideStateInSource(documentId, patch = {}) {
+    const applyPatch = (items = []) => items.map((item) => (
+        item.id === documentId
+            ? { ...item, ...patch }
+            : item
+    ));
+
+    store.patchState('source', (current) => ({
+        ...current,
+        knowledgeBaseDocuments: applyPatch(current.knowledgeBaseDocuments),
+        topicKnowledgeBaseDocuments: applyPatch(current.topicKnowledgeBaseDocuments),
+    }));
+}
+
+function updateCurrentChatHistory(updater) {
+    const nextSession = store.patchState('session', (current) => ({
+        ...current,
+        currentChatHistory: typeof updater === 'function'
+            ? updater(current.currentChatHistory, current)
+            : updater,
+    }));
+    return nextSession.currentChatHistory;
+}
 
 function makeId(prefix) {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -343,7 +454,9 @@ function initMarked() {
 }
 
 function setSidePanelTab(tab) {
-    state.sidePanelTab = 'notes';
+    store.patchState('layout', {
+        sidePanelTab: 'notes',
+    });
     el.notesPanelTab?.classList.remove('hidden');
     el.notesPanelTab?.classList.add('side-panel-pane--active');
 }
@@ -351,7 +464,9 @@ function setSidePanelTab(tab) {
 function setRightPanelMode(mode) {
     const nextMode = mode === 'flashcards' ? 'flashcards' : 'notes';
 
-    state.rightPanelMode = nextMode;
+    store.patchState('layout', {
+        rightPanelMode: nextMode,
+    });
     setSidePanelTab('notes');
     el.noteEditorCard?.classList.toggle('hidden', nextMode !== 'notes');
     el.flashcardsPracticeCard?.classList.toggle('hidden', nextMode !== 'flashcards');
@@ -359,7 +474,9 @@ function setRightPanelMode(mode) {
 
 function rememberSourceListScrollPosition() {
     if (el.topicKnowledgeBaseFiles) {
-        state.sourceListScrollTop = el.topicKnowledgeBaseFiles.scrollTop;
+        store.patchState('layout', {
+            sourceListScrollTop: el.topicKnowledgeBaseFiles.scrollTop,
+        });
     }
 }
 
@@ -369,7 +486,7 @@ function restoreSourceListScrollPosition() {
     }
     requestAnimationFrame(() => {
         if (el.topicKnowledgeBaseFiles) {
-            el.topicKnowledgeBaseFiles.scrollTop = state.sourceListScrollTop || 0;
+            el.topicKnowledgeBaseFiles.scrollTop = getLayoutSlice().sourceListScrollTop || 0;
         }
     });
 }
@@ -377,7 +494,9 @@ function restoreSourceListScrollPosition() {
 function setLeftReaderTab(tab) {
     const nextTab = tab === 'content' ? 'content' : 'guide';
     const hasPendingSelection = readerController?.hasPendingSelection?.() || false;
-    state.leftReaderActiveTab = nextTab;
+    store.patchState('layout', {
+        leftReaderActiveTab: nextTab,
+    });
 
     el.leftReaderGuideTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'guide');
     el.leftReaderContentTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'content');
@@ -394,7 +513,9 @@ function setLeftSidebarMode(mode) {
         rememberSourceListScrollPosition();
     }
 
-    state.leftSidebarMode = nextMode;
+    store.patchState('layout', {
+        leftSidebarMode: nextMode,
+    });
     el.workspaceSidebar?.classList.toggle('workspace-sidebar--reader', nextMode === 'reader');
     el.workspaceTopicCard?.classList.toggle('hidden', nextMode !== 'source-list');
     el.sourceSidebarCard?.classList.toggle('hidden', nextMode !== 'source-list');
@@ -451,10 +572,13 @@ function extractPromptTextFromLegacyConfig(config = {}) {
 }
 
 async function ensurePromptModule() {
-    if (state.promptModule || !window.OriginalPromptModule) return;
-    state.promptModule = new window.OriginalPromptModule({
-        electronAPI: chatAPI,
-    });
+    if (getPromptModule() || !window.OriginalPromptModule) return;
+    store.patchState('settings', (current) => ({
+        ...current,
+        promptModule: new window.OriginalPromptModule({
+            electronAPI: chatAPI,
+        }),
+    }));
 }
 
 async function syncPromptModule(agentId, config) {
@@ -464,8 +588,9 @@ async function syncPromptModule(agentId, config) {
     const resolvedPrompt = activePrompt?.success
         ? (activePrompt.systemPrompt || '')
         : extractPromptTextFromLegacyConfig(config);
+    const promptModule = getPromptModule();
 
-    if (!state.promptModule) {
+    if (!promptModule) {
         el.systemPromptContainer.innerHTML = `
             <p class="prompt-text-mode-note">UniStudy 当前仅保留单文本提示词编辑器，旧版模块化提示词会在这里按纯文本展示。</p>
             <textarea id="litePromptFallback" rows="6" placeholder="输入系统提示词...">${resolvedPrompt}</textarea>
@@ -473,13 +598,13 @@ async function syncPromptModule(agentId, config) {
         return;
     }
 
-    state.promptModule.updateContext(agentId, {
+    promptModule.updateContext(agentId, {
         ...config,
         promptMode: 'original',
         originalSystemPrompt: resolvedPrompt,
         systemPrompt: resolvedPrompt,
     });
-    state.promptModule.render(el.systemPromptContainer);
+    promptModule.render(el.systemPromptContainer);
 
     const note = document.createElement('p');
     note.className = 'prompt-text-mode-note';
@@ -488,7 +613,8 @@ async function syncPromptModule(agentId, config) {
 }
 
 async function populateAgentForm(config) {
-    el.editingAgentId.value = state.currentSelectedItem.id;
+    const session = getSessionSlice();
+    el.editingAgentId.value = session.currentSelectedItem.id;
     el.agentNameInput.value = config.name || '';
     el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';
     el.agentModel.value = config.model || '';
@@ -505,72 +631,88 @@ async function populateAgentForm(config) {
     el.agentNameTextColorText.value = config.nameTextColor || '#ffffff';
     el.disableCustomColors.checked = config.disableCustomColors === true;
     el.useThemeColorsInChat.checked = config.useThemeColorsInChat === true;
-    await syncPromptModule(state.currentSelectedItem.id, config);
+    await syncPromptModule(session.currentSelectedItem.id, config);
 }
 
 async function renderCurrentHistory() {
+    const session = getSessionSlice();
     messageRenderer.clearChat({ preserveHistory: true });
-    if (state.currentChatHistory.length === 0) {
+    if (session.currentChatHistory.length === 0) {
         el.chatMessages.innerHTML = `<div class="empty-state" style="margin-top: 100px; background: transparent; border: none;">
   <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4; color:var(--accent); margin-bottom:12px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
   <p style="font-size: 16px; font-weight: 500; color: var(--muted);">暂无消息，开始对话吧。</p>
 </div>`;
         return;
     }
-    await messageRenderer.renderHistory(state.currentChatHistory, true);
+    await messageRenderer.renderHistory(session.currentChatHistory, true);
     notesController?.decorateChatMessages?.();
 }
 
 function buildTopicContext() {
+    const session = getSessionSlice();
     return {
-        agentId: state.currentSelectedItem.id,
-        topicId: state.currentTopicId,
-        agentName: state.currentSelectedItem.name,
-        avatarUrl: state.currentSelectedItem.avatarUrl,
-        avatarColor: state.currentSelectedItem.config?.avatarCalculatedColor || null,
+        agentId: session.currentSelectedItem.id,
+        topicId: session.currentTopicId,
+        agentName: session.currentSelectedItem.name,
+        avatarUrl: session.currentSelectedItem.avatarUrl,
+        avatarColor: session.currentSelectedItem.config?.avatarCalculatedColor || null,
         isGroupMessage: false,
     };
 }
 
-function buildSelectionContextTemporaryMessages(selectionContextRefs = []) {
-    if (!Array.isArray(selectionContextRefs) || selectionContextRefs.length === 0) {
-        return [];
-    }
-
-    const lines = selectionContextRefs.map((ref, index) => {
-        const location = getReaderLocatorLabel(ref);
-        return `[${index + 1}] ${ref.documentName || ref.documentId} | ${location}\n${ref.selectionText || ref.snippet || ''}`;
-    });
-
-    return [{
-        role: 'system',
-        content: [
-            'Selected document excerpts for this turn:',
-            ...lines,
-            'Use these excerpts when they are relevant to the current user request.',
-        ].join('\n\n'),
-    }];
-}
-
 async function persistHistory() {
-    if (!state.currentSelectedItem.id || !state.currentTopicId) return;
-    await chatAPI.saveChatHistory(state.currentSelectedItem.id, state.currentTopicId, state.currentChatHistory);
+    const session = getSessionSlice();
+    if (!session.currentSelectedItem.id || !session.currentTopicId) return;
+    await chatAPI.saveChatHistory(session.currentSelectedItem.id, session.currentTopicId, session.currentChatHistory);
 }
 
 window.sendMessage = async (prefillText) => composerController?.sendMessage?.(prefillText);
 
-window.__liteDebugState = () => ({
-    currentSelectedItemId: state.currentSelectedItem.id,
-    currentTopicId: state.currentTopicId,
-    activeRequestId: state.activeRequestId,
-    agentCount: state.agents.length,
-    topicCount: state.topics.length,
-});
+window.__liteDebugState = () => {
+    const session = getSessionSlice();
+    const composer = getComposerSlice();
+    return {
+        currentSelectedItemId: session.currentSelectedItem.id,
+        currentTopicId: session.currentTopicId,
+        activeRequestId: composer.activeRequestId,
+        agentCount: session.agents.length,
+        topicCount: session.topics.length,
+    };
+};
 
 window.updateSendButtonState = (...args) => composerController?.updateSendButtonState?.(...args);
 window.setLiteActiveRequestId = (requestId = null) => composerController?.setActiveRequestId?.(requestId);
 
+let storeSubscriptionsBound = false;
+
+function bindStoreSubscriptions() {
+    if (storeSubscriptionsBound) {
+        return;
+    }
+
+    storeSubscriptionsBound = true;
+
+    store.subscribe('settings', (nextSettingsSlice) => {
+        window.globalSettings = nextSettingsSlice.settings;
+        applyRendererSettings();
+    });
+
+    store.subscribe('session', () => {
+        syncComposerAvailability();
+    });
+
+    store.subscribe('source', () => {
+        syncCurrentTopicKnowledgeBaseControls();
+    });
+
+    store.subscribe('composer', () => {
+        renderSelectionContextPreview();
+        updateSendButtonState();
+    });
+}
+
 function bindFeatureEvents() {
+    bindStoreSubscriptions();
     bindLayoutEvents();
     bindSettingsEvents();
     bindReaderEvents();

@@ -1,3 +1,5 @@
+import { createStoreView } from '../store/storeView.js';
+
 const SETTINGS_MODAL_META = Object.freeze({
     global: {
         title: '全局设置',
@@ -14,17 +16,17 @@ const SETTINGS_MODAL_META = Object.freeze({
 });
 
 function createSettingsController(deps = {}) {
-    const state = deps.state;
+    const store = deps.store;
+    const state = createStoreView(store, {
+        writableSlices: ['settings'],
+    });
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
     const windowObj = deps.windowObj || window;
     const documentObj = deps.documentObj || document;
     const messageRendererApi = deps.messageRendererApi;
-    const normalizeStoredLayoutWidth = deps.normalizeStoredLayoutWidth;
-    const normalizeStoredLayoutHeight = deps.normalizeStoredLayoutHeight;
-    const applyLayoutWidths = deps.applyLayoutWidths;
-    const applyLeftSidebarHeights = deps.applyLeftSidebarHeights;
+    const syncLayoutSettings = deps.syncLayoutSettings || (() => {});
     const resolvePromptText = deps.resolvePromptText || (async () => '');
     const reloadSelectedAgent = deps.reloadSelectedAgent || (async () => {});
     let settingsModalTrigger = null;
@@ -80,13 +82,7 @@ function createSettingsController(deps = {}) {
         windowObj.globalSettings = state.settings;
         syncGlobalSettingsForm();
         applyRendererSettings();
-        if (state.layoutInitialized) {
-            state.layoutLeftWidth = normalizeStoredLayoutWidth(state.settings.layoutLeftWidth, state.layoutLeftWidth);
-            state.layoutRightWidth = normalizeStoredLayoutWidth(state.settings.layoutRightWidth, state.layoutRightWidth);
-            state.layoutLeftTopHeight = normalizeStoredLayoutHeight(state.settings.layoutLeftTopHeight, state.layoutLeftTopHeight);
-            applyLayoutWidths();
-            applyLeftSidebarHeights();
-        }
+        syncLayoutSettings(state.settings);
         messageRendererApi?.setUserAvatar(state.settings.userAvatarUrl || '../assets/default_user_avatar.png');
         messageRendererApi?.setUserAvatarColor(state.settings.userAvatarCalculatedColor || null);
     }
