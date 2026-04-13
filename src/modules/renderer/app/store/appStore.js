@@ -64,6 +64,7 @@ function createInitialAppState() {
             layoutRightWidth: DEFAULT_SETTINGS.layoutRightWidth,
             layoutLeftTopHeight: DEFAULT_SETTINGS.layoutLeftTopHeight,
             layoutInitialized: false,
+            workspaceViewMode: 'overview',
             activeResizeHandle: null,
             activeVerticalResizeHandle: null,
             leftSidebarMode: 'source-list',

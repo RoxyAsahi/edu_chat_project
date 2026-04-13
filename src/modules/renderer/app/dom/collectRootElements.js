@@ -1,5 +1,12 @@
 function collectRootElements(rootDocument = document) {
     return {
+        workspaceOverviewPage: rootDocument.getElementById('workspaceOverviewPage'),
+        workspaceSubjectPage: rootDocument.getElementById('workspaceSubjectPage'),
+        workspaceOverviewCreateAgentBtn: rootDocument.getElementById('workspaceOverviewCreateAgentBtn'),
+        workspaceBackToOverviewBtn: rootDocument.getElementById('workspaceBackToOverviewBtn'),
+        subjectOverviewGrid: rootDocument.getElementById('subjectOverviewGrid'),
+        subjectOverviewHeadline: rootDocument.getElementById('subjectOverviewHeadline'),
+        subjectOverviewSummary: rootDocument.getElementById('subjectOverviewSummary'),
         layout: rootDocument.querySelector('.layout'),
         workspaceSidebar: rootDocument.querySelector('.workspace-sidebar'),
         workspaceTopicCard: rootDocument.querySelector('.workspace-topic-card'),

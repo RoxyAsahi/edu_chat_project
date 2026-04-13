@@ -182,6 +182,7 @@ function createAppBootstrap(deps = {}) {
         }
 
         workspaceController.syncWorkspaceContext();
+        workspaceController.showSubjectWorkspace?.();
         setLeftSidebarMode('source-list');
         setLeftReaderTab('guide');
         setRightPanelMode('notes');
@@ -218,12 +219,15 @@ function createAppBootstrap(deps = {}) {
         if (plan.agentId) {
             await workspaceController.selectAgent(plan.agentId, {
                 preferredTopicId: plan.topicId,
+                showSubjectWorkspace: false,
             });
         } else {
             setPromptVisible(false);
             renderNotesPanel();
             await renderCurrentHistory();
         }
+
+        workspaceController.showWorkspaceOverview?.();
 
         finalizeBootstrap();
     }

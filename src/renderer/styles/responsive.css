@@ -156,6 +156,19 @@
 }
 
 @media (max-width: 1200px) {
+  .workspace-overview-page {
+    padding: 0 16px 16px;
+  }
+
+  .subject-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-hero-card,
+  .subject-overview-empty {
+    grid-column: span 2;
+  }
+
   .layout {
     grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
     gap: 20px;
@@ -195,6 +208,26 @@
 }
 
 @media (max-width: 900px) {
+  .workspace-overview-page__header {
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 12px;
+  }
+
+  .workspace-overview-page__action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .subject-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-hero-card,
+  .subject-overview-empty {
+    grid-column: span 1;
+  }
+
   .layout { grid-template-columns: 1fr; padding: 12px; }
   .layout-splitter {
     display: none;
@@ -276,6 +309,10 @@
   .workspace-nav__column,
   .panel--files {
     max-height: 320px;
+  }
+
+  .workspace-card__titleblock {
+    width: 100%;
   }
 
   .panel__actions {

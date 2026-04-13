@@ -13,6 +13,7 @@ import { createReaderController } from '../modules/renderer/app/reader/readerCon
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
 import { createSourceController } from '../modules/renderer/app/source/sourceController.js';
 import { createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
+import { buildSubjectOverviewMarkup } from '../modules/renderer/app/workspace/workspaceOverview.js';
 import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime } from '../modules/renderer/app/bootstrap.js';
 
 const chatAPI = window.chatAPI || window.electronAPI;
@@ -222,6 +223,7 @@ workspaceController = createWorkspaceController({
     hideSourceFileTooltip,
     clearTopicKnowledgeBaseDocuments,
     getGlobalSettings: () => getSettingsSlice().settings,
+    buildSubjectOverviewMarkup,
 });
 const {
     getCurrentTopic,
