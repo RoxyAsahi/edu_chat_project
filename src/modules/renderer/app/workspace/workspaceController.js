@@ -15,6 +15,12 @@ function shouldPersistTopicSelection(options = {}) {
     return options.fromWatcher !== true;
 }
 
+function formatOverviewClock(date = new Date()) {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
 function createWorkspaceController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -47,9 +53,13 @@ function createWorkspaceController(deps = {}) {
     const buildOverviewMarkup = deps.buildSubjectOverviewMarkup || (() => ({
         headline: '学科总视图',
         summary: '把不同学科整理成独立工作台，在这里快速切换学习上下文。',
-        heroMarkup: '',
+        clockMarkup: '',
+        statsRowMarkup: '',
         gridMarkup: '',
     }));
+    const nowProvider = deps.nowProvider || (() => new Date());
+    const setIntervalFn = deps.setIntervalFn || ((handler, timeout) => windowObj.setInterval(handler, timeout));
+    const clearIntervalFn = deps.clearIntervalFn || ((timerId) => windowObj.clearInterval(timerId));
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const clearTopicKnowledgeBaseDocuments = deps.clearTopicKnowledgeBaseDocuments || (() => {});
@@ -120,6 +130,39 @@ function createWorkspaceController(deps = {}) {
     });
 
     let agentOverviewStats = {};
+    let overviewClockTimerId = null;
+
+    function clearOverviewClockTimer() {
+        if (overviewClockTimerId == null) {
+            return;
+        }
+        clearIntervalFn(overviewClockTimerId);
+        overviewClockTimerId = null;
+    }
+
+    function syncOverviewClockText() {
+        const clockElement = el.subjectOverviewGrid?.querySelector('#overviewClockTime');
+        if (!clockElement) {
+            return;
+        }
+        clockElement.textContent = formatOverviewClock(nowProvider());
+    }
+
+    function ensureOverviewClockTimer() {
+        if (state.workspaceViewMode === 'subject') {
+            clearOverviewClockTimer();
+            return;
+        }
+
+        syncOverviewClockText();
+        if (overviewClockTimerId != null) {
+            return;
+        }
+
+        overviewClockTimerId = setIntervalFn(() => {
+            syncOverviewClockText();
+        }, 1000);
+    }
 
     function getCurrentTopic() {
         return state.topics.find((topic) => topic.id === state.currentTopicId) || null;
@@ -260,6 +303,11 @@ function createWorkspaceController(deps = {}) {
         el.workspaceSubjectPage?.classList.toggle('hidden', isOverview);
         documentObj.body?.classList?.toggle('workspace-view-overview', isOverview);
         documentObj.body?.classList?.toggle('workspace-view-subject', !isOverview);
+        if (isOverview) {
+            ensureOverviewClockTimer();
+        } else {
+            clearOverviewClockTimer();
+        }
     }
 
     async function refreshAgentOverviewStats(unreadCounts = {}) {
@@ -299,7 +347,7 @@ function createWorkspaceController(deps = {}) {
             el.subjectOverviewSummary.textContent = markup.summary;
         }
 
-        el.subjectOverviewGrid.innerHTML = `${markup.heroMarkup}${markup.gridMarkup}`;
+        el.subjectOverviewGrid.innerHTML = `${markup.clockMarkup || ''}${markup.statsRowMarkup || ''}${markup.gridMarkup || ''}`;
         el.subjectOverviewGrid.querySelectorAll('[data-subject-card]').forEach((button) => {
             button.addEventListener('click', () => {
                 const { agentId } = button.dataset;
@@ -314,6 +362,8 @@ function createWorkspaceController(deps = {}) {
         createCard?.addEventListener('click', () => {
             void createAgent();
         });
+
+        ensureOverviewClockTimer();
     }
 
     function renderAgentList(unreadCounts = {}) {
