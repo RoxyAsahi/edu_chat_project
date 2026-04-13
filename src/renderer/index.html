@@ -50,12 +50,33 @@
       </div>
     </header>
 
-    <main class="layout">
+    <div class="workspace-pages">
+      <section id="workspaceOverviewPage" class="workspace-overview-page">
+        <div class="workspace-overview-page__inner">
+          <header class="workspace-overview-page__header">
+            <div class="workspace-overview-page__header-main">
+              <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
+              <h1 id="subjectOverviewHeadline">学科总视图</h1>
+              <p id="subjectOverviewSummary" class="workspace-overview-page__summary">把不同学科整理成独立工作台，在这里快速切换学习上下文。</p>
+            </div>
+            <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button">
+              <span class="material-symbols-outlined">add</span> 新建学科
+            </button>
+          </header>
+
+          <section id="subjectOverviewGrid" class="subject-overview-grid" aria-label="学科总览"></section>
+        </div>
+      </section>
+
+      <main id="workspaceSubjectPage" class="layout hidden">
       <!-- Workspace Navigation / Files -->
       <aside class="workspace-sidebar">
         <section class="panel workspace-nav workspace-topic-card">
           <div class="workspace-card__header">
-            <div>
+            <div class="workspace-card__titleblock">
+              <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn workspace-card__back-btn" type="button">
+                <span class="material-symbols-outlined">arrow_back</span> 返回首页
+              </button>
               <p class="workspace-card__title">学习主题</p>
             </div>
             <button id="quickNewTopicBtn" class="ghost-button workspace-card__cta" type="button">
@@ -324,7 +345,8 @@
             </section>
           </div>
         </aside>
-    </main>
+      </main>
+    </div>
 
     <div id="noteDetailModal" class="note-detail-modal hidden" aria-hidden="true">
       <div id="noteDetailModalBackdrop" class="note-detail-modal__backdrop"></div>

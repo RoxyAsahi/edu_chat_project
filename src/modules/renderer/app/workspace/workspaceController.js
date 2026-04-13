@@ -44,6 +44,12 @@ function createWorkspaceController(deps = {}) {
     const setPromptVisible = deps.setPromptVisible || (() => {});
     const messageRendererApi = deps.messageRendererApi || null;
     const defaultAgentAvatar = deps.defaultAgentAvatar || DEFAULT_AGENT_AVATAR;
+    const buildOverviewMarkup = deps.buildSubjectOverviewMarkup || (() => ({
+        headline: '学科总视图',
+        summary: '把不同学科整理成独立工作台，在这里快速切换学习上下文。',
+        heroMarkup: '',
+        gridMarkup: '',
+    }));
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const clearTopicKnowledgeBaseDocuments = deps.clearTopicKnowledgeBaseDocuments || (() => {});
@@ -53,8 +59,19 @@ function createWorkspaceController(deps = {}) {
         return store.getState().session;
     }
 
+    function getLayoutSlice() {
+        return store.getState().layout;
+    }
+
     function patchSession(patch) {
         return store.patchState('session', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
+    function patchLayout(patch) {
+        return store.patchState('layout', (current, rootState) => ({
             ...current,
             ...(typeof patch === 'function' ? patch(current, rootState) : patch),
         }));
@@ -96,7 +113,13 @@ function createWorkspaceController(deps = {}) {
             get: () => getSessionSlice().activeTopicMenu,
             set: (value) => patchSession({ activeTopicMenu: value }),
         },
+        workspaceViewMode: {
+            get: () => getLayoutSlice().workspaceViewMode,
+            set: (value) => patchLayout({ workspaceViewMode: value }),
+        },
     });
+
+    let agentOverviewStats = {};
 
     function getCurrentTopic() {
         return state.topics.find((topic) => topic.id === state.currentTopicId) || null;
@@ -221,6 +244,78 @@ function createWorkspaceController(deps = {}) {
         });
     }
 
+    function showWorkspaceOverview() {
+        state.workspaceViewMode = 'overview';
+        syncWorkspaceView();
+    }
+
+    function showSubjectWorkspace() {
+        state.workspaceViewMode = 'subject';
+        syncWorkspaceView();
+    }
+
+    function syncWorkspaceView() {
+        const isOverview = state.workspaceViewMode !== 'subject';
+        el.workspaceOverviewPage?.classList.toggle('hidden', !isOverview);
+        el.workspaceSubjectPage?.classList.toggle('hidden', isOverview);
+        documentObj.body?.classList?.toggle('workspace-view-overview', isOverview);
+        documentObj.body?.classList?.toggle('workspace-view-subject', !isOverview);
+    }
+
+    async function refreshAgentOverviewStats(unreadCounts = {}) {
+        const agents = Array.isArray(state.agents) ? state.agents : [];
+        const overviewEntries = await Promise.all(agents.map(async (agent) => {
+            const topics = await chatAPI.getAgentTopics(agent.id).catch(() => []);
+            const normalizedTopics = Array.isArray(topics) ? topics.map(normalizeTopic) : [];
+            return [
+                agent.id,
+                {
+                    topicCount: normalizedTopics.length,
+                    unreadCount: Number(unreadCounts[agent.id] || 0),
+                    lastTopicName: normalizedTopics[0]?.name || '',
+                },
+            ];
+        }));
+
+        agentOverviewStats = Object.fromEntries(overviewEntries);
+        return agentOverviewStats;
+    }
+
+    function renderSubjectOverview() {
+        if (!el.subjectOverviewGrid) {
+            return;
+        }
+
+        const markup = buildOverviewMarkup({
+            agents: state.agents,
+            statsByAgent: agentOverviewStats,
+            selectedAgentId: state.currentSelectedItem.id,
+        });
+
+        if (el.subjectOverviewHeadline) {
+            el.subjectOverviewHeadline.textContent = markup.headline;
+        }
+        if (el.subjectOverviewSummary) {
+            el.subjectOverviewSummary.textContent = markup.summary;
+        }
+
+        el.subjectOverviewGrid.innerHTML = `${markup.heroMarkup}${markup.gridMarkup}`;
+        el.subjectOverviewGrid.querySelectorAll('[data-subject-card]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const { agentId } = button.dataset;
+                if (!agentId) {
+                    return;
+                }
+                void selectAgent(agentId);
+            });
+        });
+
+        const createCard = el.subjectOverviewGrid.querySelector('#subjectOverviewCreateCard');
+        createCard?.addEventListener('click', () => {
+            void createAgent();
+        });
+    }
+
     function renderAgentList(unreadCounts = {}) {
         if (!el.agentList) {
             return;
@@ -276,13 +371,17 @@ function createWorkspaceController(deps = {}) {
             console.error('[UniStudyRenderer] getAgents failed:', agents.error);
             ui.showToastNotification(`加载智能体失败：${agents.error}`, 'error');
             state.agents = [];
+            agentOverviewStats = {};
             renderAgentList({});
+            renderSubjectOverview();
             return state.agents;
         }
 
         state.agents = Array.isArray(agents) ? agents : [];
         const unreadResult = await chatAPI.getUnreadTopicCounts().catch(() => ({ counts: {} }));
+        await refreshAgentOverviewStats(unreadResult?.counts || {});
         renderAgentList(unreadResult?.counts || {});
+        renderSubjectOverview();
         return state.agents;
     }
 
@@ -627,6 +726,9 @@ function createWorkspaceController(deps = {}) {
         await loadTopics({ preferredTopicId: options.preferredTopicId || null });
         await loadAgentNotes();
         await loadAgents();
+        if (options.showSubjectWorkspace !== false) {
+            showSubjectWorkspace();
+        }
 
         if (state.topics.length > 0) {
             await selectTopic(state.currentTopicId || state.topics[0].id, {
@@ -644,6 +746,7 @@ function createWorkspaceController(deps = {}) {
         renderTopicKnowledgeBaseFiles();
         await renderCurrentHistory();
         syncComposerAvailability();
+        renderSubjectOverview();
     }
 
     function buildMarkdownExport() {
@@ -773,6 +876,7 @@ function createWorkspaceController(deps = {}) {
         syncWorkspaceContext();
         setPromptVisible(false);
         await loadAgents();
+        showWorkspaceOverview();
         renderTopics();
         syncCurrentTopicKnowledgeBaseControls();
         await renderCurrentHistory();
@@ -783,6 +887,12 @@ function createWorkspaceController(deps = {}) {
         el.topicSearchInput?.addEventListener('input', filterTopics);
         el.createNewAgentBtn?.addEventListener('click', () => {
             void createAgent();
+        });
+        el.workspaceOverviewCreateAgentBtn?.addEventListener('click', () => {
+            void createAgent();
+        });
+        el.workspaceBackToOverviewBtn?.addEventListener('click', () => {
+            showWorkspaceOverview();
         });
         el.quickNewTopicBtn?.addEventListener('click', () => {
             void createTopic();
@@ -830,6 +940,7 @@ function createWorkspaceController(deps = {}) {
         renderAgentList,
         filterTopics,
         renderTopics,
+        renderSubjectOverview,
         loadAgents,
         loadTopics,
         renameTopic,
@@ -839,6 +950,9 @@ function createWorkspaceController(deps = {}) {
         deleteTopicFromList,
         selectTopic,
         selectAgent,
+        showWorkspaceOverview,
+        showSubjectWorkspace,
+        syncWorkspaceView,
         exportCurrentTopic,
         createAgent,
         createTopic,
