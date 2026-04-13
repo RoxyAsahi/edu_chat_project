@@ -40,6 +40,10 @@
           <span class="titlebar__context-label">当前话题</span>
           <strong id="titlebarCurrentTopic">请选择一个话题</strong>
         </div>
+        <button id="manualNotesLibraryBtn" class="ghost-button titlebar__context-card titlebar__context-card--action" type="button">
+          <span class="titlebar__context-label">手写笔记</span>
+          <strong>我的笔记</strong>
+        </button>
       </div>
       <div class="titlebar__meta">
         <button id="globalSettingsBtn" class="ghost-button icon-btn" title="设置"><span class="material-symbols-outlined">settings</span></button>
@@ -323,12 +327,12 @@
               </div>
 
               <div class="notes-stream">
-                <div class="notes-stream__header">
-                  <div class="notes-stream__heading">
-                    <h3>最近笔记</h3>
-                    <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
-                  </div>
-                  <div class="notes-scope-switch">
+              <div class="notes-stream__header">
+                <div class="notes-stream__heading">
+                  <h3>最近生成内容</h3>
+                  <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
+                </div>
+                <div class="notes-scope-switch">
                     <button id="topicNotesScopeBtn" class="ghost-button notes-scope-btn notes-scope-btn--active" type="button">当前话题</button>
                     <button id="agentNotesScopeBtn" class="ghost-button notes-scope-btn" type="button">学科汇总</button>
                   </div>
@@ -499,6 +503,25 @@
               </button>
             </div>
           </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="manualNotesLibraryModal" class="manual-notes-library-modal hidden" aria-hidden="true">
+      <div id="manualNotesLibraryBackdrop" class="manual-notes-library-modal__backdrop"></div>
+      <div class="manual-notes-library-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="manualNotesLibraryTitle">
+        <div class="manual-notes-library-modal__header">
+          <div>
+            <p class="eyebrow">当前学科</p>
+            <h2 id="manualNotesLibraryTitle">我的笔记</h2>
+            <p id="manualNotesLibrarySubtitle" class="settings-caption">这里会显示当前学科下的所有手写笔记。</p>
+          </div>
+          <button id="manualNotesLibraryCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭我的笔记">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="manual-notes-library-modal__body">
+          <div id="manualNotesLibraryGrid" class="manual-notes-library-grid"></div>
         </div>
       </div>
     </div>

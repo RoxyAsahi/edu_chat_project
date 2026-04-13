@@ -57,6 +57,13 @@ function createBaseState(overrides = {}) {
                     maxOutputTokens: 1200,
                 },
             },
+            topics: [{
+                id: 'topic-1',
+                name: '函数',
+            }, {
+                id: 'topic-2',
+                name: '极限',
+            }],
             currentTopicId: 'topic-1',
             currentChatHistory: [],
         },
@@ -69,6 +76,7 @@ function createBaseState(overrides = {}) {
             activeNoteId: null,
             selectedNoteIds: [],
             notesStudioView: 'overview',
+            manualNotesLibraryOpen: false,
             noteDetailKind: null,
             noteDetailMode: 'edit',
             activeNoteMenu: null,
@@ -145,6 +153,7 @@ function createNotesDom() {
             <button id="newNoteBtn"></button>
             <button id="newNoteFabBtn"></button>
             <button id="notesStudioOpenBtn"></button>
+            <button id="manualNotesLibraryBtn"></button>
             <button id="saveNoteBtn"></button>
             <button id="deleteNoteBtn"></button>
             <button id="analyzeNotesBtn"></button>
@@ -157,6 +166,12 @@ function createNotesDom() {
             <div id="noteDetailModal" class="hidden"></div>
             <button id="noteDetailCloseBtn"></button>
             <div id="noteDetailModalBackdrop"></div>
+            <div id="manualNotesLibraryModal" class="hidden"></div>
+            <div id="manualNotesLibraryBackdrop"></div>
+            <button id="manualNotesLibraryCloseBtn"></button>
+            <div id="manualNotesLibraryTitle"></div>
+            <div id="manualNotesLibrarySubtitle"></div>
+            <div id="manualNotesLibraryGrid"></div>
             <div id="noteActionMenu"></div>
             <input id="noteTitleInput" />
             <textarea id="noteContentInput"></textarea>
@@ -202,6 +217,7 @@ function createNotesDom() {
             newNoteBtn: window.document.getElementById('newNoteBtn'),
             newNoteFabBtn: window.document.getElementById('newNoteFabBtn'),
             notesStudioOpenBtn: window.document.getElementById('notesStudioOpenBtn'),
+            manualNotesLibraryBtn: window.document.getElementById('manualNotesLibraryBtn'),
             saveNoteBtn: window.document.getElementById('saveNoteBtn'),
             deleteNoteBtn: window.document.getElementById('deleteNoteBtn'),
             analyzeNotesBtn: window.document.getElementById('analyzeNotesBtn'),
@@ -214,6 +230,12 @@ function createNotesDom() {
             noteDetailModal: window.document.getElementById('noteDetailModal'),
             noteDetailCloseBtn: window.document.getElementById('noteDetailCloseBtn'),
             noteDetailModalBackdrop: window.document.getElementById('noteDetailModalBackdrop'),
+            manualNotesLibraryModal: window.document.getElementById('manualNotesLibraryModal'),
+            manualNotesLibraryBackdrop: window.document.getElementById('manualNotesLibraryBackdrop'),
+            manualNotesLibraryCloseBtn: window.document.getElementById('manualNotesLibraryCloseBtn'),
+            manualNotesLibraryTitle: window.document.getElementById('manualNotesLibraryTitle'),
+            manualNotesLibrarySubtitle: window.document.getElementById('manualNotesLibrarySubtitle'),
+            manualNotesLibraryGrid: window.document.getElementById('manualNotesLibraryGrid'),
             noteActionMenu: window.document.getElementById('noteActionMenu'),
             noteTitleInput: window.document.getElementById('noteTitleInput'),
             noteContentInput: window.document.getElementById('noteContentInput'),
@@ -367,6 +389,47 @@ test('buildNotesSelectionSummary matches topic and agent scope wording', async (
     );
 });
 
+test('normalizeNote derives structured quiz data from legacy markdown content', async () => {
+    const { normalizeNote } = await loadNotesUtilsModule();
+
+    const note = normalizeNote({
+        kind: 'quiz',
+        title: '函数测验',
+        contentMarkdown: [
+            '# 函数测验',
+            '',
+            '## 1. 导数的几何意义是什么？',
+            'A. 曲线在该点的切线斜率',
+            'B. 曲线与坐标轴围成的面积',
+            'C. 函数的定义域',
+            'D. 函数的最小值',
+            '正确答案：A',
+            '解析：导数描述函数在某点的瞬时变化率，对应切线斜率。',
+        ].join('\n'),
+    });
+
+    assert.equal(note.quizSet.title, '函数测验');
+    assert.equal(note.quizSet.items.length, 1);
+    assert.equal(note.quizSet.items[0].correctOptionId, 'option_a');
+});
+
+test('manual and generated note filters split note kinds correctly', async () => {
+    const {
+        filterGeneratedNotes,
+        filterManualNotes,
+    } = await loadNotesUtilsModule();
+
+    const notes = [
+        { id: 'note-1', kind: 'note' },
+        { id: 'note-2', kind: 'message-note' },
+        { id: 'analysis-1', kind: 'analysis' },
+        { id: 'quiz-1', kind: 'quiz' },
+        { id: 'flash-1', kind: 'flashcards', flashcardDeck: { cards: [{ front: 'Q', back: 'A' }] } },
+    ];
+
+    assert.deepEqual(filterManualNotes(notes).map((note) => note.id), ['note-1', 'note-2']);
+    assert.deepEqual(filterGeneratedNotes(notes).map((note) => note.id), ['analysis-1', 'quiz-1', 'flash-1']);
+});
 test('removeDeletedNoteReferencesFromHistory clears favorite state only when the last ref is removed', async () => {
     const { removeDeletedNoteReferencesFromHistory } = await loadNotesUtilsModule();
 
@@ -392,30 +455,6 @@ test('removeDeletedNoteReferencesFromHistory clears favorite state only when the
     assert.deepEqual(nextHistory[1].noteRefs, ['note-2']);
     assert.equal(nextHistory[1].favorited, true);
     assert.equal(nextHistory[1].favoriteAt, 456);
-});
-
-test('normalizeNote derives structured quiz data from legacy markdown content', async () => {
-    const { normalizeNote } = await loadNotesUtilsModule();
-
-    const note = normalizeNote({
-        kind: 'quiz',
-        title: '函数测验',
-        contentMarkdown: [
-            '# 函数测验',
-            '',
-            '## 1. 导数的几何意义是什么？',
-            'A. 曲线在该点的切线斜率',
-            'B. 曲线与坐标轴围成的面积',
-            'C. 函数的定义域',
-            'D. 函数的最小值',
-            '正确答案：A',
-            '解析：导数描述函数在某点的瞬时变化率，对应切线斜率。',
-        ].join('\n'),
-    });
-
-    assert.equal(note.quizSet.title, '函数测验');
-    assert.equal(note.quizSet.items.length, 1);
-    assert.equal(note.quizSet.items[0].correctOptionId, 'option_a');
 });
 
 test('note save and delete helpers cover blank drafts, save payloads, and deleted state cleanup', async () => {
@@ -522,6 +561,65 @@ test('notes refresh re-renders flashcard practice when the flashcards panel is a
     await controller.loadAgentNotes();
 
     assert.equal(renderPracticeCalls, 2);
+});
+
+test('right-side notes panel only renders generated content kinds', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                notesScope: 'agent',
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记', contentMarkdown: '普通内容', kind: 'note', topicId: 'topic-1' },
+                    { id: 'analysis-1', title: '分析报告', contentMarkdown: '分析内容', kind: 'analysis', topicId: 'topic-1' },
+                    { id: 'quiz-1', title: '选择题', contentMarkdown: '题目', kind: 'quiz', topicId: 'topic-1' },
+                    {
+                        id: 'flash-1',
+                        title: '闪卡',
+                        contentMarkdown: '卡片',
+                        kind: 'flashcards',
+                        topicId: 'topic-2',
+                        flashcardDeck: { title: '闪卡', cards: [{ id: 'card-1', front: 'Q', back: 'A' }] },
+                    },
+                ],
+            },
+        },
+    });
+
+    controller.renderNotesPanel();
+
+    const notesText = el.notesList.textContent;
+    assert.match(notesText, /分析报告/);
+    assert.match(notesText, /选择题/);
+    assert.match(notesText, /闪卡/);
+    assert.doesNotMatch(notesText, /手写笔记/);
+});
+
+test('manual notes library opens from the top button and only renders manual notes', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                notesScope: 'agent',
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', topicId: 'topic-1' },
+                    { id: 'message-note-1', title: '摘录笔记', contentMarkdown: '普通内容 B', kind: 'message-note', topicId: 'topic-2' },
+                    { id: 'analysis-1', title: '分析报告', contentMarkdown: '分析内容', kind: 'analysis', topicId: 'topic-1' },
+                ],
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNotesLibraryBtn.click();
+
+    assert.equal(store.getState().notes.manualNotesLibraryOpen, true);
+    assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), false);
+    assert.match(el.manualNotesLibraryGrid.textContent, /手写笔记 A/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /摘录笔记/);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析报告/);
 });
 
 test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {

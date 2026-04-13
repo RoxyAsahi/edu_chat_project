@@ -1,5 +1,7 @@
 import {
     buildBlankNoteTitle,
+    filterGeneratedNotes,
+    filterManualNotes,
     getNormalizedNoteKind,
     normalizeNote as normalizeStoredNote,
 } from './notesUtils.js';
@@ -44,6 +46,7 @@ function createNotesController(deps = {}) {
     const HTMLElementCtor = windowObj.HTMLElement || globalThis.HTMLElement;
     const ElementCtor = windowObj.Element || globalThis.Element;
     let noteDetailTrigger = null;
+    let manualNotesLibraryTrigger = null;
     let notesDomApi = null;
     let notesOperationsApi = null;
 
@@ -53,6 +56,10 @@ function createNotesController(deps = {}) {
 
     function getSettingsSlice() {
         return store.getState().settings;
+    }
+
+    function getSessionSlice() {
+        return store.getState().session;
     }
 
     function getLayoutSlice() {
@@ -92,6 +99,10 @@ function createNotesController(deps = {}) {
             get: () => getNotesSlice().notesStudioView,
             set: (value) => patchNotes({ notesStudioView: value }),
         },
+        manualNotesLibraryOpen: {
+            get: () => getNotesSlice().manualNotesLibraryOpen === true,
+            set: (value) => patchNotes({ manualNotesLibraryOpen: value === true }),
+        },
         noteDetailKind: {
             get: () => getNotesSlice().noteDetailKind,
             set: (value) => patchNotes({ noteDetailKind: value }),
@@ -124,6 +135,9 @@ function createNotesController(deps = {}) {
         currentSelectedItem: {
             get: () => getCurrentSelectedItem() || { id: null, name: null, config: null },
         },
+        topics: {
+            get: () => getSessionSlice().topics || [],
+        },
         currentTopicId: {
             get: () => getCurrentTopicId(),
         },
@@ -152,11 +166,29 @@ function createNotesController(deps = {}) {
         return state.notesScope === 'agent' ? state.agentNotes : state.topicNotes;
     }
 
+    function getGeneratedVisibleNotes() {
+        return filterGeneratedNotes(getVisibleNotes());
+    }
+
+    function getManualLibraryNotes() {
+        return filterManualNotes(state.agentNotes);
+    }
+
     function getActiveNote() {
         return getVisibleNotes().find((note) => note.id === state.activeNoteId)
             || state.topicNotes.find((note) => note.id === state.activeNoteId)
             || state.agentNotes.find((note) => note.id === state.activeNoteId)
             || null;
+    }
+
+    function getTopicDisplayLabel(topicId) {
+        const normalizedTopicId = String(topicId || '').trim();
+        if (!normalizedTopicId) {
+            return '未归类话题';
+        }
+
+        const topic = state.topics.find((item) => item.id === normalizedTopicId);
+        return topic?.name || normalizedTopicId;
     }
 
     function findNoteById(noteId) {
@@ -465,11 +497,50 @@ function createNotesController(deps = {}) {
         return normalized;
     }
 
+    function openManualNotesLibrary(options = {}) {
+        if (options.trigger instanceof HTMLElementCtor) {
+            manualNotesLibraryTrigger = options.trigger;
+        }
+        if (!el.manualNotesLibraryModal) {
+            return;
+        }
+
+        if (el.noteDetailModal && !el.noteDetailModal.classList.contains('hidden')) {
+            closeNoteDetail({ restoreFocus: false });
+        }
+
+        state.manualNotesLibraryOpen = true;
+        notesDomApi.renderManualNotesLibrary();
+        el.manualNotesLibraryModal.classList.remove('hidden');
+        el.manualNotesLibraryModal.setAttribute('aria-hidden', 'false');
+        documentObj.body?.classList.add('manual-notes-library-open');
+        el.manualNotesLibraryCloseBtn?.focus();
+    }
+
+    function closeManualNotesLibrary(options = {}) {
+        state.manualNotesLibraryOpen = false;
+        el.manualNotesLibraryModal?.classList.add('hidden');
+        el.manualNotesLibraryModal?.setAttribute('aria-hidden', 'true');
+        documentObj.body?.classList.remove('manual-notes-library-open');
+        if (
+            options.restoreFocus !== false
+            && manualNotesLibraryTrigger instanceof HTMLElementCtor
+            && documentObj.body?.contains(manualNotesLibraryTrigger)
+        ) {
+            manualNotesLibraryTrigger.focus();
+        }
+        manualNotesLibraryTrigger = null;
+    }
+
     function openNoteDetail(note = null, options = {}) {
         const normalized = note ? normalizeNote(note) : null;
         const requestedKind = options.kind || getNormalizedNoteKind(normalized);
         if (options.trigger instanceof HTMLElementCtor) {
             noteDetailTrigger = options.trigger;
+        }
+
+        if (state.manualNotesLibraryOpen) {
+            closeManualNotesLibrary({ restoreFocus: false });
         }
 
         state.notesStudioView = 'detail';
@@ -569,6 +640,9 @@ function createNotesController(deps = {}) {
         }
 
         notesDomApi.renderNotesPanel();
+        if (state.manualNotesLibraryOpen) {
+            notesDomApi.renderManualNotesLibrary();
+        }
     }
 
     function createBlankNote() {
@@ -607,6 +681,9 @@ function createNotesController(deps = {}) {
         }
         if (clearFlashcards) {
             flashcardsApi.resetState();
+        }
+        if (state.manualNotesLibraryOpen) {
+            closeManualNotesLibrary({ restoreFocus: false });
         }
         state.noteDetailMode = 'edit';
         resetQuizPracticeState(null);
@@ -648,6 +725,10 @@ function createNotesController(deps = {}) {
             if (state.activeNoteMenu) {
                 notesDomApi.closeNoteActionMenu();
             }
+            if (state.manualNotesLibraryOpen) {
+                closeManualNotesLibrary();
+                return;
+            }
             if (el.noteDetailModal && !el.noteDetailModal.classList.contains('hidden')) {
                 closeNoteDetail();
             }
@@ -658,6 +739,9 @@ function createNotesController(deps = {}) {
         el.newNoteBtn?.addEventListener('click', createBlankNote);
         el.newNoteFabBtn?.addEventListener('click', createBlankNote);
         el.notesStudioOpenBtn?.addEventListener('click', openNotesStudio);
+        el.manualNotesLibraryBtn?.addEventListener('click', (event) => {
+            openManualNotesLibrary({ trigger: event.currentTarget });
+        });
         el.saveNoteBtn?.addEventListener('click', () => {
             void notesOperationsApi.saveActiveNote();
         });
@@ -731,6 +815,8 @@ function createNotesController(deps = {}) {
         });
         el.noteDetailCloseBtn?.addEventListener('click', () => closeNoteDetail());
         el.noteDetailModalBackdrop?.addEventListener('click', () => closeNoteDetail());
+        el.manualNotesLibraryCloseBtn?.addEventListener('click', () => closeManualNotesLibrary());
+        el.manualNotesLibraryBackdrop?.addEventListener('click', () => closeManualNotesLibrary());
     }
 
     notesDomApi = createNotesDom({
@@ -741,8 +827,11 @@ function createNotesController(deps = {}) {
         flashcardsApi,
         normalizeNote,
         getVisibleNotes,
+        getGeneratedVisibleNotes,
+        getManualLibraryNotes,
         getActiveNote,
         getCurrentTopicDisplayName,
+        getTopicDisplayLabel,
         getNoteHighlightId,
         closeTopicActionMenu,
         closeSourceFileActionMenu,
@@ -771,6 +860,7 @@ function createNotesController(deps = {}) {
         updateCurrentChatHistory,
         getSelectedNotes,
         renderNotesPanel: (...args) => notesDomApi.renderNotesPanel(...args),
+        renderManualNotesLibrary: (...args) => notesDomApi.renderManualNotesLibrary(...args),
         clearNoteEditor: (...args) => notesDomApi.clearNoteEditor(...args),
         openNoteDetail,
         closeNoteDetail,
@@ -782,6 +872,7 @@ function createNotesController(deps = {}) {
 
     return {
         bindEvents,
+        closeManualNotesLibrary,
         closeNoteActionMenu: (...args) => notesDomApi.closeNoteActionMenu(...args),
         closeNoteDetail,
         createBlankNote,
@@ -792,8 +883,10 @@ function createNotesController(deps = {}) {
         loadAgentNotes: (...args) => notesOperationsApi.loadAgentNotes(...args),
         loadTopicNotes: (...args) => notesOperationsApi.loadTopicNotes(...args),
         normalizeNote,
+        openManualNotesLibrary,
         openNoteDetail,
         refreshNotesData: (...args) => notesOperationsApi.refreshNotesData(...args),
+        renderManualNotesLibrary: (...args) => notesDomApi.renderManualNotesLibrary(...args),
         renderNotesPanel: (...args) => notesDomApi.renderNotesPanel(...args),
         replaceNoteInCollections,
         resetState,
