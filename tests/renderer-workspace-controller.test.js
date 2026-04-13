@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('assert/strict');
 const fs = require('fs/promises');
 const path = require('path');
+const { JSDOM } = require('jsdom');
 
 async function loadWorkspaceModule() {
     const modulePath = path.resolve(__dirname, '..', 'src/modules/renderer/app/workspace/workspaceController.js');
@@ -39,6 +40,9 @@ function createControllerHarness(overrides = {}) {
             settings: {
                 userName: 'User',
             },
+        },
+        layout: {
+            workspaceViewMode: 'overview',
         },
         session: {
             agents: [],
@@ -112,7 +116,13 @@ function createControllerHarness(overrides = {}) {
                     return true;
                 },
             },
-            windowObj: { addEventListener() {} },
+            windowObj: {
+                addEventListener() {},
+                setInterval() {
+                    return 1;
+                },
+                clearInterval() {},
+            },
             documentObj: { addEventListener() {} },
             renderCurrentHistory: async () => {},
             renderTopicKnowledgeBaseFiles: () => {},
@@ -142,6 +152,28 @@ function createControllerHarness(overrides = {}) {
                 setCurrentItemAvatar() {},
                 setCurrentItemAvatarColor() {},
             },
+        },
+    };
+}
+
+function createOverviewDom() {
+    const dom = new JSDOM(`
+        <body>
+            <section id="workspaceOverviewPage"></section>
+            <main id="workspaceSubjectPage" class="hidden"></main>
+            <button id="workspaceOverviewCreateAgentBtn"></button>
+            <section id="subjectOverviewGrid"></section>
+        </body>
+    `);
+
+    return {
+        window: dom.window,
+        document: dom.window.document,
+        el: {
+            workspaceOverviewPage: dom.window.document.getElementById('workspaceOverviewPage'),
+            workspaceSubjectPage: dom.window.document.getElementById('workspaceSubjectPage'),
+            workspaceOverviewCreateAgentBtn: dom.window.document.getElementById('workspaceOverviewCreateAgentBtn'),
+            subjectOverviewGrid: dom.window.document.getElementById('subjectOverviewGrid'),
         },
     };
 }
@@ -177,4 +209,47 @@ test('deleteCurrentAgent stops the watcher before deleting the agent', async () 
     await controller.deleteCurrentAgent();
 
     assert.deepEqual(harness.watcherCalls, [['stop'], ['delete-agent']]);
+});
+
+test('renderSubjectOverview starts a single clock timer and clears it when leaving overview', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const harness = createControllerHarness();
+    const { window, document, el } = createOverviewDom();
+    let intervalCalls = 0;
+    const clearedIntervals = [];
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        el: {
+            ...harness.deps.el,
+            ...el,
+        },
+        windowObj: window,
+        documentObj: document,
+        buildSubjectOverviewMarkup: () => ({
+            headline: '学科总视图',
+            summary: '选择一个学科继续你的学习。',
+            clockMarkup: '<section class="overview-clock-panel"><div id="overviewClockTime">00:00</div></section>',
+            statsRowMarkup: '<section class="overview-stats-row"><article class="overview-stat-card"><span class="overview-stat-card__label">学科</span><strong>1</strong></article></section>',
+            gridMarkup: '<section class="overview-subject-wall"><button id="subjectOverviewCreateCard"></button></section>',
+        }),
+        nowProvider: () => new Date('2026-04-13T09:05:00'),
+        setIntervalFn: (handler) => {
+            intervalCalls += 1;
+            return { handler, id: intervalCalls };
+        },
+        clearIntervalFn: (timerId) => {
+            clearedIntervals.push(timerId.id);
+        },
+    });
+
+    controller.renderSubjectOverview();
+    controller.renderSubjectOverview();
+
+    assert.equal(intervalCalls, 1);
+    assert.equal(document.getElementById('overviewClockTime').textContent, '09:05');
+
+    controller.showSubjectWorkspace();
+
+    assert.deepEqual(clearedIntervals, [1]);
 });

@@ -2,6 +2,9 @@ import {
     normalizeFlashcardDeck,
     normalizeFlashcardProgress,
 } from '../flashcards/flashcardUtils.js';
+import {
+    parseQuizSetFromMarkdown,
+} from '../quiz/quizUtils.js';
 
 function normalizeHistory(history) {
     return Array.isArray(history)
@@ -43,6 +46,10 @@ function removeDeletedNoteReferencesFromHistory(history, noteId) {
 function normalizeNote(note = {}, options = {}) {
     const sourceDocumentRefs = Array.isArray(note.sourceDocumentRefs) ? note.sourceDocumentRefs : [];
     const flashcardDeck = normalizeFlashcardDeck(note.flashcardDeck, sourceDocumentRefs);
+    const kind = String(note.kind || 'note');
+    const quizSet = kind === 'quiz'
+        ? (note.quizSet || parseQuizSetFromMarkdown(note.contentMarkdown, note.title || '选择题练习'))
+        : null;
 
     return {
         ...note,
@@ -53,7 +60,8 @@ function normalizeNote(note = {}, options = {}) {
         contentMarkdown: String(note.contentMarkdown || ''),
         sourceMessageIds: Array.isArray(note.sourceMessageIds) ? note.sourceMessageIds : [],
         sourceDocumentRefs,
-        kind: String(note.kind || 'note'),
+        kind,
+        quizSet,
         flashcardDeck,
         flashcardProgress: normalizeFlashcardProgress(note.flashcardProgress, flashcardDeck),
         createdAt: Number(note.createdAt || Date.now()),
@@ -72,6 +80,23 @@ function getNormalizedNoteKind(note) {
     }
 
     return 'note';
+}
+
+function isManualNote(note) {
+    return getNormalizedNoteKind(note) === 'note';
+}
+
+function isGeneratedNote(note) {
+    const kind = getNormalizedNoteKind(note);
+    return kind === 'analysis' || kind === 'quiz' || kind === 'flashcards';
+}
+
+function filterManualNotes(notes = []) {
+    return Array.isArray(notes) ? notes.filter((note) => isManualNote(note)) : [];
+}
+
+function filterGeneratedNotes(notes = []) {
+    return Array.isArray(notes) ? notes.filter((note) => isGeneratedNote(note)) : [];
 }
 
 function buildNotesSelectionSummary({
@@ -122,6 +147,14 @@ function buildNoteSaveRequest({
         return null;
     }
 
+    const kind = currentNote?.kind || 'note';
+    const quizSet = kind === 'quiz'
+        ? parseQuizSetFromMarkdown(
+            resolvedContent,
+            resolvedTitle || currentNote?.title || '选择题练习',
+        )
+        : null;
+
     return {
         targetTopicId: currentNote?.topicId || currentTopicId || '',
         payload: {
@@ -130,7 +163,8 @@ function buildNoteSaveRequest({
             contentMarkdown: resolvedContent,
             sourceMessageIds: Array.isArray(currentNote?.sourceMessageIds) ? currentNote.sourceMessageIds : [],
             sourceDocumentRefs: Array.isArray(currentNote?.sourceDocumentRefs) ? currentNote.sourceDocumentRefs : [],
-            kind: currentNote?.kind || 'note',
+            kind,
+            quizSet,
             createdAt: currentNote?.createdAt,
         },
     };
@@ -174,8 +208,12 @@ export {
     buildNotesSelectionSummary,
     buildNoteSaveRequest,
     deriveDeletedNoteState,
+    filterGeneratedNotes,
+    filterManualNotes,
     formatRelativeTime,
     getNormalizedNoteKind,
+    isGeneratedNote,
+    isManualNote,
     normalizeNote,
     removeDeletedNoteReferencesFromHistory,
 };

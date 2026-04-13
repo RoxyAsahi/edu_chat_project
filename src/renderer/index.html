@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="styles/sidepanel.css" />
   <link rel="stylesheet" href="styles/responsive.css" />
 </head>
-<body class="light-theme lite-shell">
+<body class="light-theme unistudy-shell">
   <div class="window-shell">
     <header class="titlebar">
       <div class="titlebar__brand">
@@ -40,6 +40,10 @@
           <span class="titlebar__context-label">当前话题</span>
           <strong id="titlebarCurrentTopic">请选择一个话题</strong>
         </div>
+        <button id="manualNotesLibraryBtn" class="ghost-button titlebar__context-card titlebar__context-card--action" type="button">
+          <span class="titlebar__context-label">手写笔记</span>
+          <strong>我的笔记</strong>
+        </button>
       </div>
       <div class="titlebar__meta">
         <button id="globalSettingsBtn" class="ghost-button icon-btn" title="设置"><span class="material-symbols-outlined">settings</span></button>
@@ -50,12 +54,33 @@
       </div>
     </header>
 
-    <main class="layout">
+    <div class="workspace-pages">
+      <section id="workspaceOverviewPage" class="workspace-overview-page">
+        <div class="workspace-overview-page__inner">
+          <header class="workspace-overview-page__header">
+            <div class="workspace-overview-page__header-main hidden" aria-hidden="true">
+              <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
+              <h1 id="subjectOverviewHeadline">学科总视图</h1>
+              <p id="subjectOverviewSummary" class="workspace-overview-page__summary">把不同学科整理成独立工作台，在这里快速切换学习上下文。</p>
+            </div>
+            <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button">
+              <span class="material-symbols-outlined">add</span> 新建学科
+            </button>
+          </header>
+
+          <section id="subjectOverviewGrid" class="subject-overview-grid" aria-label="学科总览"></section>
+        </div>
+      </section>
+
+      <main id="workspaceSubjectPage" class="layout hidden">
       <!-- Workspace Navigation / Files -->
       <aside class="workspace-sidebar">
         <section class="panel workspace-nav workspace-topic-card">
           <div class="workspace-card__header">
-            <div>
+            <div class="workspace-card__titleblock">
+              <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn workspace-card__back-btn" type="button">
+                <span class="material-symbols-outlined">arrow_back</span> 返回首页
+              </button>
               <p class="workspace-card__title">学习主题</p>
             </div>
             <button id="quickNewTopicBtn" class="ghost-button workspace-card__cta" type="button">
@@ -302,12 +327,12 @@
               </div>
 
               <div class="notes-stream">
-                <div class="notes-stream__header">
-                  <div class="notes-stream__heading">
-                    <h3>最近笔记</h3>
-                    <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
-                  </div>
-                  <div class="notes-scope-switch">
+              <div class="notes-stream__header">
+                <div class="notes-stream__heading">
+                  <h3>最近生成内容</h3>
+                  <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
+                </div>
+                <div class="notes-scope-switch">
                     <button id="topicNotesScopeBtn" class="ghost-button notes-scope-btn notes-scope-btn--active" type="button">当前话题</button>
                     <button id="agentNotesScopeBtn" class="ghost-button notes-scope-btn" type="button">学科汇总</button>
                   </div>
@@ -323,8 +348,9 @@
               </div>
             </section>
           </div>
-      </aside>
-    </main>
+        </aside>
+      </main>
+    </div>
 
     <div id="noteDetailModal" class="note-detail-modal hidden" aria-hidden="true">
       <div id="noteDetailModalBackdrop" class="note-detail-modal__backdrop"></div>
@@ -341,6 +367,18 @@
             </div>
           </div>
           <div class="panel__actions note-detail-modal__actions">
+            <button id="analysisViewReportBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">preview</span> 查看报告
+            </button>
+            <button id="analysisEditMarkdownBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">edit_document</span> 编辑 Markdown
+            </button>
+            <button id="quizViewPracticeBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">school</span> 返回练习
+            </button>
+            <button id="quizEditSourceBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">edit_document</span> 编辑原文
+            </button>
             <button id="saveNoteBtn" class="accent-button icon-text-btn" type="button">
               <span class="material-symbols-outlined">save</span> 保存
             </button>
@@ -354,6 +392,17 @@
         </div>
 
         <div class="note-detail-modal__body">
+          <section id="analysisPreviewCard" class="settings-card analysis-preview-card hidden">
+            <div class="analysis-preview__header">
+              <div class="analysis-preview__title-block">
+                <p class="eyebrow">报告预览</p>
+                <h3 id="analysisPreviewTitle">深度分析报告</h3>
+              </div>
+            </div>
+            <article id="analysisPreviewContent" class="analysis-preview__content"></article>
+            <div id="analysisPreviewMeta" class="settings-caption analysis-preview__meta">当前没有可预览的报告。</div>
+          </section>
+
           <section id="noteEditorCard" class="settings-card note-detail-editor">
             <h3><span class="material-symbols-outlined bento-icon">edit_note</span> Markdown 编辑器</h3>
             <div class="field-grid" style="grid-template-columns: 1fr;">
@@ -419,6 +468,60 @@
               </button>
             </div>
           </section>
+
+          <section id="quizPracticeCard" class="settings-card quiz-practice-card hidden">
+            <div class="quiz-practice__header">
+              <div class="quiz-practice__title-block">
+                <p class="eyebrow">交互练习</p>
+                <h2 id="quizPracticeTitle">选择题练习</h2>
+                <p id="quizPracticeSummary" class="settings-caption">请选择一份测验开始练习。</p>
+              </div>
+              <span id="quizPracticeProgress" class="flashcards-practice__pill">0 / 0</span>
+            </div>
+
+            <div class="quiz-practice__question">
+              <span id="quizPracticeQuestionIndex" class="quiz-practice__question-index">第 1 题</span>
+              <div id="quizPracticeStem" class="quiz-practice__stem"></div>
+            </div>
+
+            <div id="quizPracticeOptions" class="quiz-practice__options" role="list"></div>
+
+            <div id="quizPracticeFeedback" class="quiz-practice__feedback hidden">
+              <div class="quiz-practice__feedback-top">
+                <strong id="quizPracticeResult">请选择答案</strong>
+                <span id="quizPracticeAnswer" class="quiz-practice__answer"></span>
+              </div>
+              <div id="quizPracticeExplanation" class="quiz-practice__explanation"></div>
+            </div>
+
+            <div class="quiz-practice__actions">
+              <button id="quizPracticePrevBtn" class="ghost-button quiz-practice__nav-btn" type="button">
+                <span class="material-symbols-outlined">arrow_back</span> 上一题
+              </button>
+              <button id="quizPracticeNextBtn" class="accent-button quiz-practice__nav-btn" type="button">
+                下一题 <span class="material-symbols-outlined">arrow_forward</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="manualNotesLibraryModal" class="manual-notes-library-modal hidden" aria-hidden="true">
+      <div id="manualNotesLibraryBackdrop" class="manual-notes-library-modal__backdrop"></div>
+      <div class="manual-notes-library-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="manualNotesLibraryTitle">
+        <div class="manual-notes-library-modal__header">
+          <div>
+            <p class="eyebrow">当前学科</p>
+            <h2 id="manualNotesLibraryTitle">我的笔记</h2>
+            <p id="manualNotesLibrarySubtitle" class="settings-caption">这里会显示当前学科下的所有手写笔记。</p>
+          </div>
+          <button id="manualNotesLibraryCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭我的笔记">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="manual-notes-library-modal__body">
+          <div id="manualNotesLibraryGrid" class="manual-notes-library-grid"></div>
         </div>
       </div>
     </div>
@@ -501,6 +604,17 @@
                   <label><input id="enableAgentBubbleTheme" type="checkbox" /> 注入气泡主题</label>
                   <label><input id="enableWideChatLayout" type="checkbox" /> 宽屏聊天布局</label>
                   <label><input id="enableSmoothStreaming" type="checkbox" /> 平滑流式输出</label>
+                </div>
+                <div class="field-grid" style="grid-template-columns: 1fr;">
+                  <label>
+                    <span>气泡主题注入提示词</span>
+                    <textarea
+                      id="agentBubbleThemePrompt"
+                      rows="4"
+                      placeholder="启用后，这段提示词会追加到发送给上游的 system 消息中。"
+                    ></textarea>
+                    <span class="settings-caption">支持提示词变量，例如 <code>{{VarDivRender}}</code>。关闭“注入气泡主题”时会保留内容但设为只读。</span>
+                  </label>
                 </div>
               </section>
 
