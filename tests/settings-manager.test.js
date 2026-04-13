@@ -40,7 +40,25 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
     const settings = await manager.readSettings();
     assert.equal(settings.userName, DEFAULT_SETTINGS.userName);
     assert.equal(settings.kbEmbeddingModel, DEFAULT_SETTINGS.kbEmbeddingModel);
+    assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
     assert.equal(settings.enableThoughtChainInjection, false);
+});
+
+test('readSettings fills in missing schema fields from older settings files', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await fs.writeJson(settingsPath, {
+        userName: 'Legacy User',
+        enableAgentBubbleTheme: true,
+    }, { spaces: 2 });
+
+    const settings = await manager.readSettings();
+    assert.equal(settings.userName, 'Legacy User');
+    assert.equal(settings.enableAgentBubbleTheme, true);
+    assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
 });
 
 test('readSettings recovers from a valid backup when the primary file is corrupted', async (t) => {

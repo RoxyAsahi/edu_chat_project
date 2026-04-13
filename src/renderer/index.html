@@ -560,6 +560,17 @@
                   <label><input id="enableWideChatLayout" type="checkbox" /> 宽屏聊天布局</label>
                   <label><input id="enableSmoothStreaming" type="checkbox" /> 平滑流式输出</label>
                 </div>
+                <div class="field-grid" style="grid-template-columns: 1fr;">
+                  <label>
+                    <span>气泡主题注入提示词</span>
+                    <textarea
+                      id="agentBubbleThemePrompt"
+                      rows="4"
+                      placeholder="启用后，这段提示词会追加到发送给上游的 system 消息中。"
+                    ></textarea>
+                    <span class="settings-caption">支持提示词变量，例如 <code>{{VarDivRender}}</code>。关闭“注入气泡主题”时会保留内容但设为只读。</span>
+                  </label>
+                </div>
               </section>
 
               <section class="settings-card settings-card--modal">

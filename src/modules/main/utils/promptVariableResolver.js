@@ -55,11 +55,12 @@ function mergeVariable(variableMap, key, value, source, overwrite = false) {
 }
 
 function collectExplicitPromptVariables(agentConfig = {}) {
+    const normalizedAgentConfig = isPlainObject(agentConfig) ? agentConfig : {};
     const variableMap = {};
 
     const objectCandidates = [
-        agentConfig.promptVariables,
-        agentConfig.variables,
+        normalizedAgentConfig.promptVariables,
+        normalizedAgentConfig.variables,
     ];
 
     for (const candidate of objectCandidates) {
@@ -72,8 +73,8 @@ function collectExplicitPromptVariables(agentConfig = {}) {
         }
     }
 
-    if (Array.isArray(agentConfig.promptVariableEntries)) {
-        for (const entry of agentConfig.promptVariableEntries) {
+    if (Array.isArray(normalizedAgentConfig.promptVariableEntries)) {
+        for (const entry of normalizedAgentConfig.promptVariableEntries) {
             if (!entry || typeof entry !== 'object') {
                 continue;
             }
@@ -88,8 +89,8 @@ function collectExplicitPromptVariables(agentConfig = {}) {
         }
     }
 
-    if (Array.isArray(agentConfig.aliases)) {
-        for (const alias of agentConfig.aliases) {
+    if (Array.isArray(normalizedAgentConfig.aliases)) {
+        for (const alias of normalizedAgentConfig.aliases) {
             if (typeof alias !== 'string') {
                 continue;
             }
@@ -103,10 +104,11 @@ function collectExplicitPromptVariables(agentConfig = {}) {
 function buildPromptVariableMap(options = {}) {
     const {
         settings = {},
-        agentConfig = {},
+        agentConfig: rawAgentConfig = {},
         context = {},
         modelConfig = {},
     } = options;
+    const agentConfig = isPlainObject(rawAgentConfig) ? rawAgentConfig : {};
 
     const variableMap = collectExplicitPromptVariables(agentConfig);
 

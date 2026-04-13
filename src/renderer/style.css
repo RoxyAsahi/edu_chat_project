@@ -2062,6 +2062,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .settings-card input[type='checkbox'], .settings-card input[type='radio'] { width: auto; accent-color: var(--accent); }
 .settings-card textarea { min-height: 100px; resize: vertical; background: rgba(255,255,255,0.5); }
 body.dark-theme .settings-card textarea { background: rgba(0,0,0,0.1); }
+.settings-card textarea.settings-textarea--readonly { opacity: 0.65; cursor: default; }
 
 .empty-state { padding: 24px; border-radius: 24px; background: var(--panel); color: var(--muted); text-align: center; font-size: 14px; box-shadow: var(--shadow-elevation-1); }
 

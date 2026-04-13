@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     kbScoreThreshold: 0.25,
     currentThemeMode: 'system',
     enableAgentBubbleTheme: false,
+    agentBubbleThemePrompt: 'Output formatting requirement: {{VarDivRender}}',
     enableWideChatLayout: true,
     enableSmoothStreaming: true,
     chatFontPreset: 'system',

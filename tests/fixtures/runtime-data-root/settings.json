@@ -22,6 +22,7 @@
   "vcpLogKey": "",
   "networkNotesPaths": [],
   "enableAgentBubbleTheme": false,
+  "agentBubbleThemePrompt": "Output formatting requirement: {{VarDivRender}}",
   "enableSmoothStreaming": false,
   "enableWideChatLayout": false,
   "chatBubbleMaxWidthDefault": 82,

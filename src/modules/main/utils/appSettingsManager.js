@@ -49,12 +49,13 @@ class SettingsManager extends EventEmitter {
 
             const content = await fs.readFile(this.settingsPath, 'utf8');
             const settings = JSON.parse(content.replace(/^\uFEFF/, ''));
+            const { validated } = validateSettings(settings, this.defaultSettings);
             
             // Refresh the in-memory cache.
-            this.cache = settings;
+            this.cache = validated;
             this.cacheTimestamp = stats ? stats.mtimeMs : Date.now();
             
-            return { ...settings };
+            return { ...validated };
         } catch (error) {
             if (error.code === 'ENOENT') {
                 return { ...this.defaultSettings };
@@ -68,17 +69,18 @@ class SettingsManager extends EventEmitter {
                 try {
                     const backupContent = await fs.readFile(backupPath, 'utf8');
                     const backupSettings = JSON.parse(backupContent.replace(/^\uFEFF/, ''));
+                    const { validated: validatedBackup } = validateSettings(backupSettings, this.defaultSettings);
                     
                     // Only recover from a backup that contains meaningful user state.
-                    const isNonDefault = backupSettings && (
-                        (Array.isArray(backupSettings.combinedItemOrder) && backupSettings.combinedItemOrder.length > 0) ||
-                        (backupSettings.userName && backupSettings.userName !== 'User') ||
-                        backupSettings.vcpServerUrl
+                    const isNonDefault = validatedBackup && (
+                        (Array.isArray(validatedBackup.combinedItemOrder) && validatedBackup.combinedItemOrder.length > 0) ||
+                        (validatedBackup.userName && validatedBackup.userName !== 'User') ||
+                        validatedBackup.vcpServerUrl
                     );
 
                     if (isNonDefault) {
                         console.log('Recovered settings from valid backup');
-                        return { ...backupSettings };
+                        return { ...validatedBackup };
                     } else {
                         console.warn('Backup exists but appears to be default or empty, skipping recovery to prevent overwrite');
                     }
@@ -262,5 +264,4 @@ class SettingsManager extends EventEmitter {
     }
 }
 module.exports = SettingsManager;
-
 

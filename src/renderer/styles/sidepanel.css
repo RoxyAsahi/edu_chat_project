@@ -1430,6 +1430,11 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 
 body.dark-theme .settings-card textarea { background: rgba(0,0,0,0.1); }
 
+.settings-card textarea.settings-textarea--readonly {
+  opacity: 0.65;
+  cursor: default;
+}
+
 #systemPromptContainer textarea { min-height: 120px; }
 
 #systemPromptContainer .prompt-text-mode-note { margin-bottom: 8px; color: var(--muted); font-size: 12px; }
