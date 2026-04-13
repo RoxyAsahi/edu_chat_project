@@ -6,6 +6,8 @@ const {
     DEFAULT_KB_SCORE_THRESHOLD,
 } = require('../knowledge-base/constants');
 
+const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{VarDivRender}}';
+
 const DEFAULT_SETTINGS = Object.freeze({
     sidebarWidth: 260,
     notificationsSidebarWidth: 300,
@@ -30,6 +32,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     vcpLogKey: '',
     networkNotesPaths: [],
     enableAgentBubbleTheme: false,
+    agentBubbleThemePrompt: DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
     enableSmoothStreaming: false,
     enableWideChatLayout: false,
     chatBubbleMaxWidthDefault: 82,
@@ -134,6 +137,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
 }
 
 module.exports = {
+    DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
     DEFAULT_SETTINGS,
     cloneDefaultSettings,
     validateSettings,

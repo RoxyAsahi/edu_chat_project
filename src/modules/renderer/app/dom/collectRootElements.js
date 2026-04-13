@@ -110,6 +110,7 @@ function collectRootElements(rootDocument = document) {
         chatCodeFontPreset: rootDocument.getElementById('chatCodeFontPreset'),
         chatBubbleMaxWidthWideDefault: rootDocument.getElementById('chatBubbleMaxWidthWideDefault'),
         enableAgentBubbleTheme: rootDocument.getElementById('enableAgentBubbleTheme'),
+        agentBubbleThemePrompt: rootDocument.getElementById('agentBubbleThemePrompt'),
         enableWideChatLayout: rootDocument.getElementById('enableWideChatLayout'),
         enableSmoothStreaming: rootDocument.getElementById('enableSmoothStreaming'),
         saveGlobalSettingsBtn: rootDocument.getElementById('saveGlobalSettingsBtn'),

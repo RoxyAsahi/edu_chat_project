@@ -6,6 +6,7 @@ const contextSanitizer = require('../contextSanitizer');
 const knowledgeBase = require('../knowledge-base');
 const vcpClient = require('../vcpClient');
 const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
+const { DEFAULT_AGENT_BUBBLE_THEME_PROMPT } = require('../utils/settingsSchema');
 
 /**
  * Initializes chat and topic related IPC handlers.
@@ -19,8 +20,6 @@ const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
  * @param {function} context.startSelectionListener - Function to start the selection listener.
  */
 let ipcHandlersRegistered = false;
-
-const AGENT_BUBBLE_THEME_INJECTION = 'Output formatting requirement: {{VarDivRender}}';
 
 function normalizeMessageForPreprocessing(message) {
     if (!message || typeof message !== 'object') {
@@ -74,7 +73,12 @@ function stripThoughtChains(messages) {
     });
 }
 
-function applyAgentBubbleTheme(messages) {
+function applyAgentBubbleTheme(messages, injectionPrompt = DEFAULT_AGENT_BUBBLE_THEME_PROMPT) {
+    const normalizedPrompt = typeof injectionPrompt === 'string' ? injectionPrompt.trim() : '';
+    if (!normalizedPrompt) {
+        return messages;
+    }
+
     const nextMessages = [...messages];
     let systemMessageIndex = nextMessages.findIndex((message) => message.role === 'system');
 
@@ -85,10 +89,10 @@ function applyAgentBubbleTheme(messages) {
 
     const systemMessage = nextMessages[systemMessageIndex];
     const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
-    if (!currentContent.includes(AGENT_BUBBLE_THEME_INJECTION)) {
+    if (!currentContent.includes(normalizedPrompt)) {
         nextMessages[systemMessageIndex] = {
             ...systemMessage,
-            content: `${currentContent}\n\n${AGENT_BUBBLE_THEME_INJECTION}`.trim(),
+            content: `${currentContent}\n\n${normalizedPrompt}`.trim(),
         };
     }
 
@@ -703,7 +707,10 @@ function initialize(mainWindow, context) {
 
         try {
             if (settings.enableAgentBubbleTheme === true) {
-                processedMessages = applyAgentBubbleTheme(processedMessages);
+                processedMessages = applyAgentBubbleTheme(
+                    processedMessages,
+                    settings.agentBubbleThemePrompt
+                );
             }
 
             if (settings.enableThoughtChainInjection !== true) {
@@ -989,6 +996,5 @@ function initialize(mainWindow, context) {
 module.exports = {
     initialize
 };
-
 
 

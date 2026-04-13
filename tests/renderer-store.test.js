@@ -24,6 +24,7 @@ test('createInitialAppState groups renderer state into the expected slices', asy
         'composer',
     ]);
     assert.equal(state.settings.settings.currentThemeMode, 'system');
+    assert.equal(state.settings.settings.agentBubbleThemePrompt, 'Output formatting requirement: {{VarDivRender}}');
     assert.equal(state.layout.sidePanelTab, 'notes');
     assert.equal(state.session.currentTopicId, null);
     assert.equal(state.source.selectedKnowledgeBaseId, null);
@@ -65,4 +66,3 @@ test('appStore no longer exports flat-state compatibility mappings', async () =>
 
     assert.equal('FLAT_STATE_PROPERTY_PATHS' in appStoreModule, false);
 });
-

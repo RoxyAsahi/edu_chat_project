@@ -13,6 +13,8 @@ const SETTINGS_MODAL_META = Object.freeze({
     },
 });
 
+const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{VarDivRender}}';
+
 function createSettingsController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -71,6 +73,17 @@ function createSettingsController(deps = {}) {
         documentObj.body.classList.toggle('wide-chat-layout', settings.enableWideChatLayout === true);
     }
 
+    function syncAgentBubbleThemePromptState() {
+        const enabled = el.enableAgentBubbleTheme?.checked === true;
+        if (!el.agentBubbleThemePrompt) {
+            return;
+        }
+
+        el.agentBubbleThemePrompt.readOnly = !enabled;
+        el.agentBubbleThemePrompt.setAttribute('aria-readonly', enabled ? 'false' : 'true');
+        el.agentBubbleThemePrompt.classList.toggle('settings-textarea--readonly', !enabled);
+    }
+
     function syncGlobalSettingsForm() {
         const settings = getGlobalSettings();
         el.userNameInput.value = settings.userName || '';
@@ -88,8 +101,12 @@ function createSettingsController(deps = {}) {
         el.chatCodeFontPreset.value = settings.chatCodeFontPreset || 'consolas';
         el.chatBubbleMaxWidthWideDefault.value = settings.chatBubbleMaxWidthWideDefault ?? 92;
         el.enableAgentBubbleTheme.checked = settings.enableAgentBubbleTheme === true;
+        el.agentBubbleThemePrompt.value = typeof settings.agentBubbleThemePrompt === 'string'
+            ? settings.agentBubbleThemePrompt
+            : DEFAULT_AGENT_BUBBLE_THEME_PROMPT;
         el.enableWideChatLayout.checked = settings.enableWideChatLayout !== false;
         el.enableSmoothStreaming.checked = settings.enableSmoothStreaming === true;
+        syncAgentBubbleThemePromptState();
 
         const themeMode = settings.currentThemeMode || 'system';
         const themeInput = documentObj.querySelector(`input[name="themeMode"][value="${themeMode}"]`);
@@ -126,6 +143,7 @@ function createSettingsController(deps = {}) {
             chatCodeFontPreset: el.chatCodeFontPreset.value,
             chatBubbleMaxWidthWideDefault: Number(el.chatBubbleMaxWidthWideDefault.value || 92),
             enableAgentBubbleTheme: el.enableAgentBubbleTheme.checked,
+            agentBubbleThemePrompt: el.agentBubbleThemePrompt?.value || '',
             enableWideChatLayout: el.enableWideChatLayout.checked,
             enableSmoothStreaming: el.enableSmoothStreaming.checked,
             currentThemeMode: themeMode,
@@ -280,6 +298,8 @@ function createSettingsController(deps = {}) {
                 }
             });
         });
+
+        el.enableAgentBubbleTheme?.addEventListener('change', syncAgentBubbleThemePromptState);
 
         el.themeToggleBtn?.addEventListener('click', () => {
             const nextTheme = documentObj.body.classList.contains('dark-theme') ? 'light' : 'dark';
