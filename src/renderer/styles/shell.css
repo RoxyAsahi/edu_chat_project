@@ -22,27 +22,27 @@ textarea, input, select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   padding: 12px 14px;
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color var(--motion-standard), box-shadow var(--motion-standard), background-color var(--motion-standard);
 }
 
 textarea:focus, input:focus, select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px rgba(26, 115, 232, 0.12);
 }
 
-.window-shell { height: 100vh; display: grid; grid-template-rows: 56px 1fr; overflow: hidden; }
+.window-shell { height: 100vh; display: grid; grid-template-rows: 64px 1fr; overflow: hidden; }
 
 .titlebar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 6px 18px;
-  background: var(--paper);
+  gap: 12px;
+  padding: 10px 20px;
+  background: transparent;
   user-select: none;
   -webkit-app-region: drag;
 }
@@ -73,7 +73,7 @@ textarea:focus, input:focus, select:focus {
 .brand-mark {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   font-family: 'MavenProExtraBold', sans-serif;
@@ -82,13 +82,13 @@ textarea:focus, input:focus, select:focus {
 }
 
 .titlebar__title {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 15px;
   letter-spacing: 0.02em;
 }
 
 .titlebar__subtitle {
-  color: var(--muted);
+  color: var(--color-text-tertiary);
   font-size: 11px;
 }
 
@@ -98,24 +98,27 @@ textarea:focus, input:focus, select:focus {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 100%, transparent);
   box-shadow: var(--shadow-elevation-1);
 }
 
 .titlebar__context-card strong {
   min-width: 0;
   font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--color-text-primary);
 }
 
 .titlebar__context-label {
-  color: var(--muted);
+  color: var(--color-text-tertiary);
   font-size: 10px;
+  font-weight: 500;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
@@ -265,17 +268,29 @@ h1, h2, h3, p { margin: 0; }
   line-height: 1.5;
 }
 
-.ghost-button { background: transparent; color: var(--accent); }
+.ghost-button {
+  background: transparent;
+  color: var(--accent);
+  transition: background-color var(--motion-standard), color var(--motion-standard), box-shadow var(--motion-standard);
+}
 
-.ghost-button:hover { background: var(--accent-soft); }
+.ghost-button:hover { background: var(--md-sys-state-hover); }
 
 .ghost-button--danger { color: #d93025; }
 
 .ghost-button--danger:hover { background: rgba(217, 48, 37, 0.1); }
 
-.accent-button { background: var(--accent); color: white; }
+.accent-button {
+  background: var(--accent);
+  color: white;
+  box-shadow: var(--shadow-elevation-1);
+  transition: background-color var(--motion-standard), box-shadow var(--motion-standard), transform var(--motion-standard);
+}
 
-.accent-button:hover { background: var(--accent-strong); }
+.accent-button:hover {
+  background: #1765cc;
+  box-shadow: var(--shadow-elevation-2);
+}
 
 .accent-button--danger { background: #d93025; }
 
@@ -347,11 +362,11 @@ button { border: none; background: transparent; outline: none; cursor: pointer; 
 /* Icon buttons */
 .icon-btn { width: 32px; height: 32px; border-radius: 50%; padding: 0 !important; color: var(--muted); }
 
-.icon-btn:hover { background: rgba(0,0,0,0.05); color: var(--ink); }
+.icon-btn:hover { background: rgba(60, 64, 67, 0.08); color: var(--ink); }
 
 body.dark-theme .icon-btn:hover { background: rgba(255,255,255,0.1); }
 
-.icon-text-btn { padding: 6px 12px; border-radius: 18px; font-weight: 500; }
+.icon-text-btn { padding: 6px 12px; border-radius: var(--radius-pill); font-weight: 500; }
 
 .icon-text-btn .material-symbols-outlined { font-size: 18px; }
 

@@ -43,6 +43,11 @@ test('renderer shell keeps the critical DOM anchors for controller wiring', asyn
     const { document } = await loadRendererShell();
 
     [
+        'workspaceOverviewPage',
+        'workspaceSubjectPage',
+        'workspaceOverviewCreateAgentBtn',
+        'workspaceBackToOverviewBtn',
+        'subjectOverviewGrid',
         'globalSettingsBtn',
         'themeToggleBtn',
         'topicList',
