@@ -33,11 +33,16 @@
   <div class="window-shell">
     <header class="titlebar">
       <div class="titlebar__brand">
-        <div class="brand-mark">US</div>
-        <div>
-          <div class="titlebar__title">UniStudy</div>
-          <div class="titlebar__subtitle">个人 AI 学习终端</div>
+        <div class="titlebar__brand-main">
+          <div class="brand-mark">US</div>
+          <div>
+            <div class="titlebar__title">UniStudy</div>
+            <div class="titlebar__subtitle">个人 AI 学习终端</div>
+          </div>
         </div>
+        <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn titlebar__home-btn" type="button">
+          <span class="material-symbols-outlined">home</span> 首页
+        </button>
       </div>
       <div class="titlebar__workspace">
         <div class="titlebar__context-card">
@@ -87,9 +92,6 @@
         <section class="panel workspace-nav workspace-topic-card">
           <div class="workspace-card__header">
             <div class="workspace-card__titleblock">
-              <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn workspace-card__back-btn" type="button">
-                <span class="material-symbols-outlined">arrow_back</span> 返回首页
-              </button>
               <p class="workspace-card__title">学习主题</p>
             </div>
             <button id="quickNewTopicBtn" class="ghost-button workspace-card__cta" type="button">
