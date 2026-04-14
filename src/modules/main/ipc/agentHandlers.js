@@ -228,7 +228,15 @@ async function getAgentConfigById(agentId) {
  * @param {object} context.settingsManager - The AppSettingsManager instance.
  */
 function initialize(context) {
-    const { AGENT_DIR, USER_DATA_DIR, AVATAR_IMAGE_DIR: nextAvatarImageDir, SETTINGS_FILE, USER_AVATAR_FILE, settingsManager, agentConfigManager } = context;
+    const {
+        AGENT_DIR,
+        USER_DATA_DIR,
+        AVATAR_IMAGE_DIR: nextAvatarImageDir,
+        SETTINGS_FILE,
+        USER_AVATAR_FILE,
+        settingsManager,
+        agentConfigManager,
+    } = context;
     AGENT_DIR_CACHE = AGENT_DIR; // Cache the directory path
     USER_DATA_DIR_CACHE = USER_DATA_DIR; // Cache the user data directory path
     agentConfigManagerInstance = agentConfigManager; // Cache the manager instance
@@ -546,5 +554,3 @@ module.exports = {
 };
 
 // recoverSettingsFromCorruptedFile 已由 SettingsManager 处理，无需此函数
-
-

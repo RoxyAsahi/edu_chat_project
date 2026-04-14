@@ -2,6 +2,12 @@
 setlocal
 cd /d "%~dp0"
 
+for /f "tokens=2 delims=:." %%A in ('chcp') do set "UNISTUDY_ORIGINAL_CP=%%A"
+set "UNISTUDY_ORIGINAL_CP=%UNISTUDY_ORIGINAL_CP: =%"
+chcp 65001 >nul
+set "PYTHONUTF8=1"
+set "NPM_CONFIG_UNICODE=true"
+
 echo [UniStudy] Working directory: %cd%
 if defined UNISTUDY_DATA_ROOT (
   echo [UniStudy] Data root override: %UNISTUDY_DATA_ROOT%
@@ -45,6 +51,10 @@ set ERR=%ERRORLEVEL%
 if not "%ERR%"=="0" (
   echo [UniStudy] App exited with code %ERR%.
   pause
+)
+
+if defined UNISTUDY_ORIGINAL_CP (
+  chcp %UNISTUDY_ORIGINAL_CP% >nul
 )
 
 exit /b %ERR%

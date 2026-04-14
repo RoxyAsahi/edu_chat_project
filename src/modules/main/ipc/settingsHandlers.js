@@ -2,7 +2,287 @@
 const { ipcMain } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
+const {
+    resolvePromptVariables,
+    resolvePromptMessageSet,
+    DEFAULT_DIV_RENDER_INSTRUCTION,
+    DEFAULT_ADAPTIVE_BUBBLE_TIP,
+} = require('../utils/promptVariableResolver');
+const { DEFAULT_AGENT_BUBBLE_THEME_PROMPT } = require('../utils/settingsSchema');
+const {
+    resolveDailyNoteToolInstruction,
+    rewriteLegacyStudyLogPromptText,
+} = require('../study/toolProtocol');
 let initialized = false;
+
+function isPlainObject(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sanitizeText(value, fallback = '') {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized || fallback;
+}
+
+function readOwnPathValue(source, pathSegments = []) {
+    if (!isPlainObject(source) || !Array.isArray(pathSegments) || pathSegments.length === 0) {
+        return {
+            exists: false,
+            value: undefined,
+        };
+    }
+
+    let current = source;
+    for (const segment of pathSegments) {
+        if (!isPlainObject(current) || !Object.prototype.hasOwnProperty.call(current, segment)) {
+            return {
+                exists: false,
+                value: undefined,
+            };
+        }
+        current = current[segment];
+    }
+
+    return {
+        exists: true,
+        value: current,
+    };
+}
+
+function writeOwnPathValue(target, pathSegments = [], value) {
+    if (!isPlainObject(target) || !Array.isArray(pathSegments) || pathSegments.length === 0) {
+        return target;
+    }
+
+    let current = target;
+    for (let index = 0; index < pathSegments.length - 1; index += 1) {
+        const segment = pathSegments[index];
+        if (!isPlainObject(current[segment])) {
+            current[segment] = {};
+        }
+        current = current[segment];
+    }
+
+    current[pathSegments[pathSegments.length - 1]] = value;
+    return target;
+}
+
+const SETTINGS_PERSISTENCE_FIELD_SPECS = [
+    {
+        id: 'agentBubbleThemePrompt',
+        path: ['agentBubbleThemePrompt'],
+        type: 'string',
+    },
+    {
+        id: 'enableAgentBubbleTheme',
+        path: ['enableAgentBubbleTheme'],
+        type: 'boolean',
+    },
+    {
+        id: 'enableRenderingPrompt',
+        path: ['enableRenderingPrompt'],
+        type: 'boolean',
+    },
+    {
+        id: 'enableAdaptiveBubbleTip',
+        path: ['enableAdaptiveBubbleTip'],
+        type: 'boolean',
+    },
+    {
+        id: 'studyLogPolicy.enableDailyNotePromptVariables',
+        path: ['studyLogPolicy', 'enableDailyNotePromptVariables'],
+        type: 'boolean',
+    },
+    {
+        id: 'studyLogPolicy.autoInjectDailyNoteProtocol',
+        path: ['studyLogPolicy', 'autoInjectDailyNoteProtocol'],
+        type: 'boolean',
+    },
+];
+
+function collectRequestedPersistenceFields(settings = {}) {
+    return SETTINGS_PERSISTENCE_FIELD_SPECS.reduce((acc, spec) => {
+        const requested = readOwnPathValue(settings, spec.path);
+        const typeMatches = spec.type === 'boolean'
+            ? typeof requested.value === 'boolean'
+            : typeof requested.value === 'string';
+
+        if (!requested.exists || !typeMatches) {
+            return acc;
+        }
+
+        acc[spec.id] = {
+            ...spec,
+            requestedValue: requested.value,
+        };
+        return acc;
+    }, {});
+}
+
+function buildPersistenceFieldChecks(rawSettings, requestedFields = {}) {
+    const fieldChecks = {};
+    const mismatchedFields = [];
+
+    for (const [fieldId, spec] of Object.entries(requestedFields)) {
+        const rawValue = readOwnPathValue(rawSettings, spec.path);
+        const matched = rawValue.exists && rawValue.value === spec.requestedValue;
+        fieldChecks[fieldId] = {
+            requestedValue: spec.requestedValue,
+            rawFieldPresent: rawValue.exists,
+            matched,
+        };
+        if (!matched) {
+            mismatchedFields.push(fieldId);
+        }
+    }
+
+    return {
+        fieldChecks,
+        mismatchedFields,
+    };
+}
+
+function extractPromptTextFromLegacyConfig(config = {}) {
+    if (typeof config.originalSystemPrompt === 'string' && config.originalSystemPrompt.trim()) {
+        return config.originalSystemPrompt;
+    }
+
+    if (typeof config.systemPrompt === 'string' && config.systemPrompt.trim()) {
+        return config.systemPrompt;
+    }
+
+    if (config.promptMode === 'modular') {
+        const advancedPrompt = config.advancedSystemPrompt;
+        if (typeof advancedPrompt === 'string' && advancedPrompt.trim()) {
+            return advancedPrompt;
+        }
+
+        if (advancedPrompt && typeof advancedPrompt === 'object' && Array.isArray(advancedPrompt.blocks)) {
+            return advancedPrompt.blocks
+                .filter((block) => block && block.disabled !== true)
+                .map((block) => {
+                    if (block.type === 'newline') {
+                        return '\n';
+                    }
+
+                    if (Array.isArray(block.variants) && block.variants.length > 0) {
+                        const selectedIndex = Number.isInteger(block.selectedVariant) ? block.selectedVariant : 0;
+                        return block.variants[selectedIndex] || block.content || '';
+                    }
+
+                    return block.content || '';
+                })
+                .join('');
+        }
+    }
+
+    if (config.promptMode === 'preset' && typeof config.presetSystemPrompt === 'string') {
+        return config.presetSystemPrompt;
+    }
+
+    return '';
+}
+
+function mergePreviewSettings(baseSettings = {}, overrideSettings = {}) {
+    return {
+        ...baseSettings,
+        ...overrideSettings,
+        studyProfile: {
+            ...(baseSettings.studyProfile || {}),
+            ...(overrideSettings.studyProfile || {}),
+        },
+        promptVariables: {
+            ...(baseSettings.promptVariables || {}),
+            ...(overrideSettings.promptVariables || {}),
+        },
+        studyLogPolicy: {
+            ...(baseSettings.studyLogPolicy || {}),
+            ...(overrideSettings.studyLogPolicy || {}),
+        },
+    };
+}
+
+function applyAgentBubbleTheme(messages, injectionPrompt = DEFAULT_AGENT_BUBBLE_THEME_PROMPT) {
+    const normalizedPrompt = typeof injectionPrompt === 'string' ? injectionPrompt.trim() : '';
+    if (!normalizedPrompt) {
+        return { messages, appended: false };
+    }
+
+    const nextMessages = [...messages];
+    let systemMessageIndex = nextMessages.findIndex((message) => message.role === 'system');
+
+    if (systemMessageIndex === -1) {
+        nextMessages.unshift({ role: 'system', content: '' });
+        systemMessageIndex = 0;
+    }
+
+    const systemMessage = nextMessages[systemMessageIndex];
+    const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
+    if (currentContent.includes(normalizedPrompt)) {
+        return { messages: nextMessages, appended: false };
+    }
+
+    nextMessages[systemMessageIndex] = {
+        ...systemMessage,
+        content: `${currentContent}\n\n${normalizedPrompt}`.trim(),
+    };
+
+    return { messages: nextMessages, appended: true };
+}
+
+function normalizeLegacyStudyLogPromptMessages(messages = []) {
+    return (Array.isArray(messages) ? messages : []).map((message) => {
+        if (!message || message.role !== 'system' || typeof message.content !== 'string') {
+            return message;
+        }
+
+        return {
+            ...message,
+            content: rewriteLegacyStudyLogPromptText(message.content),
+        };
+    });
+}
+
+function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions = {}) {
+    if (settings?.studyLogPolicy?.enabled === false) {
+        return { messages, appended: false, skippedByToken: false };
+    }
+    if (settings?.studyLogPolicy?.autoInjectDailyNoteProtocol === false) {
+        return { messages, appended: false, skippedByToken: false };
+    }
+
+    const dailyNotePrompt = resolveDailyNoteToolInstruction(settings?.dailyNoteGuide, {
+        agentConfig: promptResolutionOptions.agentConfig,
+        context: promptResolutionOptions.context,
+    });
+    const normalizedPrompt = typeof dailyNotePrompt === 'string' ? dailyNotePrompt.trim() : '';
+    if (!normalizedPrompt) {
+        return { messages, appended: false, skippedByToken: false };
+    }
+
+    const nextMessages = [...messages];
+    let systemMessageIndex = nextMessages.findIndex((message) => message.role === 'system');
+
+    if (systemMessageIndex === -1) {
+        nextMessages.unshift({ role: 'system', content: normalizedPrompt });
+        return { messages: nextMessages, appended: true, skippedByToken: false };
+    }
+
+    const systemMessage = nextMessages[systemMessageIndex];
+    const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
+    const skippedByToken = currentContent.includes('—— 日记 (DailyNote) ——')
+        || /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(currentContent);
+    if (skippedByToken) {
+        return { messages: nextMessages, appended: false, skippedByToken: true };
+    }
+
+    nextMessages[systemMessageIndex] = {
+        ...systemMessage,
+        content: `${currentContent}\n\n${normalizedPrompt}`.trim(),
+    };
+
+    return { messages: nextMessages, appended: true, skippedByToken: false };
+}
 
 /**
  * Initializes settings and theme related IPC handlers.
@@ -13,7 +293,14 @@ let initialized = false;
  * @param {object} paths.settingsManager - The AppSettingsManager instance.
  */
 function initialize(paths) {
-    const { SETTINGS_FILE, USER_AVATAR_FILE, AGENT_DIR, settingsManager, agentConfigManager } = paths;
+    const {
+        SETTINGS_FILE,
+        USER_AVATAR_FILE,
+        AGENT_DIR,
+        DATA_ROOT,
+        settingsManager,
+        agentConfigManager,
+    } = paths;
     const WEBINDEX_MODEL_FILE = path.join(path.dirname(SETTINGS_FILE), 'webindexmodel.json');
 
     if (initialized) {
@@ -55,11 +342,311 @@ function initialize(paths) {
                 ...settingsToSave
             } = settings;
 
+            const requestedPersistenceFields = collectRequestedPersistenceFields(settingsToSave);
             const result = await settingsManager.updateSettings(settingsToSave);
-            return result;
+            let persistedSettings = await settingsManager.readSettings();
+
+            let rawPersistedSettings = null;
+            try {
+                rawPersistedSettings = await fs.readJson(SETTINGS_FILE);
+            } catch (readError) {
+                console.warn('[SettingsHandlers] Failed to read persisted settings for verification:', readError);
+            }
+
+            let persistenceSummary = buildPersistenceFieldChecks(rawPersistedSettings, requestedPersistenceFields);
+            let repairedMissingFields = false;
+
+            if (rawPersistedSettings && persistenceSummary.mismatchedFields.length > 0) {
+                const repairedSettings = {
+                    ...persistedSettings,
+                    studyLogPolicy: {
+                        ...(persistedSettings.studyLogPolicy || {}),
+                    },
+                };
+
+                persistenceSummary.mismatchedFields.forEach((fieldId) => {
+                    const spec = requestedPersistenceFields[fieldId];
+                    if (spec) {
+                        writeOwnPathValue(repairedSettings, spec.path, spec.requestedValue);
+                    }
+                });
+
+                await settingsManager.writeSettings(repairedSettings);
+                repairedMissingFields = true;
+                persistedSettings = await settingsManager.readSettings();
+
+                try {
+                    rawPersistedSettings = await fs.readJson(SETTINGS_FILE);
+                } catch (readError) {
+                    console.warn('[SettingsHandlers] Failed to reread persisted settings after repair:', readError);
+                    rawPersistedSettings = null;
+                }
+
+                persistenceSummary = buildPersistenceFieldChecks(rawPersistedSettings, requestedPersistenceFields);
+            }
+
+            const agentBubbleThemePromptCheck = persistenceSummary.fieldChecks.agentBubbleThemePrompt;
+            const enableAgentBubbleThemeCheck = persistenceSummary.fieldChecks.enableAgentBubbleTheme;
+
+            return {
+                ...result,
+                settings: persistedSettings,
+                persistenceCheck: {
+                    rawSettingsAvailable: Boolean(rawPersistedSettings),
+                    repairedMissingFields,
+                    fieldChecks: persistenceSummary.fieldChecks,
+                    mismatchedFields: persistenceSummary.mismatchedFields,
+                    allRequestedFieldsMatched: persistenceSummary.mismatchedFields.length === 0,
+                    rawHasAgentBubbleThemePromptField: agentBubbleThemePromptCheck?.rawFieldPresent === true,
+                    rawHasEnableAgentBubbleThemeField: enableAgentBubbleThemeCheck?.rawFieldPresent === true,
+                    agentBubbleThemePromptMatched: agentBubbleThemePromptCheck?.matched !== false,
+                    enableAgentBubbleThemeMatched: enableAgentBubbleThemeCheck?.matched !== false,
+                    promptToggleFieldsMatched: [
+                        'enableRenderingPrompt',
+                        'enableAdaptiveBubbleTip',
+                        'studyLogPolicy.enableDailyNotePromptVariables',
+                        'studyLogPolicy.autoInjectDailyNoteProtocol',
+                    ].every((fieldId) => persistenceSummary.fieldChecks[fieldId]?.matched !== false),
+                },
+            };
         } catch (error) {
             console.error('Failed to save settings:', error);
             return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('preview-agent-bubble-theme-prompt', async (_event, payload) => {
+        try {
+            const persistedSettings = await settingsManager.readSettings();
+            const previewPayload = isPlainObject(payload) ? payload : {};
+            const enabled = previewPayload.enabled === true;
+            const prompt = typeof previewPayload.prompt === 'string'
+                ? previewPayload.prompt
+                : (persistedSettings.agentBubbleThemePrompt || DEFAULT_AGENT_BUBBLE_THEME_PROMPT);
+            const trimmedPrompt = prompt.trim();
+
+            if (!enabled || !trimmedPrompt) {
+                return {
+                    enabled,
+                    willInject: false,
+                    rawPrompt: prompt,
+                    resolvedPrompt: '',
+                    unresolvedTokens: [],
+                    substitutions: {},
+                    variableSources: {},
+                };
+            }
+
+            const previewSettings = isPlainObject(previewPayload.settings)
+                ? { ...persistedSettings, ...previewPayload.settings }
+                : persistedSettings;
+            const previewContext = isPlainObject(previewPayload.context) ? previewPayload.context : {};
+            const previewModelConfig = isPlainObject(previewPayload.modelConfig) ? previewPayload.modelConfig : {};
+            const localResult = resolvePromptVariables(trimmedPrompt, {
+                settings: previewSettings,
+                context: previewContext,
+                modelConfig: previewModelConfig,
+            });
+            const previewResult = {
+                resolvedPrompt: localResult.resolvedPrompt,
+                unresolvedTokens: localResult.unresolvedTokens,
+                substitutions: localResult.substitutions,
+                variableSources: localResult.variableSources,
+            };
+
+            return {
+                enabled,
+                willInject: true,
+                rawPrompt: prompt,
+                resolvedPrompt: previewResult.resolvedPrompt,
+                unresolvedTokens: previewResult.unresolvedTokens,
+                substitutions: previewResult.substitutions,
+                variableSources: previewResult.variableSources,
+                available: previewResult.available !== false,
+                unavailable: previewResult.unavailable === true,
+                errorCode: previewResult.errorCode || '',
+            };
+        } catch (error) {
+            console.error('[SettingsHandlers] Failed to preview agent bubble theme prompt:', error);
+            return {
+                enabled: Boolean(payload?.enabled),
+                willInject: false,
+                rawPrompt: typeof payload?.prompt === 'string' ? payload.prompt : '',
+                resolvedPrompt: '',
+                unresolvedTokens: [],
+                substitutions: {},
+                variableSources: {},
+                available: false,
+                unavailable: true,
+                error: error.message,
+                errorCode: error.code || '',
+            };
+        }
+    });
+
+    ipcMain.handle('preview-final-system-prompt', async (_event, payload) => {
+        try {
+            const persistedSettings = await settingsManager.readSettings();
+            const previewPayload = isPlainObject(payload) ? payload : {};
+            const previewSettings = mergePreviewSettings(
+                persistedSettings,
+                isPlainObject(previewPayload.settings) ? previewPayload.settings : {}
+            );
+            const previewContext = isPlainObject(previewPayload.context) ? { ...previewPayload.context } : {};
+            const previewModelConfig = isPlainObject(previewPayload.modelConfig) ? previewPayload.modelConfig : {};
+
+            let agentConfig = null;
+            if (previewContext.agentId && agentConfigManager && typeof agentConfigManager.readAgentConfig === 'function') {
+                agentConfig = await agentConfigManager.readAgentConfig(previewContext.agentId, { allowDefault: true }).catch(() => null);
+            }
+
+            if (agentConfig) {
+                if (!previewContext.agentName && typeof agentConfig.name === 'string') {
+                    previewContext.agentName = agentConfig.name;
+                }
+                if (!previewContext.topicName && previewContext.topicId && Array.isArray(agentConfig.topics)) {
+                    const matchedTopic = agentConfig.topics.find((topic) => topic?.id === previewContext.topicId);
+                    if (matchedTopic?.name) {
+                        previewContext.topicName = matchedTopic.name;
+                    }
+                }
+            }
+
+            const promptResolutionOptions = {
+                settings: previewSettings,
+                agentConfig,
+                context: previewContext,
+                modelConfig: previewModelConfig,
+            };
+
+            const basePrompt = typeof previewPayload.systemPrompt === 'string'
+                ? previewPayload.systemPrompt
+                : extractPromptTextFromLegacyConfig(agentConfig || {});
+            let messages = basePrompt ? [{ role: 'system', content: basePrompt }] : [];
+
+            const renderingPromptSource = sanitizeText(previewSettings.renderingPrompt)
+                ? 'custom'
+                : 'default';
+            const adaptiveBubbleSource = sanitizeText(previewSettings.adaptiveBubbleTip)
+                ? 'custom'
+                : 'default';
+            const dailyNoteSource = sanitizeText(previewSettings.dailyNoteGuide)
+                ? 'custom'
+                : 'default';
+            const bubbleThemeSource = sanitizeText(previewSettings.agentBubbleThemePrompt)
+                ? 'custom'
+                : 'default';
+
+            const renderingRaw = previewSettings.enableRenderingPrompt === false
+                ? ''
+                : (sanitizeText(previewSettings.renderingPrompt) || DEFAULT_DIV_RENDER_INSTRUCTION);
+            const adaptiveBubbleRaw = previewSettings.enableAdaptiveBubbleTip === false
+                ? ''
+                : (sanitizeText(previewSettings.adaptiveBubbleTip) || DEFAULT_ADAPTIVE_BUBBLE_TIP);
+            const studyLogEnabled = previewSettings.studyLogPolicy?.enabled !== false;
+            const dailyNoteVariablesEnabled = studyLogEnabled
+                && previewSettings.studyLogPolicy?.enableDailyNotePromptVariables !== false;
+            const dailyNoteAutoInjectEnabled = studyLogEnabled
+                && previewSettings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false;
+            const dailyNoteRaw = !dailyNoteVariablesEnabled && !dailyNoteAutoInjectEnabled
+                ? ''
+                : resolveDailyNoteToolInstruction(previewSettings.dailyNoteGuide, {
+                    agentConfig,
+                    context: previewContext,
+                });
+            const bubbleThemeRaw = previewSettings.enableAgentBubbleTheme === true
+                ? (sanitizeText(previewSettings.agentBubbleThemePrompt) || DEFAULT_AGENT_BUBBLE_THEME_PROMPT)
+                : '';
+
+            const normalizedMessages = normalizeLegacyStudyLogPromptMessages(messages);
+            const bubbleThemeApplied = previewSettings.enableAgentBubbleTheme === true
+                ? applyAgentBubbleTheme(normalizedMessages, previewSettings.agentBubbleThemePrompt)
+                : { messages: normalizedMessages, appended: false };
+            const dailyNoteApplied = applyDailyNoteProtocol(
+                bubbleThemeApplied.messages,
+                previewSettings,
+                promptResolutionOptions
+            );
+            const resolution = resolvePromptMessageSet(dailyNoteApplied.messages, promptResolutionOptions);
+            const finalSystemPrompt = resolution.messages.find((message) => message?.role === 'system')?.content || '';
+
+            const renderingResolved = renderingRaw
+                ? resolvePromptVariables(renderingRaw, promptResolutionOptions)
+                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+            const adaptiveBubbleResolved = adaptiveBubbleRaw
+                ? resolvePromptVariables(adaptiveBubbleRaw, promptResolutionOptions)
+                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+            const dailyNoteResolved = dailyNoteRaw
+                ? resolvePromptVariables(dailyNoteRaw, promptResolutionOptions)
+                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+            const bubbleThemeResolved = bubbleThemeRaw
+                ? resolvePromptVariables(bubbleThemeRaw, promptResolutionOptions)
+                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+
+            const normalizedBasePrompt = rewriteLegacyStudyLogPromptText(basePrompt || '');
+            const references = {
+                renderingInBasePrompt: /{{\s*(VarDivRender|VarRendering)\s*}}/.test(normalizedBasePrompt),
+                adaptiveInBasePrompt: /{{\s*VarAdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
+                dailyNoteInBasePrompt: /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(normalizedBasePrompt),
+            };
+
+            return {
+                success: true,
+                preview: {
+                    agentName: previewContext.agentName || '',
+                    topicName: previewContext.topicName || '',
+                    hasBasePrompt: Boolean(basePrompt),
+                    basePrompt: normalizedBasePrompt,
+                    finalSystemPrompt,
+                    unresolvedTokens: resolution.unresolvedTokens,
+                    substitutions: resolution.substitutions,
+                    variableSources: resolution.variableSources,
+                    segments: {
+                        rendering: {
+                            enabled: previewSettings.enableRenderingPrompt !== false,
+                            source: renderingPromptSource,
+                            referencedInBasePrompt: references.renderingInBasePrompt,
+                            rawPrompt: renderingRaw,
+                            resolvedPrompt: renderingResolved.resolvedPrompt || '',
+                        },
+                        adaptiveBubbleTip: {
+                            enabled: previewSettings.enableAdaptiveBubbleTip !== false,
+                            source: adaptiveBubbleSource,
+                            referencedInBasePrompt: references.adaptiveInBasePrompt,
+                            rawPrompt: adaptiveBubbleRaw,
+                            resolvedPrompt: adaptiveBubbleResolved.resolvedPrompt || '',
+                        },
+                        dailyNoteVariable: {
+                            enabled: dailyNoteVariablesEnabled,
+                            source: dailyNoteSource,
+                            referencedInBasePrompt: references.dailyNoteInBasePrompt,
+                            rawPrompt: dailyNoteRaw,
+                            resolvedPrompt: dailyNoteResolved.resolvedPrompt || '',
+                        },
+                        dailyNoteAutoInject: {
+                            enabled: dailyNoteAutoInjectEnabled,
+                            source: dailyNoteSource,
+                            appended: dailyNoteApplied.appended === true,
+                            skippedBecausePromptAlreadyContainsProtocol: dailyNoteApplied.skippedByToken === true,
+                            rawPrompt: dailyNoteRaw,
+                            resolvedPrompt: dailyNoteResolved.resolvedPrompt || '',
+                        },
+                        bubbleTheme: {
+                            enabled: previewSettings.enableAgentBubbleTheme === true,
+                            source: bubbleThemeSource,
+                            appended: bubbleThemeApplied.appended === true,
+                            rawPrompt: bubbleThemeRaw,
+                            resolvedPrompt: bubbleThemeResolved.resolvedPrompt || '',
+                        },
+                    },
+                },
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                preview: null,
+            };
         }
     });
 
@@ -197,4 +784,3 @@ function initialize(paths) {
 module.exports = {
     initialize
 };
-

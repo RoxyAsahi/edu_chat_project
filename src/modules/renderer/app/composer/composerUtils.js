@@ -32,6 +32,8 @@ function normalizeHistory(history) {
             favoriteAt: message.favoriteAt || null,
             noteRefs: Array.isArray(message.noteRefs) ? message.noteRefs : [],
             selectionContextRefs: Array.isArray(message.selectionContextRefs) ? message.selectionContextRefs : [],
+            toolEvents: Array.isArray(message.toolEvents) ? message.toolEvents : [],
+            studyMemoryRefs: Array.isArray(message.studyMemoryRefs) ? message.studyMemoryRefs : [],
         }))
         : [];
 }

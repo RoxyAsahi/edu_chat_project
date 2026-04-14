@@ -21,14 +21,17 @@ test('createInitialAppState groups renderer state into the expected slices', asy
         'source',
         'reader',
         'notes',
+        'logs',
         'composer',
     ]);
     assert.equal(state.settings.settings.currentThemeMode, 'system');
     assert.equal(state.settings.settings.agentBubbleThemePrompt, 'Output formatting requirement: {{VarDivRender}}');
+    assert.equal(state.settings.settings.studyProfile.timezone, 'Asia/Hong_Kong');
     assert.equal(state.layout.sidePanelTab, 'notes');
     assert.equal(state.session.currentTopicId, null);
     assert.equal(state.source.selectedKnowledgeBaseId, null);
     assert.equal(state.notes.notesScope, 'topic');
+    assert.equal(state.logs.scope, 'topic');
     assert.equal(state.composer.activeRequestId, null);
 });
 

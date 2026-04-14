@@ -419,6 +419,25 @@ function createComposerController(deps = {}) {
         return nextMessage;
     }
 
+    function applyAssistantResponseMetadata(messageId, payload = {}) {
+        if (!messageId) {
+            return;
+        }
+
+        const unresolvedTokens = Array.isArray(payload?.promptVariableResolution?.unresolvedTokens)
+            ? payload.promptVariableResolution.unresolvedTokens
+            : [];
+        if (unresolvedTokens.length > 0) {
+            ui.showToastNotification(`提示词变量未解析：${unresolvedTokens.join(', ')}`, 'warning', 5000);
+        }
+
+        patchCurrentHistoryMessage(messageId, (entry) => ({
+            ...entry,
+            toolEvents: Array.isArray(payload?.toolEvents) ? payload.toolEvents : (entry.toolEvents || []),
+            studyMemoryRefs: Array.isArray(payload?.studyMemoryRefs) ? payload.studyMemoryRefs : (entry.studyMemoryRefs || []),
+        }));
+    }
+
     async function sendMessage(prefillText) {
         if (typeof prefillText === 'string') {
             el.messageInput.value = prefillText;
@@ -500,6 +519,8 @@ function createComposerController(deps = {}) {
             timestamp: Date.now(),
             isThinking: true,
             topicId: state.currentTopicId,
+            toolEvents: [],
+            studyMemoryRefs: [],
         };
 
         const retrieval = await buildKnowledgeBaseRetrieval(userMessage);
@@ -542,7 +563,13 @@ function createComposerController(deps = {}) {
                 ],
             }),
             modelConfig,
-            context: buildTopicContext(),
+            context: {
+                ...buildTopicContext(),
+                topicName: getCurrentTopic()?.name || '',
+                lastUserMessageId: userMessage.id,
+                assistantMessageId: assistantMessage.id,
+                model: modelConfig.model,
+            },
         });
 
         if (response?.error) {
@@ -554,6 +581,9 @@ function createComposerController(deps = {}) {
             ui.showToastNotification(`请求失败：${response.error}`, 'error');
             return;
         }
+
+        applyAssistantResponseMetadata(assistantMessage.id, response);
+        await persistHistory();
 
         if (!modelConfig.stream && response?.response) {
             const content = response.response?.choices?.[0]?.message?.content || '';

@@ -40,6 +40,7 @@ function createWorkspaceController(deps = {}) {
     const loadCurrentTopicKnowledgeBaseDocuments = deps.loadCurrentTopicKnowledgeBaseDocuments || (async () => {});
     const loadTopicNotes = deps.loadTopicNotes || (async () => {});
     const loadAgentNotes = deps.loadAgentNotes || (async () => {});
+    const refreshLogs = deps.refreshLogs || (async () => {});
     const populateAgentForm = deps.populateAgentForm || (async () => {});
     const setPromptVisible = deps.setPromptVisible || (() => {});
     const messageRendererApi = deps.messageRendererApi || null;
@@ -582,6 +583,7 @@ function createWorkspaceController(deps = {}) {
         syncCurrentTopicKnowledgeBaseControls();
         renderTopicKnowledgeBaseFiles();
         await renderCurrentHistory();
+        await refreshLogs();
     }
 
     async function deleteTopicFromList(topic) {
@@ -658,6 +660,7 @@ function createWorkspaceController(deps = {}) {
         await loadCurrentTopicKnowledgeBaseDocuments({ silent: true });
         await loadTopicNotes();
         await renderCurrentHistory();
+        await refreshLogs();
 
         const historyPath = buildHistoryFilePath();
         if (historyPath) {
@@ -726,6 +729,7 @@ function createWorkspaceController(deps = {}) {
         await loadTopics({ preferredTopicId: options.preferredTopicId || null });
         await loadAgentNotes();
         await loadAgents();
+        await refreshLogs();
         if (options.showSubjectWorkspace !== false) {
             showSubjectWorkspace();
         }
@@ -880,6 +884,7 @@ function createWorkspaceController(deps = {}) {
         renderTopics();
         syncCurrentTopicKnowledgeBaseControls();
         await renderCurrentHistory();
+        await refreshLogs();
     }
 
     function bindEvents() {

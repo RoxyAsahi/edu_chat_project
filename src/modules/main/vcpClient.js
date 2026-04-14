@@ -1,5 +1,9 @@
 const DEFAULT_TIMEOUT_MS = 300000;
 const STREAM_CHANNEL = 'vcp-stream-event';
+const {
+    logOutboundRequest,
+    logUpstreamRawReply,
+} = require('./study/chatDebugLogger');
 
 const activeRequests = new Map();
 
@@ -437,6 +441,15 @@ async function send(request) {
     activeRequests.set(requestId, requestState);
 
     try {
+        logOutboundRequest({
+            requestId,
+            round: request.round || 1,
+            endpoint: finalEndpoint,
+            model: modelConfig.model || '',
+            context,
+            messages: normalizedMessages,
+        });
+
         const response = await fetch(finalEndpoint, {
             method: 'POST',
             headers: {
@@ -464,6 +477,16 @@ async function send(request) {
         }
 
         const parsedResponse = await response.json();
+        logUpstreamRawReply({
+            requestId,
+            round: request.round || 1,
+            content: extractTextFromCandidate(
+                parsedResponse?.choices?.[0]?.message?.content
+                ?? parsedResponse?.message?.content
+                ?? parsedResponse?.content
+                ?? ''
+            ),
+        });
         cleanupRequest(requestState);
         return { response: parsedResponse, context, requestId };
     } catch (error) {

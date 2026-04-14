@@ -49,11 +49,25 @@ class SettingsManager extends EventEmitter {
 
             const content = await fs.readFile(this.settingsPath, 'utf8');
             const settings = JSON.parse(content.replace(/^\uFEFF/, ''));
-            const { validated } = validateSettings(settings, this.defaultSettings);
+            const { validated, hasIssues } = validateSettings(settings, this.defaultSettings);
+
+            if (hasIssues) {
+                const tempFile = this.settingsPath + '.tmp';
+                const backupFile = this.settingsPath + '.backup';
+                try {
+                    await fs.writeJson(tempFile, validated, { spaces: 2 });
+                    await fs.copy(this.settingsPath, backupFile, { overwrite: true }).catch(() => {});
+                    await fs.move(tempFile, this.settingsPath, { overwrite: true });
+                } catch (rewriteError) {
+                    await fs.remove(tempFile).catch(() => {});
+                    console.warn('Failed to rewrite normalized settings file:', rewriteError);
+                }
+            }
             
             // Refresh the in-memory cache.
+            const refreshedStats = await fs.stat(this.settingsPath).catch(() => stats);
             this.cache = validated;
-            this.cacheTimestamp = stats ? stats.mtimeMs : Date.now();
+            this.cacheTimestamp = refreshedStats ? refreshedStats.mtimeMs : Date.now();
             
             return { ...validated };
         } catch (error) {
@@ -264,4 +278,3 @@ class SettingsManager extends EventEmitter {
     }
 }
 module.exports = SettingsManager;
-
