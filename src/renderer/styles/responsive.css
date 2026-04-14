@@ -160,6 +160,26 @@
 }
 
 @media (max-width: 1240px) {
+  .titlebar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .titlebar__brand,
+  .titlebar__workspace,
+  .titlebar__meta {
+    width: 100%;
+  }
+
+  .titlebar__workspace {
+    justify-content: flex-start;
+    padding: 0;
+  }
+
+  .titlebar__meta {
+    justify-content: flex-end;
+  }
+
   .workspace-overview-page {
     padding: 0 16px 16px;
   }
@@ -215,6 +235,29 @@
 }
 
 @media (max-width: 905px) {
+  .titlebar {
+    padding: 12px 12px 8px;
+    gap: 10px;
+  }
+
+  .titlebar__brand {
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .titlebar__brand-main {
+    min-width: 0;
+  }
+
+  .titlebar__home-btn {
+    padding: 7px 14px;
+  }
+
+  .titlebar__workspace {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .workspace-overview-page__header {
     justify-content: center;
     gap: 12px;
