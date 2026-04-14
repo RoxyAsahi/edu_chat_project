@@ -93,6 +93,7 @@ function createInitialAppState() {
             leftReaderActiveTab: 'guide',
             sourceListScrollTop: 0,
             sidePanelTab: 'notes',
+            mobileWorkspaceTab: 'source',
             rightPanelMode: 'notes',
         },
         session: {

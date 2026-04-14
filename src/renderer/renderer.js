@@ -8,6 +8,7 @@ import { createFlashcardController } from '../modules/renderer/app/flashcards/fl
 import { createAppStore, createInitialAppState } from '../modules/renderer/app/store/appStore.js';
 import { collectRootElements } from '../modules/renderer/app/dom/collectRootElements.js';
 import { createLayoutController } from '../modules/renderer/app/layout/layoutController.js';
+import { createMobileWorkspaceController } from '../modules/renderer/app/layout/mobileWorkspaceController.js';
 import { createDiaryWallController } from '../modules/renderer/app/diaryWall/diaryWallController.js';
 import { createLogsController } from '../modules/renderer/app/logs/logsController.js';
 import { createNotesController } from '../modules/renderer/app/notes/notesController.js';
@@ -31,6 +32,18 @@ let notesController = null;
 let logsController = null;
 let diaryWallController = null;
 let composerController = null;
+const mobileWorkspaceController = createMobileWorkspaceController({
+    store,
+    el,
+    windowObj: window,
+    mobileBreakpoint: 1180,
+});
+const {
+    bindEvents: bindMobileWorkspaceEvents,
+    isNarrowWorkspaceLayout,
+    setMobileWorkspaceTab,
+    syncMobileWorkspaceLayout,
+} = mobileWorkspaceController;
 const layoutController = createLayoutController({
     store,
     el,
@@ -81,8 +94,7 @@ const settingsController = createSettingsController({
         };
     },
     openLogsPanel: async () => {
-        setSidePanelTab('logs');
-        await logsController?.refreshLogs?.();
+        setSidePanelTab('notes');
     },
 });
 const {
@@ -235,8 +247,7 @@ diaryWallController = createDiaryWallController({
     getCurrentTopicName: () => workspaceController?.getCurrentTopicDisplayName?.() || '',
     selectTopic: (...args) => workspaceController?.selectTopic?.(...args),
     openLogsPanel: async () => {
-        setSidePanelTab('logs');
-        await logsController?.refreshLogs?.();
+        setSidePanelTab('notes');
     },
 });
 workspaceController = createWorkspaceController({
@@ -555,16 +566,13 @@ function initMarked() {
 }
 
 function setSidePanelTab(tab) {
-    const nextTab = tab === 'logs' ? 'logs' : 'notes';
+    const nextTab = 'notes';
     store.patchState('layout', {
         sidePanelTab: nextTab,
     });
     el.notesPanelTab?.classList.toggle('hidden', nextTab !== 'notes');
     el.notesPanelTab?.classList.toggle('side-panel-pane--active', nextTab === 'notes');
-    el.logsPanelTab?.classList.toggle('hidden', nextTab !== 'logs');
-    el.logsPanelTab?.classList.toggle('side-panel-pane--active', nextTab === 'logs');
     el.sidePanelNotesTabBtn?.classList.toggle('side-panel-tab--active', nextTab === 'notes');
-    el.sidePanelLogsTabBtn?.classList.toggle('side-panel-tab--active', nextTab === 'logs');
 }
 
 function setRightPanelMode(mode) {
@@ -574,6 +582,9 @@ function setRightPanelMode(mode) {
         rightPanelMode: nextMode,
     });
     setSidePanelTab('notes');
+    if (isNarrowWorkspaceLayout()) {
+        setMobileWorkspaceTab('studio');
+    }
     el.noteEditorCard?.classList.toggle('hidden', nextMode !== 'notes');
     el.flashcardsPracticeCard?.classList.toggle('hidden', nextMode !== 'flashcards');
 }
@@ -844,6 +855,7 @@ function bindFeatureEvents() {
     bindDiaryWallEvents();
     bindFlashcardEvents();
     bindComposerEvents();
+    bindMobileWorkspaceEvents();
     bindShellEvents();
 }
 
@@ -865,10 +877,6 @@ function bindShellEvents() {
     el.sidePanelNotesTabBtn?.addEventListener('click', () => {
         setSidePanelTab('notes');
     });
-    el.sidePanelLogsTabBtn?.addEventListener('click', () => {
-        setSidePanelTab('logs');
-        void logsController?.refreshLogs?.();
-    });
 
     el.minimizeBtn?.addEventListener('click', () => chatAPI.minimizeWindow());
     el.maximizeBtn?.addEventListener('click', () => chatAPI.maximizeWindow());
@@ -884,4 +892,5 @@ bootstrap()
     })
     .finally(() => {
         setAppBootLoading(false);
+        syncMobileWorkspaceLayout();
     });

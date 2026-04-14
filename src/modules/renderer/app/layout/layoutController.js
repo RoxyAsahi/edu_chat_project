@@ -13,7 +13,7 @@ const LAYOUT_DEFAULTS = Object.freeze({
     leftBottomCompactMin: 180,
     dividerWidth: 12,
     leftVerticalDividerHeight: 12,
-    desktopBreakpoint: 1200,
+    desktopBreakpoint: 1180,
 });
 
 function clamp(value, min, max) {

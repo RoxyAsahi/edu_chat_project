@@ -28,7 +28,6 @@ function createDom() {
             <input id="diaryWallTagInput" />
             <input id="diaryWallDateInput" />
             <button id="diaryWallRefreshBtn" type="button">refresh</button>
-            <button id="diaryWallOpenLogsBtn" type="button">logs</button>
             <div id="diaryWallAgentNav"></div>
             <div id="diaryWallSummary"></div>
             <div id="diaryWallCards"></div>
@@ -290,7 +289,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     assert.equal(detailPayloads.at(-1).topicId, 'junior_math_quadratic');
 });
 
-test('diaryWallController can jump back to source messages and hand off to Logs', async (t) => {
+test('diaryWallController can jump back to source messages without handing off to a logs panel', async (t) => {
     const { createDiaryWallController } = await loadDiaryWallControllerModule();
     const dom = createDom();
     const previousWindow = global.window;
@@ -399,11 +398,5 @@ test('diaryWallController can jump back to source messages and hand off to Logs'
     assert.equal(documentObj.getElementById('diaryWallModal').classList.contains('hidden'), true);
     assert.equal(documentObj.querySelector('[data-message-id="msg-1"]').classList.contains('message-item--logs-highlight'), true);
 
-    controller.open();
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    documentObj.getElementById('diaryWallOpenLogsBtn').click();
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    assert.equal(logsOpenCount, 1);
-    assert.equal(documentObj.getElementById('diaryWallModal').classList.contains('hidden'), true);
+    assert.equal(logsOpenCount, 0);
 });
