@@ -119,6 +119,7 @@ function createInitialAppState() {
             activeNoteId: null,
             selectedNoteIds: [],
             notesStudioView: 'overview',
+            manualNotesLibraryOpen: false,
             noteDetailKind: null,
             noteDetailMode: 'edit',
             activeNoteMenu: null,
