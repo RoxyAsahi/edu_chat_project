@@ -69,6 +69,7 @@ function createBaseState(overrides = {}) {
             activeNoteId: null,
             selectedNoteIds: [],
             notesStudioView: 'overview',
+            manualNotesLibraryOpen: false,
             noteDetailKind: null,
             noteDetailMode: 'edit',
             activeNoteMenu: null,
@@ -145,6 +146,7 @@ function createNotesDom() {
             <button id="newNoteBtn"></button>
             <button id="newNoteFabBtn"></button>
             <button id="notesStudioOpenBtn"></button>
+            <button id="manualNotesLibraryBtn"></button>
             <button id="saveNoteBtn"></button>
             <button id="deleteNoteBtn"></button>
             <button id="analyzeNotesBtn"></button>
@@ -158,6 +160,12 @@ function createNotesDom() {
             <button id="noteDetailCloseBtn"></button>
             <div id="noteDetailModalBackdrop"></div>
             <div id="noteActionMenu"></div>
+            <div id="manualNotesLibraryModal" class="hidden"></div>
+            <div id="manualNotesLibraryBackdrop"></div>
+            <button id="manualNotesLibraryCloseBtn"></button>
+            <div id="manualNotesLibraryTitle"></div>
+            <div id="manualNotesLibrarySubtitle"></div>
+            <div id="manualNotesLibraryGrid"></div>
             <input id="noteTitleInput" />
             <textarea id="noteContentInput"></textarea>
             <div id="noteMetaSummary"></div>
@@ -202,6 +210,7 @@ function createNotesDom() {
             newNoteBtn: window.document.getElementById('newNoteBtn'),
             newNoteFabBtn: window.document.getElementById('newNoteFabBtn'),
             notesStudioOpenBtn: window.document.getElementById('notesStudioOpenBtn'),
+            manualNotesLibraryBtn: window.document.getElementById('manualNotesLibraryBtn'),
             saveNoteBtn: window.document.getElementById('saveNoteBtn'),
             deleteNoteBtn: window.document.getElementById('deleteNoteBtn'),
             analyzeNotesBtn: window.document.getElementById('analyzeNotesBtn'),
@@ -215,6 +224,12 @@ function createNotesDom() {
             noteDetailCloseBtn: window.document.getElementById('noteDetailCloseBtn'),
             noteDetailModalBackdrop: window.document.getElementById('noteDetailModalBackdrop'),
             noteActionMenu: window.document.getElementById('noteActionMenu'),
+            manualNotesLibraryModal: window.document.getElementById('manualNotesLibraryModal'),
+            manualNotesLibraryBackdrop: window.document.getElementById('manualNotesLibraryBackdrop'),
+            manualNotesLibraryCloseBtn: window.document.getElementById('manualNotesLibraryCloseBtn'),
+            manualNotesLibraryTitle: window.document.getElementById('manualNotesLibraryTitle'),
+            manualNotesLibrarySubtitle: window.document.getElementById('manualNotesLibrarySubtitle'),
+            manualNotesLibraryGrid: window.document.getElementById('manualNotesLibraryGrid'),
             noteTitleInput: window.document.getElementById('noteTitleInput'),
             noteContentInput: window.document.getElementById('noteContentInput'),
             noteMetaSummary: window.document.getElementById('noteMetaSummary'),
@@ -418,6 +433,24 @@ test('normalizeNote derives structured quiz data from legacy markdown content', 
     assert.equal(note.quizSet.items[0].correctOptionId, 'option_a');
 });
 
+test('manual and generated note filters split note kinds correctly', async () => {
+    const {
+        filterGeneratedNotes,
+        filterManualNotes,
+    } = await loadNotesUtilsModule();
+
+    const notes = [
+        { id: 'note-1', kind: 'note' },
+        { id: 'note-2', kind: 'message-note' },
+        { id: 'analysis-1', kind: 'analysis' },
+        { id: 'quiz-1', kind: 'quiz' },
+        { id: 'flash-1', kind: 'flashcards', flashcardDeck: { cards: [{ front: 'Q', back: 'A' }] } },
+    ];
+
+    assert.deepEqual(filterManualNotes(notes).map((note) => note.id), ['note-1', 'note-2']);
+    assert.deepEqual(filterGeneratedNotes(notes).map((note) => note.id), ['analysis-1', 'quiz-1', 'flash-1']);
+});
+
 test('note save and delete helpers cover blank drafts, save payloads, and deleted state cleanup', async () => {
     const {
         buildBlankNoteTitle,
@@ -522,6 +555,73 @@ test('notes refresh re-renders flashcard practice when the flashcards panel is a
     await controller.loadAgentNotes();
 
     assert.equal(renderPracticeCalls, 2);
+});
+
+test('right-side notes panel only renders generated content kinds', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                notesScope: 'agent',
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记', contentMarkdown: '普通内容', kind: 'note', topicId: 'topic-1' },
+                    { id: 'analysis-1', title: '分析报告', contentMarkdown: '分析内容', kind: 'analysis', topicId: 'topic-1' },
+                    { id: 'quiz-1', title: '选择题', contentMarkdown: '题目', kind: 'quiz', topicId: 'topic-1' },
+                    {
+                        id: 'flash-1',
+                        title: '闪卡',
+                        contentMarkdown: '卡片',
+                        kind: 'flashcards',
+                        topicId: 'topic-2',
+                        flashcardDeck: { title: '闪卡', cards: [{ id: 'card-1', front: 'Q', back: 'A' }] },
+                    },
+                ],
+            },
+        },
+    });
+
+    controller.renderNotesPanel();
+
+    const notesText = el.notesList.textContent;
+    assert.match(notesText, /分析报告/);
+    assert.match(notesText, /选择题/);
+    assert.match(notesText, /闪卡/);
+    assert.doesNotMatch(notesText, /手写笔记/);
+});
+
+test('manual notes library opens from the top button and only renders manual notes', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                topics: [
+                    { id: 'topic-1', name: '函数' },
+                    { id: 'topic-2', name: '极限' },
+                ],
+            },
+            notes: {
+                notesScope: 'agent',
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', topicId: 'topic-1' },
+                    { id: 'message-note-1', title: '摘录笔记', contentMarkdown: '普通内容 B', kind: 'message-note', topicId: 'topic-2' },
+                    { id: 'analysis-1', title: '分析报告', contentMarkdown: '分析内容', kind: 'analysis', topicId: 'topic-1' },
+                ],
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNotesLibraryBtn.click();
+
+    assert.equal(store.getState().notes.manualNotesLibraryOpen, true);
+    assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), false);
+    assert.match(el.manualNotesLibraryGrid.textContent, /手写笔记 A/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /摘录笔记/);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析报告/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /函数/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /极限/);
 });
 
 test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {

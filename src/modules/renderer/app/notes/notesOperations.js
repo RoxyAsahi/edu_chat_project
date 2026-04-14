@@ -35,6 +35,7 @@ function createNotesOperations(deps = {}) {
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
     const getSelectedNotes = deps.getSelectedNotes || (() => []);
     const renderNotesPanel = deps.renderNotesPanel || (() => {});
+    const renderManualNotesLibrary = deps.renderManualNotesLibrary || (() => {});
     const clearNoteEditor = deps.clearNoteEditor || (() => {});
     const openNoteDetail = deps.openNoteDetail || (() => {});
     const closeNoteDetail = deps.closeNoteDetail || (() => {});
@@ -47,6 +48,9 @@ function createNotesOperations(deps = {}) {
         if (!state.currentSelectedItem.id || !state.currentTopicId) {
             state.topicNotes = [];
             renderNotesPanel();
+            if (state.manualNotesLibraryOpen) {
+                renderManualNotesLibrary();
+            }
             return;
         }
 
@@ -60,11 +64,17 @@ function createNotesOperations(deps = {}) {
             ui.showToastNotification(`加载话题笔记失败：${result?.error || '未知错误'}`, 'error');
             state.topicNotes = [];
             renderNotesPanel();
+            if (state.manualNotesLibraryOpen) {
+                renderManualNotesLibrary();
+            }
             return;
         }
 
         state.topicNotes = Array.isArray(result.items) ? result.items.map(normalizeNote) : [];
         renderNotesPanel();
+        if (state.manualNotesLibraryOpen) {
+            renderManualNotesLibrary();
+        }
         if (state.rightPanelMode === 'flashcards') {
             flashcardsApi.renderPractice();
         }
@@ -74,6 +84,9 @@ function createNotesOperations(deps = {}) {
         if (!state.currentSelectedItem.id) {
             state.agentNotes = [];
             renderNotesPanel();
+            if (state.manualNotesLibraryOpen) {
+                renderManualNotesLibrary();
+            }
             return;
         }
 
@@ -87,11 +100,17 @@ function createNotesOperations(deps = {}) {
             ui.showToastNotification(`加载学科笔记失败：${result?.error || '未知错误'}`, 'error');
             state.agentNotes = [];
             renderNotesPanel();
+            if (state.manualNotesLibraryOpen) {
+                renderManualNotesLibrary();
+            }
             return;
         }
 
         state.agentNotes = Array.isArray(result.items) ? result.items.map(normalizeNote) : [];
         renderNotesPanel();
+        if (state.manualNotesLibraryOpen) {
+            renderManualNotesLibrary();
+        }
         if (state.rightPanelMode === 'flashcards') {
             flashcardsApi.renderPractice();
         }
@@ -317,7 +336,7 @@ function createNotesOperations(deps = {}) {
             await persistHistory();
             revealNote(favoriteNote);
             decorateChatMessages();
-            ui.showToastNotification('已收藏，并已定位到右侧笔记。', 'success');
+            ui.showToastNotification('已收藏，并已打开关联笔记。', 'success');
         }
 
         return favoriteNote;

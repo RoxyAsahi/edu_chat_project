@@ -48,6 +48,10 @@
           <span class="titlebar__context-label">当前话题</span>
           <strong id="titlebarCurrentTopic">请选择一个话题</strong>
         </div>
+        <button id="manualNotesLibraryBtn" class="ghost-button titlebar__context-card titlebar__context-card--action" type="button">
+          <span class="titlebar__context-label">手写笔记</span>
+          <strong>我的笔记</strong>
+        </button>
       </div>
       <div class="titlebar__meta">
         <button id="openDiaryWallBtn" class="ghost-button icon-btn" title="日记墙"><span class="material-symbols-outlined">auto_stories</span></button>
@@ -366,7 +370,7 @@
               <div class="notes-stream">
                 <div class="notes-stream__header">
                   <div class="notes-stream__heading">
-                    <h3>最近笔记</h3>
+                    <h3>最近生成内容</h3>
                     <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
                   </div>
                   <div class="notes-scope-switch">
@@ -617,6 +621,29 @@
               </button>
             </div>
           </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="manualNotesLibraryModal" class="note-detail-modal hidden" aria-hidden="true">
+      <div id="manualNotesLibraryBackdrop" class="note-detail-modal__backdrop"></div>
+      <div class="note-detail-modal__dialog manual-notes-library-modal" role="dialog" aria-modal="true" aria-labelledby="manualNotesLibraryTitle">
+        <div class="note-detail-modal__header manual-notes-library-modal__header">
+          <div class="note-detail-modal__header-main">
+            <div>
+              <p class="eyebrow">手写笔记库</p>
+              <h2 id="manualNotesLibraryTitle">我的笔记</h2>
+              <p id="manualNotesLibrarySubtitle" class="settings-caption">这里会收纳当前学科下的所有手写笔记。</p>
+            </div>
+          </div>
+          <div class="panel__actions note-detail-modal__actions">
+            <button id="manualNotesLibraryCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭手写笔记库">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </div>
+        <div class="note-detail-modal__body manual-notes-library-modal__body">
+          <section id="manualNotesLibraryGrid" class="manual-notes-library-grid" aria-live="polite"></section>
         </div>
       </div>
     </div>

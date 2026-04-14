@@ -59,8 +59,11 @@ function createNotesDom(deps = {}) {
     };
     const normalizeNote = deps.normalizeNote || ((note) => note);
     const getVisibleNotes = deps.getVisibleNotes || (() => []);
+    const getGeneratedVisibleNotes = deps.getGeneratedVisibleNotes || (() => []);
+    const getManualLibraryNotes = deps.getManualLibraryNotes || (() => []);
     const getActiveNote = deps.getActiveNote || (() => null);
     const getCurrentTopicDisplayName = deps.getCurrentTopicDisplayName || (() => '请选择一个话题');
+    const getTopicDisplayLabel = deps.getTopicDisplayLabel || ((topicId) => topicId || '未归类话题');
     const getNoteHighlightId = deps.getNoteHighlightId || (() => null);
     const openNoteDetail = deps.openNoteDetail || (() => {});
     const toggleNoteSelection = deps.toggleNoteSelection || (() => {});
@@ -163,7 +166,7 @@ function createNotesDom(deps = {}) {
 
         const sourceCount = Array.isArray(note.sourceMessageIds) ? note.sourceMessageIds.length : 0;
         const refCount = Array.isArray(note.sourceDocumentRefs) ? note.sourceDocumentRefs.length : 0;
-        const topicLabel = note.topicId ? ` · 话题 ${note.topicId}` : '';
+        const topicLabel = note.topicId ? ` · ${getTopicDisplayLabel(note.topicId)}` : '';
         if (el.noteMetaSummary) {
             el.noteMetaSummary.textContent = `更新时间：${formatRelativeTime(note.updatedAt)}${topicLabel} · 来源消息 ${sourceCount} 条 · 来源资料 ${refCount} 条`;
         }
@@ -258,15 +261,29 @@ function createNotesDom(deps = {}) {
             return;
         }
 
-        el.notesSelectionSummary.textContent = buildNotesSelectionSummary({
-            notesScope: state.notesScope,
-            selectedCount: state.selectedNoteIds.length,
-            visibleCount: getVisibleNotes().length,
-        });
+        const selectedCount = state.selectedNoteIds.length;
+        const scopeLabel = state.notesScope === 'agent' ? '学科汇总' : '当前话题';
+        const generatedCount = getGeneratedVisibleNotes().length;
+
+        if (selectedCount > 0) {
+            el.notesSelectionSummary.textContent = buildNotesSelectionSummary({
+                notesScope: state.notesScope,
+                selectedCount,
+                visibleCount: getVisibleNotes().length,
+            });
+            return;
+        }
+
+        if (generatedCount > 0) {
+            el.notesSelectionSummary.textContent = `${scopeLabel} · 最近生成 ${generatedCount} 条内容`;
+            return;
+        }
+
+        el.notesSelectionSummary.textContent = `${scopeLabel} · 暂无生成内容，普通笔记请到顶部“我的笔记”查看`;
     }
 
     function renderNotesPanel() {
-        const notes = getVisibleNotes();
+        const notes = getGeneratedVisibleNotes();
         closeNoteActionMenu();
 
         el.topicNotesScopeBtn?.classList.toggle('notes-scope-btn--active', state.notesScope === 'topic');
@@ -303,8 +320,8 @@ function createNotesDom(deps = {}) {
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state';
             empty.innerHTML = `
-                <strong>还没有笔记</strong>
-                <span>收藏聊天气泡、手动新建笔记，或在这里沉淀当前话题的学习成果。</span>
+                <strong>还没有生成内容</strong>
+                <span>右侧这里会显示深度分析、选择题和闪卡；你手写的普通笔记会收纳到顶部“我的笔记”。</span>
             `;
             el.notesList.appendChild(empty);
             if (!getActiveNote() && state.notesStudioView !== 'detail') {
@@ -327,17 +344,16 @@ function createNotesDom(deps = {}) {
             const sourceCount = flashcardsApi.getFlashcardSourceCount(normalized);
             const typeKind = getNormalizedNoteKind(normalized);
             const typeConfig = {
-                note: { icon: 'edit_note', label: '笔记', accent: 'note' },
                 analysis: { icon: 'analytics', label: '分析', accent: 'analysis' },
                 quiz: { icon: 'quiz', label: '测验', accent: 'quiz' },
                 flashcards: { icon: 'style', label: '闪卡', accent: 'flashcards' },
-            }[typeKind] || { icon: 'description', label: '笔记', accent: 'note' };
+            }[typeKind] || { icon: 'description', label: '内容', accent: 'note' };
             const metaParts = [
                 sourceCount > 0 ? `${sourceCount} 个来源` : '当前话题',
                 formatRelativeTime(normalized.updatedAt),
             ];
             if (state.notesScope === 'agent' && normalized.topicId) {
-                metaParts.push(`话题 ${escapeHtml(normalized.topicId)}`);
+                metaParts.push(getTopicDisplayLabel(normalized.topicId));
             }
             const selectedBadge = isSelected
                 ? '<span class="note-card__selection-pill"><span class="material-symbols-outlined">check</span><span>已选</span></span>'
@@ -380,7 +396,7 @@ function createNotesDom(deps = {}) {
                                     <span class="material-symbols-outlined">${escapeHtml(typeConfig.icon)}</span>
                                     <span>${escapeHtml(typeConfig.label)}</span>
                                 </span>
-                                ${metaParts.map((item) => `<span>${item}</span>`).join('')}
+                                ${metaParts.map((item) => `<span>${escapeHtml(item || '')}</span>`).join('')}
                             </div>
                         </div>
                         <button class="note-card__menu-button" type="button" data-note-menu="${escapeHtml(normalized.id)}" aria-label="打开笔记菜单">
@@ -408,6 +424,91 @@ function createNotesDom(deps = {}) {
             });
 
             el.notesList.appendChild(card);
+        });
+    }
+
+    function renderManualNotesLibrary() {
+        if (!el.manualNotesLibraryGrid) {
+            return;
+        }
+
+        const manualNotes = getManualLibraryNotes();
+        const currentAgentName = state.currentSelectedItem?.name || '当前学科';
+
+        if (el.manualNotesLibraryTitle) {
+            el.manualNotesLibraryTitle.textContent = `${currentAgentName} · 我的笔记`;
+        }
+        if (el.manualNotesLibrarySubtitle) {
+            el.manualNotesLibrarySubtitle.textContent = state.currentSelectedItem?.id
+                ? `这里收纳当前学科下的 ${manualNotes.length} 条手写笔记。`
+                : '选择一个学科后，这里会显示该学科下的所有手写笔记。';
+        }
+
+        el.manualNotesLibraryGrid.innerHTML = '';
+        if (!state.currentSelectedItem?.id) {
+            const empty = documentObj.createElement('div');
+            empty.className = 'empty-list-state manual-notes-library-grid__empty';
+            empty.innerHTML = `
+                <strong>还没有选中学科</strong>
+                <span>请选择一个学科后，再查看当前学科下的手写笔记总览。</span>
+            `;
+            el.manualNotesLibraryGrid.appendChild(empty);
+            return;
+        }
+
+        if (manualNotes.length === 0) {
+            const empty = documentObj.createElement('div');
+            empty.className = 'empty-list-state manual-notes-library-grid__empty';
+            empty.innerHTML = `
+                <strong>当前学科还没有手写笔记</strong>
+                <span>你可以继续使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。</span>
+            `;
+            el.manualNotesLibraryGrid.appendChild(empty);
+            return;
+        }
+
+        manualNotes.forEach((note) => {
+            const normalized = normalizeNote(note);
+            const preview = escapeHtml(stripMarkdown(normalized.contentMarkdown || '').trim());
+            const topicLabel = escapeHtml(getTopicDisplayLabel(normalized.topicId));
+            const updatedLabel = escapeHtml(formatRelativeTime(normalized.updatedAt) || '');
+            const isSelected = state.selectedNoteIds.includes(normalized.id);
+            const card = documentObj.createElement('article');
+
+            card.className = 'manual-note-card';
+            card.classList.toggle('manual-note-card--selected', isSelected);
+            card.innerHTML = `
+                <div class="manual-note-card__header">
+                    <div class="manual-note-card__header-main">
+                        <span class="manual-note-card__eyebrow">手写笔记</span>
+                        <strong class="manual-note-card__title">${escapeHtml(normalized.title)}</strong>
+                    </div>
+                    <button class="note-card__menu-button manual-note-card__menu" type="button" data-note-menu="${escapeHtml(normalized.id)}" aria-label="打开笔记菜单">
+                        <span class="material-symbols-outlined">more_vert</span>
+                    </button>
+                </div>
+                <p class="manual-note-card__preview">${preview || '暂无内容。'}</p>
+                <div class="manual-note-card__meta">
+                    <span>${topicLabel}</span>
+                    <span>${updatedLabel}</span>
+                    ${isSelected ? '<span class="manual-note-card__selection">已选用于生成</span>' : ''}
+                </div>
+            `;
+
+            card.addEventListener('click', (event) => {
+                const target = event.target;
+                if (target instanceof ElementCtor && target.closest('[data-note-menu]')) {
+                    return;
+                }
+                openNoteDetail(normalized, { trigger: el.manualNotesLibraryBtn || card });
+            });
+
+            card.querySelector('[data-note-menu]')?.addEventListener('click', (event) => {
+                event.stopPropagation();
+                openNoteItemMenu(normalized, event.currentTarget);
+            });
+
+            el.manualNotesLibraryGrid.appendChild(card);
         });
     }
 
@@ -457,6 +558,7 @@ function createNotesDom(deps = {}) {
         closeNoteActionMenu,
         fillNoteEditor,
         openNoteItemMenu,
+        renderManualNotesLibrary,
         renderNoteActionMenu,
         renderNotesPanel,
         decorateChatMessages,

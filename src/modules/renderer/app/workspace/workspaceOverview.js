@@ -28,12 +28,12 @@ function formatSubjectStatus(stats = {}, isActive = false) {
         return isActive ? '当前学科，等待创建第一个话题' : '尚未创建学习话题';
     }
     if (unreadCount > 0) {
-        return `${unreadCount} 个待处理话题`;
+        return isActive ? `当前学科，还有 ${unreadCount} 项内容待处理` : `还有 ${unreadCount} 项内容待处理`;
     }
     if (isActive) {
-        return '当前学科工作台';
+        return '当前学科，已经做好学习准备';
     }
-    return '已准备好进入学习';
+    return '已经做好学习准备';
 }
 
 function getSubjectState(stats = {}, isActive = false) {
@@ -55,34 +55,32 @@ function getSubjectState(stats = {}, isActive = false) {
 function buildSubjectOverviewMarkup({ agents = [], statsByAgent = {}, selectedAgentId = null } = {}) {
     const totalTopics = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.topicCount || 0), 0);
     const totalUnread = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.unreadCount || 0), 0);
-    const activeAgent = agents.find((agent) => agent.id === selectedAgentId) || null;
     const headline = agents.length > 0 ? '学科总视图' : '创建你的第一个学科';
-    const summary = activeAgent
-        ? `继续管理 ${activeAgent.name || activeAgent.id}，或从下方切换到其他学科。`
-        : '把不同学科整理成独立工作台，在这里快速切换学习上下文。';
+    const summary = agents.length > 0
+        ? '选择一个学科继续你的学习。'
+        : '创建一个学科后，你就可以开始组织自己的学习空间。';
 
-    const heroMarkup = `
-        <article class="overview-hero-card">
-            <div class="overview-hero-card__eyebrow">Overview</div>
-            <div class="overview-hero-card__content">
-                <h2>${escapeHtml(headline)}</h2>
-                <p>${escapeHtml(summary)}</p>
-            </div>
-            <div class="overview-hero-card__stats" aria-label="学科总览统计">
-                <div class="overview-stat-pill">
-                    <span class="overview-stat-pill__label">学科</span>
-                    <strong>${agents.length}</strong>
-                </div>
-                <div class="overview-stat-pill overview-stat-pill--warm">
-                    <span class="overview-stat-pill__label">话题</span>
-                    <strong>${totalTopics}</strong>
-                </div>
-                <div class="overview-stat-pill overview-stat-pill--accent">
-                    <span class="overview-stat-pill__label">待处理</span>
-                    <strong>${totalUnread}</strong>
-                </div>
-            </div>
-        </article>
+    const clockMarkup = `
+        <section class="overview-clock-panel" aria-label="当前时间">
+            <div id="overviewClockTime" class="overview-clock-panel__time">00:00</div>
+        </section>
+    `;
+
+    const statsRowMarkup = `
+        <section class="overview-stats-row" aria-label="学科总览统计">
+            <article class="overview-stat-card">
+                <span class="overview-stat-card__label">学科</span>
+                <strong>${agents.length}</strong>
+            </article>
+            <article class="overview-stat-card overview-stat-card--warm">
+                <span class="overview-stat-card__label">话题</span>
+                <strong>${totalTopics}</strong>
+            </article>
+            <article class="overview-stat-card overview-stat-card--accent">
+                <span class="overview-stat-card__label">待处理</span>
+                <strong>${totalUnread}</strong>
+            </article>
+        </section>
     `;
 
     const cardsMarkup = agents.length > 0
@@ -93,11 +91,6 @@ function buildSubjectOverviewMarkup({ agents = [], statsByAgent = {}, selectedAg
             const unreadCount = Number(stats.unreadCount || 0);
             const lastTopicName = stats.lastTopicName || '';
             const cardState = getSubjectState(stats, isActive);
-            const statusChips = [
-                isActive ? '<span class="subject-overview-card__chip subject-overview-card__chip--selected">当前学科</span>' : '',
-                unreadCount > 0 ? `<span class="subject-overview-card__chip subject-overview-card__chip--attention">${unreadCount} 个待处理</span>` : '',
-                topicCount === 0 ? '<span class="subject-overview-card__chip">待创建话题</span>' : `<span class="subject-overview-card__chip">${topicCount} 个话题</span>`,
-            ].filter(Boolean).join('');
 
             return `
                 <button
@@ -116,15 +109,15 @@ function buildSubjectOverviewMarkup({ agents = [], statsByAgent = {}, selectedAg
                         <p>${escapeHtml(formatSubjectStatus(stats, isActive))}</p>
                     </div>
                     <div class="subject-overview-card__chips">
-                        ${statusChips}
+                        <span class="subject-overview-card__chip">${topicCount} 个话题</span>
                     </div>
                     <div class="subject-overview-card__meta" aria-label="学科摘要">
                         <span class="subject-overview-card__meta-item">
-                            <span class="subject-overview-card__meta-label">话题</span>
+                            <span class="subject-overview-card__meta-label">话题数量</span>
                             <strong>${topicCount}</strong>
                         </span>
                         <span class="subject-overview-card__meta-item">
-                            <span class="subject-overview-card__meta-label">待处理</span>
+                            <span class="subject-overview-card__meta-label">待处理的数量</span>
                             <strong>${unreadCount}</strong>
                         </span>
                     </div>
@@ -158,8 +151,9 @@ function buildSubjectOverviewMarkup({ agents = [], statsByAgent = {}, selectedAg
     return {
         headline,
         summary,
-        heroMarkup,
-        gridMarkup: `${cardsMarkup}${createCardMarkup}`,
+        clockMarkup,
+        statsRowMarkup,
+        gridMarkup: `<section class="overview-subject-wall" aria-label="学科卡片墙">${cardsMarkup}${createCardMarkup}</section>`,
     };
 }
 

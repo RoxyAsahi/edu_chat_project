@@ -82,6 +82,23 @@ function getNormalizedNoteKind(note) {
     return 'note';
 }
 
+function isManualNote(note) {
+    return getNormalizedNoteKind(note) === 'note';
+}
+
+function isGeneratedNote(note) {
+    const kind = getNormalizedNoteKind(note);
+    return kind === 'analysis' || kind === 'quiz' || kind === 'flashcards';
+}
+
+function filterManualNotes(notes = []) {
+    return Array.isArray(notes) ? notes.filter((note) => isManualNote(note)) : [];
+}
+
+function filterGeneratedNotes(notes = []) {
+    return Array.isArray(notes) ? notes.filter((note) => isGeneratedNote(note)) : [];
+}
+
 function buildNotesSelectionSummary({
     notesScope = 'topic',
     selectedCount = 0,
@@ -191,8 +208,12 @@ export {
     buildNotesSelectionSummary,
     buildNoteSaveRequest,
     deriveDeletedNoteState,
+    filterGeneratedNotes,
+    filterManualNotes,
     formatRelativeTime,
     getNormalizedNoteKind,
+    isGeneratedNote,
+    isManualNote,
     normalizeNote,
     removeDeletedNoteReferencesFromHistory,
 };

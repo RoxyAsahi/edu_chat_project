@@ -105,6 +105,19 @@ textarea:focus, input:focus, select:focus {
   box-shadow: var(--shadow-elevation-1);
 }
 
+.titlebar__context-card--action {
+  justify-content: space-between;
+  min-width: 150px;
+  transition: transform var(--motion-standard), box-shadow var(--motion-standard), border-color var(--motion-standard);
+}
+
+.titlebar__context-card--action:hover,
+.titlebar__context-card--action:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line) 72%);
+  box-shadow: var(--shadow-elevation-2);
+}
+
 .titlebar__context-card strong {
   min-width: 0;
   font-size: 13px;
