@@ -590,8 +590,7 @@ function createDiaryWallController(deps = {}) {
         }
 
         if (!node) {
-            await openLogsPanel();
-            ui.showToastNotification('当前聊天页没有找到这条来源消息，已帮你切到 Logs。', 'warning');
+            ui.showToastNotification('当前聊天页没有找到这条来源消息，请先切换到对应话题后再试。', 'warning');
             return;
         }
 
@@ -612,10 +611,6 @@ function createDiaryWallController(deps = {}) {
         });
         el.diaryWallRefreshBtn?.addEventListener('click', () => {
             void refresh();
-        });
-        el.diaryWallOpenLogsBtn?.addEventListener('click', () => {
-            close();
-            void openLogsPanel();
         });
         el.diaryWallAgentNav?.addEventListener('click', (event) => {
             const target = event.target instanceof Element ? event.target.closest('[data-diary-wall-agent-filter]') : null;

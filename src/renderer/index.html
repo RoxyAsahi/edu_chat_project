@@ -87,6 +87,11 @@
       </section>
 
       <main id="workspaceSubjectPage" class="layout hidden">
+      <nav class="mobile-workspace-tabs" aria-label="窄态工作区导航">
+        <button id="mobileWorkspaceSourceTabBtn" class="mobile-workspace-tab mobile-workspace-tab--active" type="button">来源</button>
+        <button id="mobileWorkspaceChatTabBtn" class="mobile-workspace-tab" type="button">对话</button>
+        <button id="mobileWorkspaceStudioTabBtn" class="mobile-workspace-tab" type="button">Studio</button>
+      </nav>
       <!-- Workspace Navigation / Files -->
       <aside class="workspace-sidebar">
         <section class="panel workspace-nav workspace-topic-card">
@@ -94,9 +99,6 @@
             <div class="workspace-card__titleblock">
               <p class="workspace-card__title">学习主题</p>
             </div>
-            <button id="quickNewTopicBtn" class="ghost-button workspace-card__cta" type="button">
-              <span class="material-symbols-outlined">add</span> 新建话题
-            </button>
           </div>
 
           <div class="hidden">
@@ -318,60 +320,52 @@
         aria-label="调整右侧面板宽度"
       ></div>
 
-      <aside id="settingsPanel" class="settings-panel">
-          <div class="side-panel-tabs">
-            <button id="sidePanelNotesTabBtn" class="side-panel-tab side-panel-tab--active" type="button">Notes</button>
-            <button id="sidePanelLogsTabBtn" class="side-panel-tab" type="button">Logs</button>
-          </div>
+      <aside id="settingsPanel" class="settings-panel settings-panel--notes-only">
           <div id="notesPanelTab" class="side-panel-pane side-panel-pane--active">
-            <section id="notesWorkspaceCard" class="settings-card notes-studio">
-              <div class="notes-studio__header">
-                <div class="notes-studio__titleblock">
-                  <h2>Studio</h2>
+            <section id="notesWorkspaceCard" class="panel notes-studio notes-studio--panel">
+              <header class="chat-stage__header notes-studio__header">
+                <div>
+                  <h1 class="chat-stage__title">功能区</h1>
                 </div>
-                <button id="notesStudioOpenBtn" class="ghost-button icon-btn notes-studio__expand" type="button" title="展开 Notes 工作台">
-                  <span class="material-symbols-outlined">arrow_outward</span>
-                </button>
-              </div>
+              </header>
 
-              <div class="notes-tool-grid">
-                <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>新建笔记</strong>
-                    <span>从空白开始</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
-                <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>深度分析</strong>
-                    <span>整理重点内容</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
-                <button id="generateQuizBtn" class="notes-tool-tile notes-tool-tile--quiz" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">quiz</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>生成选择题</strong>
-                    <span>围绕重点出题</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
-                <button id="generateFlashcardsBtn" class="notes-tool-tile notes-tool-tile--flashcards" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">style</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>生成闪卡</strong>
-                    <span>压缩成卡组</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
+              <div class="notes-studio__section notes-studio__section--tools">
+                <div class="notes-tool-grid">
+                  <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>新建笔记</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                  <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>深度分析</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                  <button id="generateQuizBtn" class="notes-tool-tile notes-tool-tile--quiz" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">quiz</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>生成选择题</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                  <button id="generateFlashcardsBtn" class="notes-tool-tile notes-tool-tile--flashcards" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">style</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>生成闪卡</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
               </div>
 
               <div class="notes-stream">
-                <div class="notes-stream__header">
+                <div class="notes-stream__hero">
                   <div class="notes-stream__heading">
+                    <p class="eyebrow notes-stream__eyebrow">Recent Notes</p>
                     <h3>最近生成内容</h3>
                     <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
                   </div>
@@ -388,83 +382,6 @@
                   <span class="material-symbols-outlined">note_add</span>
                   <span>添加笔记</span>
                 </button>
-              </div>
-            </section>
-          </div>
-          <div id="logsPanelTab" class="side-panel-pane hidden">
-            <section id="logsWorkspaceCard" class="settings-card logs-studio">
-              <div class="logs-studio__header">
-                <div class="logs-studio__titleblock">
-                  <p class="eyebrow">DailyNote</p>
-                  <h2>Logs</h2>
-                  <p class="logs-studio__subtitle">查看学习日志、当日日记和长期记忆召回记录。</p>
-                </div>
-                <div class="logs-studio__actions">
-                  <button id="logsOpenDiaryWallBtn" class="accent-button icon-text-btn logs-studio__action" type="button">
-                    <span class="material-symbols-outlined">auto_stories</span> 打开日记墙
-                  </button>
-                  <button id="logsOpenDiaryManagerBtn" class="ghost-button icon-text-btn logs-studio__action" type="button">
-                    <span class="material-symbols-outlined">tune</span> 提示词设置
-                  </button>
-                </div>
-              </div>
-
-              <div class="logs-overview">
-                <div class="logs-overview__copy">
-                  <strong id="logsRangeSummary">当前范围：等待选择学科与话题</strong>
-                  <span id="logsStateSummary" class="settings-caption">条目数、日记天数、召回次数和运行状态会显示在这里。</span>
-                </div>
-                <div class="logs-overview__badges" aria-hidden="true">
-                  <span class="logs-overview__badge">按日记本 + 日期聚合</span>
-                  <span class="logs-overview__badge">支持消息回跳</span>
-                  <span class="logs-overview__badge">RAG 回忆可解释</span>
-                </div>
-              </div>
-
-              <div class="logs-toolbar">
-                <div class="notes-scope-switch">
-                  <button id="topicLogsScopeBtn" class="ghost-button notes-scope-btn notes-scope-btn--active" type="button">当前话题</button>
-                  <button id="agentLogsScopeBtn" class="ghost-button notes-scope-btn" type="button">学科汇总</button>
-                </div>
-                <label class="logs-toolbar__field">
-                  <span>检索</span>
-                  <input id="logsSearchInput" type="text" placeholder="关键词搜索日志" />
-                </label>
-                <label class="logs-toolbar__field">
-                  <span>日期</span>
-                  <input id="logsDateInput" type="date" />
-                </label>
-              </div>
-
-              <div class="logs-grid">
-                <section class="logs-column">
-                  <div class="logs-column__header">
-                    <h3>时间线</h3>
-                    <p id="logsSummaryText" class="settings-caption">当前没有学习日志。</p>
-                  </div>
-                  <div id="logsDaysList" class="logs-list"></div>
-                </section>
-
-                <section class="logs-column">
-                  <div class="logs-column__header">
-                    <h3>条目</h3>
-                    <p id="logsEntrySummary" class="settings-caption">选择日期后查看逐条记录。</p>
-                  </div>
-                  <div id="logsEntriesList" class="logs-list"></div>
-                </section>
-
-                <section class="logs-column logs-column--detail">
-                  <div class="logs-column__header">
-                    <h3>详情</h3>
-                    <p id="logsDetailMeta" class="settings-caption">在这里查看日记聚合、来源消息和召回情况。</p>
-                  </div>
-                  <div id="logsDetailView" class="logs-detail-view">
-                    <div class="empty-list-state">
-                      <strong>还没有选中日志</strong>
-                      <span>点击左侧日期或中间条目，查看学习日志正文和被召回的情况。</span>
-                    </div>
-                  </div>
-                </section>
               </div>
             </section>
           </div>
@@ -1162,9 +1079,6 @@
             <div class="diary-wall-actions">
               <button id="diaryWallRefreshBtn" class="accent-button icon-text-btn" type="button">
                 <span class="material-symbols-outlined">refresh</span> 刷新日记墙
-              </button>
-              <button id="diaryWallOpenLogsBtn" class="ghost-button icon-text-btn" type="button">
-                <span class="material-symbols-outlined">list_alt</span> 打开当前 Logs
               </button>
             </div>
           </div>

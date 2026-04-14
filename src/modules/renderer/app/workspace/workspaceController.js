@@ -449,12 +449,26 @@ function createWorkspaceController(deps = {}) {
         }
 
         el.topicList.innerHTML = '';
+
+        const createItem = documentObj.createElement('li');
+        createItem.className = 'list-item topic-item topic-item--compact topic-item--create';
+        createItem.dataset.searchText = '新建话题 create topic';
+        createItem.innerHTML = `
+            <div class="topic-item__body">
+                <span class="topic-item__create-icon material-symbols-outlined" aria-hidden="true">add</span>
+                <strong>新建话题</strong>
+            </div>
+        `;
+        createItem.addEventListener('click', () => {
+            void createTopic();
+        });
+        el.topicList.appendChild(createItem);
+
         if (state.topics.length === 0) {
-            el.topicList.innerHTML = `
-                <li class="empty-list-state" style="border: none; background: transparent; padding: 0;">
-                    <span style="font-size: 12px; color: var(--muted); text-align: center;">暂无话题</span>
-                </li>
-            `;
+            const emptyItem = documentObj.createElement('li');
+            emptyItem.className = 'empty-list-state empty-list-state--topics';
+            emptyItem.innerHTML = '<span>暂无话题</span>';
+            el.topicList.appendChild(emptyItem);
             return;
         }
 
