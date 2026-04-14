@@ -379,3 +379,271 @@
     flex-direction: column;
   }
 }
+
+@media (max-width: 1280px) {
+  .titlebar__brand,
+  .titlebar__workspace,
+  .titlebar__context-card,
+  .workspace-overview-page__header-main,
+  .workspace-card__titleblock,
+  .notes-studio__titleblock,
+  .notes-stream__heading,
+  .logs-studio__titleblock,
+  .logs-overview__copy,
+  .chat-stage__header > div:first-child,
+  .workspace-reader-panel__header-main > div,
+  .note-detail-modal__header-main > div,
+  .flashcards-practice__title-block,
+  .settings-modal__header > div,
+  .diary-wall-modal__header > div,
+  .subject-overview-card__body,
+  .subject-overview-card__footer,
+  .topic-item__main,
+  .topic-item__header,
+  .topic-item__meta-row,
+  .topic-statuses,
+  .knowledge-base-item,
+  .knowledge-base-item__body,
+  .kb-document-row__body,
+  .workspace-nav__summary-card {
+    min-width: 0;
+  }
+
+  .titlebar__title,
+  .titlebar__subtitle,
+  .titlebar__context-label,
+  .titlebar__context-card strong,
+  #subjectOverviewHeadline,
+  #subjectOverviewSummary,
+  .subject-overview-card__body strong,
+  .subject-overview-card__body p,
+  .subject-overview-card__footer-label,
+  .subject-overview-create-card strong,
+  .subject-overview-create-card p,
+  .subject-overview-empty strong,
+  .subject-overview-empty p,
+  .workspace-card__title,
+  #readerDocumentTitle,
+  #readerDocumentMeta,
+  #readerSelectionSummary,
+  #currentChatTopicName,
+  #currentChatAgentName,
+  #currentTopicKnowledgeBaseStatus,
+  #noteDetailTitle,
+  #noteDetailSubtitle,
+  #analysisPreviewMeta,
+  #flashcardsDeckTitle,
+  #flashcardsDeckMeta,
+  #quizPracticeTitle,
+  #quizPracticeSummary,
+  #settingsModalTitle,
+  #settingsModalSubtitle,
+  #selectedAgentNameForSettings,
+  #knowledgeBaseSelectionSummary,
+  #diaryWallTitle,
+  #diaryWallSubtitle,
+  #logsRangeSummary,
+  #logsStateSummary,
+  #logsSummaryText,
+  #logsEntrySummary,
+  #logsDetailMeta,
+  .notes-stream__summary,
+  .notes-studio__subtitle,
+  .logs-studio__subtitle,
+  .workspace-nav__summary-card strong,
+  .topic-item__source-label,
+  .topic-files__status,
+  .topic-files__hint,
+  .knowledge-base-item__name,
+  .knowledge-base-item__meta,
+  .kb-document-row__body strong,
+  .kb-document-row__body span,
+  .settings-modal__nav-button,
+  .notes-scope-btn,
+  .side-panel-tab,
+  .logs-studio__action,
+  .workspace-card__cta,
+  .workspace-reader-tab,
+  .logs-jump-btn,
+  .flashcards-practice__pill,
+  .flashcards-practice__stat,
+  .logs-overview__badge {
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topic-statuses,
+  .subject-overview-card__meta,
+  .logs-card__tagline,
+  .diary-wall-card__tags,
+  .topic-files-empty-actions,
+  .settings-inline-actions,
+  .panel__actions,
+  .chat-stage__header-actions,
+  .workspace-reader-panel__header-actions,
+  .logs-studio__actions {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .topic-item__meta-row {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .topic-status,
+  .subject-overview-card__meta span,
+  .logs-card__tagline .logs-tag,
+  .diary-wall-card__tags .diary-wall-chip,
+  .topic-files-empty-actions .ghost-button,
+  .topic-files-empty-actions .accent-button {
+    flex-shrink: 0;
+  }
+
+  .topic-status:nth-child(n + 3),
+  .subject-overview-card__meta span:nth-child(n + 3),
+  .logs-card__tagline .logs-tag:nth-child(n + 3),
+  .diary-wall-card__tags .diary-wall-chip:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .titlebar__subtitle,
+  #subjectOverviewSummary,
+  .subject-overview-card__body p,
+  .subject-overview-create-card p,
+  .subject-overview-empty p,
+  .notes-studio__subtitle,
+  .notes-stream__summary,
+  .logs-studio__subtitle,
+  .logs-overview__badges,
+  #logsStateSummary,
+  #currentChatAgentName,
+  #currentTopicKnowledgeBaseStatus,
+  #readerDocumentMeta,
+  #noteDetailSubtitle,
+  #analysisPreviewMeta,
+  #flashcardsDeckMeta,
+  #quizPracticeSummary,
+  #settingsModalSubtitle,
+  #diaryWallSubtitle,
+  .settings-subsection__header .settings-caption,
+  .kb-debug-panel__header .settings-caption,
+  .workspace-reader-panel__header .settings-caption,
+  .logs-column__header .settings-caption,
+  .topic-files__hint {
+    display: none;
+  }
+
+  .titlebar__context-label {
+    display: none;
+  }
+
+  .titlebar__context-card {
+    max-width: 220px;
+  }
+
+  .titlebar__context-card--topic {
+    max-width: 280px;
+  }
+
+  .workspace-nav__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .subject-overview-card__meta span:nth-child(n + 2),
+  .topic-status:nth-child(n + 2) {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .titlebar__workspace {
+    justify-content: flex-end;
+  }
+
+  .titlebar__context-card--topic {
+    display: none;
+  }
+
+  .topic-item:hover .list-item__body,
+  .topic-item.active .list-item__body {
+    padding-right: 52px;
+  }
+
+  .workspace-card__header .workspace-card__cta,
+  .workspace-reader-panel__header-actions .icon-text-btn,
+  .logs-studio__actions .icon-text-btn,
+  .diary-wall-actions .icon-text-btn,
+  .note-detail-modal__actions .icon-text-btn,
+  .chat-stage__header-actions .icon-text-btn,
+  .settings-inline-actions .icon-text-btn,
+  .panel__actions .icon-text-btn {
+    width: 38px;
+    min-width: 38px;
+    padding-inline: 0;
+    gap: 0;
+    font-size: 0;
+    flex-shrink: 0;
+  }
+
+  .workspace-card__header .workspace-card__cta .material-symbols-outlined,
+  .workspace-reader-panel__header-actions .icon-text-btn .material-symbols-outlined,
+  .logs-studio__actions .icon-text-btn .material-symbols-outlined,
+  .diary-wall-actions .icon-text-btn .material-symbols-outlined,
+  .note-detail-modal__actions .icon-text-btn .material-symbols-outlined,
+  .chat-stage__header-actions .icon-text-btn .material-symbols-outlined,
+  .settings-inline-actions .icon-text-btn .material-symbols-outlined,
+  .panel__actions .icon-text-btn .material-symbols-outlined {
+    font-size: 18px;
+  }
+
+  .workspace-nav__summary,
+  .topic-files-empty-actions > *:nth-child(n + 2) {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .titlebar__brand {
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    font-size: 12px;
+  }
+
+  .titlebar__title {
+    max-width: 92px;
+  }
+
+  .titlebar__meta {
+    gap: 2px;
+  }
+
+  .titlebar__context-card {
+    padding: 4px 10px;
+    max-width: 150px;
+  }
+
+  .notes-scope-btn,
+  .side-panel-tab {
+    padding-inline: 10px;
+  }
+
+  .workspace-card__header,
+  .chat-stage__header,
+  .logs-studio__header,
+  .diary-wall-modal__header,
+  .note-detail-modal__header,
+  .flashcards-practice__header {
+    gap: 8px;
+  }
+}

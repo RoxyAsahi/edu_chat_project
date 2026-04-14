@@ -1,9 +1,14 @@
 const TOKEN_PATTERN = /{{\s*([A-Za-z0-9_]+)\s*}}/g;
+const { resolveDailyNoteToolInstruction } = require('../study/toolProtocol');
 
 const DEFAULT_DIV_RENDER_INSTRUCTION = [
     'When structured rendering helps, emit semantic HTML div blocks that the client can render directly.',
     'Prefer normal Markdown for standard prose.',
     'Do not echo unresolved template variables in the final answer.',
+].join(' ');
+const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
+    'Keep answers readable and compact when rich layout is unnecessary.',
+    'Only switch to more structured rendering when it clearly helps comprehension.',
 ].join(' ');
 
 function isPlainObject(value) {
@@ -52,6 +57,37 @@ function mergeVariable(variableMap, key, value, source, overwrite = false) {
         value: normalizedValue,
         source,
     };
+}
+
+function formatDateParts(date, timeZone) {
+    try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        }).formatToParts(date);
+        const pick = (type) => parts.find((part) => part.type === type)?.value || '';
+        return {
+            date: `${pick('year')}-${pick('month')}-${pick('day')}`,
+            dateTime: `${pick('year')}-${pick('month')}-${pick('day')} ${pick('hour')}:${pick('minute')}:${pick('second')}`,
+        };
+    } catch (_error) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return {
+            date: `${year}-${month}-${day}`,
+            dateTime: `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`,
+        };
+    }
 }
 
 function collectExplicitPromptVariables(agentConfig = {}) {
@@ -109,21 +145,88 @@ function buildPromptVariableMap(options = {}) {
         modelConfig = {},
     } = options;
     const agentConfig = isPlainObject(rawAgentConfig) ? rawAgentConfig : {};
+    const studyProfile = isPlainObject(settings.studyProfile) ? settings.studyProfile : {};
+    const studyLogPolicy = isPlainObject(settings.studyLogPolicy) ? settings.studyLogPolicy : {};
+    const promptVariables = isPlainObject(settings.promptVariables) ? settings.promptVariables : {};
+    const renderingPromptEnabled = settings.enableRenderingPrompt !== false;
+    const adaptiveBubbleTipEnabled = settings.enableAdaptiveBubbleTip !== false;
+    const timeZone = context.timeZone || studyProfile.timezone || 'Asia/Hong_Kong';
+    const now = new Date();
+    const formattedNow = formatDateParts(now, timeZone);
+    const dailyNoteInstruction = resolveDailyNoteToolInstruction(settings.dailyNoteGuide, {
+        agentConfig,
+        context,
+    });
+    const protocolVariablesEnabled = studyLogPolicy.enabled !== false
+        && studyLogPolicy.enableDailyNotePromptVariables !== false;
 
     const variableMap = collectExplicitPromptVariables(agentConfig);
+
+    if (isPlainObject(agentConfig.promptVariableOverrides)) {
+        for (const [key, value] of Object.entries(agentConfig.promptVariableOverrides)) {
+            mergeVariable(variableMap, key, value, 'agent-config-override', true);
+        }
+    }
+
+    for (const [key, value] of Object.entries(promptVariables)) {
+        mergeVariable(variableMap, key, value, 'settings-prompt-variable', false);
+    }
 
     mergeVariable(variableMap, 'AgentId', context.agentId || agentConfig.id, 'context');
     mergeVariable(variableMap, 'AgentName', context.agentName || agentConfig.name, 'context');
     mergeVariable(variableMap, 'TopicId', context.topicId, 'context');
     mergeVariable(variableMap, 'TopicName', context.topicName, 'context');
     mergeVariable(variableMap, 'UserName', settings.userName, 'settings');
+    mergeVariable(variableMap, 'StudentName', studyProfile.studentName || settings.userName, 'settings');
+    mergeVariable(variableMap, 'VarUser', settings.userName || studyProfile.studentName, 'settings');
+    mergeVariable(variableMap, 'VarCity', studyProfile.city, 'settings');
+    mergeVariable(variableMap, 'StudyWorkspace', studyProfile.studyWorkspace, 'settings');
+    mergeVariable(variableMap, 'WorkEnvironment', studyProfile.workEnvironment, 'settings');
+    mergeVariable(variableMap, 'CurrentDate', formattedNow.date, 'builtin');
+    mergeVariable(variableMap, 'CurrentDateTime', formattedNow.dateTime, 'builtin');
+    mergeVariable(variableMap, 'VarTimeNow', formattedNow.dateTime, 'builtin');
+    if (protocolVariablesEnabled) {
+        mergeVariable(variableMap, 'DailyNoteTool', dailyNoteInstruction, 'builtin');
+        mergeVariable(variableMap, 'StudyLogTool', dailyNoteInstruction, 'builtin');
+        mergeVariable(variableMap, 'VarDailyNoteGuide', dailyNoteInstruction, 'builtin');
+    } else {
+        variableMap.DailyNoteTool = { value: '', source: 'study-log-policy-disabled', forceResolve: true };
+        variableMap.StudyLogTool = { value: '', source: 'study-log-policy-disabled', forceResolve: true };
+        variableMap.VarDailyNoteGuide = { value: '', source: 'study-log-policy-disabled', forceResolve: true };
+    }
     mergeVariable(
         variableMap,
         'Model',
         context.model || modelConfig.model || agentConfig.model,
         'model-config'
     );
-    mergeVariable(variableMap, 'VarDivRender', DEFAULT_DIV_RENDER_INSTRUCTION, 'builtin');
+    if (renderingPromptEnabled) {
+        mergeVariable(
+            variableMap,
+            'VarDivRender',
+            normalizeVariableValue(settings.renderingPrompt) || DEFAULT_DIV_RENDER_INSTRUCTION,
+            'builtin'
+        );
+        mergeVariable(
+            variableMap,
+            'VarRendering',
+            normalizeVariableValue(settings.renderingPrompt) || DEFAULT_DIV_RENDER_INSTRUCTION,
+            'builtin'
+        );
+    } else {
+        variableMap.VarDivRender = { value: '', source: 'rendering-prompt-disabled', forceResolve: true };
+        variableMap.VarRendering = { value: '', source: 'rendering-prompt-disabled', forceResolve: true };
+    }
+    if (adaptiveBubbleTipEnabled) {
+        mergeVariable(
+            variableMap,
+            'VarAdaptiveBubbleTip',
+            normalizeVariableValue(settings.adaptiveBubbleTip) || DEFAULT_ADAPTIVE_BUBBLE_TIP,
+            'builtin'
+        );
+    } else {
+        variableMap.VarAdaptiveBubbleTip = { value: '', source: 'adaptive-bubble-tip-disabled', forceResolve: true };
+    }
 
     const aliasCandidates = [
         agentConfig.name,
@@ -158,7 +261,7 @@ function resolvePromptVariables(prompt, options = {}) {
 
     const resolvedPrompt = prompt.replace(TOKEN_PATTERN, (match, token) => {
         const entry = variableMap[token];
-        if (!entry || !entry.value) {
+        if (!entry || (!entry.forceResolve && !entry.value)) {
             unresolvedTokens.add(token);
             return match;
         }
@@ -232,6 +335,7 @@ function resolvePromptMessageSet(messages, options = {}) {
 
 module.exports = {
     DEFAULT_DIV_RENDER_INSTRUCTION,
+    DEFAULT_ADAPTIVE_BUBBLE_TIP,
     buildPromptVariableMap,
     resolvePromptVariables,
     resolvePromptMessageSet,

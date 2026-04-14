@@ -7,6 +7,11 @@ const knowledgeBase = require('../knowledge-base');
 const vcpClient = require('../vcpClient');
 const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
 const { DEFAULT_AGENT_BUBBLE_THEME_PROMPT } = require('../utils/settingsSchema');
+const { createStudyServices } = require('../study');
+const {
+    resolveDailyNoteToolInstruction,
+    rewriteLegacyStudyLogPromptText,
+} = require('../study/toolProtocol');
 
 /**
  * Initializes chat and topic related IPC handlers.
@@ -20,6 +25,7 @@ const { DEFAULT_AGENT_BUBBLE_THEME_PROMPT } = require('../utils/settingsSchema')
  * @param {function} context.startSelectionListener - Function to start the selection listener.
  */
 let ipcHandlersRegistered = false;
+let studyServices = null;
 
 function normalizeMessageForPreprocessing(message) {
     if (!message || typeof message !== 'object') {
@@ -99,6 +105,61 @@ function applyAgentBubbleTheme(messages, injectionPrompt = DEFAULT_AGENT_BUBBLE_
     return nextMessages;
 }
 
+function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions = {}) {
+    if (settings?.studyLogPolicy?.enabled === false) {
+        return messages;
+    }
+    if (settings?.studyLogPolicy?.autoInjectDailyNoteProtocol === false) {
+        return messages;
+    }
+
+    const dailyNotePrompt = resolveDailyNoteToolInstruction(settings?.dailyNoteGuide, {
+        agentConfig: promptResolutionOptions.agentConfig,
+        context: promptResolutionOptions.context,
+    });
+    const normalizedPrompt = typeof dailyNotePrompt === 'string' ? dailyNotePrompt.trim() : '';
+    if (!normalizedPrompt) {
+        return messages;
+    }
+
+    const nextMessages = [...messages];
+    let systemMessageIndex = nextMessages.findIndex((message) => message.role === 'system');
+
+    if (systemMessageIndex === -1) {
+        nextMessages.unshift({ role: 'system', content: normalizedPrompt });
+        return nextMessages;
+    }
+
+    const systemMessage = nextMessages[systemMessageIndex];
+    const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
+    if (
+        currentContent.includes('—— 日记 (DailyNote) ——')
+        || /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(currentContent)
+    ) {
+        return nextMessages;
+    }
+
+    nextMessages[systemMessageIndex] = {
+        ...systemMessage,
+        content: `${currentContent}\n\n${normalizedPrompt}`.trim(),
+    };
+
+    return nextMessages;
+}
+
+function normalizeLegacyStudyLogPromptMessages(messages = []) {
+    return (Array.isArray(messages) ? messages : []).map((message) => {
+        if (!message || message.role !== 'system' || typeof message.content !== 'string') {
+            return message;
+        }
+
+        return {
+            ...message,
+            content: rewriteLegacyStudyLogPromptText(message.content),
+        };
+    });
+}
+
 function applyContextSanitizer(messages, settings) {
     if (settings.enableContextSanitizer !== true) {
         return messages;
@@ -168,6 +229,11 @@ function initialize(mainWindow, context) {
         : (typeof mainWindow === 'function' ? mainWindow : () => mainWindow || null);
 
     vcpClient.initialize({ settingsManager });
+    studyServices = createStudyServices({
+        dataRoot: DATA_ROOT,
+        settingsManager,
+        vcpClient,
+    });
 
     // Ensure the watcher is in a clean state on initialization
     if (fileWatcher) {
@@ -704,6 +770,23 @@ function initialize(mainWindow, context) {
             substitutions: {},
             variableSources: {},
         };
+        let promptResolutionOptions = {
+            settings,
+            agentConfig: null,
+            context: { ...(context || {}) },
+            modelConfig,
+        };
+
+        try {
+            promptResolutionOptions = await buildPromptResolutionOptions({
+                settings,
+                context,
+                modelConfig,
+                agentConfigManager,
+            });
+        } catch (error) {
+            console.warn('[Main - sendToVCP] Failed to pre-read agent context for DailyNote protocol injection:', error);
+        }
 
         try {
             if (settings.enableAgentBubbleTheme === true) {
@@ -713,31 +796,14 @@ function initialize(mainWindow, context) {
                 );
             }
 
+            processedMessages = normalizeLegacyStudyLogPromptMessages(processedMessages);
+            processedMessages = applyDailyNoteProtocol(processedMessages, settings, promptResolutionOptions);
+
             if (settings.enableThoughtChainInjection !== true) {
                 processedMessages = stripThoughtChains(processedMessages);
             }
 
             processedMessages = applyContextSanitizer(processedMessages, settings);
-
-            const promptResolutionOptions = await buildPromptResolutionOptions({
-                settings,
-                context,
-                modelConfig,
-                agentConfigManager,
-            });
-            const resolution = resolvePromptMessageSet(processedMessages, promptResolutionOptions);
-            processedMessages = resolution.messages;
-            promptVariableResolution = {
-                unresolvedTokens: resolution.unresolvedTokens,
-                substitutions: resolution.substitutions,
-                variableSources: resolution.variableSources,
-            };
-
-            if (resolution.unresolvedTokens.length > 0) {
-                console.warn(
-                    `[Main - sendToVCP] Unresolved prompt variables for request ${requestId || 'unknown'}: ${resolution.unresolvedTokens.join(', ')}`
-                );
-            }
         } catch (error) {
             console.error('[Main - sendToVCP] Message preprocessing failed:', error);
             return { error: `Message preprocessing failed: ${error.message}` };
@@ -752,19 +818,64 @@ function initialize(mainWindow, context) {
             console.error('[ModelUsage] Failed to record model usage:', error);
         }
 
-        const result = await vcpClient.send({
+        try {
+            const resolution = resolvePromptMessageSet(processedMessages, promptResolutionOptions);
+            processedMessages = resolution.messages;
+            promptVariableResolution = {
+                unresolvedTokens: resolution.unresolvedTokens,
+                substitutions: resolution.substitutions,
+                variableSources: resolution.variableSources,
+            };
+
+            if (resolution.unresolvedTokens.length > 0) {
+                console.warn(
+                    `[Main - sendToVCP] Unresolved prompt variables for request ${requestId || 'unknown'}: ${resolution.unresolvedTokens.join(', ')}`
+                );
+            }
+        } catch (error) {
+            console.error('[Main - sendToVCP] Prompt variable resolution failed:', error);
+                return { error: `Prompt variable resolution failed: ${error.message}` };
+        }
+
+        const studyProfile = settings.studyProfile || {};
+        const currentDate = promptVariableResolution.substitutions.CurrentDate
+            || new Date().toISOString().slice(0, 10);
+        const enrichedContext = {
+            ...(context || {}),
+            model: modelConfig?.model || context?.model || '',
+            topicName: promptVariableResolution.substitutions.TopicName || context?.topicName || '',
+            agentName: promptVariableResolution.substitutions.AgentName || context?.agentName || '',
+            studentName: studyProfile.studentName || settings.userName || '',
+            studyWorkspace: studyProfile.studyWorkspace || '',
+            workEnvironment: studyProfile.workEnvironment || '',
+            currentDate,
+        };
+
+        const orchestrationResult = await studyServices.chatOrchestrator.runRequest({
             requestId,
             endpoint,
             apiKey,
             messages: processedMessages,
             modelConfig,
-            context,
+            context: enrichedContext,
+            settings,
             webContents: event.sender,
             streamChannel: 'vcp-stream-event',
         });
 
+        if (orchestrationResult?.error) {
+            return {
+                error: orchestrationResult.error,
+                promptVariableResolution,
+                toolEvents: orchestrationResult.toolEvents || [],
+                studyMemoryRefs: orchestrationResult.studyMemoryRefs || [],
+            };
+        }
+
         return {
-            ...(result || {}),
+            ...(orchestrationResult || {}),
+            toolEvents: orchestrationResult?.toolEvents || [],
+            studyMemoryRefs: orchestrationResult?.studyMemoryRefs || [],
             promptVariableResolution,
         };
     });
@@ -774,7 +885,22 @@ function initialize(mainWindow, context) {
             return { success: false, error: 'interrupt-vcp-request expects a request object.' };
         }
 
-        return vcpClient.interrupt(request);
+        const requestId = request.requestId;
+        const localInterrupted = studyServices?.chatOrchestrator?.abortSyntheticRequest?.(requestId) === true;
+        const remoteResult = await vcpClient.interrupt(request);
+
+        if (localInterrupted && !remoteResult?.success) {
+            return {
+                success: true,
+                requestId,
+                localAborted: true,
+                remoteAttempted: remoteResult?.remoteAttempted || false,
+                remoteSucceeded: remoteResult?.remoteSucceeded || false,
+                warning: remoteResult?.error || remoteResult?.warning || '',
+            };
+        }
+
+        return remoteResult;
     });
 
     /**
@@ -996,5 +1122,3 @@ function initialize(mainWindow, context) {
 module.exports = {
     initialize
 };
-
-

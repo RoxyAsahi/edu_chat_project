@@ -61,6 +61,30 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
 });
 
+test('readSettings promotes legacy vcpLite prompt fields to top-level native settings', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await fs.writeJson(settingsPath, {
+        userName: 'Legacy Prompt User',
+        vcpLite: {
+            renderingPrompt: 'legacy rendering prompt',
+            adaptiveBubbleTip: 'legacy bubble tip',
+            dailyNoteGuide: 'legacy daily note guide',
+        },
+    }, { spaces: 2 });
+
+    const settings = await manager.readSettings();
+    const rawWritten = await fs.readJson(settingsPath);
+
+    assert.equal(settings.renderingPrompt, 'legacy rendering prompt');
+    assert.equal(settings.adaptiveBubbleTip, 'legacy bubble tip');
+    assert.equal(settings.dailyNoteGuide, 'legacy daily note guide');
+    assert.equal('vcpLite' in rawWritten, false);
+});
+
 test('readSettings recovers from a valid backup when the primary file is corrupted', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');

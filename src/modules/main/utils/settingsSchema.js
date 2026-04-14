@@ -7,6 +7,21 @@ const {
 } = require('../knowledge-base/constants');
 
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{VarDivRender}}';
+const DEFAULT_STUDY_PROFILE = Object.freeze({
+    studentName: '',
+    city: '',
+    studyWorkspace: '',
+    workEnvironment: '',
+    timezone: 'Asia/Hong_Kong',
+});
+const DEFAULT_STUDY_LOG_POLICY = Object.freeze({
+    enabled: true,
+    enableDailyNotePromptVariables: true,
+    autoInjectDailyNoteProtocol: true,
+    maxToolRounds: 3,
+    memoryTopK: 4,
+    memoryFallbackTopK: 2,
+});
 
 const DEFAULT_SETTINGS = Object.freeze({
     sidebarWidth: 260,
@@ -31,6 +46,11 @@ const DEFAULT_SETTINGS = Object.freeze({
     vcpLogUrl: '',
     vcpLogKey: '',
     networkNotesPaths: [],
+    enableRenderingPrompt: true,
+    enableAdaptiveBubbleTip: true,
+    renderingPrompt: '',
+    adaptiveBubbleTip: '',
+    dailyNoteGuide: '',
     enableAgentBubbleTheme: false,
     agentBubbleThemePrompt: DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
     enableSmoothStreaming: false,
@@ -62,16 +82,27 @@ const DEFAULT_SETTINGS = Object.freeze({
     currentThemeMode: 'system',
     themeLastUpdated: 0,
     enableThoughtChainInjection: false,
+    studyProfile: { ...DEFAULT_STUDY_PROFILE },
+    promptVariables: {},
+    studyLogPolicy: { ...DEFAULT_STUDY_LOG_POLICY },
 });
 
 function cloneDefaultSettings() {
-    return { ...DEFAULT_SETTINGS };
+    return {
+        ...DEFAULT_SETTINGS,
+        studyProfile: { ...DEFAULT_STUDY_PROFILE },
+        promptVariables: {},
+        studyLogPolicy: { ...DEFAULT_STUDY_LOG_POLICY },
+    };
 }
 
 function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
     const sourceSettings = settings || {};
     const validated = {};
     let hasIssues = false;
+    const legacyPromptSource = sourceSettings.vcpLite && typeof sourceSettings.vcpLite === 'object'
+        ? sourceSettings.vcpLite
+        : {};
 
     const unknownKeys = Object.keys(sourceSettings).filter((key) => !(key in defaultSettings));
     if (unknownKeys.length > 0) {
@@ -123,6 +154,47 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
+    if (typeof validated.enableRenderingPrompt !== 'boolean') {
+        validated.enableRenderingPrompt = defaultSettings.enableRenderingPrompt;
+        hasIssues = true;
+    }
+
+    if (typeof validated.enableAdaptiveBubbleTip !== 'boolean') {
+        validated.enableAdaptiveBubbleTip = defaultSettings.enableAdaptiveBubbleTip;
+        hasIssues = true;
+    }
+
+    const normalizePromptText = (value, fallback = '') => {
+        if (typeof value === 'string') {
+            return value;
+        }
+        return fallback;
+    };
+
+    if (typeof sourceSettings.renderingPrompt !== 'string') {
+        validated.renderingPrompt = normalizePromptText(
+            legacyPromptSource.renderingPrompt,
+            defaultSettings.renderingPrompt
+        );
+        hasIssues = true;
+    }
+
+    if (typeof sourceSettings.adaptiveBubbleTip !== 'string') {
+        validated.adaptiveBubbleTip = normalizePromptText(
+            legacyPromptSource.adaptiveBubbleTip,
+            defaultSettings.adaptiveBubbleTip
+        );
+        hasIssues = true;
+    }
+
+    if (typeof sourceSettings.dailyNoteGuide !== 'string') {
+        validated.dailyNoteGuide = normalizePromptText(
+            legacyPromptSource.dailyNoteGuide,
+            defaultSettings.dailyNoteGuide
+        );
+        hasIssues = true;
+    }
+
     if (!Array.isArray(validated.combinedItemOrder)) {
         validated.combinedItemOrder = [];
         hasIssues = true;
@@ -133,11 +205,67 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
+    if (!validated.studyProfile || typeof validated.studyProfile !== 'object' || Array.isArray(validated.studyProfile)) {
+        validated.studyProfile = { ...DEFAULT_STUDY_PROFILE };
+        hasIssues = true;
+    } else {
+        validated.studyProfile = {
+            studentName: typeof validated.studyProfile.studentName === 'string'
+                ? validated.studyProfile.studentName
+                : DEFAULT_STUDY_PROFILE.studentName,
+            city: typeof validated.studyProfile.city === 'string'
+                ? validated.studyProfile.city
+                : DEFAULT_STUDY_PROFILE.city,
+            studyWorkspace: typeof validated.studyProfile.studyWorkspace === 'string'
+                ? validated.studyProfile.studyWorkspace
+                : DEFAULT_STUDY_PROFILE.studyWorkspace,
+            workEnvironment: typeof validated.studyProfile.workEnvironment === 'string'
+                ? validated.studyProfile.workEnvironment
+                : DEFAULT_STUDY_PROFILE.workEnvironment,
+            timezone: typeof validated.studyProfile.timezone === 'string' && validated.studyProfile.timezone.trim()
+                ? validated.studyProfile.timezone.trim()
+                : DEFAULT_STUDY_PROFILE.timezone,
+        };
+    }
+
+    if (!validated.promptVariables || typeof validated.promptVariables !== 'object' || Array.isArray(validated.promptVariables)) {
+        validated.promptVariables = {};
+        hasIssues = true;
+    } else {
+        validated.promptVariables = Object.fromEntries(
+            Object.entries(validated.promptVariables)
+                .filter(([key, value]) => typeof key === 'string' && typeof value === 'string')
+                .map(([key, value]) => [key, value])
+        );
+    }
+
+    if (!validated.studyLogPolicy || typeof validated.studyLogPolicy !== 'object' || Array.isArray(validated.studyLogPolicy)) {
+        validated.studyLogPolicy = { ...DEFAULT_STUDY_LOG_POLICY };
+        hasIssues = true;
+    } else {
+        validated.studyLogPolicy = {
+            enabled: validated.studyLogPolicy.enabled !== false,
+            enableDailyNotePromptVariables: validated.studyLogPolicy.enableDailyNotePromptVariables !== false,
+            autoInjectDailyNoteProtocol: validated.studyLogPolicy.autoInjectDailyNoteProtocol !== false,
+            maxToolRounds: Number.isFinite(Number(validated.studyLogPolicy.maxToolRounds))
+                ? Math.max(1, Number(validated.studyLogPolicy.maxToolRounds))
+                : DEFAULT_STUDY_LOG_POLICY.maxToolRounds,
+            memoryTopK: Number.isFinite(Number(validated.studyLogPolicy.memoryTopK))
+                ? Math.max(1, Number(validated.studyLogPolicy.memoryTopK))
+                : DEFAULT_STUDY_LOG_POLICY.memoryTopK,
+            memoryFallbackTopK: Number.isFinite(Number(validated.studyLogPolicy.memoryFallbackTopK))
+                ? Math.max(1, Number(validated.studyLogPolicy.memoryFallbackTopK))
+                : DEFAULT_STUDY_LOG_POLICY.memoryFallbackTopK,
+        };
+    }
+
     return { validated, hasIssues };
 }
 
 module.exports = {
     DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
+    DEFAULT_STUDY_LOG_POLICY,
+    DEFAULT_STUDY_PROFILE,
     DEFAULT_SETTINGS,
     cloneDefaultSettings,
     validateSettings,

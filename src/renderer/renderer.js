@@ -8,6 +8,8 @@ import { createFlashcardController } from '../modules/renderer/app/flashcards/fl
 import { createAppStore, createInitialAppState } from '../modules/renderer/app/store/appStore.js';
 import { collectRootElements } from '../modules/renderer/app/dom/collectRootElements.js';
 import { createLayoutController } from '../modules/renderer/app/layout/layoutController.js';
+import { createDiaryWallController } from '../modules/renderer/app/diaryWall/diaryWallController.js';
+import { createLogsController } from '../modules/renderer/app/logs/logsController.js';
 import { createNotesController } from '../modules/renderer/app/notes/notesController.js';
 import { createReaderController } from '../modules/renderer/app/reader/readerController.js';
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
@@ -26,6 +28,8 @@ let workspaceController = null;
 let readerController = null;
 let flashcardController = null;
 let notesController = null;
+let logsController = null;
+let diaryWallController = null;
 let composerController = null;
 const layoutController = createLayoutController({
     store,
@@ -63,6 +67,22 @@ const settingsController = createSettingsController({
     reloadSelectedAgent: async (agentId) => {
         await workspaceController?.loadAgents?.();
         await workspaceController?.selectAgent?.(agentId);
+    },
+    getBubbleThemePreviewContext: () => {
+        const session = getSessionSlice();
+        const currentSelectedItem = session.currentSelectedItem || {};
+        const currentTopic = session.topics.find((topic) => topic?.id === session.currentTopicId) || null;
+        return {
+            agentId: currentSelectedItem.id || '',
+            agentName: currentSelectedItem.name || '',
+            topicId: session.currentTopicId || '',
+            topicName: currentTopic?.name || '',
+            model: getSettingsSlice().settings.lastModel || getSettingsSlice().settings.defaultModel || '',
+        };
+    },
+    openLogsPanel: async () => {
+        setSidePanelTab('logs');
+        await logsController?.refreshLogs?.();
     },
 });
 const {
@@ -191,6 +211,34 @@ notesController = createNotesController({
     closeSourceFileActionMenu,
     updateCurrentChatHistory,
 });
+  logsController = createLogsController({
+      store,
+      el,
+      chatAPI,
+    ui,
+    renderMarkdownFragment,
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+      getCurrentTopicId: () => getSessionSlice().currentTopicId,
+      getCurrentTopicName: () => workspaceController?.getCurrentTopicDisplayName?.() || '',
+      selectTopic: (...args) => workspaceController?.selectTopic?.(...args),
+      openDiaryWall: () => diaryWallController?.open?.(),
+      openDiaryManager: () => settingsController.openToolboxDiaryManager(),
+  });
+diaryWallController = createDiaryWallController({
+    el,
+    chatAPI,
+    ui,
+    documentObj: document,
+    renderMarkdownFragment,
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+    getCurrentTopicId: () => getSessionSlice().currentTopicId,
+    getCurrentTopicName: () => workspaceController?.getCurrentTopicDisplayName?.() || '',
+    selectTopic: (...args) => workspaceController?.selectTopic?.(...args),
+    openLogsPanel: async () => {
+        setSidePanelTab('logs');
+        await logsController?.refreshLogs?.();
+    },
+});
 workspaceController = createWorkspaceController({
     store,
     el,
@@ -216,6 +264,7 @@ workspaceController = createWorkspaceController({
     loadCurrentTopicKnowledgeBaseDocuments,
     loadTopicNotes: (...args) => notesController?.loadTopicNotes?.(...args),
     loadAgentNotes: (...args) => notesController?.loadAgentNotes?.(...args),
+    refreshLogs: (...args) => logsController?.refreshLogs?.(...args),
     populateAgentForm,
     setPromptVisible: (visible) => settingsController.setPromptVisible(visible),
     messageRendererApi: messageRenderer,
@@ -248,6 +297,13 @@ const {
 const {
     bindEvents: bindNotesEvents,
 } = notesController;
+const {
+    bindEvents: bindLogsEvents,
+    renderLogsPanel,
+} = logsController;
+const {
+    bindEvents: bindDiaryWallEvents,
+} = diaryWallController;
 const {
     bindEvents: bindFlashcardEvents,
 } = flashcardController;
@@ -292,6 +348,7 @@ const { bootstrap } = createAppBootstrap({
     handleStreamEvent: (...args) => composerController?.handleStreamEvent?.(...args),
     setPromptVisible,
     renderNotesPanel: (...args) => notesController?.renderNotesPanel?.(...args),
+    renderLogsPanel: (...args) => logsController?.renderLogsPanel?.(...args),
     renderCurrentHistory,
     finalizeBootstrap: () => {
         ui.autoResizeTextarea(el.messageInput);
@@ -306,30 +363,56 @@ const INTERRUPT_SEND_BUTTON_HTML = `
         <rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor"></rect>
     </svg>
 `;
+let chatLoadingTicket = 0;
 
-function getAppState() {
-    return store.getState();
+function setAppBootLoading(visible) {
+    if (!el.appBootLoading) {
+        return;
+    }
+
+    el.appBootLoading.classList.toggle('hidden', !visible);
+    el.appBootLoading.setAttribute('aria-hidden', visible ? 'false' : 'true');
 }
 
-function getSettingsSlice() {
-    return getAppState().settings;
+function setChatLoading(visible, options = {}) {
+    if (!el.chatLoadingOverlay) {
+        return () => {};
+    }
+
+    if (!visible) {
+        el.chatLoadingOverlay.classList.add('hidden');
+        el.chatLoadingOverlay.setAttribute('aria-hidden', 'true');
+        if (el.chatStage) {
+            el.chatStage.classList.remove('chat-stage--loading');
+        }
+        return () => {};
+    }
+
+    const ticket = Number.isFinite(options.ticket) ? options.ticket : ++chatLoadingTicket;
+    el.chatLoadingOverlay.classList.remove('hidden');
+    el.chatLoadingOverlay.setAttribute('aria-hidden', 'false');
+    if (el.chatStage) {
+        el.chatStage.classList.add('chat-stage--loading');
+    }
+
+    return () => {
+        if (ticket !== chatLoadingTicket) {
+            return;
+        }
+        el.chatLoadingOverlay.classList.add('hidden');
+        el.chatLoadingOverlay.setAttribute('aria-hidden', 'true');
+        if (el.chatStage) {
+            el.chatStage.classList.remove('chat-stage--loading');
+        }
+    };
 }
 
-function getLayoutSlice() {
-    return getAppState().layout;
-}
-
-function getSessionSlice() {
-    return getAppState().session;
-}
-
-function getComposerSlice() {
-    return getAppState().composer;
-}
-
-function getPromptModule() {
-    return getSettingsSlice().promptModule;
-}
+function getAppState() { return store.getState(); }
+function getSettingsSlice() { return getAppState().settings; }
+function getLayoutSlice() { return getAppState().layout; }
+function getSessionSlice() { return getAppState().session; }
+function getComposerSlice() { return getAppState().composer; }
+function getPromptModule() { return getSettingsSlice().promptModule; }
 
 function mergeSettingsPatch(patch = {}) {
     store.patchState('settings', (current) => ({
@@ -472,11 +555,16 @@ function initMarked() {
 }
 
 function setSidePanelTab(tab) {
+    const nextTab = tab === 'logs' ? 'logs' : 'notes';
     store.patchState('layout', {
-        sidePanelTab: 'notes',
+        sidePanelTab: nextTab,
     });
-    el.notesPanelTab?.classList.remove('hidden');
-    el.notesPanelTab?.classList.add('side-panel-pane--active');
+    el.notesPanelTab?.classList.toggle('hidden', nextTab !== 'notes');
+    el.notesPanelTab?.classList.toggle('side-panel-pane--active', nextTab === 'notes');
+    el.logsPanelTab?.classList.toggle('hidden', nextTab !== 'logs');
+    el.logsPanelTab?.classList.toggle('side-panel-pane--active', nextTab === 'logs');
+    el.sidePanelNotesTabBtn?.classList.toggle('side-panel-tab--active', nextTab === 'notes');
+    el.sidePanelLogsTabBtn?.classList.toggle('side-panel-tab--active', nextTab === 'logs');
 }
 
 function setRightPanelMode(mode) {
@@ -636,6 +724,14 @@ async function populateAgentForm(config) {
     el.agentNameInput.value = config.name || '';
     el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';
     el.agentModel.value = config.model || '';
+    if (el.agentVcpAliasesInput) {
+        el.agentVcpAliasesInput.value = Array.isArray(config.vcpAliases)
+            ? config.vcpAliases.join('\n')
+            : (typeof config.vcpAliases === 'string' ? config.vcpAliases : '');
+    }
+    if (el.agentVcpMaidInput) {
+        el.agentVcpMaidInput.value = config.vcpMaid || '';
+    }
     el.agentTemperature.value = config.temperature ?? 0.7;
     el.agentContextTokenLimit.value = config.contextTokenLimit ?? 4000;
     el.agentMaxOutputTokens.value = config.maxOutputTokens ?? 1000;
@@ -654,16 +750,25 @@ async function populateAgentForm(config) {
 
 async function renderCurrentHistory() {
     const session = getSessionSlice();
-    messageRenderer.clearChat({ preserveHistory: true });
-    if (session.currentChatHistory.length === 0) {
-        el.chatMessages.innerHTML = `<div class="empty-state" style="margin-top: 100px; background: transparent; border: none;">
+    const shouldShowLoading = session.currentChatHistory.length > 0;
+    const releaseChatLoading = shouldShowLoading
+        ? setChatLoading(true, { ticket: ++chatLoadingTicket })
+        : () => {};
+
+    try {
+        messageRenderer.clearChat({ preserveHistory: true });
+        if (session.currentChatHistory.length === 0) {
+            el.chatMessages.innerHTML = `<div class="empty-state" style="margin-top: 100px; background: transparent; border: none;">
   <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4; color:var(--accent); margin-bottom:12px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
   <p style="font-size: 16px; font-weight: 500; color: var(--muted);">暂无消息，开始对话吧。</p>
 </div>`;
-        return;
+            return;
+        }
+        await messageRenderer.renderHistory(session.currentChatHistory, true);
+        notesController?.decorateChatMessages?.();
+    } finally {
+        releaseChatLoading();
     }
-    await messageRenderer.renderHistory(session.currentChatHistory, true);
-    notesController?.decorateChatMessages?.();
 }
 
 function buildTopicContext() {
@@ -735,6 +840,8 @@ function bindFeatureEvents() {
     bindSourceEvents();
     bindWorkspaceEvents();
     bindNotesEvents();
+    bindLogsEvents();
+    bindDiaryWallEvents();
     bindFlashcardEvents();
     bindComposerEvents();
     bindShellEvents();
@@ -755,12 +862,26 @@ function bindShellEvents() {
         el.agentAvatarPreview.src = file.path ? `file://${file.path.replace(/\\/g, '/')}` : URL.createObjectURL(file);
     });
 
+    el.sidePanelNotesTabBtn?.addEventListener('click', () => {
+        setSidePanelTab('notes');
+    });
+    el.sidePanelLogsTabBtn?.addEventListener('click', () => {
+        setSidePanelTab('logs');
+        void logsController?.refreshLogs?.();
+    });
+
     el.minimizeBtn?.addEventListener('click', () => chatAPI.minimizeWindow());
     el.maximizeBtn?.addEventListener('click', () => chatAPI.maximizeWindow());
     el.closeBtn?.addEventListener('click', () => chatAPI.closeWindow());
 }
 
-bootstrap().catch((error) => {
-    console.error('[UniStudyRenderer] bootstrap failed:', error);
-    ui?.showToastNotification?.(error.message || 'Bootstrap failed', 'error', 5000);
-});
+setAppBootLoading(true);
+
+bootstrap()
+    .catch((error) => {
+        console.error('[UniStudyRenderer] bootstrap failed:', error);
+        ui?.showToastNotification?.(error.message || 'Bootstrap failed', 'error', 5000);
+    })
+    .finally(() => {
+        setAppBootLoading(false);
+    });
