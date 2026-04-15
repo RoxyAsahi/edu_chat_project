@@ -90,13 +90,9 @@ textarea:focus, input:focus, select:focus {
 .brand-mark {
   width: 32px;
   height: 32px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-family: 'MavenProExtraBold', sans-serif;
-  background: linear-gradient(135deg, #1a73e8, #4c8df6);
-  color: white;
-  box-shadow: 0 10px 20px rgba(26, 115, 232, 0.28);
+  display: block;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .titlebar__title {

@@ -34,7 +34,7 @@
     <header class="titlebar">
       <div class="titlebar__brand">
         <div class="titlebar__brand-main">
-          <div class="brand-mark">US</div>
+          <img class="brand-mark" src="../assets/brand-logo.png" alt="UniStudy logo" />
           <div>
             <div class="titlebar__title">UniStudy</div>
             <div class="titlebar__subtitle">个人 AI 学习终端</div>
@@ -95,6 +95,41 @@
               <span class="material-symbols-outlined">add</span> 新建学科
             </button>
           </header>
+
+          <section class="workspace-overview-page__island-row" aria-label="首页专注计时">
+            <div id="dynamicIsland" class="dynamic-island dynamic-island--overview">
+              <div class="dynamic-island__bar">
+                <button
+                  id="dynamicIslandStatusBtn"
+                  class="ghost-button dynamic-island__status-button"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="dynamicIslandPanel"
+                >
+                  <span id="dynamicIslandStatusEyebrow" class="dynamic-island__status-eyebrow">专注计时</span>
+                  <strong id="dynamicIslandStatusText" class="dynamic-island__status-text">番茄钟</strong>
+                </button>
+              </div>
+              <div id="dynamicIslandPanel" class="dynamic-island__panel" aria-hidden="true">
+                <div class="dynamic-island__panel-main">
+                  <div class="dynamic-island__panel-copy">
+                    <span class="dynamic-island__panel-label">番茄钟</span>
+                    <strong id="dynamicIslandTimerDisplay" class="dynamic-island__timer-display">25:00</strong>
+                  </div>
+                  <label class="dynamic-island__duration-field" for="dynamicIslandMinutesInput">
+                    <span>专注分钟</span>
+                    <input id="dynamicIslandMinutesInput" type="number" min="1" max="180" step="1" value="25" inputmode="numeric" />
+                  </label>
+                </div>
+                <div class="dynamic-island__panel-actions">
+                  <button id="dynamicIslandStartBtn" class="accent-button dynamic-island__action" type="button">开始</button>
+                  <button id="dynamicIslandPauseBtn" class="ghost-button dynamic-island__action hidden" type="button">暂停</button>
+                  <button id="dynamicIslandResumeBtn" class="accent-button dynamic-island__action hidden" type="button">继续</button>
+                  <button id="dynamicIslandResetBtn" class="ghost-button dynamic-island__action" type="button">重置</button>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section id="subjectOverviewGrid" class="subject-overview-grid" aria-label="学科总览"></section>
         </div>
@@ -548,10 +583,10 @@
       </div>
     </div>
 
-    <div id="manualNotesLibraryModal" class="note-detail-modal hidden" aria-hidden="true">
-      <div id="manualNotesLibraryBackdrop" class="note-detail-modal__backdrop"></div>
-      <div class="note-detail-modal__dialog manual-notes-library-modal" role="dialog" aria-modal="true" aria-labelledby="manualNotesLibraryTitle">
-        <div class="note-detail-modal__header manual-notes-library-modal__header">
+    <div id="manualNotesLibraryModal" class="manual-notes-library-modal hidden" aria-hidden="true">
+      <div id="manualNotesLibraryBackdrop" class="manual-notes-library-modal__backdrop"></div>
+      <div class="manual-notes-library-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="manualNotesLibraryTitle">
+        <div class="manual-notes-library-modal__header">
           <div class="note-detail-modal__header-main">
             <div>
               <p class="eyebrow">手写笔记库</p>
@@ -559,13 +594,13 @@
               <p id="manualNotesLibrarySubtitle" class="settings-caption">这里会收纳当前学科下的所有手写笔记。</p>
             </div>
           </div>
-          <div class="panel__actions note-detail-modal__actions">
+          <div class="panel__actions manual-notes-library-modal__actions">
             <button id="manualNotesLibraryCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭手写笔记库">
               <span class="material-symbols-outlined">close</span>
             </button>
           </div>
         </div>
-        <div class="note-detail-modal__body manual-notes-library-modal__body">
+        <div class="manual-notes-library-modal__body">
           <section id="manualNotesLibraryGrid" class="manual-notes-library-grid" aria-live="polite"></section>
         </div>
       </div>

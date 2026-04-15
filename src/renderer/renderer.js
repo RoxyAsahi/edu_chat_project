@@ -10,6 +10,7 @@ import { collectRootElements } from '../modules/renderer/app/dom/collectRootElem
 import { createLayoutController } from '../modules/renderer/app/layout/layoutController.js';
 import { createMobileWorkspaceController } from '../modules/renderer/app/layout/mobileWorkspaceController.js';
 import { createDiaryWallController } from '../modules/renderer/app/diaryWall/diaryWallController.js';
+import { createDynamicIslandController } from '../modules/renderer/app/dynamicIsland/dynamicIslandController.js';
 import { createLogsController } from '../modules/renderer/app/logs/logsController.js';
 import { createNotesController } from '../modules/renderer/app/notes/notesController.js';
 import { createReaderController } from '../modules/renderer/app/reader/readerController.js';
@@ -31,6 +32,7 @@ let flashcardController = null;
 let notesController = null;
 let logsController = null;
 let diaryWallController = null;
+let dynamicIslandController = null;
 let composerController = null;
 const mobileWorkspaceController = createMobileWorkspaceController({
     store,
@@ -250,6 +252,13 @@ diaryWallController = createDiaryWallController({
     openLogsPanel: async () => {
         setSidePanelTab('notes');
     },
+});
+dynamicIslandController = createDynamicIslandController({
+    store,
+    el,
+    ui,
+    windowObj: window,
+    documentObj: document,
 });
 workspaceController = createWorkspaceController({
     store,
@@ -856,6 +865,7 @@ function bindFeatureEvents() {
     bindNotesEvents();
     bindLogsEvents();
     bindDiaryWallEvents();
+    dynamicIslandController?.bindEvents?.();
     bindFlashcardEvents();
     bindComposerEvents();
     bindMobileWorkspaceEvents();

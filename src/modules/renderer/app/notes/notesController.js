@@ -589,7 +589,26 @@ function createNotesController(deps = {}) {
     }
 
     function getSelectedNotes() {
-        return getVisibleNotes().filter((note) => state.selectedNoteIds.includes(note.id));
+        const selectedIds = new Set(
+            Array.isArray(state.selectedNoteIds)
+                ? state.selectedNoteIds.filter(Boolean)
+                : [],
+        );
+        if (selectedIds.size === 0) {
+            return [];
+        }
+
+        const selectedNotes = [];
+        const seenNoteIds = new Set();
+        const allNotes = [...state.topicNotes, ...state.agentNotes];
+        allNotes.forEach((note) => {
+            if (!selectedIds.has(note?.id) || seenNoteIds.has(note?.id)) {
+                return;
+            }
+            seenNoteIds.add(note.id);
+            selectedNotes.push(note);
+        });
+        return selectedNotes;
     }
 
     function toggleNoteSelection(noteId) {
@@ -610,7 +629,7 @@ function createNotesController(deps = {}) {
         }
     }
 
-    function openManualNotesLibrary(options = {}) {
+    async function openManualNotesLibrary(options = {}) {
         if (options.trigger instanceof HTMLElementCtor) {
             manualNotesLibraryTrigger = options.trigger;
         }
@@ -628,6 +647,10 @@ function createNotesController(deps = {}) {
         el.manualNotesLibraryModal.setAttribute('aria-hidden', 'false');
         documentObj.body?.classList.add('manual-notes-library-open');
         el.manualNotesLibraryCloseBtn?.focus();
+
+        // Re-read persisted notes so externally added notes appear without a full app reload.
+        void notesOperationsApi.loadAgentNotes();
+        void notesOperationsApi.loadTopicNotes();
     }
 
     function closeManualNotesLibrary(options = {}) {
@@ -740,7 +763,7 @@ function createNotesController(deps = {}) {
         el.newNoteFabBtn?.addEventListener('click', createBlankNote);
         el.notesStudioOpenBtn?.addEventListener('click', openNotesStudio);
         el.manualNotesLibraryBtn?.addEventListener('click', (event) => {
-            openManualNotesLibrary({ trigger: event.currentTarget });
+            void openManualNotesLibrary({ trigger: event.currentTarget });
         });
         el.saveNoteBtn?.addEventListener('click', () => {
             void notesOperationsApi.saveActiveNote();

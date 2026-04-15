@@ -114,12 +114,9 @@ textarea:focus, input:focus, select:focus {
 .brand-mark {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  font-family: 'MavenProExtraBold', sans-serif;
-  background: var(--accent);
-  color: white;
+  display: block;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 .titlebar__title {
   font-weight: 600;

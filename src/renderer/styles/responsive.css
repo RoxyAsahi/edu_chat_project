@@ -615,7 +615,7 @@
     display: none;
   }
 
-  .manual-notes-library-modal {
+  .manual-notes-library-modal__dialog {
     width: min(960px, calc(100vw - 40px));
   }
 }
@@ -733,8 +733,7 @@
   .brand-mark {
     width: 28px;
     height: 28px;
-    border-radius: 9px;
-    font-size: 12px;
+    object-fit: contain;
   }
 
   .titlebar__title {
@@ -768,7 +767,7 @@
     gap: 8px;
   }
 
-  .manual-notes-library-modal {
+  .manual-notes-library-modal__dialog {
     width: calc(100vw - 20px);
   }
 }
