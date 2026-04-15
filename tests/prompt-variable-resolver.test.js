@@ -39,6 +39,44 @@ test('resolvePromptVariables resolves VarDivRender locally', () => {
     assert.deepEqual(result.unresolvedTokens, []);
 });
 
+test('resolvePromptVariables resolves study profile variables and DailyNoteTool locally', () => {
+    const result = resolvePromptVariables('{{StudentName}} @ {{StudyWorkspace}} / {{WorkEnvironment}}\n{{DailyNoteTool}}', {
+        settings: {
+            userName: 'FallbackUser',
+            studyProfile: {
+                studentName: 'Alice',
+                studyWorkspace: 'Dorm A-301',
+                workEnvironment: 'Laptop + Pen Tablet',
+            },
+        },
+        agentConfig: {
+            name: 'Hornet_验收',
+            vcpAliases: ['Hornet'],
+            vcpMaid: '[Hornet]Hornet',
+        },
+    });
+
+    assert.match(result.resolvedPrompt, /Alice @ Dorm A-301 \/ Laptop \+ Pen Tablet/);
+    assert.match(result.resolvedPrompt, /DailyNote/);
+    assert.match(result.resolvedPrompt, /<<<\[TOOL_REQUEST\]>>>/);
+    assert.match(result.resolvedPrompt, /\[Hornet\]Hornet/);
+    assert.deepEqual(result.unresolvedTokens, []);
+});
+
+test('resolvePromptVariables suppresses DailyNoteTool when study log loop is disabled', () => {
+    const result = resolvePromptVariables('协议：{{DailyNoteTool}}', {
+        settings: {
+            studyLogPolicy: {
+                enabled: false,
+                enableDailyNotePromptVariables: true,
+            },
+        },
+    });
+
+    assert.equal(result.resolvedPrompt, '协议：');
+    assert.deepEqual(result.unresolvedTokens, []);
+});
+
 test('resolvePromptMessageSet resolves text content inside message arrays', () => {
     const result = resolvePromptMessageSet([{
         role: 'system',

@@ -173,6 +173,12 @@ function createNotesDom() {
             <div id="manualNotesLibrarySubtitle"></div>
             <div id="manualNotesLibraryGrid"></div>
             <div id="noteActionMenu"></div>
+            <div id="manualNotesLibraryModal" class="hidden"></div>
+            <div id="manualNotesLibraryBackdrop"></div>
+            <button id="manualNotesLibraryCloseBtn"></button>
+            <div id="manualNotesLibraryTitle"></div>
+            <div id="manualNotesLibrarySubtitle"></div>
+            <div id="manualNotesLibraryGrid"></div>
             <input id="noteTitleInput" />
             <textarea id="noteContentInput"></textarea>
             <div id="noteMetaSummary"></div>
@@ -237,6 +243,12 @@ function createNotesDom() {
             manualNotesLibrarySubtitle: window.document.getElementById('manualNotesLibrarySubtitle'),
             manualNotesLibraryGrid: window.document.getElementById('manualNotesLibraryGrid'),
             noteActionMenu: window.document.getElementById('noteActionMenu'),
+            manualNotesLibraryModal: window.document.getElementById('manualNotesLibraryModal'),
+            manualNotesLibraryBackdrop: window.document.getElementById('manualNotesLibraryBackdrop'),
+            manualNotesLibraryCloseBtn: window.document.getElementById('manualNotesLibraryCloseBtn'),
+            manualNotesLibraryTitle: window.document.getElementById('manualNotesLibraryTitle'),
+            manualNotesLibrarySubtitle: window.document.getElementById('manualNotesLibrarySubtitle'),
+            manualNotesLibraryGrid: window.document.getElementById('manualNotesLibraryGrid'),
             noteTitleInput: window.document.getElementById('noteTitleInput'),
             noteContentInput: window.document.getElementById('noteContentInput'),
             noteMetaSummary: window.document.getElementById('noteMetaSummary'),
@@ -457,6 +469,47 @@ test('removeDeletedNoteReferencesFromHistory clears favorite state only when the
     assert.equal(nextHistory[1].favoriteAt, 456);
 });
 
+test('normalizeNote derives structured quiz data from legacy markdown content', async () => {
+    const { normalizeNote } = await loadNotesUtilsModule();
+
+    const note = normalizeNote({
+        kind: 'quiz',
+        title: '函数测验',
+        contentMarkdown: [
+            '# 函数测验',
+            '',
+            '## 1. 导数的几何意义是什么？',
+            'A. 曲线在该点的切线斜率',
+            'B. 曲线与坐标轴围成的面积',
+            'C. 函数的定义域',
+            'D. 函数的最小值',
+            '正确答案：A',
+            '解析：导数描述函数在某点的瞬时变化率，对应切线斜率。',
+        ].join('\n'),
+    });
+
+    assert.equal(note.quizSet.title, '函数测验');
+    assert.equal(note.quizSet.items.length, 1);
+    assert.equal(note.quizSet.items[0].correctOptionId, 'option_a');
+});
+
+test('manual and generated note filters split note kinds correctly', async () => {
+    const {
+        filterGeneratedNotes,
+        filterManualNotes,
+    } = await loadNotesUtilsModule();
+
+    const notes = [
+        { id: 'note-1', kind: 'note' },
+        { id: 'note-2', kind: 'message-note' },
+        { id: 'analysis-1', kind: 'analysis' },
+        { id: 'quiz-1', kind: 'quiz' },
+        { id: 'flash-1', kind: 'flashcards', flashcardDeck: { cards: [{ front: 'Q', back: 'A' }] } },
+    ];
+
+    assert.deepEqual(filterManualNotes(notes).map((note) => note.id), ['note-1', 'note-2']);
+    assert.deepEqual(filterGeneratedNotes(notes).map((note) => note.id), ['analysis-1', 'quiz-1', 'flash-1']);
+});
 test('note save and delete helpers cover blank drafts, save payloads, and deleted state cleanup', async () => {
     const {
         buildBlankNoteTitle,
@@ -601,6 +654,12 @@ test('manual notes library opens from the top button and only renders manual not
 
     const { controller, el, store } = createNotesControllerHarness(createNotesController, {
         stateOverrides: {
+            session: {
+                topics: [
+                    { id: 'topic-1', name: '函数' },
+                    { id: 'topic-2', name: '极限' },
+                ],
+            },
             notes: {
                 notesScope: 'agent',
                 agentNotes: [
@@ -620,6 +679,8 @@ test('manual notes library opens from the top button and only renders manual not
     assert.match(el.manualNotesLibraryGrid.textContent, /手写笔记 A/);
     assert.match(el.manualNotesLibraryGrid.textContent, /摘录笔记/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析报告/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /函数/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /极限/);
 });
 
 test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {

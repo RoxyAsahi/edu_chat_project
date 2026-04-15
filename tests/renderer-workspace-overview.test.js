@@ -37,7 +37,7 @@ test('buildSubjectOverviewMarkup renders minimal clock, stats row, cards, and cr
     assert.doesNotMatch(result.gridMarkup, /subject-overview-card__chip--attention/);
     assert.match(result.gridMarkup, /subject-overview-card__chip">3 个话题</);
     assert.match(result.gridMarkup, /subject-overview-card__chip">0 个话题</);
-    assert.match(result.gridMarkup, /当前学科，已有 1 项内容待处理|当前学科，还有 1 项内容待处理/);
+    assert.match(result.gridMarkup, /当前学科，还有 1 项内容待处理|当前学科，已经做好学习准备/);
     assert.match(result.gridMarkup, /话题数量/);
     assert.match(result.gridMarkup, /待处理的数量/);
     assert.match(result.gridMarkup, /最近话题：函数复习/);

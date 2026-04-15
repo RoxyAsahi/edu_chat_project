@@ -11,6 +11,11 @@ const DEFAULT_SETTINGS = Object.freeze({
     kbCandidateTopK: 20,
     kbScoreThreshold: 0.25,
     currentThemeMode: 'system',
+    enableRenderingPrompt: true,
+    enableAdaptiveBubbleTip: true,
+    renderingPrompt: '',
+    adaptiveBubbleTip: '',
+    dailyNoteGuide: '',
     enableAgentBubbleTheme: false,
     agentBubbleThemePrompt: 'Output formatting requirement: {{VarDivRender}}',
     enableWideChatLayout: true,
@@ -21,6 +26,22 @@ const DEFAULT_SETTINGS = Object.freeze({
     layoutLeftWidth: 410,
     layoutRightWidth: 400,
     layoutLeftTopHeight: 360,
+    studyProfile: {
+        studentName: '',
+        city: '',
+        studyWorkspace: '',
+        workEnvironment: '',
+        timezone: 'Asia/Hong_Kong',
+    },
+    promptVariables: {},
+    studyLogPolicy: {
+        enabled: true,
+        enableDailyNotePromptVariables: true,
+        autoInjectDailyNoteProtocol: true,
+        maxToolRounds: 3,
+        memoryTopK: 4,
+        memoryFallbackTopK: 2,
+    },
 });
 
 const SLICE_NAMES = Object.freeze([
@@ -30,6 +51,7 @@ const SLICE_NAMES = Object.freeze([
     'source',
     'reader',
     'notes',
+    'logs',
     'composer',
 ]);
 
@@ -71,6 +93,7 @@ function createInitialAppState() {
             leftReaderActiveTab: 'guide',
             sourceListScrollTop: 0,
             sidePanelTab: 'notes',
+            mobileWorkspaceTab: 'source',
             rightPanelMode: 'notes',
         },
         session: {
@@ -109,6 +132,17 @@ function createInitialAppState() {
                 selectedOptionId: null,
                 revealed: false,
             },
+        },
+        logs: {
+            scope: 'topic',
+            days: [],
+            entries: [],
+            activeDiaryId: null,
+            activeDateKey: null,
+            activeEntryId: null,
+            searchQuery: '',
+            dateFilter: '',
+            detail: null,
         },
         composer: {
             pendingAttachments: [],

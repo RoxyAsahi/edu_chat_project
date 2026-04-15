@@ -81,6 +81,7 @@ const chatHandlers = require('../modules/main/ipc/chatHandlers');
 const knowledgeBaseHandlers = require('../modules/main/ipc/knowledgeBaseHandlers');
 const notesHandlers = require('../modules/main/ipc/notesHandlers');
 const promptHandlers = require('../modules/main/ipc/promptHandlers');
+const studyHandlers = require('../modules/main/ipc/studyHandlers');
 const themeHandlers = require('../modules/main/ipc/themeHandlers');
 const emoticonHandlers = require('../modules/main/ipc/emoticonHandlers');
 const { ok, fail } = require('../modules/main/ipc/ipcResult');
@@ -334,7 +335,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1540,
         height: 960,
-        minWidth: 1120,
+        minWidth: 900,
         minHeight: 720,
         frame: false,
         backgroundColor: '#efe7db',
@@ -433,10 +434,17 @@ async function registerDomainIpc() {
         return;
     }
 
+    await emoticonHandlers.initialize({
+        SETTINGS_FILE,
+        DATA_ROOT,
+    });
+    emoticonHandlers.setupEmoticonHandlers();
+
     settingsHandlers.initialize({
         SETTINGS_FILE,
         USER_AVATAR_FILE,
         AGENT_DIR,
+        DATA_ROOT,
         settingsManager,
         agentConfigManager,
     });
@@ -486,6 +494,11 @@ async function registerDomainIpc() {
         agentConfigManager,
     });
 
+    studyHandlers.initialize({
+        DATA_ROOT,
+        settingsManager,
+    });
+
     promptHandlers.initialize({
         AGENT_DIR,
         DATA_ROOT,
@@ -498,12 +511,6 @@ async function registerDomainIpc() {
         APP_DATA_ROOT_IN_PROJECT: DATA_ROOT,
         settingsManager,
     });
-
-    await emoticonHandlers.initialize({
-        SETTINGS_FILE,
-        DATA_ROOT,
-    });
-    emoticonHandlers.setupEmoticonHandlers();
 
     domainIpcRegistered = true;
 }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta
     http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: file: http: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: file: http: https:; connect-src 'self' http://127.0.0.1:*; frame-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self';"
   />
   <title>UniStudy</title>
   <link rel="stylesheet" href="../../vendor/katex.min.css" />
@@ -22,14 +22,27 @@
   <link rel="stylesheet" href="styles/responsive.css" />
 </head>
 <body class="light-theme unistudy-shell">
+  <div id="appBootLoading" class="app-boot-loading" aria-live="polite" aria-hidden="false">
+    <div class="app-boot-loading__panel">
+      <div class="app-boot-loading__badge">UniStudy</div>
+      <h1>正在准备学习工作台</h1>
+      <p>正在恢复上次会话、加载学科和渲染聊天内容。</p>
+      <div class="app-boot-loading__bar" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
   <div class="window-shell">
     <header class="titlebar">
       <div class="titlebar__brand">
-        <div class="brand-mark">US</div>
-        <div>
-          <div class="titlebar__title">UniStudy</div>
-          <div class="titlebar__subtitle">个人 AI 学习终端</div>
+        <div class="titlebar__brand-main">
+          <div class="brand-mark">US</div>
+          <div>
+            <div class="titlebar__title">UniStudy</div>
+            <div class="titlebar__subtitle">个人 AI 学习终端</div>
+          </div>
         </div>
+        <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn titlebar__home-btn" type="button">
+          <span class="material-symbols-outlined">home</span> 首页
+        </button>
       </div>
       <div class="titlebar__workspace">
         <div class="titlebar__context-card">
@@ -46,6 +59,7 @@
         </button>
       </div>
       <div class="titlebar__meta">
+        <button id="openDiaryWallBtn" class="ghost-button icon-btn" title="日记墙"><span class="material-symbols-outlined">auto_stories</span></button>
         <button id="globalSettingsBtn" class="ghost-button icon-btn" title="设置"><span class="material-symbols-outlined">settings</span></button>
         <button id="themeToggleBtn" class="ghost-button icon-btn" title="切换主题"><span class="material-symbols-outlined">dark_mode</span></button>
         <button id="minimize-btn" class="window-button"><span class="material-symbols-outlined" style="font-size: 16px;">remove</span></button>
@@ -62,6 +76,20 @@
               <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
               <h1 id="subjectOverviewHeadline">学科总视图</h1>
               <p id="subjectOverviewSummary" class="workspace-overview-page__summary">把不同学科整理成独立工作台，在这里快速切换学习上下文。</p>
+              <div class="workspace-overview-page__highlights" aria-label="工作台亮点">
+                <span class="workspace-overview-page__highlight-chip">
+                  <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+                  学科仪表盘
+                </span>
+                <span class="workspace-overview-page__highlight-chip">
+                  <span class="material-symbols-outlined" aria-hidden="true">chat</span>
+                  对话学习
+                </span>
+                <span class="workspace-overview-page__highlight-chip">
+                  <span class="material-symbols-outlined" aria-hidden="true">library_books</span>
+                  来源阅读
+                </span>
+              </div>
             </div>
             <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button">
               <span class="material-symbols-outlined">add</span> 新建学科
@@ -73,19 +101,18 @@
       </section>
 
       <main id="workspaceSubjectPage" class="layout hidden">
+      <nav class="mobile-workspace-tabs" aria-label="窄态工作区导航">
+        <button id="mobileWorkspaceSourceTabBtn" class="mobile-workspace-tab mobile-workspace-tab--active" type="button">来源</button>
+        <button id="mobileWorkspaceChatTabBtn" class="mobile-workspace-tab" type="button">对话</button>
+        <button id="mobileWorkspaceStudioTabBtn" class="mobile-workspace-tab" type="button">Studio</button>
+      </nav>
       <!-- Workspace Navigation / Files -->
       <aside class="workspace-sidebar">
         <section class="panel workspace-nav workspace-topic-card">
           <div class="workspace-card__header">
             <div class="workspace-card__titleblock">
-              <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn workspace-card__back-btn" type="button">
-                <span class="material-symbols-outlined">arrow_back</span> 返回首页
-              </button>
               <p class="workspace-card__title">学习主题</p>
             </div>
-            <button id="quickNewTopicBtn" class="ghost-button workspace-card__cta" type="button">
-              <span class="material-symbols-outlined">add</span> 新建话题
-            </button>
           </div>
 
           <div class="hidden">
@@ -217,6 +244,34 @@
           </header>
 
           <div class="chat-messages-container">
+            <div id="chatLoadingOverlay" class="chat-loading-overlay hidden" aria-live="polite" aria-hidden="true">
+              <div class="chat-loading-overlay__inner">
+                <div class="chat-loading-overlay__label">正在加载对话</div>
+                <div class="chat-skeleton-list" aria-hidden="true">
+                  <div class="chat-skeleton-message">
+                    <div class="chat-skeleton-message__avatar"></div>
+                    <div class="chat-skeleton-message__body">
+                      <span class="chat-skeleton-message__line chat-skeleton-message__line--lg"></span>
+                      <span class="chat-skeleton-message__line chat-skeleton-message__line--md"></span>
+                    </div>
+                  </div>
+                  <div class="chat-skeleton-message chat-skeleton-message--user">
+                    <div class="chat-skeleton-message__avatar"></div>
+                    <div class="chat-skeleton-message__body">
+                      <span class="chat-skeleton-message__line chat-skeleton-message__line--md"></span>
+                      <span class="chat-skeleton-message__line chat-skeleton-message__line--sm"></span>
+                    </div>
+                  </div>
+                  <div class="chat-skeleton-message">
+                    <div class="chat-skeleton-message__avatar"></div>
+                    <div class="chat-skeleton-message__body">
+                      <span class="chat-skeleton-message__line chat-skeleton-message__line--lg"></span>
+                      <span class="chat-skeleton-message__line chat-skeleton-message__line--sm"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div id="chatMessages" class="chat-messages"></div>
           </div>
 
@@ -279,60 +334,55 @@
         aria-label="调整右侧面板宽度"
       ></div>
 
-      <aside id="settingsPanel" class="settings-panel">
+      <aside id="settingsPanel" class="settings-panel settings-panel--notes-only">
           <div id="notesPanelTab" class="side-panel-pane side-panel-pane--active">
-            <section id="notesWorkspaceCard" class="settings-card notes-studio">
-              <div class="notes-studio__header">
-                <div class="notes-studio__titleblock">
-                  <h2>Studio</h2>
+            <section id="notesWorkspaceCard" class="panel notes-studio notes-studio--panel">
+              <header class="chat-stage__header notes-studio__header">
+                <div>
+                  <h1 class="chat-stage__title">功能区</h1>
                 </div>
-                <button id="notesStudioOpenBtn" class="ghost-button icon-btn notes-studio__expand" type="button" title="展开 Notes 工作台">
-                  <span class="material-symbols-outlined">arrow_outward</span>
-                </button>
-              </div>
+              </header>
 
-              <div class="notes-tool-grid">
-                <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>新建笔记</strong>
-                    <span>从空白开始</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
-                <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>深度分析</strong>
-                    <span>整理重点内容</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
-                <button id="generateQuizBtn" class="notes-tool-tile notes-tool-tile--quiz" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">quiz</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>生成选择题</strong>
-                    <span>围绕重点出题</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
-                <button id="generateFlashcardsBtn" class="notes-tool-tile notes-tool-tile--flashcards" type="button">
-                  <span class="notes-tool-tile__icon material-symbols-outlined">style</span>
-                  <span class="notes-tool-tile__body">
-                    <strong>生成闪卡</strong>
-                    <span>压缩成卡组</span>
-                  </span>
-                  <span class="notes-tool-tile__arrow material-symbols-outlined">arrow_outward</span>
-                </button>
+              <div class="notes-studio__section notes-studio__section--tools">
+                <div class="notes-tool-grid">
+                  <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>新建笔记</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                  <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>深度分析</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                  <button id="generateQuizBtn" class="notes-tool-tile notes-tool-tile--quiz" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">quiz</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>生成选择题</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                  <button id="generateFlashcardsBtn" class="notes-tool-tile notes-tool-tile--flashcards" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">style</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>生成闪卡</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
               </div>
 
               <div class="notes-stream">
-              <div class="notes-stream__header">
-                <div class="notes-stream__heading">
-                  <h3>最近生成内容</h3>
-                  <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
-                </div>
-                <div class="notes-scope-switch">
+                <div class="notes-stream__header">
+                  <div class="notes-stream__heading">
+                    <h3>最近生成内容</h3>
+                    <p id="notesSelectionSummary" class="notes-stream__summary">当前未选择笔记。</p>
+                  </div>
+                  <div class="notes-scope-switch">
                     <button id="topicNotesScopeBtn" class="ghost-button notes-scope-btn notes-scope-btn--active" type="button">当前话题</button>
                     <button id="agentNotesScopeBtn" class="ghost-button notes-scope-btn" type="button">学科汇总</button>
                   </div>
@@ -566,7 +616,7 @@
                     <input id="userNameInput" type="text" />
                   </label>
                   <label>
-                    <span>VCP 服务器 URL</span>
+                    <span>聊天上游 URL</span>
                     <input id="vcpServerUrl" type="text" placeholder="http://host:port/v1/chat/completions" />
                   </label>
                   <label>
@@ -577,7 +627,161 @@
               </section>
 
               <section class="settings-card settings-card--modal">
-                <h3><span class="material-symbols-outlined bento-icon">brush</span> 渲染</h3>
+                <h3><span class="material-symbols-outlined bento-icon">school</span> 学习档案</h3>
+                <div class="field-grid">
+                  <label>
+                    <span>学生姓名</span>
+                    <input id="studentNameInput" type="text" placeholder="用于 {{StudentName}}" />
+                  </label>
+                  <label>
+                    <span>所在城市</span>
+                    <input id="studyCityInput" type="text" placeholder="用于 {{VarCity}}" />
+                  </label>
+                  <label>
+                    <span>学习工作区</span>
+                    <input id="studyWorkspaceInput" type="text" placeholder="用于 {{StudyWorkspace}}" />
+                  </label>
+                  <label>
+                    <span>工作环境</span>
+                    <input id="workEnvironmentInput" type="text" placeholder="用于 {{WorkEnvironment}}" />
+                  </label>
+                  <label>
+                    <span>默认时区</span>
+                    <input id="studyTimezoneInput" type="text" placeholder="Asia/Hong_Kong" />
+                  </label>
+                </div>
+                <div class="checkbox-row">
+                  <label><input id="studyLogEnabledInput" type="checkbox" /> 启用本地学习日志工具环</label>
+                </div>
+                <p class="settings-caption">关闭后，DailyNote 工具执行、自动协议注入和日志写入都会一起停用。</p>
+                <div class="field-grid hidden">
+                  <label>
+                    <span>日志工具回合上限</span>
+                    <input id="studyLogMaxRoundsInput" type="number" min="1" step="1" />
+                  </label>
+                  <label>
+                    <span>长期记忆 Top K</span>
+                    <input id="studyMemoryTopKInput" type="number" min="1" step="1" />
+                  </label>
+                  <label>
+                    <span>Fallback Top K</span>
+                    <input id="studyMemoryFallbackTopKInput" type="number" min="1" step="1" />
+                  </label>
+                </div>
+                <div class="field-grid hidden" style="grid-template-columns: 1fr;">
+                  <label>
+                    <span>自定义提示词变量(JSON)</span>
+                    <textarea
+                      id="promptVariablesInput"
+                      rows="5"
+                      placeholder='{"CourseName":"高数","Classroom":"A-301"}'
+                    ></textarea>
+                    <span class="settings-caption">支持字符串键值对，会和系统内置变量一起参与提示词解析。</span>
+                  </label>
+                </div>
+              </section>
+
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">construction</span> 提示词与日志协议</h3>
+                <div class="settings-subsection settings-subsection--primary">
+                  <div class="settings-subsection__header">
+                    <div>
+                      <h4>高频常用</h4>
+                      <p class="settings-caption">这里只保留最常改的几项：渲染提示、气泡提示和 DailyNote 协议文本。</p>
+                    </div>
+                  </div>
+                  <div class="field-grid" style="grid-template-columns: 1fr;">
+                    <div class="settings-prompt-editor-grid">
+                      <div class="settings-prompt-editor">
+                        <span class="settings-prompt-editor__title">
+                          <label><input id="enableRenderingPromptInput" type="checkbox" /> 结构化渲染提示</label>
+                          <code>{{VarDivRender}} / {{VarRendering}}</code>
+                        </span>
+                        <textarea
+                          id="renderingPromptInput"
+                          rows="5"
+                          placeholder="用于控制结构化 div 渲染风格；关闭后会从提示词里解析为空。"
+                        ></textarea>
+                        <span class="settings-caption">控制回答是否携带结构化渲染指导。留空时会自动显示并使用内置默认文案。</span>
+                      </div>
+                      <div class="settings-prompt-editor">
+                        <span class="settings-prompt-editor__title">
+                          <label><input id="enableAdaptiveBubbleTipInput" type="checkbox" /> 简洁气泡补充</label>
+                          <code>{{VarAdaptiveBubbleTip}}</code>
+                        </span>
+                        <textarea
+                          id="adaptiveBubbleTipInput"
+                          rows="4"
+                          placeholder="用于补充气泡风格自适应提示；关闭后会从提示词里解析为空。"
+                        ></textarea>
+                        <span class="settings-caption">控制回答偏紧凑还是偏展开。留空时会自动显示并使用内置默认文案。</span>
+                      </div>
+                      <div class="settings-prompt-editor">
+                        <span class="settings-prompt-editor__title">
+                          <label><input id="enableAgentBubbleTheme" type="checkbox" /> 视觉气泡主题注入</label>
+                          <code>append to system prompt</code>
+                        </span>
+                        <textarea
+                          id="agentBubbleThemePrompt"
+                          rows="5"
+                          placeholder="启用后，这段提示词会额外追加到发送给上游的 system 消息中。"
+                        ></textarea>
+                        <span class="settings-caption">这是一段真正“追加到 system prompt 末尾”的附加提示。留空时会自动显示并使用默认文案。</span>
+                        <span id="agentBubbleThemePersistStatus" class="settings-caption"></span>
+                      </div>
+                      <div class="settings-prompt-editor">
+                        <span class="settings-prompt-editor__title">
+                          <span>DailyNote 协议文本（全局）</span>
+                          <code>{{DailyNoteTool}} / auto inject</code>
+                        </span>
+                        <div class="settings-prompt-editor__toggles">
+                          <label><input id="studyLogEnablePromptVariablesInput" type="checkbox" /> 作为内建变量注入</label>
+                          <label><input id="studyLogAutoInjectProtocolInput" type="checkbox" /> 发送前自动补上协议</label>
+                        </div>
+                        <textarea
+                          id="dailyNoteGuideInput"
+                          rows="7"
+                          placeholder="这里定义全局 DailyNote 协议文本。启用内建变量或自动注入后，都会使用这里的内容。"
+                        ></textarea>
+                        <span class="settings-caption">这份文本会作为 <code>{{DailyNoteTool}}</code>、<code>{{VarDailyNoteGuide}}</code> 的展开内容，也会被“自动追加到 system prompt”复用。<code>{{StudyLogTool}}</code> 仅作为兼容别名继续可用。留空时会直接显示并使用默认协议。</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-subsection">
+                  <div class="settings-subsection__header">
+                    <div>
+                      <h4>协议预览</h4>
+                      <p class="settings-caption">先看“哪些片段会被加入”，再看真正发给上游的完整 system prompt。</p>
+                    </div>
+                  </div>
+                  <div id="promptSegmentPreview" class="settings-token-grid" aria-label="当前提示词片段总览"></div>
+                  <div class="field-grid" style="grid-template-columns: 1fr;">
+                    <label>
+                      <span>最终完整 system prompt</span>
+                      <textarea
+                        id="finalSystemPromptPreview"
+                        class="settings-textarea--preview"
+                        rows="12"
+                        readonly
+                        aria-readonly="true"
+                        placeholder="这里会显示当前选中智能体在发送时真正使用的完整 system prompt。"
+                      ></textarea>
+                      <div id="finalSystemPromptPreviewMeta" class="settings-preview-meta">这里会显示当前上下文、哪些片段会生效，以及未解析变量提示。</div>
+                    </label>
+                  </div>
+                  <div class="settings-inline-actions">
+                    <button id="refreshFinalSystemPromptPreviewBtn" class="ghost-button icon-text-btn" type="button">
+                      <span class="material-symbols-outlined">preview</span> 刷新完整预览
+                    </button>
+                  </div>
+                </div>
+
+              </section>
+
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">brush</span> 显示与排版</h3>
                 <div class="field-grid">
                   <label>
                     <span>聊天字体</span>
@@ -601,20 +805,8 @@
                   </label>
                 </div>
                 <div class="checkbox-row">
-                  <label><input id="enableAgentBubbleTheme" type="checkbox" /> 注入气泡主题</label>
                   <label><input id="enableWideChatLayout" type="checkbox" /> 宽屏聊天布局</label>
                   <label><input id="enableSmoothStreaming" type="checkbox" /> 平滑流式输出</label>
-                </div>
-                <div class="field-grid" style="grid-template-columns: 1fr;">
-                  <label>
-                    <span>气泡主题注入提示词</span>
-                    <textarea
-                      id="agentBubbleThemePrompt"
-                      rows="4"
-                      placeholder="启用后，这段提示词会追加到发送给上游的 system 消息中。"
-                    ></textarea>
-                    <span class="settings-caption">支持提示词变量，例如 <code>{{VarDivRender}}</code>。关闭“注入气泡主题”时会保留内容但设为只读。</span>
-                  </label>
                 </div>
               </section>
 
@@ -663,6 +855,34 @@
                     </div>
                   </div>
                   <input id="editingAgentId" type="hidden" />
+                </section>
+
+                <section class="settings-card">
+                  <h3><span class="material-symbols-outlined bento-icon">construction</span> 兼容迁移</h3>
+                  <div class="settings-subsection settings-subsection--primary">
+                    <div class="settings-subsection__header">
+                      <div>
+                        <h4>兼容与工具署名</h4>
+                        <p class="settings-caption">把旧 prompt 的 alias 和工具署名直接收回到当前学科设置里，方便做迁移与长期维护。</p>
+                      </div>
+                    </div>
+                    <div class="field-grid" style="grid-template-columns: 1fr;">
+                      <label>
+                        <span>兼容 Alias（每行一个）</span>
+                        <textarea
+                          id="agentVcpAliasesInput"
+                          rows="4"
+                          placeholder="Nova"
+                        ></textarea>
+                        <span class="settings-caption">用于兼容 <code>{{Nova}}</code> 这类旧变量和 agent 别名。留空时会回退到当前学科名称。</span>
+                      </label>
+                      <label>
+                        <span>兼容署名</span>
+                        <input id="agentVcpMaidInput" type="text" placeholder="[UniStudy/{{AgentName}}]{{VarUser}}" />
+                        <span class="settings-caption">工具调用时优先使用这里的署名；留空时回退到全局 Maid 签名模板。</span>
+                      </label>
+                    </div>
+                  </div>
                 </section>
 
                 <section class="settings-card bento-prompt">
@@ -820,6 +1040,86 @@
           <p class="settings-caption">全局设置和 Source 模型配置会一起保存。</p>
           <button id="saveGlobalSettingsBtn" class="accent-button" type="button">保存全局与来源设置</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="diaryWallModal" class="diary-wall-modal hidden" aria-hidden="true">
+    <div id="diaryWallModalBackdrop" class="diary-wall-modal__backdrop"></div>
+    <div class="diary-wall-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="diaryWallTitle">
+      <div class="diary-wall-modal__header">
+        <div>
+          <p class="eyebrow">DailyNote Wall</p>
+          <h2 id="diaryWallTitle">日记墙</h2>
+          <p id="diaryWallSubtitle" class="settings-caption">通过 agent 导航切换当前视图，再按“日记本 + 日期”浏览 DailyNote；支持筛选、细节查看和回忆来源追踪。</p>
+        </div>
+        <button id="diaryWallCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭日记墙">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="diary-wall-modal__body">
+        <aside class="diary-wall-sidebar">
+          <div class="diary-wall-sidebar__group">
+            <label class="diary-wall-field">
+              <span>范围</span>
+              <select id="diaryWallScopeSelect">
+                <option value="global">全局所有日记</option>
+                <option value="agent">当前学科</option>
+                <option value="topic">当前话题</option>
+                <option value="public">[公共] 日记本</option>
+              </select>
+            </label>
+            <label class="diary-wall-field">
+              <span>关键词</span>
+              <input id="diaryWallSearchInput" type="text" placeholder="搜索正文、标签、署名或话题" />
+            </label>
+            <label class="diary-wall-field">
+              <span>日记本</span>
+              <input id="diaryWallNotebookInput" type="text" placeholder="例如 Nova / 公共 / Nova的知识" />
+            </label>
+            <label class="diary-wall-field">
+              <span>标签</span>
+              <input id="diaryWallTagInput" type="text" placeholder="例如 二次函数 / 错题复盘" />
+            </label>
+            <label class="diary-wall-field">
+              <span>日期</span>
+              <input id="diaryWallDateInput" type="date" />
+            </label>
+            <div class="diary-wall-actions">
+              <button id="diaryWallRefreshBtn" class="accent-button icon-text-btn" type="button">
+                <span class="material-symbols-outlined">refresh</span> 刷新日记墙
+              </button>
+            </div>
+          </div>
+          <div class="diary-wall-sidebar__group">
+            <strong>摘要</strong>
+            <div id="diaryWallSummary" class="settings-record-detail">
+              <div class="empty-list-state">
+                <strong>等待加载</strong>
+                <span>打开日记墙后，这里会显示当前筛选范围的卡片数量、日记本分布和最近更新时间。</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+        <section class="diary-wall-canvas">
+          <div id="diaryWallAgentNav" class="diary-wall-agent-nav" aria-label="日记墙 Agent 导航">
+            <button type="button" class="diary-wall-agent-tab diary-wall-agent-tab--active" data-diary-wall-agent-filter="all">全部</button>
+          </div>
+          <div id="diaryWallCards" class="diary-wall-grid">
+            <div class="empty-list-state">
+              <strong>还没有日记卡</strong>
+              <span>首次触发 DailyNote.create 后，这里会按瀑布流展示不同日记本的聚合日记。</span>
+            </div>
+          </div>
+        </section>
+        <aside class="diary-wall-detail">
+          <div id="diaryWallDetail" class="diary-wall-detail__content">
+            <div class="empty-list-state">
+              <strong>选择一张日记卡</strong>
+              <span>右侧会展示完整聚合日记、条目列表、原始 DailyNote 请求和来源消息。</span>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   </div>

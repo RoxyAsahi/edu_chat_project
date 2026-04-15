@@ -1,5 +1,9 @@
 /* Responsive, container-query, and late shell overrides. */
 
+.mobile-workspace-tabs {
+  display: none;
+}
+
 @media (max-width: 1500px) {
   .flashcard-card {
     min-height: 440px;
@@ -19,27 +23,31 @@
   .notes-tool-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-    padding: 12px 14px 14px;
   }
 
   .notes-tool-tile {
-    min-height: 74px;
-    padding: 14px 38px 14px 14px;
-    border-radius: 24px;
-    gap: 10px;
+    min-height: 92px;
+    height: 92px;
+    padding: 14px 40px 14px 14px;
+    border-radius: 18px;
+    gap: 8px;
   }
 
   .notes-tool-tile__icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 12px;
-    font-size: 16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    font-size: 18px;
   }
 
   .notes-tool-tile__body strong {
-    font-size: 0.9rem;
-    line-height: 1.18;
+    font-size: 0.95rem;
+    line-height: 1.15;
     padding-bottom: 0;
+  }
+
+  .notes-tool-tile__body span:last-child {
+    display: none;
   }
 
   .notes-tool-tile__arrow {
@@ -48,41 +56,31 @@
   }
 
   .notes-stream {
-    padding-left: 16px;
-    padding-right: 16px;
+    margin: 16px 16px 0;
+    padding: 16px 14px 0;
   }
 
-  .notes-stream__header {
-    grid-template-columns: 1fr;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .notes-stream__summary {
-    max-width: none;
-  }
 }
 
 @container notes-studio (max-width: 280px) {
   .notes-tool-grid {
     gap: 8px;
-    padding: 10px 14px 12px;
   }
 
   .notes-tool-tile {
-    min-height: 0;
-    height: 60px;
-    padding: 10px 14px;
-    gap: 6px;
+    min-height: 92px;
+    height: 92px;
+    padding: 14px 40px 14px 14px;
+    gap: 8px;
     align-items: flex-start;
     justify-content: space-between;
   }
 
   .notes-tool-tile__body strong {
-    max-width: calc(100% - 26px);
-    font-size: 0.75rem;
-    font-weight: 650;
-    line-height: 1.18;
+    max-width: 100%;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.15;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -101,21 +99,15 @@
 }
 
 @media (max-width: 900px) {
-  .notes-studio__header,
+  .notes-studio__hero,
   .notes-studio__footer {
     padding-left: 16px;
     padding-right: 16px;
   }
 
-  .notes-tool-grid {
-    padding-left: 16px;
-    padding-right: 16px;
-    gap: 12px;
-  }
-
   .notes-stream {
-    margin: 0 16px;
-    padding: 0;
+    margin: 16px 16px 0;
+    padding: 16px 14px 0;
   }
 
   .notes-fab {
@@ -146,71 +138,48 @@
   .note-detail-modal__body {
     padding: 16px;
   }
+
+  .manual-notes-library-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 620px) {
-  .notes-stream__header {
+  .notes-stream__hero {
+    grid-template-columns: 1fr;
     align-items: stretch;
-    flex-direction: column;
   }
 }
 
-@media (max-width: 1240px) {
-  .workspace-overview-page {
-    padding: 0 16px 16px;
+@media (max-width: 1180px) {
+  .titlebar {
+    flex-wrap: nowrap;
+    align-items: center;
+    padding: 12px 12px 8px;
+    gap: 10px;
   }
 
-  .overview-stats-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .titlebar__brand {
+    gap: 10px;
+    min-width: 0;
   }
 
-  .overview-subject-wall {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .titlebar__meta {
+    width: auto;
   }
 
-  .subject-overview-empty {
-    grid-column: span 2;
+  .titlebar__brand-main {
+    min-width: 0;
   }
 
-  .layout {
-    grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
-    gap: 20px;
+  .titlebar__home-btn {
+    padding: 7px 14px;
   }
 
-  .layout-splitter {
+  .titlebar__workspace {
     display: none;
   }
 
-  .settings-panel {
-    position: absolute;
-    top: 84px;
-    right: 20px;
-    bottom: 20px;
-    width: min(400px, calc(100vw - 40px));
-    max-width: calc(100vw - 40px);
-    z-index: 30;
-    margin-left: 0 !important;
-  }
-
-  .settings-modal {
-    padding: 20px;
-  }
-
-  .settings-modal__dialog {
-    width: min(1000px, calc(100vw - 40px));
-    max-height: calc(100vh - 40px);
-  }
-
-  .workspace-sidebar {
-    grid-template-rows: auto 0 auto;
-  }
-
-  .workspace-sidebar--reader {
-    grid-template-rows: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 905px) {
   .workspace-overview-page__header {
     justify-content: center;
     gap: 12px;
@@ -222,6 +191,10 @@
     justify-content: center;
   }
 
+  .workspace-overview-page {
+    padding: 0 16px 16px;
+  }
+
   .overview-stats-row,
   .overview-subject-wall {
     grid-template-columns: 1fr;
@@ -231,15 +204,130 @@
     grid-column: span 1;
   }
 
-  .layout { grid-template-columns: 1fr; padding: 12px; }
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 0;
+    gap: 0;
+    background: var(--panel);
+    border-top: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  }
   .layout-splitter {
     display: none;
   }
-  .sidebar { flex-direction: row; }
-  .panel--agents, .panel--topics { max-height: 300px; flex: 1 1 50%; }
-  .chat-input-area { padding: 0 12px 12px; }
-  .chat-messages-container { padding: 20px 16px; }
-
+  .mobile-workspace-tabs {
+    grid-row: 1;
+    grid-column: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+    gap: 0;
+    min-height: 68px;
+    padding: 0 0 1px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+    background: color-mix(in srgb, var(--panel) 98%, white 2%);
+  }
+  .mobile-workspace-tab {
+    min-height: 68px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .mobile-workspace-tab--active {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(240, 244, 252, 0.92));
+  }
+  .workspace-sidebar,
+  .chat-stage,
+  .settings-panel {
+    grid-row: 2;
+    grid-column: 1;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+  .workspace-sidebar,
+  .chat-stage,
+  .settings-panel,
+  .workspace-topic-card,
+  .source-sidebar-card,
+  .workspace-reader-panel,
+  .notes-studio {
+    border-radius: 0;
+    box-shadow: none;
+    border: none;
+    background: var(--panel);
+  }
+  .workspace-sidebar,
+  .settings-panel {
+    overflow: hidden;
+  }
+  .workspace-topic-card,
+  .source-sidebar-card,
+  .workspace-reader-panel {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .chat-stage {
+    border-radius: 0;
+  }
+  .chat-stage__header,
+  .chat-input-area {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .chat-messages-container {
+    padding: 20px 16px;
+  }
+  .settings-panel {
+    position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    max-width: none;
+    z-index: auto;
+    margin-left: 0 !important;
+    padding: 0;
+    overflow: hidden;
+  }
+  .settings-panel--notes-only {
+    padding-top: 0;
+  }
+  .side-panel-pane {
+    height: 100%;
+    overflow: auto;
+  }
+  .notes-studio {
+    min-height: 100%;
+  }
+  .notes-studio__hero,
+  .notes-studio__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .notes-studio__section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .notes-stream {
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    border-top: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 16px 16px 0;
+  }
+  .mobile-workspace-pane--hidden {
+    display: none !important;
+  }
   .settings-modal {
     padding: 12px;
   }
@@ -284,6 +372,19 @@
     align-items: stretch;
     padding: 16px;
   }
+
+  .workspace-sidebar {
+    grid-template-rows: auto 0 auto;
+  }
+
+  .workspace-sidebar--reader {
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 905px) {
+  .sidebar { flex-direction: row; }
+  .panel--agents, .panel--topics { max-height: 300px; flex: 1 1 50%; }
 }
 
 @media (max-width: 600px) {
@@ -381,5 +482,293 @@
   .panel--files .panel__header {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 1280px) {
+  .titlebar__brand,
+  .titlebar__workspace,
+  .titlebar__context-card,
+  .workspace-overview-page__header-main,
+  .workspace-card__titleblock,
+  .notes-studio__titleblock,
+  .notes-stream__heading,
+  .logs-studio__titleblock,
+  .logs-overview__copy,
+  .chat-stage__header > div:first-child,
+  .workspace-reader-panel__header-main > div,
+  .note-detail-modal__header-main > div,
+  .flashcards-practice__title-block,
+  .settings-modal__header > div,
+  .diary-wall-modal__header > div,
+  .subject-overview-card__body,
+  .subject-overview-card__footer,
+  .topic-item__main,
+  .topic-item__header,
+  .topic-item__meta-row,
+  .topic-statuses,
+  .knowledge-base-item,
+  .knowledge-base-item__body,
+  .kb-document-row__body,
+  .workspace-nav__summary-card {
+    min-width: 0;
+  }
+
+  .titlebar__title,
+  .titlebar__subtitle,
+  .titlebar__context-label,
+  .titlebar__context-card strong,
+  #subjectOverviewHeadline,
+  #subjectOverviewSummary,
+  .subject-overview-card__body strong,
+  .subject-overview-card__body p,
+  .subject-overview-card__footer-label,
+  .subject-overview-create-card strong,
+  .subject-overview-create-card p,
+  .subject-overview-empty strong,
+  .subject-overview-empty p,
+  .workspace-card__title,
+  #readerDocumentTitle,
+  #readerDocumentMeta,
+  #readerSelectionSummary,
+  #currentChatTopicName,
+  #currentChatAgentName,
+  #currentTopicKnowledgeBaseStatus,
+  #noteDetailTitle,
+  #noteDetailSubtitle,
+  #analysisPreviewMeta,
+  #flashcardsDeckTitle,
+  #flashcardsDeckMeta,
+  #quizPracticeTitle,
+  #quizPracticeSummary,
+  #settingsModalTitle,
+  #settingsModalSubtitle,
+  #selectedAgentNameForSettings,
+  #knowledgeBaseSelectionSummary,
+  #diaryWallTitle,
+  #diaryWallSubtitle,
+  #logsRangeSummary,
+  #logsStateSummary,
+  #logsSummaryText,
+  #logsEntrySummary,
+  #logsDetailMeta,
+  .notes-stream__summary,
+  .notes-studio__subtitle,
+  .logs-studio__subtitle,
+  .workspace-nav__summary-card strong,
+  .topic-item__source-label,
+  .topic-files__status,
+  .topic-files__hint,
+  .knowledge-base-item__name,
+  .knowledge-base-item__meta,
+  .kb-document-row__body strong,
+  .kb-document-row__body span,
+  .settings-modal__nav-button,
+  .notes-scope-btn,
+  .side-panel-tab,
+  .logs-studio__action,
+  .workspace-card__cta,
+  .workspace-reader-tab,
+  .logs-jump-btn,
+  .flashcards-practice__pill,
+  .flashcards-practice__stat,
+  .logs-overview__badge {
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topic-statuses,
+  .subject-overview-card__meta,
+  .logs-card__tagline,
+  .diary-wall-card__tags,
+  .topic-files-empty-actions,
+  .settings-inline-actions,
+  .panel__actions,
+  .chat-stage__header-actions,
+  .workspace-reader-panel__header-actions,
+  .logs-studio__actions {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .topic-item__meta-row {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .topic-status,
+  .subject-overview-card__meta span,
+  .logs-card__tagline .logs-tag,
+  .diary-wall-card__tags .diary-wall-chip,
+  .topic-files-empty-actions .ghost-button,
+  .topic-files-empty-actions .accent-button {
+    flex-shrink: 0;
+  }
+
+  .topic-status:nth-child(n + 3),
+  .subject-overview-card__meta span:nth-child(n + 3),
+  .logs-card__tagline .logs-tag:nth-child(n + 3),
+  .diary-wall-card__tags .diary-wall-chip:nth-child(n + 4) {
+    display: none;
+  }
+
+  .manual-notes-library-modal {
+    width: min(960px, calc(100vw - 40px));
+  }
+}
+
+@media (max-width: 1100px) {
+  .titlebar__subtitle,
+  #subjectOverviewSummary,
+  .subject-overview-card__body p,
+  .subject-overview-create-card p,
+  .subject-overview-empty p,
+  .notes-studio__subtitle,
+  .notes-stream__summary,
+  .logs-studio__subtitle,
+  .logs-overview__badges,
+  #logsStateSummary,
+  #currentChatAgentName,
+  #currentTopicKnowledgeBaseStatus,
+  #readerDocumentMeta,
+  #noteDetailSubtitle,
+  #analysisPreviewMeta,
+  #flashcardsDeckMeta,
+  #quizPracticeSummary,
+  #settingsModalSubtitle,
+  #diaryWallSubtitle,
+  .settings-subsection__header .settings-caption,
+  .kb-debug-panel__header .settings-caption,
+  .workspace-reader-panel__header .settings-caption,
+  .logs-column__header .settings-caption,
+  .topic-files__hint {
+    display: none;
+  }
+
+  .titlebar__context-label {
+    display: none;
+  }
+
+  .titlebar__context-card {
+    max-width: 220px;
+  }
+
+  .titlebar__context-card--topic {
+    max-width: 280px;
+  }
+
+  .titlebar__context-card--action {
+    max-width: 180px;
+  }
+
+  .workspace-nav__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .subject-overview-card__meta span:nth-child(n + 2),
+  .topic-status:nth-child(n + 2) {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .titlebar__workspace {
+    justify-content: flex-end;
+  }
+
+  .titlebar__context-card--topic {
+    display: none;
+  }
+
+  .titlebar__context-card--action {
+    min-width: 0;
+  }
+
+  .topic-item:hover .list-item__body,
+  .topic-item.active .list-item__body {
+    padding-right: 52px;
+  }
+
+  .workspace-card__header .workspace-card__cta,
+  .workspace-reader-panel__header-actions .icon-text-btn,
+  .logs-studio__actions .icon-text-btn,
+  .diary-wall-actions .icon-text-btn,
+  .note-detail-modal__actions .icon-text-btn,
+  .chat-stage__header-actions .icon-text-btn,
+  .settings-inline-actions .icon-text-btn,
+  .panel__actions .icon-text-btn {
+    width: 38px;
+    min-width: 38px;
+    padding-inline: 0;
+    gap: 0;
+    font-size: 0;
+    flex-shrink: 0;
+  }
+
+  .workspace-card__header .workspace-card__cta .material-symbols-outlined,
+  .workspace-reader-panel__header-actions .icon-text-btn .material-symbols-outlined,
+  .logs-studio__actions .icon-text-btn .material-symbols-outlined,
+  .diary-wall-actions .icon-text-btn .material-symbols-outlined,
+  .note-detail-modal__actions .icon-text-btn .material-symbols-outlined,
+  .chat-stage__header-actions .icon-text-btn .material-symbols-outlined,
+  .settings-inline-actions .icon-text-btn .material-symbols-outlined,
+  .panel__actions .icon-text-btn .material-symbols-outlined {
+    font-size: 18px;
+  }
+
+  .workspace-nav__summary,
+  .topic-files-empty-actions > *:nth-child(n + 2) {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .titlebar__brand {
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    font-size: 12px;
+  }
+
+  .titlebar__title {
+    max-width: 92px;
+  }
+
+  .titlebar__meta {
+    gap: 2px;
+  }
+
+  .titlebar__context-card {
+    padding: 4px 10px;
+    max-width: 150px;
+  }
+
+  .titlebar__context-card--action {
+    max-width: 132px;
+  }
+
+  .notes-scope-btn,
+  .side-panel-tab {
+    padding-inline: 10px;
+  }
+
+  .workspace-card__header,
+  .chat-stage__header,
+  .logs-studio__header,
+  .diary-wall-modal__header,
+  .note-detail-modal__header,
+  .flashcards-practice__header {
+    gap: 8px;
+  }
+
+  .manual-notes-library-modal {
+    width: calc(100vw - 20px);
   }
 }

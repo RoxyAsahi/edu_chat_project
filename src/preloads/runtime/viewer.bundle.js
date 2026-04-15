@@ -110,6 +110,8 @@ function createShellCatalog(ops) {
     return {
         loadSettings: query(() => ops.invoke('load-settings')),
         saveSettings: query((settings) => ops.invoke('save-settings', settings)),
+        previewAgentBubbleThemePrompt: query((payload) => ops.invoke('preview-agent-bubble-theme-prompt', payload)),
+        previewFinalSystemPrompt: query((payload) => ops.invoke('preview-final-system-prompt', payload)),
         saveAvatarColor: query((data) => ops.invoke('save-avatar-color', data)),
         readImageFromClipboard: query(async () => {
             const result = await ops.invoke('read-image-from-clipboard-main');
@@ -174,6 +176,17 @@ function createSessionCatalog(ops) {
         interruptVcpRequest: query((request) => ops.invoke('interrupt-vcp-request', request)),
         exportTopicAsMarkdown: query((exportData) => ops.invoke('export-topic-as-markdown', exportData)),
         getEmoticonLibrary: query(() => ops.invoke('get-emoticon-library')),
+        listEmoticonLibrary: query(() => ops.invoke('list-emoticon-library')),
+        saveEmoticonItem: query((payload) => ops.invoke('save-emoticon-item', payload)),
+        deleteEmoticonItem: query((id) => ops.invoke('delete-emoticon-item', id)),
+        importEmoticonItems: query((payload) => ops.invoke('import-emoticon-items', payload)),
+        listStudyLogDays: query((payload) => ops.invoke('list-study-log-days', payload)),
+        listStudyLogEntries: query((payload) => ops.invoke('list-study-log-entries', payload)),
+        getStudyLogEntry: query((payload) => ops.invoke('get-study-log-entry', payload)),
+        getStudyDiaryDay: query((payload) => ops.invoke('get-study-diary-day', payload)),
+        listStudyDiaryWallCards: query((payload) => ops.invoke('list-study-diary-wall-cards', payload)),
+        getStudyDiaryWallDetail: query((payload) => ops.invoke('get-study-diary-wall-detail', payload)),
+        searchStudyMemory: query((payload) => ops.invoke('search-study-memory', payload)),
         onAddFileToInput: subscription(ops.subscribe('add-file-to-input', (_event, filePath) => filePath)),
         watcherStart: query((filePath, agentId, topicId) => ops.invoke('watcher:start', filePath, agentId, topicId)),
         watcherStop: query(() => ops.invoke('watcher:stop')),

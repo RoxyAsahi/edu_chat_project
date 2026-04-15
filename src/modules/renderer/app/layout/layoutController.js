@@ -13,7 +13,7 @@ const LAYOUT_DEFAULTS = Object.freeze({
     leftBottomCompactMin: 180,
     dividerWidth: 12,
     leftVerticalDividerHeight: 12,
-    desktopBreakpoint: 1200,
+    desktopBreakpoint: 1180,
 });
 
 function clamp(value, min, max) {
@@ -146,6 +146,7 @@ function createLayoutController(deps = {}) {
     const mergeSettingsPatch = deps.mergeSettingsPatch || (() => {});
     const getPersistedLayoutSettings = deps.getPersistedLayoutSettings || (() => store.getState().settings.settings);
     let layoutResizeFrame = 0;
+    let layoutRefreshSequence = 0;
 
     function getLayoutSlice() {
         return store.getState().layout;
@@ -194,6 +195,27 @@ function createLayoutController(deps = {}) {
         el.workspaceVerticalResizeHandle?.classList.toggle('layout-splitter--hidden', !desktopMode);
     }
 
+    function clearLayoutWidthStyles() {
+        if (!el.layout) {
+            return;
+        }
+
+        el.layout.style.removeProperty('--unistudy-left-width');
+        el.layout.style.removeProperty('--unistudy-right-width');
+        el.layout.style.removeProperty('--unistudy-effective-right-width');
+        el.layout.style.removeProperty('--unistudy-divider-width');
+        el.layout.style.removeProperty('--unistudy-effective-right-divider-width');
+    }
+
+    function clearLeftSidebarHeightStyles() {
+        if (!el.workspaceSidebar) {
+            return;
+        }
+
+        el.workspaceSidebar.style.removeProperty('--unistudy-left-top-height');
+        el.workspaceSidebar.style.removeProperty('--unistudy-left-vertical-divider-height');
+    }
+
     function applyLayoutWidths() {
         const layout = getLayoutSlice();
         if (!el.layout || !layout.layoutInitialized) {
@@ -201,11 +223,13 @@ function createLayoutController(deps = {}) {
         }
 
         if (!isDesktopResizableLayout()) {
-            el.layout.style.removeProperty('--unistudy-left-width');
-            el.layout.style.removeProperty('--unistudy-right-width');
-            el.layout.style.removeProperty('--unistudy-effective-right-width');
-            el.layout.style.removeProperty('--unistudy-divider-width');
-            el.layout.style.removeProperty('--unistudy-effective-right-divider-width');
+            clearLayoutWidthStyles();
+            syncLayoutHandleVisibility();
+            return;
+        }
+
+        const contentWidth = getLayoutContentWidth();
+        if (contentWidth <= 0 || el.layout.classList.contains('hidden')) {
             syncLayoutHandleVisibility();
             return;
         }
@@ -213,7 +237,7 @@ function createLayoutController(deps = {}) {
         const resolved = resolveLayoutWidths({
             desiredLeft: layout.layoutLeftWidth,
             desiredRight: layout.layoutRightWidth,
-            contentWidth: getLayoutContentWidth(),
+            contentWidth,
             collapsed: isRightPanelCollapsed(),
         });
         const nextPatch = {
@@ -241,8 +265,12 @@ function createLayoutController(deps = {}) {
         }
 
         if (!isDesktopResizableLayout()) {
-            el.workspaceSidebar.style.removeProperty('--unistudy-left-top-height');
-            el.workspaceSidebar.style.removeProperty('--unistudy-left-vertical-divider-height');
+            clearLeftSidebarHeightStyles();
+            syncLayoutHandleVisibility();
+            return;
+        }
+
+        if (el.layout?.classList.contains('hidden')) {
             syncLayoutHandleVisibility();
             return;
         }
@@ -259,15 +287,39 @@ function createLayoutController(deps = {}) {
         syncLayoutHandleVisibility();
     }
 
-    function scheduleLayoutRefresh() {
+    function scheduleLayoutRefresh(options = {}) {
+        const frames = Math.max(1, Number(options.frames) || 1);
+        const resetDesktopLayout = options.resetDesktopLayout === true;
+
         if (layoutResizeFrame) {
             windowObj.cancelAnimationFrame(layoutResizeFrame);
         }
-        layoutResizeFrame = windowObj.requestAnimationFrame(() => {
-            layoutResizeFrame = 0;
-            applyLayoutWidths();
-            applyLeftSidebarHeights();
-        });
+        layoutRefreshSequence += 1;
+        const refreshToken = layoutRefreshSequence;
+
+        const queueRefresh = (remainingFrames) => {
+            layoutResizeFrame = windowObj.requestAnimationFrame(() => {
+                if (refreshToken !== layoutRefreshSequence) {
+                    layoutResizeFrame = 0;
+                    return;
+                }
+
+                if (remainingFrames > 1) {
+                    queueRefresh(remainingFrames - 1);
+                    return;
+                }
+
+                layoutResizeFrame = 0;
+                if (resetDesktopLayout && isDesktopResizableLayout()) {
+                    clearLayoutWidthStyles();
+                    clearLeftSidebarHeightStyles();
+                }
+                applyLayoutWidths();
+                applyLeftSidebarHeights();
+            });
+        };
+
+        queueRefresh(frames);
     }
 
     async function persistLayoutWidths() {
