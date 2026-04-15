@@ -62,7 +62,10 @@ function buildSubjectOverviewMarkup({ agents = [], statsByAgent = {}, selectedAg
 
     const clockMarkup = `
         <section class="overview-clock-panel" aria-label="当前时间">
-            <div id="overviewClockTime" class="overview-clock-panel__time">00:00</div>
+            <div class="overview-clock-panel__face">
+                <div id="overviewClockDate" class="overview-clock-panel__date">4月15日 星期三</div>
+                <div id="overviewClockTime" class="overview-clock-panel__time">00:00</div>
+            </div>
         </section>
     `;
 
@@ -93,41 +96,59 @@ function buildSubjectOverviewMarkup({ agents = [], statsByAgent = {}, selectedAg
             const cardState = getSubjectState(stats, isActive);
 
             return `
-                <button
-                    type="button"
+                <article
                     class="subject-overview-card subject-overview-card--${cardState} ${isActive ? 'is-active' : ''}"
-                    data-subject-card
-                    data-agent-id="${escapeHtml(agent.id)}"
-                    aria-label="进入 ${escapeHtml(agent.name || agent.id)} 学科"
+                    aria-label="${escapeHtml(agent.name || agent.id)} 学科卡片"
                 >
                     <div class="subject-overview-card__topline">
                         <span class="subject-overview-card__monogram" aria-hidden="true">${escapeHtml(getAgentMonogram(agent))}</span>
-                        ${isActive ? '<span class="subject-overview-card__badge">当前</span>' : ''}
+                        <div class="subject-overview-card__actions">
+                            ${isActive ? '<span class="subject-overview-card__badge">当前</span>' : ''}
+                            <button
+                                type="button"
+                                class="subject-overview-card__delete"
+                                data-delete-subject-card
+                                data-agent-id="${escapeHtml(agent.id)}"
+                                data-agent-name="${escapeHtml(agent.name || agent.id)}"
+                                aria-label="删除 ${escapeHtml(agent.name || agent.id)} 学科"
+                                title="删除此学科及其全部内容"
+                            >
+                                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="subject-overview-card__body">
-                        <strong>${escapeHtml(agent.name || agent.id)}</strong>
-                        <p>${escapeHtml(formatSubjectStatus(stats, isActive))}</p>
-                    </div>
-                    <div class="subject-overview-card__chips">
-                        <span class="subject-overview-card__chip">${topicCount} 个话题</span>
-                    </div>
-                    <div class="subject-overview-card__meta" aria-label="学科摘要">
-                        <span class="subject-overview-card__meta-item">
-                            <span class="subject-overview-card__meta-label">话题数量</span>
-                            <strong>${topicCount}</strong>
-                        </span>
-                        <span class="subject-overview-card__meta-item">
-                            <span class="subject-overview-card__meta-label">待处理的数量</span>
-                            <strong>${unreadCount}</strong>
-                        </span>
-                    </div>
-                    <div class="subject-overview-card__footer">
-                        <span class="subject-overview-card__footer-label">
-                            ${escapeHtml(lastTopicName ? `最近话题：${lastTopicName}` : '点击进入学科工作台')}
-                        </span>
-                        <span class="material-symbols-outlined">arrow_outward</span>
-                    </div>
-                </button>
+                    <button
+                        type="button"
+                        class="subject-overview-card__action"
+                        data-subject-card
+                        data-agent-id="${escapeHtml(agent.id)}"
+                        aria-label="进入 ${escapeHtml(agent.name || agent.id)} 学科"
+                    >
+                        <div class="subject-overview-card__body">
+                            <strong>${escapeHtml(agent.name || agent.id)}</strong>
+                            <p>${escapeHtml(formatSubjectStatus(stats, isActive))}</p>
+                        </div>
+                        <div class="subject-overview-card__chips">
+                            <span class="subject-overview-card__chip">${topicCount} 个话题</span>
+                        </div>
+                        <div class="subject-overview-card__meta" aria-label="学科摘要">
+                            <span class="subject-overview-card__meta-item">
+                                <span class="subject-overview-card__meta-label">话题数量</span>
+                                <strong>${topicCount}</strong>
+                            </span>
+                            <span class="subject-overview-card__meta-item">
+                                <span class="subject-overview-card__meta-label">待处理的数量</span>
+                                <strong>${unreadCount}</strong>
+                            </span>
+                        </div>
+                        <div class="subject-overview-card__footer">
+                            <span class="subject-overview-card__footer-label">
+                                ${escapeHtml(lastTopicName ? `最近话题：${lastTopicName}` : '点击进入学科工作台')}
+                            </span>
+                            <span class="material-symbols-outlined">arrow_outward</span>
+                        </div>
+                    </button>
+                </article>
             `;
         }).join('')
         : `

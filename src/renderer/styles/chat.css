@@ -25,10 +25,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 2px 18px 9px;
+  padding: 6px 18px 13px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
   background: transparent;
-  min-height: 34px;
+  min-height: 38px;
 }
 
 .chat-stage__title {

@@ -9,7 +9,7 @@ async function loadOverviewModule() {
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
-test('buildSubjectOverviewMarkup renders minimal clock, stats row, cards, and create card for populated overview', async () => {
+test('buildSubjectOverviewMarkup renders clock, stats row, cards, and create card for populated overview', async () => {
     const { buildSubjectOverviewMarkup } = await loadOverviewModule();
 
     const result = buildSubjectOverviewMarkup({
@@ -26,13 +26,16 @@ test('buildSubjectOverviewMarkup renders minimal clock, stats row, cards, and cr
 
     assert.equal(result.headline, '学科总视图');
     assert.match(result.clockMarkup, /overviewClockTime/);
-    assert.doesNotMatch(result.clockMarkup, /年|周|Overview/);
+    assert.match(result.clockMarkup, /overviewClockDate/);
+    assert.match(result.clockMarkup, /星期/);
     assert.match(result.statsRowMarkup, /overview-stat-card__label/);
     assert.match(result.statsRowMarkup, /学科/);
     assert.match(result.statsRowMarkup, /话题/);
     assert.match(result.statsRowMarkup, /待处理/);
     assert.match(result.gridMarkup, /subject-overview-card--active/);
     assert.match(result.gridMarkup, /subject-overview-card__badge">当前</);
+    assert.match(result.gridMarkup, /data-delete-subject-card/);
+    assert.match(result.gridMarkup, /删除 数学 学科/);
     assert.doesNotMatch(result.gridMarkup, /subject-overview-card__chip--selected/);
     assert.doesNotMatch(result.gridMarkup, /subject-overview-card__chip--attention/);
     assert.match(result.gridMarkup, /subject-overview-card__chip">3 个话题</);
@@ -56,6 +59,7 @@ test('buildSubjectOverviewMarkup renders empty state when there are no agents', 
 
     assert.equal(result.headline, '创建你的第一个学科');
     assert.match(result.clockMarkup, /overviewClockTime/);
+    assert.match(result.clockMarkup, /overviewClockDate/);
     assert.match(result.statsRowMarkup, /待处理/);
     assert.match(result.gridMarkup, /subject-overview-empty/);
     assert.match(result.gridMarkup, /Ready to start/);

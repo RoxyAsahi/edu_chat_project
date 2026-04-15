@@ -624,7 +624,26 @@ function createNotesController(deps = {}) {
     }
 
     function getSelectedNotes() {
-        return getVisibleNotes().filter((note) => state.selectedNoteIds.includes(note.id));
+        const selectedIds = new Set(
+            Array.isArray(state.selectedNoteIds)
+                ? state.selectedNoteIds.filter(Boolean)
+                : [],
+        );
+        if (selectedIds.size === 0) {
+            return [];
+        }
+
+        const selectedNotes = [];
+        const seenNoteIds = new Set();
+        const allNotes = [...state.topicNotes, ...state.agentNotes];
+        allNotes.forEach((note) => {
+            if (!selectedIds.has(note?.id) || seenNoteIds.has(note?.id)) {
+                return;
+            }
+            seenNoteIds.add(note.id);
+            selectedNotes.push(note);
+        });
+        return selectedNotes;
     }
 
     function toggleNoteSelection(noteId) {

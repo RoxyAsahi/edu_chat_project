@@ -389,7 +389,7 @@ test('buildNotesSelectionSummary matches topic and agent scope wording', async (
 
     assert.equal(
         buildNotesSelectionSummary({ notesScope: 'topic', selectedCount: 2, visibleCount: 8 }),
-        '当前话题 · 已选 2 条，生成时优先使用这些笔记'
+        '已选 2 条笔记 · 生成时优先使用这些内容'
     );
     assert.equal(
         buildNotesSelectionSummary({ notesScope: 'agent', selectedCount: 0, visibleCount: 3 }),
@@ -683,6 +683,50 @@ test('manual notes library opens from the top button and only renders manual not
     assert.match(el.manualNotesLibraryGrid.textContent, /极限/);
 });
 
+test('manual notes library close button hides the modal and clears the open state', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', topicId: 'topic-1' },
+                ],
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNotesLibraryBtn.click();
+    el.manualNotesLibraryCloseBtn.click();
+
+    assert.equal(store.getState().notes.manualNotesLibraryOpen, false);
+    assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), true);
+    assert.equal(el.manualNotesLibraryModal.getAttribute('aria-hidden'), 'true');
+});
+
+test('manual notes library can add a note into Studio selection directly from the card', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                notesScope: 'topic',
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', topicId: 'topic-2' },
+                ],
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNotesLibraryBtn.click();
+    el.manualNotesLibraryGrid.querySelector('[data-manual-note-select="note-1"]').click();
+
+    assert.deepEqual(store.getState().notes.selectedNoteIds, ['note-1']);
+    assert.match(el.manualNotesLibrarySubtitle.textContent, /已选 1 条可直接用于 Studio/);
+});
+
 test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {
     const { createNotesController } = await loadNotesControllerModule();
     let upstreamPayload = null;
@@ -740,4 +784,66 @@ test('notes tool actions read endpoint settings from the settings slice before c
 
     assert.equal(upstreamPayload.endpoint, 'https://study.example.test/v1/chat');
     assert.equal(upstreamPayload.apiKey, 'fixture-api-key');
+});
+
+test('notes tool actions can consume selected manual notes from the agent library even when topic scope is active', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            settings: {
+                settings: {
+                    vcpServerUrl: 'https://study.example.test/v1/chat',
+                    vcpApiKey: 'fixture-api-key',
+                },
+            },
+            notes: {
+                notesScope: 'topic',
+                topicNotes: [],
+                agentNotes: [{
+                    id: 'manual-note-1',
+                    title: '跨话题手写笔记',
+                    contentMarkdown: '这里是跨话题整理的重点内容。',
+                    kind: 'note',
+                    topicId: 'topic-2',
+                }],
+                selectedNoteIds: ['manual-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendToVCP: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: '这是一份生成后的分析结果。' } }],
+                    },
+                };
+            },
+            listTopicNotes: async () => ({ success: true, items: [] }),
+            listAgentNotes: async () => ({
+                success: true,
+                items: [{
+                    id: 'manual-note-1',
+                    title: '跨话题手写笔记',
+                    contentMarkdown: '这里是跨话题整理的重点内容。',
+                    kind: 'note',
+                    topicId: 'topic-2',
+                }],
+            }),
+        },
+    });
+
+    controller.bindEvents();
+    el.analyzeNotesBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.match(upstreamPayload.messages[1].content, /跨话题手写笔记/);
+    assert.match(upstreamPayload.messages[1].content, /这里是跨话题整理的重点内容/);
 });

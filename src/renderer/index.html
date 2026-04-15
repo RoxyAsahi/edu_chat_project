@@ -45,18 +45,52 @@
         </button>
       </div>
       <div class="titlebar__workspace">
-        <div class="titlebar__context-card">
-          <span class="titlebar__context-label">当前学科</span>
-          <strong id="titlebarCurrentAgent">未选择学科</strong>
+        <div id="dynamicIsland" class="dynamic-island" aria-label="番茄钟灵动岛">
+          <div class="dynamic-island__bar">
+            <button
+              id="dynamicIslandStatusBtn"
+              class="ghost-button dynamic-island__status-button"
+              type="button"
+              aria-expanded="false"
+              aria-controls="dynamicIslandPanel"
+            >
+              <span id="dynamicIslandStatusEyebrow" class="dynamic-island__status-eyebrow">专注计时</span>
+              <strong id="dynamicIslandStatusText" class="dynamic-island__status-text">番茄钟</strong>
+            </button>
+          </div>
+          <div id="dynamicIslandPanel" class="dynamic-island__panel" aria-hidden="true">
+            <div class="dynamic-island__shortcuts" aria-label="灵动岛快捷入口">
+              <button id="dynamicIslandCurrentAgentBtn" class="ghost-button dynamic-island__shortcut" type="button">
+                <span class="dynamic-island__shortcut-label">当前学科</span>
+                <strong id="titlebarCurrentAgent">未选择学科</strong>
+              </button>
+              <div class="dynamic-island__shortcut dynamic-island__shortcut--pomodoro" aria-hidden="true">
+                <span class="dynamic-island__shortcut-label">番茄钟</span>
+                <strong id="dynamicIslandShortcutStatus">专注计时</strong>
+              </div>
+              <button id="manualNotesLibraryBtn" class="ghost-button dynamic-island__shortcut dynamic-island__shortcut--notes" type="button">
+                <span class="dynamic-island__shortcut-label">手写笔记</span>
+                <strong>我的笔记</strong>
+              </button>
+            </div>
+            <div class="dynamic-island__panel-main">
+              <div class="dynamic-island__panel-copy">
+                <span class="dynamic-island__panel-label">番茄钟</span>
+                <strong id="dynamicIslandTimerDisplay" class="dynamic-island__timer-display">25:00</strong>
+              </div>
+              <label class="dynamic-island__duration-field" for="dynamicIslandMinutesInput">
+                <span>专注分钟</span>
+                <input id="dynamicIslandMinutesInput" type="number" min="1" max="180" step="1" value="25" inputmode="numeric" />
+              </label>
+            </div>
+            <div class="dynamic-island__panel-actions">
+              <button id="dynamicIslandStartBtn" class="accent-button dynamic-island__action" type="button">开始</button>
+              <button id="dynamicIslandPauseBtn" class="ghost-button dynamic-island__action hidden" type="button">暂停</button>
+              <button id="dynamicIslandResumeBtn" class="accent-button dynamic-island__action hidden" type="button">继续</button>
+              <button id="dynamicIslandResetBtn" class="ghost-button dynamic-island__action" type="button">重置</button>
+            </div>
+          </div>
         </div>
-        <div class="titlebar__context-card titlebar__context-card--topic">
-          <span class="titlebar__context-label">当前话题</span>
-          <strong id="titlebarCurrentTopic">请选择一个话题</strong>
-        </div>
-        <button id="manualNotesLibraryBtn" class="ghost-button titlebar__context-card titlebar__context-card--action" type="button">
-          <span class="titlebar__context-label">手写笔记</span>
-          <strong>我的笔记</strong>
-        </button>
       </div>
       <div class="titlebar__meta">
         <button id="openDiaryWallBtn" class="ghost-button icon-btn" title="日记墙"><span class="material-symbols-outlined">auto_stories</span></button>

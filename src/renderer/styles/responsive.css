@@ -139,8 +139,22 @@
     padding: 16px;
   }
 
-  .manual-notes-library-grid {
-    grid-template-columns: 1fr;
+  .manual-notes-library-modal {
+    padding: 12px;
+  }
+
+  .manual-notes-library-modal__dialog {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 24px;
+  }
+
+  .manual-notes-library-modal__header {
+    padding: 18px 16px 14px;
+  }
+
+  .manual-notes-library-modal__body {
+    padding: 16px;
   }
 }
 
@@ -149,12 +163,22 @@
     grid-template-columns: 1fr;
     align-items: stretch;
   }
+
+  .manual-notes-library-grid {
+    column-width: auto;
+    column-count: 1;
+  }
 }
 
 @media (max-width: 1180px) {
+  .window-shell {
+    grid-template-rows: auto 1fr;
+  }
+
   .titlebar {
-    flex-wrap: nowrap;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    min-height: 0;
     padding: 12px 12px 8px;
     gap: 10px;
   }
@@ -177,7 +201,19 @@
   }
 
   .titlebar__workspace {
-    display: none;
+    order: 3;
+    position: static;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: 100%;
+    justify-content: center;
+    padding: 0 4px 4px;
+  }
+
+  .dynamic-island {
+    width: min(100%, 260px);
+    min-width: 0;
   }
 
   .workspace-overview-page__header {
@@ -488,6 +524,9 @@
 @media (max-width: 1280px) {
   .titlebar__brand,
   .titlebar__workspace,
+  .dynamic-island,
+  .dynamic-island__side-button,
+  .dynamic-island__status-button,
   .titlebar__context-card,
   .workspace-overview-page__header-main,
   .workspace-card__titleblock,
@@ -516,6 +555,9 @@
 
   .titlebar__title,
   .titlebar__subtitle,
+  .dynamic-island__side-label,
+  .dynamic-island__status-eyebrow,
+  .dynamic-island__status-text,
   .titlebar__context-label,
   .titlebar__context-card strong,
   #subjectOverviewHeadline,
@@ -652,16 +694,17 @@
     display: none;
   }
 
+  .dynamic-island__side-label,
+  .dynamic-island__status-eyebrow {
+    display: none;
+  }
+
+  .dynamic-island--expanded {
+    width: min(100%, 620px);
+  }
+
   .titlebar__context-card {
-    max-width: 220px;
-  }
-
-  .titlebar__context-card--topic {
-    max-width: 280px;
-  }
-
-  .titlebar__context-card--action {
-    max-width: 180px;
+    max-width: 250px;
   }
 
   .workspace-nav__summary {
@@ -676,14 +719,23 @@
 
 @media (max-width: 860px) {
   .titlebar__workspace {
-    justify-content: flex-end;
+    justify-content: center;
   }
 
-  .titlebar__context-card--topic {
-    display: none;
+  .dynamic-island {
+    width: 100%;
   }
 
-  .titlebar__context-card--action {
+  .dynamic-island__shortcuts {
+    grid-template-columns: 1fr;
+  }
+
+  .dynamic-island__panel-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dynamic-island__duration-field {
     min-width: 0;
   }
 
@@ -745,13 +797,41 @@
     gap: 2px;
   }
 
-  .titlebar__context-card {
-    padding: 4px 10px;
-    max-width: 150px;
+  .dynamic-island {
+    padding: 5px;
+    border-radius: 24px;
   }
 
-  .titlebar__context-card--action {
-    max-width: 132px;
+  .dynamic-island__status-button {
+    min-height: 40px;
+    border-radius: 20px;
+  }
+
+  .dynamic-island__status-button {
+    padding: 8px 12px;
+  }
+
+  .dynamic-island__status-text,
+  .dynamic-island__shortcut strong {
+    font-size: 12px;
+  }
+
+  .dynamic-island__timer-display {
+    font-size: 32px;
+  }
+
+  .dynamic-island__panel-actions {
+    gap: 8px;
+  }
+
+  .dynamic-island__action {
+    min-width: 72px;
+  }
+
+  .dynamic-island__shortcut {
+    min-height: 64px;
+    padding: 10px 12px;
+    border-radius: 18px;
   }
 
   .notes-scope-btn,

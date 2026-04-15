@@ -96,8 +96,8 @@ function createControllerHarness(overrides = {}) {
         async getUnreadTopicCounts() {
             return { counts: {} };
         },
-        async deleteAgent() {
-            watcherCalls.push(['delete-agent']);
+        async deleteAgent(agentId) {
+            watcherCalls.push(['delete-agent', agentId]);
             return { success: true };
         },
         ...overrides.chatAPI,
@@ -208,7 +208,74 @@ test('deleteCurrentAgent stops the watcher before deleting the agent', async () 
 
     await controller.deleteCurrentAgent();
 
-    assert.deepEqual(harness.watcherCalls, [['stop'], ['delete-agent']]);
+    assert.deepEqual(harness.watcherCalls, [['stop'], ['delete-agent', 'agent-1']]);
+});
+
+test('renderSubjectOverview delete button removes the targeted subject card item', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const confirmMessages = [];
+    const configCalls = [];
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getAgents() {
+                return [
+                    { id: 'agent-1', name: 'Agent 1' },
+                    { id: 'agent-2', name: 'Agent 2' },
+                ];
+            },
+            async getAgentConfig(agentId) {
+                configCalls.push(agentId);
+                return {
+                    name: agentId,
+                    avatarUrl: null,
+                    agentDataPath: 'C:\\data\\agent-1',
+                };
+            },
+        },
+    });
+    const { window, document, el } = createOverviewDom();
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        el: {
+            ...harness.deps.el,
+            ...el,
+        },
+        ui: {
+            ...harness.deps.ui,
+            async showConfirmDialog(message) {
+                confirmMessages.push(message);
+                return true;
+            },
+        },
+        windowObj: window,
+        documentObj: document,
+        setIntervalFn: () => 1,
+        clearIntervalFn: () => {},
+        buildSubjectOverviewMarkup: () => ({
+            headline: '学科总视图',
+            summary: '选择一个学科继续你的学习。',
+            clockMarkup: '<section class="overview-clock-panel"><div class="overview-clock-panel__face"><div id="overviewClockDate">4月13日 星期一</div><div id="overviewClockTime">00:00</div></div></section>',
+            statsRowMarkup: '<section class="overview-stats-row"><article class="overview-stat-card"><span class="overview-stat-card__label">学科</span><strong>2</strong></article></section>',
+            gridMarkup: `
+                <section class="overview-subject-wall">
+                    <article class="subject-overview-card">
+                        <button type="button" data-delete-subject-card data-agent-id="agent-2" data-agent-name="Agent 2">删除</button>
+                        <button type="button" data-subject-card data-agent-id="agent-2">进入</button>
+                    </article>
+                    <button id="subjectOverviewCreateCard"></button>
+                </section>
+            `,
+        }),
+    });
+
+    await controller.loadAgents();
+    document.querySelector('[data-delete-subject-card]').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(confirmMessages, ['确定删除学科 Agent 2 吗？这会删除该学科下的全部话题、笔记和资料。']);
+    assert.deepEqual(harness.watcherCalls, [['delete-agent', 'agent-2']]);
+    assert.deepEqual(configCalls, []);
 });
 
 test('renderSubjectOverview starts a single clock timer and clears it when leaving overview', async () => {
@@ -229,7 +296,7 @@ test('renderSubjectOverview starts a single clock timer and clears it when leavi
         buildSubjectOverviewMarkup: () => ({
             headline: '学科总视图',
             summary: '选择一个学科继续你的学习。',
-            clockMarkup: '<section class="overview-clock-panel"><div id="overviewClockTime">00:00</div></section>',
+            clockMarkup: '<section class="overview-clock-panel"><div class="overview-clock-panel__face"><div id="overviewClockDate">4月13日 星期一</div><div id="overviewClockTime">00:00</div></div></section>',
             statsRowMarkup: '<section class="overview-stats-row"><article class="overview-stat-card"><span class="overview-stat-card__label">学科</span><strong>1</strong></article></section>',
             gridMarkup: '<section class="overview-subject-wall"><button id="subjectOverviewCreateCard"></button></section>',
         }),
@@ -248,6 +315,7 @@ test('renderSubjectOverview starts a single clock timer and clears it when leavi
 
     assert.equal(intervalCalls, 1);
     assert.equal(document.getElementById('overviewClockTime').textContent, '09:05');
+    assert.equal(document.getElementById('overviewClockDate').textContent, '4月13日 星期一');
 
     controller.showSubjectWorkspace();
 
