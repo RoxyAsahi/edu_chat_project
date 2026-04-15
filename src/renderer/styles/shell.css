@@ -7,7 +7,9 @@
 html, body {
   margin: 0;
   min-height: 100%;
-  background: var(--paper);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-soft) 30%, transparent), transparent 32%),
+    linear-gradient(180deg, color-mix(in srgb, var(--paper) 90%, white 10%), var(--paper));
   color: var(--ink);
   font-family: var(--unistudy-chat-font);
 }
@@ -34,15 +36,17 @@ textarea:focus, input:focus, select:focus {
   box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px rgba(26, 115, 232, 0.12);
 }
 
-.window-shell { height: 100vh; display: grid; grid-template-rows: 64px 1fr; overflow: hidden; }
+.window-shell { height: 100vh; display: grid; grid-template-rows: 56px 1fr; overflow: hidden; }
 
 .titlebar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 20px;
-  background: transparent;
+  gap: 10px;
+  padding: 6px 18px;
+  background: color-mix(in srgb, var(--paper) 74%, transparent);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
   user-select: none;
   -webkit-app-region: drag;
 }
@@ -84,14 +88,15 @@ textarea:focus, input:focus, select:focus {
 .titlebar__meta > * { flex-shrink: 0; }
 
 .brand-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
   font-family: 'MavenProExtraBold', sans-serif;
-  background: var(--accent);
+  background: linear-gradient(135deg, #1a73e8, #4c8df6);
   color: white;
+  box-shadow: 0 10px 20px rgba(26, 115, 232, 0.28);
 }
 
 .titlebar__title {
@@ -109,12 +114,13 @@ textarea:focus, input:focus, select:focus {
   flex-shrink: 0;
   min-width: 0;
   padding: 8px 16px;
-  border-radius: 18px;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--panel) 94%, white 6%);
-  border: 1px solid color-mix(in srgb, var(--line) 88%, white 12%);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
-  font-weight: 600;
+  min-height: 40px;
+  border-radius: 20px;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--panel) 92%, white 8%);
+  border: none;
+  box-shadow: none;
+  font-weight: 500;
 }
 
 .titlebar__home-btn .material-symbols-outlined {
@@ -123,7 +129,7 @@ textarea:focus, input:focus, select:focus {
 }
 
 .titlebar__home-btn:hover {
-  background: color-mix(in srgb, var(--accent-soft) 24%, var(--panel) 76%);
+  background: color-mix(in srgb, var(--accent-soft) 34%, var(--panel) 66%);
   color: var(--accent-strong);
 }
 
@@ -141,11 +147,11 @@ body.workspace-view-overview .titlebar__home-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 9px 14px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid color-mix(in srgb, var(--line) 100%, transparent);
-  box-shadow: var(--shadow-elevation-1);
+  background: color-mix(in srgb, var(--panel) 88%, white 12%);
+  border: none;
+  box-shadow: none;
 }
 
 .titlebar__context-card--action {
@@ -157,8 +163,6 @@ body.workspace-view-overview .titlebar__home-btn {
 .titlebar__context-card--action:hover,
 .titlebar__context-card--action:focus-visible {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--line) 72%);
-  box-shadow: var(--shadow-elevation-2);
 }
 
 .titlebar__context-card strong {
@@ -307,11 +311,11 @@ h1, h2, h3, p { margin: 0; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 14px 12px;
-  border: 1px dashed var(--line);
-  border-radius: 12px;
+  padding: 16px 14px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
+  border-radius: 18px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.45);
+  background: color-mix(in srgb, var(--panel) 82%, var(--accent-soft) 18%);
 }
 
 .empty-list-state strong {
@@ -327,25 +331,29 @@ h1, h2, h3, p { margin: 0; }
 .ghost-button {
   background: transparent;
   color: var(--accent);
-  transition: background-color var(--motion-standard), color var(--motion-standard), box-shadow var(--motion-standard);
+  transition: background-color var(--motion-standard), color var(--motion-standard), box-shadow var(--motion-standard), border-color var(--motion-standard), transform var(--motion-standard);
 }
 
-.ghost-button:hover { background: var(--md-sys-state-hover); }
+.ghost-button:hover {
+  background: var(--md-sys-state-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
 
 .ghost-button--danger { color: #d93025; }
 
 .ghost-button--danger:hover { background: rgba(217, 48, 37, 0.1); }
 
 .accent-button {
-  background: var(--accent);
+  background: linear-gradient(180deg, #1a73e8, #1967d2);
   color: white;
   box-shadow: var(--shadow-elevation-1);
   transition: background-color var(--motion-standard), box-shadow var(--motion-standard), transform var(--motion-standard);
 }
 
 .accent-button:hover {
-  background: #1765cc;
+  background: linear-gradient(180deg, #1b74e4, #185abc);
   box-shadow: var(--shadow-elevation-2);
+  transform: translateY(-1px);
 }
 
 .accent-button--danger { background: #d93025; }
@@ -359,6 +367,14 @@ body.dark-theme .window-button:hover { background: rgba(255,255,255,0.1); }
 .window-button--danger:hover { background: #d93025; color: white; }
 
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--md-sys-state-focus);
+}
 
 .attachment-thumbnail-image {
   width: 32px;
@@ -418,7 +434,7 @@ button { border: none; background: transparent; outline: none; cursor: pointer; 
 /* Icon buttons */
 .icon-btn { width: 32px; height: 32px; border-radius: 50%; padding: 0 !important; color: var(--muted); }
 
-.icon-btn:hover { background: rgba(60, 64, 67, 0.08); color: var(--ink); }
+.icon-btn:hover { background: rgba(60, 64, 67, 0.08); color: var(--ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent); }
 
 body.dark-theme .icon-btn:hover { background: rgba(255,255,255,0.1); }
 
