@@ -765,24 +765,25 @@
   gap: 10px;
   padding: 8px 10px;
   border-radius: 999px;
-  border: 1px solid transparent;
-  background: color-mix(in srgb, var(--panel-strong) 74%, transparent);
+  border: none;
+  background: transparent;
   min-height: 52px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
-  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  box-shadow: none;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .topic-item--compact:hover {
-  background: color-mix(in srgb, var(--paper) 84%, var(--panel) 16%);
-  border-color: color-mix(in srgb, var(--line) 76%, transparent);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
-  transform: translateY(-1px);
+  background: #edeff9;
+  border: none;
+  box-shadow: none;
+  transform: none;
 }
 
 .topic-item--compact.active {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 72%, white 28%), color-mix(in srgb, var(--panel) 88%, var(--paper)));
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--line) 72%);
-  box-shadow: 0 12px 24px rgba(11, 87, 208, 0.12);
+  background: #edeff9;
+  border: none;
+  box-shadow: none;
+  transform: none;
 }
 
 .topic-item__body {
@@ -1205,10 +1206,9 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 
 .workspace-topic-card,
 .source-sidebar-card {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--panel) 98%, white 2%), color-mix(in srgb, var(--panel-strong) 90%, transparent));
+  background: #ffffff;
   box-shadow: none;
-  padding: 12px 18px 16px;
+  padding: 8px 18px 16px;
   border-radius: 24px;
   border: none;
 }
@@ -1218,10 +1218,12 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 4px 0 10px;
+  padding: 2px 18px 9px;
+  margin-left: -18px;
+  margin-right: -18px;
   margin-bottom: 1px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
-  min-height: 42px;
+  min-height: 34px;
 }
 
 .workspace-card__header > div {
@@ -1234,7 +1236,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   font-family: var(--unistudy-chat-font);
   font-size: 16px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
   letter-spacing: 0.01em;
 }
 
@@ -1260,7 +1262,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   min-height: 42px;
   margin: 0 0 4px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--panel-soft) 80%, white 20%);
+  background: var(--panel-soft);
   box-shadow: none;
 }
 
@@ -1326,7 +1328,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   padding: 12px;
   border-radius: 22px;
   border: none;
-  background: color-mix(in srgb, var(--panel-soft) 86%, white 14%);
+  background: var(--panel-soft);
 }
 
 .workspace-nav__column .list {
@@ -1410,7 +1412,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   padding: 12px 14px;
   border: none;
   border-radius: 20px;
-  background: color-mix(in srgb, var(--panel-soft) 80%, white 20%);
+  background: var(--panel-soft);
 }
 
 .topic-files__status {

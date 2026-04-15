@@ -283,6 +283,10 @@ function createNotesDom(deps = {}) {
     }
 
     function renderNotesPanel() {
+        if (state.notesScope !== 'topic') {
+            state.notesScope = 'topic';
+        }
+
         const notes = getGeneratedVisibleNotes();
         closeNoteActionMenu();
 
@@ -321,7 +325,7 @@ function createNotesDom(deps = {}) {
             empty.className = 'empty-list-state';
             empty.innerHTML = `
                 <strong>还没有生成内容</strong>
-                <span>右侧这里会显示深度分析、选择题和闪卡；你手写的普通笔记会收纳到顶部“我的笔记”。</span>
+                <span>右侧这里会显示分析报告、选择题和闪卡；你手写的普通笔记会收纳到顶部“我的笔记”。</span>
             `;
             el.notesList.appendChild(empty);
             if (!getActiveNote() && state.notesStudioView !== 'detail') {
