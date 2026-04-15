@@ -95,6 +95,11 @@ function createInitialAppState() {
             sidePanelTab: 'notes',
             mobileWorkspaceTab: 'source',
             rightPanelMode: 'notes',
+            dynamicIslandExpanded: false,
+            pomodoroStatus: 'idle',
+            pomodoroDurationMinutes: 25,
+            pomodoroRemainingMs: 25 * 60 * 1000,
+            pomodoroEndsAt: null,
         },
         session: {
             agents: [],

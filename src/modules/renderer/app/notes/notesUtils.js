@@ -104,11 +104,11 @@ function buildNotesSelectionSummary({
     selectedCount = 0,
     visibleCount = 0,
 } = {}) {
-    const scopeLabel = notesScope === 'agent' ? '学科汇总' : '当前话题';
-
     if (selectedCount > 0) {
-        return `${scopeLabel} · 已选 ${selectedCount} 条，生成时优先使用这些笔记`;
+        return `已选 ${selectedCount} 条笔记 · 生成时优先使用这些内容`;
     }
+
+    const scopeLabel = notesScope === 'agent' ? '学科汇总' : '当前话题';
 
     if (visibleCount > 0) {
         return `${scopeLabel} · ${visibleCount} 条笔记，未选择时回退到当前 Source`;

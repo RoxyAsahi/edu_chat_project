@@ -438,18 +438,23 @@ function createNotesDom(deps = {}) {
 
         const manualNotes = getManualLibraryNotes();
         const currentAgentName = state.currentSelectedItem?.name || '当前学科';
+        const setGridEmptyState = (empty) => {
+            el.manualNotesLibraryGrid.classList.toggle('manual-notes-library-grid--empty', empty);
+        };
 
         if (el.manualNotesLibraryTitle) {
             el.manualNotesLibraryTitle.textContent = `${currentAgentName} · 我的笔记`;
         }
         if (el.manualNotesLibrarySubtitle) {
+            const selectedCount = manualNotes.filter((note) => state.selectedNoteIds.includes(note.id)).length;
             el.manualNotesLibrarySubtitle.textContent = state.currentSelectedItem?.id
-                ? `这里收纳当前学科下的 ${manualNotes.length} 条手写笔记。`
+                ? `这里收纳当前学科下的 ${manualNotes.length} 条手写笔记，已选 ${selectedCount} 条可直接用于 Studio。`
                 : '选择一个学科后，这里会显示该学科下的所有手写笔记。';
         }
 
         el.manualNotesLibraryGrid.innerHTML = '';
         if (!state.currentSelectedItem?.id) {
+            setGridEmptyState(true);
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
             empty.innerHTML = `
@@ -461,6 +466,7 @@ function createNotesDom(deps = {}) {
         }
 
         if (manualNotes.length === 0) {
+            setGridEmptyState(true);
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
             empty.innerHTML = `
@@ -470,6 +476,8 @@ function createNotesDom(deps = {}) {
             el.manualNotesLibraryGrid.appendChild(empty);
             return;
         }
+
+        setGridEmptyState(false);
 
         manualNotes.forEach((note) => {
             const normalized = normalizeNote(note);
@@ -487,9 +495,20 @@ function createNotesDom(deps = {}) {
                         <span class="manual-note-card__eyebrow">手写笔记</span>
                         <strong class="manual-note-card__title">${escapeHtml(normalized.title)}</strong>
                     </div>
-                    <button class="note-card__menu-button manual-note-card__menu" type="button" data-note-menu="${escapeHtml(normalized.id)}" aria-label="打开笔记菜单">
-                        <span class="material-symbols-outlined">more_vert</span>
-                    </button>
+                    <div class="manual-note-card__header-actions">
+                        <button
+                            class="ghost-button manual-note-card__studio-btn ${isSelected ? 'manual-note-card__studio-btn--active' : ''}"
+                            type="button"
+                            data-manual-note-select="${escapeHtml(normalized.id)}"
+                            aria-pressed="${isSelected ? 'true' : 'false'}"
+                        >
+                            <span class="material-symbols-outlined">${isSelected ? 'check_circle' : 'add_circle'}</span>
+                            <span>${isSelected ? '已加入 Studio' : '加入 Studio'}</span>
+                        </button>
+                        <button class="note-card__menu-button manual-note-card__menu" type="button" data-note-menu="${escapeHtml(normalized.id)}" aria-label="打开笔记菜单">
+                            <span class="material-symbols-outlined">more_vert</span>
+                        </button>
+                    </div>
                 </div>
                 <p class="manual-note-card__preview">${preview || '暂无内容。'}</p>
                 <div class="manual-note-card__meta">
@@ -510,6 +529,11 @@ function createNotesDom(deps = {}) {
             card.querySelector('[data-note-menu]')?.addEventListener('click', (event) => {
                 event.stopPropagation();
                 openNoteItemMenu(normalized, event.currentTarget);
+            });
+
+            card.querySelector('[data-manual-note-select]')?.addEventListener('click', (event) => {
+                event.stopPropagation();
+                toggleNoteSelection(normalized.id);
             });
 
             el.manualNotesLibraryGrid.appendChild(card);
