@@ -59,6 +59,7 @@ const {
     normalizeStoredLayoutHeight,
     applyLayoutWidths,
     applyLeftSidebarHeights,
+    scheduleLayoutRefresh,
     initializeResizableLayout,
     bindEvents: bindLayoutEvents,
 } = layoutController;
@@ -284,6 +285,8 @@ workspaceController = createWorkspaceController({
     clearTopicKnowledgeBaseDocuments,
     getGlobalSettings: () => getSettingsSlice().settings,
     buildSubjectOverviewMarkup,
+    syncMobileWorkspaceLayout,
+    refreshWorkspaceLayout: scheduleLayoutRefresh,
 });
 const {
     getCurrentTopic,
