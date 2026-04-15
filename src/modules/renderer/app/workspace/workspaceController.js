@@ -65,6 +65,8 @@ function createWorkspaceController(deps = {}) {
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const clearTopicKnowledgeBaseDocuments = deps.clearTopicKnowledgeBaseDocuments || (() => {});
     const getGlobalSettings = deps.getGlobalSettings || (() => store.getState().settings.settings);
+    const syncMobileWorkspaceLayout = deps.syncMobileWorkspaceLayout || (() => {});
+    const refreshWorkspaceLayout = deps.refreshWorkspaceLayout || (() => {});
 
     function getSessionSlice() {
         return store.getState().session;
@@ -308,6 +310,13 @@ function createWorkspaceController(deps = {}) {
             ensureOverviewClockTimer();
         } else {
             clearOverviewClockTimer();
+        }
+        syncMobileWorkspaceLayout();
+        if (!isOverview) {
+            refreshWorkspaceLayout({
+                frames: 2,
+                resetDesktopLayout: true,
+            });
         }
     }
 

@@ -253,3 +253,35 @@ test('renderSubjectOverview starts a single clock timer and clears it when leavi
 
     assert.deepEqual(clearedIntervals, [1]);
 });
+
+test('showSubjectWorkspace requests a deferred desktop layout reset after leaving overview', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const harness = createControllerHarness();
+    const { window, document, el } = createOverviewDom();
+    const syncCalls = [];
+    const refreshCalls = [];
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        el: {
+            ...harness.deps.el,
+            ...el,
+        },
+        windowObj: window,
+        documentObj: document,
+        syncMobileWorkspaceLayout: () => {
+            syncCalls.push('sync');
+        },
+        refreshWorkspaceLayout: (options) => {
+            refreshCalls.push(options);
+        },
+    });
+
+    controller.showSubjectWorkspace();
+
+    assert.equal(syncCalls.length, 1);
+    assert.deepEqual(refreshCalls, [{
+        frames: 2,
+        resetDesktopLayout: true,
+    }]);
+});
