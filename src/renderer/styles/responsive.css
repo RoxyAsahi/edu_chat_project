@@ -26,22 +26,22 @@
   }
 
   .notes-tool-tile {
-    min-height: 92px;
-    height: 92px;
-    padding: 14px 40px 14px 14px;
-    border-radius: 18px;
+    min-height: 62px;
+    height: 62px;
+    padding: 8px 34px 8px 10px;
+    border-radius: 14px;
     gap: 8px;
   }
 
   .notes-tool-tile__icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
+    width: auto;
+    height: auto;
+    border-radius: 0;
     font-size: 18px;
   }
 
   .notes-tool-tile__body strong {
-    font-size: 0.95rem;
+    font-size: 0.82rem;
     line-height: 1.15;
     padding-bottom: 0;
   }
@@ -52,12 +52,12 @@
 
   .notes-tool-tile__arrow {
     right: 14px;
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .notes-stream {
-    margin: 16px 16px 0;
-    padding: 16px 14px 0;
+    margin: 16px -16px 0;
+    padding: 16px 16px 0;
   }
 
 }
@@ -68,9 +68,9 @@
   }
 
   .notes-tool-tile {
-    min-height: 92px;
-    height: 92px;
-    padding: 14px 40px 14px 14px;
+    min-height: 62px;
+    height: 62px;
+    padding: 8px 34px 8px 10px;
     gap: 8px;
     align-items: flex-start;
     justify-content: space-between;
@@ -78,8 +78,8 @@
 
   .notes-tool-tile__body strong {
     max-width: 100%;
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 0.82rem;
+    font-weight: 400;
     line-height: 1.15;
     white-space: nowrap;
     overflow: hidden;
@@ -88,7 +88,7 @@
 
   .notes-tool-tile__arrow {
     right: 14px;
-    font-size: 16px;
+    font-size: 15px;
   }
 }
 

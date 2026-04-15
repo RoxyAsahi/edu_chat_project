@@ -944,7 +944,8 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 }
 
 .notes-studio__section--tools {
-  padding-top: 8px;
+  padding-top: 14px;
+  padding-bottom: 0;
 }
 
 .notes-scope-switch {
@@ -990,10 +991,10 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: 92px;
-  height: 92px;
-  border-radius: 18px;
-  padding: 14px 40px 14px 14px;
+  min-height: 62px;
+  height: 62px;
+  border-radius: 14px;
+  padding: 8px 34px 8px 10px;
   justify-content: space-between;
   align-items: flex-start;
   text-align: left;
@@ -1041,22 +1042,29 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 
 .notes-tool-tile__icon {
   font-size: 20px;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.68);
+  width: auto;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
   align-self: flex-start;
+  margin-top: 2px;
+  margin-left: 2px;
+}
+
+.notes-tool-tile__body {
+  transform: translate(2px, -4px);
 }
 
 .notes-tool-tile__body strong {
   display: block;
   max-width: 100%;
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   line-height: 1.15;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
@@ -1068,7 +1076,7 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   top: 50%;
   right: 14px;
   transform: translateY(-50%);
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
   opacity: 0.7;
   pointer-events: none;
@@ -1079,8 +1087,8 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   flex-direction: column;
   min-height: 0;
   flex: 1 1 auto;
-  margin: 14px 0 0;
-  padding: 20px 0 0;
+  margin: 0 -18px 0;
+  padding: 0 18px 0;
   border: none;
   border-radius: 0;
   background: #ffffff;
@@ -1088,10 +1096,11 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 }
 
 .notes-stream__divider {
-  width: 100%;
-  height: 1px;
-  margin: 0 0 16px;
-  background: color-mix(in srgb, var(--line) 84%, transparent);
+  width: auto;
+  height: 0;
+  margin: -8px -18px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  background: transparent;
 }
 
 .notes-list--studio {
@@ -1410,7 +1419,7 @@ body.dark-theme .note-card--studio.note-card--selected {
   font-weight: 700;
 }
 
-.panel h2, .chat-stage h1, .settings-card h3 { font-size: 18px; font-weight: 600; }
+.panel h2, .settings-card h3 { font-size: 18px; font-weight: 600; }
 
 .list-item__meta, .settings-caption, .topic-lock { font-size: 12px; color: var(--muted); }
 

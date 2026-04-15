@@ -493,6 +493,10 @@
 /* Lists */
 .list { list-style: none; margin: 0; padding: 0 4px 0 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 
+.list--topics {
+  gap: 4px;
+}
+
 .list-item {
   cursor: pointer;
   display: grid;
@@ -1234,10 +1238,10 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   margin: 0;
   color: var(--ink);
   font-family: var(--unistudy-chat-font);
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 400;
   line-height: 1.15;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .workspace-card__cta {
