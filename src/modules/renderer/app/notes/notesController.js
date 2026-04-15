@@ -692,7 +692,7 @@ function createNotesController(deps = {}) {
     }
 
     function setNotesScope(scope) {
-        state.notesScope = scope === 'agent' ? 'agent' : 'topic';
+        state.notesScope = 'topic';
         state.selectedNoteIds = [];
         notesDomApi.renderNotesPanel();
     }
