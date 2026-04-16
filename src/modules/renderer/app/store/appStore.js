@@ -131,6 +131,8 @@ function createInitialAppState() {
             activeNoteMenu: null,
             activeFlashcardNoteId: null,
             pendingFlashcardGeneration: null,
+            studioPomodoroVisible: false,
+            studioPomodoroExpanded: true,
             quizPractice: {
                 noteId: null,
                 currentIndex: 0,
