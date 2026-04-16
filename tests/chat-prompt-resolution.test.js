@@ -558,9 +558,26 @@ test('generate-follow-ups retries once when the first upstream reply is malforme
     assert.match(requests[0].messages[0].content, /交互按钮：查看往期记忆/);
 });
 
-test('follow-up model resolution prefers agent config, then global default model, then requested model', async () => {
+test('follow-up model resolution prefers dedicated task model, then agent config, then global default model, then requested model', async () => {
     const { chatHandlers } = loadChatHandlers({ initialize() {} });
     const { resolveFollowUpModel } = chatHandlers.__testUtils;
+
+    assert.equal(
+        await resolveFollowUpModel({
+            agentId: 'agent-1',
+            requestedModel: 'requested-model',
+            settings: {
+                followUpDefaultModel: 'follow-up-model',
+                defaultModel: 'global-model',
+            },
+            agentConfigManager: {
+                async readAgentConfig() {
+                    return { model: 'agent-model' };
+                },
+            },
+        }),
+        'follow-up-model'
+    );
 
     assert.equal(
         await resolveFollowUpModel({

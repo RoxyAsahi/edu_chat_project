@@ -588,7 +588,14 @@ async function resolveTaskModel({
     settings = {},
     agentConfigManager = null,
     logLabel = 'task',
+    preferredSettingsKeys = [],
 }) {
+    for (const settingsKey of Array.isArray(preferredSettingsKeys) ? preferredSettingsKeys : []) {
+        if (typeof settings?.[settingsKey] === 'string' && settings[settingsKey].trim()) {
+            return settings[settingsKey].trim();
+        }
+    }
+
     if (agentId && agentConfigManager && typeof agentConfigManager.readAgentConfig === 'function') {
         try {
             const agentConfig = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
@@ -623,6 +630,7 @@ async function resolveFollowUpModel({
         settings,
         agentConfigManager,
         logLabel: 'generate-follow-ups',
+        preferredSettingsKeys: ['followUpDefaultModel'],
     });
 }
 
@@ -1309,13 +1317,6 @@ function initialize(mainWindow, context) {
             const settings = settingsManager && typeof settingsManager.readSettings === 'function'
                 ? await settingsManager.readSettings()
                 : {};
-            if (settings.enableTopicTitleGeneration === false) {
-                return {
-                    success: true,
-                    generated: false,
-                    title: fallbackTitle,
-                };
-            }
             const endpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
             const apiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
             if (!endpoint || !apiKey) {
@@ -1406,6 +1407,7 @@ function initialize(mainWindow, context) {
                 settings,
                 agentConfigManager,
                 logLabel: 'generate-topic-title',
+                preferredSettingsKeys: ['topicTitleDefaultModel'],
             });
             const prompt = buildTopicTitlePrompt(settings.topicTitlePromptTemplate, visibleMessages);
             const response = await vcpClient.send({

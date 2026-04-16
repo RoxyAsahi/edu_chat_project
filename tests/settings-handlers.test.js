@@ -100,6 +100,38 @@ test('save-settings verifies follow-up prompt template persistence', async (t) =
     assert.deepEqual(result.persistenceCheck.mismatchedFields, []);
 });
 
+test('save-settings verifies dedicated task model fields persist correctly', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await manager.writeSettings(DEFAULT_SETTINGS);
+
+    const { settingsHandlers, handleHandlers } = loadSettingsHandlers();
+    settingsHandlers.initialize({
+        SETTINGS_FILE: settingsPath,
+        USER_AVATAR_FILE: path.join(tempRoot, 'user_avatar.png'),
+        AGENT_DIR: path.join(tempRoot, 'Agents'),
+        settingsManager: manager,
+        agentConfigManager: null,
+    });
+
+    const saveSettings = handleHandlers.get('save-settings');
+    const result = await saveSettings({}, {
+        followUpDefaultModel: 'follow-up-model',
+        topicTitleDefaultModel: 'topic-title-model',
+    });
+
+    const rawSettings = await fs.readJson(settingsPath);
+    assert.equal(result.success, true);
+    assert.equal(rawSettings.followUpDefaultModel, 'follow-up-model');
+    assert.equal(rawSettings.topicTitleDefaultModel, 'topic-title-model');
+    assert.equal(result.persistenceCheck.fieldChecks.followUpDefaultModel.matched, true);
+    assert.equal(result.persistenceCheck.fieldChecks.topicTitleDefaultModel.matched, true);
+    assert.deepEqual(result.persistenceCheck.mismatchedFields, []);
+});
+
 test('save-settings verifies topic title generation fields persist correctly', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
     const settingsPath = path.join(tempRoot, 'settings.json');

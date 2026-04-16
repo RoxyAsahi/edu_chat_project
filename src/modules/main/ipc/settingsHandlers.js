@@ -76,9 +76,19 @@ const SETTINGS_PERSISTENCE_FIELD_SPECS = [
         type: 'string',
     },
     {
+        id: 'followUpDefaultModel',
+        path: ['followUpDefaultModel'],
+        type: 'string',
+    },
+    {
         id: 'enableTopicTitleGeneration',
         path: ['enableTopicTitleGeneration'],
         type: 'boolean',
+    },
+    {
+        id: 'topicTitleDefaultModel',
+        path: ['topicTitleDefaultModel'],
+        type: 'string',
     },
     {
         id: 'topicTitlePromptTemplate',

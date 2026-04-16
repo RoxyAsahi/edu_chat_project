@@ -35,6 +35,9 @@ function createDom() {
     return new JSDOM(`
         <body>
           <input id="userNameInput" />
+          <input id="defaultModelInput" />
+          <input id="followUpDefaultModelInput" />
+          <input id="topicTitleDefaultModelInput" />
           <input id="studentNameInput" />
           <input id="studyCityInput" />
           <input id="studyWorkspaceInput" />
@@ -114,6 +117,9 @@ function createDom() {
 function createElementMap(documentObj) {
     return {
         userNameInput: documentObj.getElementById('userNameInput'),
+        defaultModelInput: documentObj.getElementById('defaultModelInput'),
+        followUpDefaultModelInput: documentObj.getElementById('followUpDefaultModelInput'),
+        topicTitleDefaultModelInput: documentObj.getElementById('topicTitleDefaultModelInput'),
         studentNameInput: documentObj.getElementById('studentNameInput'),
         studyCityInput: documentObj.getElementById('studyCityInput'),
         studyWorkspaceInput: documentObj.getElementById('studyWorkspaceInput'),
@@ -236,6 +242,9 @@ test('settingsController loads native toolbox settings, previews placeholders, a
             async loadSettings() {
                 return {
                     userName: 'Alice',
+                    defaultModel: 'chat-default-model',
+                    followUpDefaultModel: 'follow-up-default-model',
+                    topicTitleDefaultModel: 'topic-title-default-model',
                     kbUseRerank: true,
                     kbTopK: 6,
                     kbCandidateTopK: 20,
@@ -405,6 +414,9 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.agentBubbleThemePrompt.classList.contains('settings-textarea--readonly'), true);
     assert.equal(el.agentBubbleThemeResolvedPreview.value, '');
     assert.equal(el.agentBubbleThemePreviewMeta.textContent, '当前关闭，不会注入到 system 提示词。');
+    assert.equal(el.defaultModelInput.value, 'chat-default-model');
+    assert.equal(el.followUpDefaultModelInput.value, 'follow-up-default-model');
+    assert.equal(el.topicTitleDefaultModelInput.value, 'topic-title-default-model');
     assert.equal(el.renderingPromptInput.value, 'rendering prompt');
     assert.equal(el.adaptiveBubbleTipInput.value, 'adaptive tip');
     assert.equal(el.dailyNoteGuideInput.value, 'daily guide');
@@ -430,6 +442,9 @@ test('settingsController loads native toolbox settings, previews placeholders, a
 
     el.agentBubbleThemePrompt.value = 'Editable prompt: {{VarDivRender}}';
     el.agentBubbleThemePrompt.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    el.defaultModelInput.value = 'updated-chat-default-model';
+    el.followUpDefaultModelInput.value = 'updated-follow-up-model';
+    el.topicTitleDefaultModelInput.value = 'updated-topic-title-model';
     el.renderingPromptInput.value = 'native rendering text';
     el.adaptiveBubbleTipInput.value = 'native adaptive tip';
     el.dailyNoteGuideInput.value = 'native daily guide';
@@ -447,6 +462,9 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     await flushAsyncWork();
 
     assert.ok(savedPatch);
+    assert.equal(savedPatch.defaultModel, 'updated-chat-default-model');
+    assert.equal(savedPatch.followUpDefaultModel, 'updated-follow-up-model');
+    assert.equal(savedPatch.topicTitleDefaultModel, 'updated-topic-title-model');
     assert.equal(savedPatch.enableAgentBubbleTheme, true);
     assert.equal(savedPatch.agentBubbleThemePrompt, 'Editable prompt: {{VarDivRender}}');
     assert.equal(savedPatch.renderingPrompt, 'native rendering text');

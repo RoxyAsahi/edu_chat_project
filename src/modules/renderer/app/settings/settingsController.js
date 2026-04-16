@@ -5,7 +5,7 @@ const SETTINGS_MODAL_META = Object.freeze({
     },
     'default-model': {
         title: '默认模型',
-        subtitle: '统一设置新建智能体和默认会话优先使用的模型。',
+        subtitle: '统一设置通用默认模型，以及追问与话题命名任务各自优先使用的模型。',
     },
     prompts: {
         title: '提示词设置',
@@ -67,8 +67,10 @@ const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
     '{{CHAT_HISTORY}}',
 ].join('\n');
 const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
+    followUpDefaultModel: '追问默认模型',
     followUpPromptTemplate: '追问提示词模板',
     enableTopicTitleGeneration: '自动命名话题',
+    topicTitleDefaultModel: '话题命名默认模型',
     topicTitlePromptTemplate: '话题命名提示词模板',
     enableRenderingPrompt: '结构化渲染提示',
     enableAdaptiveBubbleTip: '简洁气泡补充',
@@ -747,6 +749,8 @@ function createSettingsController(deps = {}) {
         const settings = getGlobalSettings();
         el.userNameInput.value = settings.userName || '';
         if (el.defaultModelInput) el.defaultModelInput.value = settings.defaultModel || '';
+        if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = settings.followUpDefaultModel || '';
+        if (el.topicTitleDefaultModelInput) el.topicTitleDefaultModelInput.value = settings.topicTitleDefaultModel || '';
         if (el.studentNameInput) el.studentNameInput.value = settings.studyProfile?.studentName || '';
         if (el.studyCityInput) el.studyCityInput.value = settings.studyProfile?.city || '';
         if (el.studyWorkspaceInput) el.studyWorkspaceInput.value = settings.studyProfile?.studyWorkspace || '';
@@ -878,6 +882,8 @@ function createSettingsController(deps = {}) {
         const patch = {
             userName: el.userNameInput.value.trim() || 'User',
             defaultModel: el.defaultModelInput?.value.trim() || '',
+            followUpDefaultModel: el.followUpDefaultModelInput?.value.trim() || '',
+            topicTitleDefaultModel: el.topicTitleDefaultModelInput?.value.trim() || '',
             studyProfile: {
                 studentName: el.studentNameInput?.value.trim() || '',
                 city: el.studyCityInput?.value.trim() || '',
@@ -1311,6 +1317,8 @@ function createSettingsController(deps = {}) {
         [
             el.userNameInput,
             el.defaultModelInput,
+            el.followUpDefaultModelInput,
+            el.topicTitleDefaultModelInput,
             el.studentNameInput,
             el.studyCityInput,
             el.studyWorkspaceInput,
