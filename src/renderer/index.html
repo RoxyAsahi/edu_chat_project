@@ -415,12 +415,51 @@
                     </span>
                     <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
                   </button>
+                  <button id="openPomodoroBtn" class="notes-tool-tile notes-tool-tile--pomodoro" type="button">
+                    <span class="notes-tool-tile__icon material-symbols-outlined">timer</span>
+                    <span class="notes-tool-tile__body">
+                      <strong>番茄钟</strong>
+                    </span>
+                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                  </button>
                 </div>
               </div>
 
               <div class="notes-stream">
                 <div class="notes-stream__divider" aria-hidden="true"></div>
                 <div id="notesList" class="notes-list notes-list--studio"></div>
+                <section id="studioPomodoroPanel" class="notes-pomodoro-panel hidden" aria-label="番茄钟面板">
+                  <button id="studioPomodoroToggleBtn" class="notes-pomodoro-panel__summary" type="button" aria-expanded="true" aria-controls="studioPomodoroBody">
+                    <span class="notes-pomodoro-panel__summary-main">
+                      <span class="material-symbols-outlined notes-pomodoro-panel__summary-icon" aria-hidden="true">timer</span>
+                      <span class="notes-pomodoro-panel__summary-copy">
+                        <strong>番茄钟</strong>
+                        <span id="studioPomodoroSummaryText">25:00</span>
+                      </span>
+                    </span>
+                    <span class="material-symbols-outlined notes-pomodoro-panel__summary-arrow" aria-hidden="true">expand_more</span>
+                  </button>
+                  <div id="studioPomodoroBody" class="notes-pomodoro-panel__body">
+                    <div class="notes-pomodoro-panel__header">
+                      <div class="notes-pomodoro-panel__copy">
+                        <input
+                          id="studioPomodoroDisplayInput"
+                          class="notes-pomodoro-panel__display-input"
+                          type="text"
+                          value="25:00"
+                          inputmode="numeric"
+                          aria-label="番茄钟时间"
+                        />
+                      </div>
+                    </div>
+                    <div class="dynamic-island__panel-actions notes-pomodoro-panel__actions">
+                      <button id="studioPomodoroStartBtn" class="accent-button dynamic-island__action" type="button">开始</button>
+                      <button id="studioPomodoroPauseBtn" class="ghost-button dynamic-island__action hidden" type="button">暂停</button>
+                      <button id="studioPomodoroResumeBtn" class="accent-button dynamic-island__action hidden" type="button">继续</button>
+                      <button id="studioPomodoroResetBtn" class="ghost-button dynamic-island__action" type="button">重置</button>
+                    </div>
+                  </div>
+                </section>
               </div>
 
               <div class="notes-studio__footer">

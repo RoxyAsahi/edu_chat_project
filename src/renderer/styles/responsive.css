@@ -90,6 +90,29 @@
     right: 14px;
     font-size: 15px;
   }
+
+  .notes-pomodoro-panel__summary {
+    padding-inline: 12px;
+    gap: 8px;
+  }
+
+  .notes-pomodoro-panel__summary-main,
+  .notes-pomodoro-panel__summary-copy {
+    gap: 8px;
+  }
+
+  .notes-pomodoro-panel__summary-copy strong {
+    display: none;
+  }
+
+  .notes-pomodoro-panel__summary-copy span {
+    font-size: 12px;
+  }
+
+  .notes-pomodoro-panel__display-input {
+    width: min(100%, 132px);
+    font-size: 46px;
+  }
 }
 
 @media (max-width: 1500px) {

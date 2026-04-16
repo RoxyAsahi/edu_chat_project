@@ -42,7 +42,6 @@ function createNotesController(deps = {}) {
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
     const getCurrentChatHistory = deps.getCurrentChatHistory || (() => store.getState().session.currentChatHistory);
-
     const HTMLElementCtor = windowObj.HTMLElement || globalThis.HTMLElement;
     const ElementCtor = windowObj.Element || globalThis.Element;
     let noteDetailTrigger = null;
@@ -122,6 +121,14 @@ function createNotesController(deps = {}) {
         pendingFlashcardGeneration: {
             get: () => getNotesSlice().pendingFlashcardGeneration,
             set: (value) => patchNotes({ pendingFlashcardGeneration: value }),
+        },
+        studioPomodoroVisible: {
+            get: () => getNotesSlice().studioPomodoroVisible === true,
+            set: (value) => patchNotes({ studioPomodoroVisible: value === true }),
+        },
+        studioPomodoroExpanded: {
+            get: () => getNotesSlice().studioPomodoroExpanded !== false,
+            set: (value) => patchNotes({ studioPomodoroExpanded: value !== false }),
         },
         quizPractice: {
             get: () => getNotesSlice().quizPractice || {
@@ -791,6 +798,26 @@ function createNotesController(deps = {}) {
         });
         el.generateFlashcardsBtn?.addEventListener('click', () => {
             void notesOperationsApi.runNotesTool('flashcards');
+        });
+        el.openPomodoroBtn?.addEventListener('click', () => {
+            const nextVisible = !state.studioPomodoroVisible;
+            state.studioPomodoroVisible = nextVisible;
+            if (nextVisible) {
+                state.studioPomodoroExpanded = true;
+            }
+            el.openPomodoroBtn?.classList.toggle('notes-tool-tile--active', nextVisible);
+            const pomodoroArrow = el.openPomodoroBtn?.querySelector('.notes-tool-tile__arrow');
+            if (pomodoroArrow) {
+                pomodoroArrow.textContent = nextVisible ? 'expand_more' : 'chevron_right';
+            }
+            notesDomApi?.renderNotesPanel?.();
+            if (nextVisible) {
+                el.studioPomodoroPanel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+        el.studioPomodoroToggleBtn?.addEventListener('click', () => {
+            state.studioPomodoroExpanded = !state.studioPomodoroExpanded;
+            notesDomApi?.renderNotesPanel?.();
         });
         el.quizPracticeOptions?.addEventListener('click', (event) => {
             const target = event.target;

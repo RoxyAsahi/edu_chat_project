@@ -292,6 +292,13 @@ function createNotesDom(deps = {}) {
 
         el.topicNotesScopeBtn?.classList.toggle('notes-scope-btn--active', state.notesScope === 'topic');
         el.agentNotesScopeBtn?.classList.toggle('notes-scope-btn--active', state.notesScope === 'agent');
+        if (el.openPomodoroBtn) {
+            el.openPomodoroBtn.classList.toggle('notes-tool-tile--active', state.studioPomodoroVisible === true);
+            const pomodoroArrow = el.openPomodoroBtn.querySelector('.notes-tool-tile__arrow');
+            if (pomodoroArrow) {
+                pomodoroArrow.textContent = state.studioPomodoroVisible === true ? 'expand_more' : 'chevron_right';
+            }
+        }
         updateNotesSelectionSummary();
 
         if (!el.notesList) {
@@ -300,6 +307,14 @@ function createNotesDom(deps = {}) {
 
         el.notesList.innerHTML = '';
         const pendingFlashcards = flashcardsApi.getPendingGeneration();
+
+        if (el.studioPomodoroPanel && state.studioPomodoroVisible) {
+            el.studioPomodoroPanel.classList.remove('hidden');
+            el.studioPomodoroPanel.classList.toggle('notes-pomodoro-panel--collapsed', state.studioPomodoroExpanded === false);
+            el.studioPomodoroBody?.classList.toggle('hidden', state.studioPomodoroExpanded === false);
+            el.studioPomodoroToggleBtn?.setAttribute('aria-expanded', state.studioPomodoroExpanded === false ? 'false' : 'true');
+            el.notesList.appendChild(el.studioPomodoroPanel);
+        }
 
         if (pendingFlashcards) {
             const pendingCard = documentObj.createElement('div');

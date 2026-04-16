@@ -19,6 +19,15 @@ function formatPomodoroRemaining(ms = 0) {
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function parsePomodoroDisplayMinutes(value, fallback = 25) {
+    const text = String(value || '').trim();
+    if (!text) {
+        return fallback;
+    }
+    const [minutesPart] = text.split(':');
+    return clampPomodoroMinutes(minutesPart, fallback);
+}
+
 function createDynamicIslandController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -74,14 +83,25 @@ function createDynamicIslandController(deps = {}) {
     }
 
     function syncDurationInput(layout = getLayoutSlice()) {
-        if (!el.dynamicIslandMinutesInput) {
-            return;
-        }
         const nextMinutes = clampPomodoroMinutes(layout.pomodoroDurationMinutes, 25);
-        if (String(nextMinutes) !== el.dynamicIslandMinutesInput.value) {
-            el.dynamicIslandMinutesInput.value = String(nextMinutes);
+        [el.dynamicIslandMinutesInput].forEach((input) => {
+            if (!input) {
+                return;
+            }
+            if (String(nextMinutes) !== input.value) {
+                input.value = String(nextMinutes);
+            }
+            input.disabled = layout.pomodoroStatus === 'running';
+        });
+        if (el.studioPomodoroDisplayInput) {
+            const displayValue = layout.pomodoroStatus === 'idle'
+                ? `${nextMinutes}:00`
+                : formatPomodoroRemaining(getPomodoroRemainingMs(layout));
+            if (documentObj.activeElement !== el.studioPomodoroDisplayInput) {
+                el.studioPomodoroDisplayInput.value = displayValue;
+            }
+            el.studioPomodoroDisplayInput.readOnly = layout.pomodoroStatus !== 'idle';
         }
-        el.dynamicIslandMinutesInput.disabled = layout.pomodoroStatus === 'running';
     }
 
     function pulseIsland() {
@@ -154,21 +174,35 @@ function createDynamicIslandController(deps = {}) {
             el.dynamicIslandStatusText.textContent = presentation.text;
             el.dynamicIslandStatusText.classList.toggle('is-placeholder', presentation.isPlaceholder);
         }
-        if (el.dynamicIslandTimerDisplay) {
-            el.dynamicIslandTimerDisplay.textContent = formatPomodoroRemaining(remainingMs);
+        [el.dynamicIslandTimerDisplay].forEach((node) => {
+            if (node) {
+                node.textContent = formatPomodoroRemaining(remainingMs);
+            }
+        });
+        if (el.studioPomodoroDisplayInput && documentObj.activeElement !== el.studioPomodoroDisplayInput) {
+            el.studioPomodoroDisplayInput.value = layout.pomodoroStatus === 'idle'
+                ? `${clampPomodoroMinutes(layout.pomodoroDurationMinutes, 25)}:00`
+                : formatPomodoroRemaining(remainingMs);
         }
-        if (el.dynamicIslandPauseBtn) {
-            el.dynamicIslandPauseBtn.classList.toggle('hidden', layout.pomodoroStatus !== 'running');
+        if (el.studioPomodoroSummaryText) {
+            el.studioPomodoroSummaryText.textContent = layout.pomodoroStatus === 'idle'
+                ? `${clampPomodoroMinutes(layout.pomodoroDurationMinutes, 25)} 分钟`
+                : formatPomodoroRemaining(remainingMs);
         }
-        if (el.dynamicIslandResumeBtn) {
-            el.dynamicIslandResumeBtn.classList.toggle('hidden', layout.pomodoroStatus !== 'paused');
-        }
-        if (el.dynamicIslandStartBtn) {
-            el.dynamicIslandStartBtn.classList.toggle('hidden', layout.pomodoroStatus === 'running' || layout.pomodoroStatus === 'paused');
-        }
-        if (el.dynamicIslandResetBtn) {
-            el.dynamicIslandResetBtn.disabled = layout.pomodoroStatus === 'idle' && remainingMs === getConfiguredDurationMs(layout);
-        }
+        [el.dynamicIslandPauseBtn, el.studioPomodoroPauseBtn].forEach((node) => {
+            node?.classList.toggle('hidden', layout.pomodoroStatus !== 'running');
+        });
+        [el.dynamicIslandResumeBtn, el.studioPomodoroResumeBtn].forEach((node) => {
+            node?.classList.toggle('hidden', layout.pomodoroStatus !== 'paused');
+        });
+        [el.dynamicIslandStartBtn, el.studioPomodoroStartBtn].forEach((node) => {
+            node?.classList.toggle('hidden', layout.pomodoroStatus === 'running' || layout.pomodoroStatus === 'paused');
+        });
+        [el.dynamicIslandResetBtn, el.studioPomodoroResetBtn].forEach((node) => {
+            if (node) {
+                node.disabled = layout.pomodoroStatus === 'idle' && remainingMs === getConfiguredDurationMs(layout);
+            }
+        });
 
         syncDurationInput(layout);
     }
@@ -182,12 +216,21 @@ function createDynamicIslandController(deps = {}) {
     }
 
     function syncDurationFromInput() {
-        if (!el.dynamicIslandMinutesInput) {
+        const activeInput = el.dynamicIslandMinutesInput || null;
+        const studioInputActive = documentObj.activeElement === el.studioPomodoroDisplayInput;
+        if (!activeInput && !studioInputActive) {
             return getLayoutSlice().pomodoroDurationMinutes || 25;
         }
         const layout = getLayoutSlice();
-        const nextMinutes = clampPomodoroMinutes(el.dynamicIslandMinutesInput.value, layout.pomodoroDurationMinutes || 25);
-        el.dynamicIslandMinutesInput.value = String(nextMinutes);
+        const nextMinutes = studioInputActive
+            ? parsePomodoroDisplayMinutes(el.studioPomodoroDisplayInput.value, layout.pomodoroDurationMinutes || 25)
+            : clampPomodoroMinutes(activeInput.value, layout.pomodoroDurationMinutes || 25);
+        if (activeInput) {
+            activeInput.value = String(nextMinutes);
+        }
+        if (studioInputActive && el.studioPomodoroDisplayInput) {
+            el.studioPomodoroDisplayInput.value = `${nextMinutes}:00`;
+        }
         patchLayout((current) => {
             const nextPatch = {
                 pomodoroDurationMinutes: nextMinutes,
@@ -304,16 +347,53 @@ function createDynamicIslandController(deps = {}) {
         el.dynamicIslandMinutesInput?.addEventListener('blur', () => {
             syncDurationFromInput();
         });
+        el.studioPomodoroDisplayInput?.addEventListener('blur', () => {
+            syncDurationFromInput();
+        });
+        el.studioPomodoroDisplayInput?.addEventListener('focus', () => {
+            if (getLayoutSlice().pomodoroStatus === 'idle') {
+                el.studioPomodoroDisplayInput?.select();
+            }
+        });
+        el.studioPomodoroDisplayInput?.addEventListener('input', () => {
+            if (getLayoutSlice().pomodoroStatus !== 'idle' || !el.studioPomodoroSummaryText) {
+                return;
+            }
+            const previewMinutes = parsePomodoroDisplayMinutes(
+                el.studioPomodoroDisplayInput.value,
+                getLayoutSlice().pomodoroDurationMinutes || 25,
+            );
+            el.studioPomodoroSummaryText.textContent = `${previewMinutes} 分钟`;
+        });
+        el.studioPomodoroDisplayInput?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                syncDurationFromInput();
+                el.studioPomodoroDisplayInput?.blur();
+            }
+        });
         el.dynamicIslandStartBtn?.addEventListener('click', () => {
+            startPomodoro();
+        });
+        el.studioPomodoroStartBtn?.addEventListener('click', () => {
             startPomodoro();
         });
         el.dynamicIslandPauseBtn?.addEventListener('click', () => {
             pausePomodoro();
         });
+        el.studioPomodoroPauseBtn?.addEventListener('click', () => {
+            pausePomodoro();
+        });
         el.dynamicIslandResumeBtn?.addEventListener('click', () => {
             resumePomodoro();
         });
+        el.studioPomodoroResumeBtn?.addEventListener('click', () => {
+            resumePomodoro();
+        });
         el.dynamicIslandResetBtn?.addEventListener('click', () => {
+            resetPomodoro();
+        });
+        el.studioPomodoroResetBtn?.addEventListener('click', () => {
             resetPomodoro();
         });
         documentObj.addEventListener('click', (event) => {
