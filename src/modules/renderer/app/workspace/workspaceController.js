@@ -316,10 +316,14 @@ function createWorkspaceController(deps = {}) {
         const isOverview = state.workspaceViewMode !== 'subject';
         el.workspaceOverviewPage?.classList.toggle('hidden', !isOverview);
         el.workspaceSubjectPage?.classList.toggle('hidden', isOverview);
+        el.settingsModal?.classList.add('hidden');
+        el.settingsModal?.classList.remove('settings-page--open');
         el.workspaceBackToOverviewBtn?.classList.toggle('titlebar__tab--active', isOverview);
         el.workspaceOpenSubjectBtn?.classList.toggle('titlebar__tab--active', !isOverview);
         documentObj.body?.classList?.toggle('workspace-view-overview', isOverview);
         documentObj.body?.classList?.toggle('workspace-view-subject', !isOverview);
+        documentObj.body?.classList?.remove('workspace-view-settings');
+        documentObj.body?.classList?.remove('settings-page-open');
         if (isOverview) {
             ensureOverviewClockTimer();
         } else {

@@ -621,30 +621,41 @@
         <button id="settingsModalCloseBtn" class="ghost-button icon-btn settings-modal__close hidden" type="button" aria-label="关闭设置" tabindex="-1" aria-hidden="true">
           <span class="material-symbols-outlined">close</span>
         </button>
-        <button id="settingsModalCloseBtnFloating" class="ghost-button icon-btn settings-modal__close settings-modal__close--floating" type="button" aria-label="关闭设置">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-
         <div class="settings-modal__body">
           <nav class="settings-modal__nav" aria-label="设置分类">
-            <button id="settingsNavGlobalBtn" class="settings-modal__nav-button settings-modal__nav-button--active" type="button" data-settings-section-button="global">
-              <span class="material-symbols-outlined">tune</span>
-              <span>全局设置</span>
+            <div class="workspace-card__header settings-modal__nav-header">
+              <div class="workspace-card__titleblock">
+                <p class="workspace-card__title">设置导航</p>
+              </div>
+            </div>
+            <button id="settingsNavServicesBtn" class="settings-modal__nav-button settings-modal__nav-button--active" type="button" data-settings-section-button="services">
+              <span class="material-symbols-outlined">hub</span>
+              <span>模型服务</span>
             </button>
-            <button id="settingsNavAgentBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="agent">
+            <button id="settingsNavDefaultModelBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="default-model">
               <span class="material-symbols-outlined">smart_toy</span>
-              <span>智能体设置</span>
+              <span>默认模型</span>
             </button>
-            <button id="settingsNavKnowledgeBaseBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="knowledge-base">
-              <span class="material-symbols-outlined">database</span>
-              <span>来源管理</span>
+            <button id="settingsNavPromptsBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="prompts">
+              <span class="material-symbols-outlined">text_snippet</span>
+              <span>提示词设置</span>
+            </button>
+            <button id="settingsNavDisplayBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="display">
+              <span class="material-symbols-outlined">brush</span>
+              <span>显示设置</span>
             </button>
           </nav>
 
           <div class="settings-modal__content">
-            <section id="settingsModalSectionGlobal" class="settings-modal__section" data-settings-section="global">
+            <div class="workspace-card__header settings-modal__content-header">
+              <div class="workspace-card__titleblock">
+                <p id="settingsModalTitleDisplay" class="workspace-card__title">模型服务</p>
+              </div>
+            </div>
+            <div class="settings-modal__content-scroll">
+            <section id="settingsModalSectionServices" class="settings-modal__section" data-settings-section="services">
               <section class="settings-card settings-card--modal">
-                <h3><span class="material-symbols-outlined bento-icon">public</span> 全局连接</h3>
+                <h3><span class="material-symbols-outlined bento-icon">public</span> 模型服务</h3>
                 <div class="field-grid">
                   <label>
                     <span>用户名</span>
@@ -697,7 +708,22 @@
                   </div>
                 </div>
               </section>
+            </section>
 
+            <section id="settingsModalSectionDefaultModel" class="settings-modal__section hidden" data-settings-section="default-model">
+              <section class="settings-card settings-card--modal">
+                <h3><span class="material-symbols-outlined bento-icon">smart_toy</span> 默认模型</h3>
+                <div class="field-grid">
+                  <label style="grid-column: span 2;">
+                    <span>默认模型</span>
+                    <input id="defaultModelInput" type="text" placeholder="gemini-3.1-flash-lite-preview" />
+                  </label>
+                </div>
+                <p class="settings-caption">新建智能体或未显式指定模型时，会优先使用这里的默认模型。</p>
+              </section>
+            </section>
+
+            <section id="settingsModalSectionPrompts" class="settings-modal__section hidden" data-settings-section="prompts">
               <section class="settings-card settings-card--modal">
                 <h3><span class="material-symbols-outlined bento-icon">school</span> 学习档案</h3>
                 <div class="field-grid">
@@ -851,7 +877,9 @@
                 </div>
 
               </section>
+            </section>
 
+            <section id="settingsModalSectionDisplay" class="settings-modal__section hidden" data-settings-section="display">
               <section class="settings-card settings-card--modal">
                 <h3><span class="material-symbols-outlined bento-icon">brush</span> 显示与排版</h3>
                 <div class="field-grid">
@@ -877,12 +905,11 @@
                   </label>
                 </div>
                 <div class="checkbox-row">
-                  <label><input id="enableWideChatLayout" type="checkbox" /> 宽屏聊天布局</label>
                   <label><input id="enableSmoothStreaming" type="checkbox" /> 平滑流式输出</label>
                 </div>
               </section>
-
             </section>
+            </div>
 
             <section id="settingsModalSectionAgent" class="settings-modal__section hidden" data-settings-section="agent">
               <div class="settings-panel__header settings-modal__agent-header">

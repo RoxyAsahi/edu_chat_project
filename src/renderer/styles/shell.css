@@ -511,6 +511,12 @@ body.dark-theme .icon-btn:hover { background: rgba(255,255,255,0.1); }
 
 .titlebar__meta .ghost-button:hover { color: var(--ink); }
 
+body.workspace-view-settings #globalSettingsBtn {
+  background: #ffffff;
+  color: #111111;
+  box-shadow: none;
+}
+
 .empty-list-state--compact {
   border: none;
   background: transparent;

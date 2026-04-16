@@ -1,7 +1,23 @@
 const SETTINGS_MODAL_META = Object.freeze({
+    services: {
+        title: '模型服务',
+        subtitle: '管理全局连接、检索模型和来源服务参数。',
+    },
+    'default-model': {
+        title: '默认模型',
+        subtitle: '统一设置新建智能体和默认会话优先使用的模型。',
+    },
+    prompts: {
+        title: '提示词设置',
+        subtitle: '集中管理学习档案、提示变量和日志协议。',
+    },
+    display: {
+        title: '显示设置',
+        subtitle: '调整聊天字体、宽度和流式显示效果。',
+    },
     global: {
-        title: '全局设置',
-        subtitle: '管理账号、VCP 连接、渲染样式与主题外观。',
+        title: '模型服务',
+        subtitle: '管理全局连接、检索模型和来源服务参数。',
     },
     agent: {
         title: '智能体设置',
@@ -127,6 +143,7 @@ function createSettingsController(deps = {}) {
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getBubbleThemePreviewContext = deps.getBubbleThemePreviewContext || (() => ({}));
     let settingsModalTrigger = null;
+    let settingsPageReturnView = 'overview';
     let globalSettingsSaveTimer = null;
     let isSyncingGlobalSettingsForm = false;
     let isSavingGlobalSettings = false;
@@ -189,7 +206,6 @@ function createSettingsController(deps = {}) {
         documentObj.documentElement.style.setProperty('--unistudy-chat-max-width', `${Number(settings.chatBubbleMaxWidthWideDefault || 92)}%`);
         documentObj.documentElement.style.setProperty('--unistudy-chat-font', chatFonts[settings.chatFontPreset] || chatFonts.system);
         documentObj.documentElement.style.setProperty('--unistudy-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.consolas);
-        documentObj.body.classList.toggle('wide-chat-layout', settings.enableWideChatLayout === true);
     }
 
     function syncPromptTextareaState(node, enabled) {
@@ -699,6 +715,7 @@ function createSettingsController(deps = {}) {
         isSyncingGlobalSettingsForm = true;
         const settings = getGlobalSettings();
         el.userNameInput.value = settings.userName || '';
+        if (el.defaultModelInput) el.defaultModelInput.value = settings.defaultModel || '';
         if (el.studentNameInput) el.studentNameInput.value = settings.studyProfile?.studentName || '';
         if (el.studyCityInput) el.studyCityInput.value = settings.studyProfile?.city || '';
         if (el.studyWorkspaceInput) el.studyWorkspaceInput.value = settings.studyProfile?.studyWorkspace || '';
@@ -771,7 +788,6 @@ function createSettingsController(deps = {}) {
                 markPromptTextareaDefault(el.dailyNoteGuideInput, getDailyNoteDefaultPromptText());
             }
         }
-        el.enableWideChatLayout.checked = settings.enableWideChatLayout !== false;
         el.enableSmoothStreaming.checked = settings.enableSmoothStreaming === true;
         syncPromptInjectionState();
         void refreshAgentBubbleThemePreview();
@@ -809,6 +825,7 @@ function createSettingsController(deps = {}) {
         const globalApiKey = el.vcpApiKey.value.trim();
         const patch = {
             userName: el.userNameInput.value.trim() || 'User',
+            defaultModel: el.defaultModelInput?.value.trim() || '',
             studyProfile: {
                 studentName: el.studentNameInput?.value.trim() || '',
                 city: el.studyCityInput?.value.trim() || '',
@@ -845,7 +862,6 @@ function createSettingsController(deps = {}) {
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
             adaptiveBubbleTip: getPromptTextareaRawValue(el.adaptiveBubbleTipInput),
             dailyNoteGuide: getPromptTextareaRawValue(el.dailyNoteGuideInput),
-            enableWideChatLayout: el.enableWideChatLayout.checked,
             enableSmoothStreaming: el.enableSmoothStreaming.checked,
             currentThemeMode: themeMode,
         };
@@ -922,9 +938,10 @@ function createSettingsController(deps = {}) {
     }
 
     function switchSettingsModalSection(section) {
-        const nextSection = Object.prototype.hasOwnProperty.call(SETTINGS_MODAL_META, section)
-            ? section
-            : 'global';
+        const normalizedSection = section === 'global' ? 'services' : section;
+        const nextSection = Object.prototype.hasOwnProperty.call(SETTINGS_MODAL_META, normalizedSection)
+            ? normalizedSection
+            : 'services';
         patchSettingsSlice({
             settingsModalSection: nextSection,
         });
@@ -936,7 +953,10 @@ function createSettingsController(deps = {}) {
         });
 
         const sections = [
-            ['global', el.settingsModalSectionGlobal],
+            ['services', el.settingsModalSectionServices],
+            ['default-model', el.settingsModalSectionDefaultModel],
+            ['prompts', el.settingsModalSectionPrompts],
+            ['display', el.settingsModalSectionDisplay],
             ['agent', el.settingsModalSectionAgent],
             ['knowledge-base', el.settingsModalSectionKnowledgeBase],
         ];
@@ -950,32 +970,52 @@ function createSettingsController(deps = {}) {
         if (el.settingsModalTitle) {
             el.settingsModalTitle.textContent = meta.title;
         }
+        if (el.settingsModalTitleDisplay) {
+            el.settingsModalTitleDisplay.textContent = meta.title;
+        }
         if (el.settingsModalSubtitle) {
             el.settingsModalSubtitle.textContent = meta.subtitle;
         }
         el.settingsModalFooter?.classList.toggle('hidden', nextSection === 'agent');
-        if (nextSection === 'global') {
+        if (['services', 'default-model', 'prompts', 'display'].includes(nextSection)) {
             void refreshFinalSystemPromptPreview();
         }
+    }
+
+    function detectCurrentWorkspaceView() {
+        if (!el.workspaceSubjectPage?.classList.contains('hidden')) {
+            return 'subject';
+        }
+        return 'overview';
     }
 
     function openSettingsModal(section = 'global', trigger = null) {
         if (trigger instanceof HTMLElement) {
             settingsModalTrigger = trigger;
         }
+        settingsPageReturnView = detectCurrentWorkspaceView();
         switchSettingsModalSection(section);
+        el.workspaceOverviewPage?.classList.add('hidden');
+        el.workspaceSubjectPage?.classList.add('hidden');
         el.settingsModal?.classList.remove('hidden');
-        el.settingsModal?.classList.add('settings-modal--open');
+        el.settingsModal?.classList.add('settings-page--open');
         el.settingsModal?.setAttribute('aria-hidden', 'false');
-        documentObj.body.classList.add('settings-modal-open');
-        (el.settingsModalCloseBtnFloating || el.settingsModalCloseBtn)?.focus();
+        documentObj.body.classList.add('settings-page-open');
+        documentObj.body.classList.add('workspace-view-settings');
+        documentObj.body.classList.remove('workspace-view-overview', 'workspace-view-subject');
     }
 
     function closeSettingsModal() {
         el.settingsModal?.classList.add('hidden');
-        el.settingsModal?.classList.remove('settings-modal--open');
+        el.settingsModal?.classList.remove('settings-page--open');
         el.settingsModal?.setAttribute('aria-hidden', 'true');
-        documentObj.body.classList.remove('settings-modal-open');
+        documentObj.body.classList.remove('settings-page-open');
+        documentObj.body.classList.remove('workspace-view-settings');
+        const returnToSubject = settingsPageReturnView === 'subject';
+        el.workspaceOverviewPage?.classList.toggle('hidden', returnToSubject);
+        el.workspaceSubjectPage?.classList.toggle('hidden', !returnToSubject);
+        documentObj.body.classList.toggle('workspace-view-overview', !returnToSubject);
+        documentObj.body.classList.toggle('workspace-view-subject', returnToSubject);
         if (settingsModalTrigger instanceof HTMLElement && documentObj.body.contains(settingsModalTrigger)) {
             settingsModalTrigger.focus();
         }
@@ -1050,8 +1090,9 @@ function createSettingsController(deps = {}) {
         el.globalSettingsBtn?.addEventListener('click', () => {
             openSettingsModal('global', el.globalSettingsBtn);
         });
+        el.workspaceBackToOverviewBtn?.addEventListener('click', closeSettingsModal);
+        el.workspaceOpenSubjectBtn?.addEventListener('click', closeSettingsModal);
         el.settingsModalCloseBtn?.addEventListener('click', closeSettingsModal);
-        el.settingsModalCloseBtnFloating?.addEventListener('click', closeSettingsModal);
         el.settingsModalBackdrop?.addEventListener('click', closeSettingsModal);
         el.settingsNavButtons?.forEach((button) => {
             button.addEventListener('click', () => {
@@ -1175,6 +1216,7 @@ function createSettingsController(deps = {}) {
 
         [
             el.userNameInput,
+            el.defaultModelInput,
             el.studentNameInput,
             el.studyCityInput,
             el.studyWorkspaceInput,
@@ -1196,7 +1238,6 @@ function createSettingsController(deps = {}) {
 
         [
             el.kbUseRerank,
-            el.enableWideChatLayout,
             el.enableSmoothStreaming,
             el.chatFontPreset,
             el.chatCodeFontPreset,
