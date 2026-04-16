@@ -526,10 +526,10 @@
 }
 
 /* Lists */
-.list { list-style: none; margin: 0; padding: 0 4px 0 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.list { list-style: none; margin: 0; padding: 0 2px 0 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 
 .list--topics {
-  gap: 4px;
+  gap: 2px;
 }
 
 .list-item {
@@ -801,12 +801,12 @@
 .topic-item.topic-item--compact {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 5px 8px 5px 6px;
   border-radius: 999px;
   border: none;
   background: transparent;
-  min-height: 52px;
+  min-height: 42px;
   box-shadow: none;
   transition: background 0.18s ease, color 0.18s ease;
 }
@@ -830,8 +830,8 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-left: 6px;
+  gap: 8px;
+  padding-left: 7px;
 }
 
 .topic-item__body strong {
@@ -847,11 +847,24 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 28px;
+  opacity: 0;
+  transform: translateX(4px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.topic-item--compact:hover .topic-item__actions,
+.topic-item--compact:focus-within .topic-item__actions {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .topic-item__menu-btn {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 999px;
   background: transparent;
@@ -983,8 +996,8 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .knowledge-base-documents {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .kb-debug-panel {
@@ -1097,10 +1110,10 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   display: flex;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 12px;
+  gap: 10px;
   border: 1px solid transparent;
-  border-radius: 14px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 7px 10px 7px 8px;
   background: transparent;
   position: relative;
   transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
@@ -1115,8 +1128,8 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 
 .kb-document-row__menu-btn {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: 999px;
   background: transparent;
@@ -1189,6 +1202,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   align-items: center;
   min-width: 0;
   flex: 1 1 auto;
+  padding-left: 3px;
 }
 
 .kb-document-row__body strong {
@@ -1247,7 +1261,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .source-sidebar-card {
   background: #ffffff;
   box-shadow: none;
-  padding: 8px 18px 16px;
+  padding: 8px 12px 16px;
   border-radius: 24px;
   border: none;
 }
@@ -1257,9 +1271,9 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 2px 18px 9px;
-  margin-left: -18px;
-  margin-right: -18px;
+  padding: 2px 12px 9px;
+  margin-left: -12px;
+  margin-right: -12px;
   margin-bottom: 1px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
   min-height: 34px;
@@ -1410,7 +1424,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .source-sidebar-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .source-sidebar-card .panel__header--stacked {
@@ -1428,7 +1442,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 
 .source-sidebar-card .workspace-card__cta--list-item {
   align-self: stretch;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
 }
 
 .source-sidebar-card .workspace-card__list {
@@ -1472,7 +1486,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   padding-right: 4px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .topic-files-empty-actions {
