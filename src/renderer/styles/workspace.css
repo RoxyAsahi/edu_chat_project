@@ -802,11 +802,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px 5px 6px;
+  padding: 3px 8px 3px 6px;
   border-radius: 999px;
   border: none;
   background: transparent;
-  min-height: 42px;
+  min-height: 38px;
   box-shadow: none;
   transition: background 0.18s ease, color 0.18s ease;
 }
@@ -1271,10 +1271,10 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 2px 12px 9px;
+  padding: 1px 12px 6px;
   margin-left: -12px;
   margin-right: -12px;
-  margin-bottom: 1px;
+  margin-bottom: -1px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
   min-height: 34px;
 }
@@ -1308,6 +1308,30 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   box-shadow: none;
 }
 
+.workspace-card__cta--topic-create {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #111111;
+  gap: 0;
+  align-self: center;
+}
+
+.workspace-card__cta--topic-create:hover,
+.workspace-card__cta--topic-create:focus-visible {
+  background: #f1f3f4;
+  color: #111111;
+  box-shadow: none;
+  transform: none;
+}
+
+.workspace-card__cta--topic-create .material-symbols-outlined {
+  font-size: 19px;
+}
+
 .workspace-card__cta--list-item {
   width: 100%;
   justify-content: flex-start;
@@ -1326,7 +1350,7 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .workspace-card__list {
   min-height: 0;
   flex: 1 1 auto;
-  margin-top: -2px;
+  margin-top: -5px;
 }
 
 .workspace-nav__summary {

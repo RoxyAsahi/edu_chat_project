@@ -136,6 +136,14 @@ textarea:focus, input:focus, select:focus {
   color: #111111;
 }
 
+body.workspace-view-overview .titlebar__home-btn,
+body.workspace-view-subject #workspaceOpenSubjectBtn {
+  background: #ffffff;
+  border-color: #e0e3e7;
+  box-shadow: none;
+  color: #111111;
+}
+
 .titlebar__tab-text {
   min-width: 0;
   white-space: nowrap;
@@ -150,6 +158,10 @@ textarea:focus, input:focus, select:focus {
   color: currentColor;
 }
 
+.titlebar__tab .titlebar__tab-icon {
+  font-size: 16px;
+}
+
 .titlebar__tab-copy {
   min-width: 0;
   display: flex;
@@ -159,7 +171,7 @@ textarea:focus, input:focus, select:focus {
 }
 
 .titlebar__context-card {
-  max-width: 300px;
+  max-width: 420px;
   border: none;
   justify-content: flex-start;
   padding-inline: 12px;
@@ -175,29 +187,32 @@ textarea:focus, input:focus, select:focus {
 }
 
 .titlebar__context-card strong {
-  min-width: 0;
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: currentColor;
-}
-
-.titlebar__context-label {
-  color: currentColor;
-  opacity: 0.9;
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
 }
 
 .titlebar__context-card--topic {
-  max-width: 360px;
+  max-width: 420px;
 }
 
-.titlebar__tab--context .titlebar__context-label::after {
-  content: '';
+.titlebar__context-card--topic .titlebar__tab-copy {
+  min-width: 0;
+  gap: 8px;
+}
+
+.titlebar__context-card--topic strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titlebar__context-separator {
+  flex: 0 0 auto;
+  color: rgba(17, 17, 17, 0.62);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .titlebar__home-btn {
@@ -228,12 +243,8 @@ textarea:focus, input:focus, select:focus {
 .titlebar__tab .material-symbols-outlined,
 .titlebar__tab strong,
 .titlebar__tab .titlebar__tab-text,
-.titlebar__tab .titlebar__context-label {
+.titlebar__tab .titlebar__context-separator {
   color: currentColor;
-}
-
-body.workspace-view-overview .titlebar__home-btn {
-  display: none;
 }
 
 .layout {
