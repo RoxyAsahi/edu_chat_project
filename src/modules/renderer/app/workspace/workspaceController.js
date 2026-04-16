@@ -921,19 +921,7 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        const name = await ui.showPromptDialog({
-            title: '新建话题',
-            message: `为 ${state.currentSelectedItem.name || state.currentSelectedItem.id} 创建一个新的学习主题。`,
-            placeholder: '话题名称',
-            defaultValue: '新建学习话题',
-            confirmText: '创建',
-            cancelText: '取消',
-        });
-        if (!name) {
-            return;
-        }
-
-        const result = await chatAPI.createNewTopicForAgent(state.currentSelectedItem.id, name || '', false, true);
+        const result = await chatAPI.createNewTopicForAgent(state.currentSelectedItem.id, '', false, true);
         if (result?.error) {
             ui.showToastNotification(result.error, 'error');
             return;

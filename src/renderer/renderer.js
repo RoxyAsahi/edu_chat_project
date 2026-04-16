@@ -11,11 +11,13 @@ import { createLayoutController } from '../modules/renderer/app/layout/layoutCon
 import { createMobileWorkspaceController } from '../modules/renderer/app/layout/mobileWorkspaceController.js';
 import { createDiaryWallController } from '../modules/renderer/app/diaryWall/diaryWallController.js';
 import { createDynamicIslandController } from '../modules/renderer/app/dynamicIsland/dynamicIslandController.js';
+import { createFollowUpController } from '../modules/renderer/app/followUps/followUpController.js';
 import { createLogsController } from '../modules/renderer/app/logs/logsController.js';
 import { createNotesController } from '../modules/renderer/app/notes/notesController.js';
 import { createReaderController } from '../modules/renderer/app/reader/readerController.js';
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
 import { createSourceController } from '../modules/renderer/app/source/sourceController.js';
+import { createTopicTitleController } from '../modules/renderer/app/topicTitles/topicTitleController.js';
 import { createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
 import { buildSubjectOverviewMarkup } from '../modules/renderer/app/workspace/workspaceOverview.js';
 import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime } from '../modules/renderer/app/bootstrap.js';
@@ -34,6 +36,8 @@ let logsController = null;
 let diaryWallController = null;
 let dynamicIslandController = null;
 let composerController = null;
+let followUpController = null;
+let topicTitleController = null;
 const mobileWorkspaceController = createMobileWorkspaceController({
     store,
     el,
@@ -134,8 +138,36 @@ composerController = createComposerController({
             : (document.getElementById('unistudyPromptFallback')?.value || '').trim()
     ),
     autoResizeTextarea: (node) => ui.autoResizeTextarea(node),
-    decorateChatMessages: (...args) => notesController?.decorateChatMessages?.(...args),
+    decorateChatMessages: (...args) => {
+        followUpController?.decorateChatMessages?.(...args);
+        notesController?.decorateChatMessages?.(...args);
+    },
+    generateFollowUpsForAssistantMessage: (...args) => followUpController?.generateForAssistantMessage?.(...args),
+    generateTopicTitleForAssistantMessage: (...args) => topicTitleController?.generateForAssistantMessage?.(...args),
     updateCurrentChatHistory,
+});
+followUpController = createFollowUpController({
+    store,
+    el,
+    chatAPI,
+    windowObj: window,
+    documentObj: document,
+    sendFollowUp: (...args) => composerController?.sendFollowUp?.(...args),
+    updateCurrentChatHistory,
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+    getCurrentTopicId: () => getSessionSlice().currentTopicId,
+    getCurrentChatHistory: () => getSessionSlice().currentChatHistory,
+});
+topicTitleController = createTopicTitleController({
+    store,
+    chatAPI,
+    windowObj: window,
+    normalizeTopic,
+    renderTopics: (...args) => workspaceController?.renderTopics?.(...args),
+    syncWorkspaceContext: (...args) => workspaceController?.syncWorkspaceContext?.(...args),
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+    getCurrentTopicId: () => getSessionSlice().currentTopicId,
+    getCurrentChatHistory: () => getSessionSlice().currentChatHistory,
 });
 readerController = createReaderController({
     store,
@@ -360,6 +392,7 @@ const { bootstrap } = createAppBootstrap({
         messageRendererApi: messageRenderer,
         interruptRequest,
         appendAttachments: (...args) => composerController?.appendStoredAttachments?.(...args),
+        generateFollowUpsForAssistantMessage: (...args) => followUpController?.generateForAssistantMessage?.(...args),
         setActiveRequestId: (...args) => composerController?.setActiveRequestId?.(...args),
         windowObj: window,
     }),
@@ -790,6 +823,7 @@ async function renderCurrentHistory() {
             return;
         }
         await messageRenderer.renderHistory(session.currentChatHistory, true);
+        followUpController?.decorateChatMessages?.();
         notesController?.decorateChatMessages?.();
     } finally {
         releaseChatLoading();
@@ -815,6 +849,7 @@ async function persistHistory() {
 }
 
 window.sendMessage = async (prefillText) => composerController?.sendMessage?.(prefillText);
+window.sendFollowUp = async (prompt) => composerController?.sendFollowUp?.(prompt);
 
 window.__unistudyDebugState = () => {
     const session = getSessionSlice();

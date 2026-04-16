@@ -285,3 +285,45 @@ test('showSubjectWorkspace requests a deferred desktop layout reset after leavin
         resetDesktopLayout: true,
     }]);
 });
+
+test('createTopic creates a placeholder topic without opening the prompt dialog', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    let promptCalls = 0;
+    let createTopicArgs = null;
+    const harness = createControllerHarness({
+        chatAPI: {
+            async createNewTopicForAgent(agentId, topicName, isBranch, locked) {
+                createTopicArgs = { agentId, topicName, isBranch, locked };
+                return { success: true, topicId: 'topic-new' };
+            },
+            async getAgentTopics() {
+                return [
+                    { id: 'topic-new', name: '新对话 2', createdAt: Date.now() },
+                    { id: 'topic-2', name: 'Topic 2', createdAt: Date.now() },
+                ];
+            },
+        },
+    });
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        ui: {
+            ...harness.deps.ui,
+            async showPromptDialog() {
+                promptCalls += 1;
+                return 'should-not-open';
+            },
+        },
+    });
+
+    await controller.createTopic();
+
+    assert.equal(promptCalls, 0);
+    assert.deepEqual(createTopicArgs, {
+        agentId: 'agent-1',
+        topicName: '',
+        isBranch: false,
+        locked: true,
+    });
+    assert.equal(harness.state.session.currentTopicId, 'topic-new');
+  });

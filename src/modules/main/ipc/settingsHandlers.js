@@ -8,7 +8,9 @@ const {
     DEFAULT_DIV_RENDER_INSTRUCTION,
     DEFAULT_ADAPTIVE_BUBBLE_TIP,
 } = require('../utils/promptVariableResolver');
-const { DEFAULT_AGENT_BUBBLE_THEME_PROMPT } = require('../utils/settingsSchema');
+const {
+    DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
+} = require('../utils/settingsSchema');
 const {
     resolveDailyNoteToolInstruction,
     rewriteLegacyStudyLogPromptText,
@@ -68,6 +70,21 @@ function writeOwnPathValue(target, pathSegments = [], value) {
 }
 
 const SETTINGS_PERSISTENCE_FIELD_SPECS = [
+    {
+        id: 'followUpPromptTemplate',
+        path: ['followUpPromptTemplate'],
+        type: 'string',
+    },
+    {
+        id: 'enableTopicTitleGeneration',
+        path: ['enableTopicTitleGeneration'],
+        type: 'boolean',
+    },
+    {
+        id: 'topicTitlePromptTemplate',
+        path: ['topicTitlePromptTemplate'],
+        type: 'string',
+    },
     {
         id: 'agentBubbleThemePrompt',
         path: ['agentBubbleThemePrompt'],

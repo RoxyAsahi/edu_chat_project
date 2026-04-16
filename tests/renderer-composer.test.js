@@ -191,3 +191,29 @@ test('knowledge-base query helper includes attachment excerpts with truncation',
     assert.match(query, /Attachment: chapter\.txt/);
     assert.equal(query.includes('A'.repeat(1201)), false);
 });
+
+test('normalizeHistory stabilizes follow-up arrays when loading stored chat history', async () => {
+    const { normalizeHistory } = await loadComposerUtilsModule();
+
+    assert.deepEqual(
+        normalizeHistory([{
+            id: 'assistant-1',
+            role: 'assistant',
+            content: '回答',
+            followUps: [' 再举个例子 ', '', '再举个例子', null, '总结一下', '继续展开', '换个角度'],
+        }]),
+        [{
+            id: 'assistant-1',
+            role: 'assistant',
+            content: '回答',
+            attachments: [],
+            favorited: false,
+            favoriteAt: null,
+            noteRefs: [],
+            selectionContextRefs: [],
+            toolEvents: [],
+            studyMemoryRefs: [],
+            followUps: ['再举个例子', '总结一下', '继续展开'],
+        }]
+    );
+});

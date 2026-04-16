@@ -172,6 +172,8 @@ function createSessionCatalog(ops) {
         handleTextPasteAsFile: query((agentId, topicId, textContent) => ops.invoke('handle-text-paste-as-file', agentId, topicId, textContent)),
         handleFileDrop: query((agentId, topicId, droppedFilesData) => ops.invoke('handle-file-drop', agentId, topicId, droppedFilesData)),
         sendToVCP: query((request) => ops.invoke('send-to-vcp', request)),
+        generateFollowUps: query((payload) => ops.invoke('generate-follow-ups', payload)),
+        generateTopicTitle: query((payload) => ops.invoke('generate-topic-title', payload)),
         onVCPStreamEvent: subscription(ops.subscribe('vcp-stream-event', (_event, eventData) => eventData)),
         interruptVcpRequest: query((request) => ops.invoke('interrupt-vcp-request', request)),
         exportTopicAsMarkdown: query((exportData) => ops.invoke('export-topic-as-markdown', exportData)),

@@ -390,3 +390,221 @@ test('send-to-vcp executes local DailyNote tool requests and returns tool metada
     assert.equal(storedLogs[0].notebookName, 'Nova');
     assert.equal(storedLogs[0].requestedToolName, 'DailyNote');
 });
+
+test('follow-up helpers parse object, array, fenced, and invalid JSON responses safely', async () => {
+    const { chatHandlers } = loadChatHandlers({ initialize() {} });
+    const { parseFollowUpsResponse } = chatHandlers.__testUtils;
+
+    assert.deepEqual(
+        parseFollowUpsResponse('{"follow_ups":["继续讲一下","给我一个例题","继续讲一下","","  "]}'),
+        ['继续讲一下', '给我一个例题']
+    );
+    assert.deepEqual(
+        parseFollowUpsResponse('["下一步怎么做？","能再解释一下吗？"]'),
+        ['下一步怎么做？', '能再解释一下吗？']
+    );
+    assert.deepEqual(
+        parseFollowUpsResponse('```json\n{"follow_ups":["A","B"]}\n```'),
+        ['A', 'B']
+    );
+    assert.deepEqual(parseFollowUpsResponse(''), []);
+    assert.deepEqual(parseFollowUpsResponse('not-json'), []);
+});
+
+test('follow-up helpers trim to the latest visible turns and append chat history when the placeholder is missing', async () => {
+    const { chatHandlers } = loadChatHandlers({ initialize() {} });
+    const {
+        buildFollowUpPrompt,
+        selectVisibleFollowUpMessages,
+    } = chatHandlers.__testUtils;
+
+    const selected = selectVisibleFollowUpMessages([
+        { role: 'system', content: 'ignore me' },
+        { role: 'user', content: '问题 1' },
+        { role: 'assistant', content: '回答 1' },
+        { role: 'assistant', content: 'thinking', isThinking: true },
+        { role: 'user', content: { text: '问题 2' } },
+        { role: 'assistant', content: [{ type: 'text', text: '回答 2' }, { type: 'image_url' }] },
+        { role: 'user', content: '问题 3' },
+        { role: 'assistant', content: '回答 3' },
+        { role: 'user', content: '问题 4' },
+        { role: 'assistant', content: '回答 4' },
+        { role: 'user', content: '问题 5' },
+        { role: 'assistant', content: '回答 5' },
+        { role: 'user', content: '问题 6' },
+        { role: 'assistant', content: '回答 6' },
+    ]);
+
+    assert.equal(selected.length, 6);
+    assert.deepEqual(
+        selected.map((message) => message.content),
+        ['问题 4', '回答 4', '问题 5', '回答 5', '问题 6', '回答 6']
+    );
+
+    const prompt = buildFollowUpPrompt('请输出追问建议。', selected);
+    assert.match(prompt, /请输出追问建议。/);
+    assert.match(prompt, /\[1\] 用户:\n问题 4/);
+    assert.match(prompt, /\[6\] 助手:\n回答 6/);
+});
+
+test('follow-up helpers sanitize rich assistant content into readable prompt text', async () => {
+    const { chatHandlers } = loadChatHandlers({ initialize() {} });
+    const { sanitizeFollowUpText } = chatHandlers.__testUtils;
+
+    const sanitized = sanitizeFollowUpText([
+        '### 标题',
+        '<div>正文<button>点我继续</button></div>',
+        '<style>.danger { color: red; }</style>',
+        '<<<[TOOL_REQUEST]>>>secret<<<[END_TOOL_REQUEST]>>>',
+        `<div>${'内容'.repeat(600)}</div>`,
+        '<div>结尾</div>',
+    ].join('\n'));
+
+    assert.doesNotMatch(sanitized, /TOOL_REQUEST|<div>|<style>/);
+    assert.match(sanitized, /标题/);
+    assert.match(sanitized, /正文/);
+    assert.match(sanitized, /交互按钮：点我继续/);
+    assert.match(sanitized, /\[工具调用已省略\]/);
+    assert.match(sanitized, /\[\.\.\.省略\.\.\.\]/);
+    assert.match(sanitized, /结尾/);
+});
+
+test('generate-follow-ups retries once when the first upstream reply is malformed JSON', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-follow-up-retry-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const requests = [];
+    let sendCount = 0;
+    const vcpClientStub = {
+        initialize() {},
+        async send(request) {
+            requests.push(request);
+            sendCount += 1;
+
+            if (sendCount === 1) {
+                return {
+                    response: {
+                        choices: [{
+                            message: {
+                                content: '{"follow_ups":["能不能帮我把今天学的内容',
+                            },
+                        }],
+                    },
+                };
+            }
+
+            return {
+                response: {
+                    choices: [{
+                        message: {
+                            content: '{"follow_ups":["继续讲一下","给我一个例子"]}',
+                        },
+                    }],
+                },
+            };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    vcpServerUrl: 'http://example.com/v1/chat/completions',
+                    vcpApiKey: 'demo-key',
+                    followUpPromptTemplate: '',
+                    defaultModel: 'fixture-model',
+                };
+            },
+        },
+        agentConfigManager: {
+            async readAgentConfig() {
+                return { model: 'agent-model' };
+            },
+        },
+    });
+
+    const generateFollowUps = handlers.get('generate-follow-ups');
+    const result = await generateFollowUps({ sender: {} }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        messageId: 'assistant-1',
+        messages: [
+            { role: 'user', content: '你知道怎么记日记吗' },
+            {
+                role: 'assistant',
+                content: '<div>回答<button>查看往期记忆</button></div>\n<<<[TOOL_REQUEST]>>>debug<<<[END_TOOL_REQUEST]>>>',
+            },
+        ],
+    });
+
+    assert.deepEqual(result, {
+        success: true,
+        followUps: ['继续讲一下', '给我一个例子'],
+    });
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].modelConfig.model, 'agent-model');
+    assert.equal(requests[0].round, 1);
+    assert.equal(requests[1].round, 2);
+    assert.deepEqual(requests[0].modelConfig.response_format, { type: 'json_object' });
+    assert.equal(requests[0].modelConfig.max_tokens, 1200);
+    assert.equal(requests[1].modelConfig.temperature, 0);
+    assert.match(requests[1].messages[0].content, /请重新生成 3 条简短追问/);
+    assert.doesNotMatch(requests[0].messages[0].content, /<div>|TOOL_REQUEST/);
+    assert.match(requests[0].messages[0].content, /交互按钮：查看往期记忆/);
+});
+
+test('follow-up model resolution prefers agent config, then global default model, then requested model', async () => {
+    const { chatHandlers } = loadChatHandlers({ initialize() {} });
+    const { resolveFollowUpModel } = chatHandlers.__testUtils;
+
+    assert.equal(
+        await resolveFollowUpModel({
+            agentId: 'agent-1',
+            requestedModel: 'requested-model',
+            settings: { defaultModel: 'global-model' },
+            agentConfigManager: {
+                async readAgentConfig() {
+                    return { model: 'agent-model' };
+                },
+            },
+        }),
+        'agent-model'
+    );
+
+    assert.equal(
+        await resolveFollowUpModel({
+            agentId: 'agent-1',
+            requestedModel: 'requested-model',
+            settings: { defaultModel: 'global-model' },
+            agentConfigManager: {
+                async readAgentConfig() {
+                    return { model: '   ' };
+                },
+            },
+        }),
+        'global-model'
+    );
+
+    assert.equal(
+        await resolveFollowUpModel({
+            requestedModel: 'requested-model',
+            settings: { defaultModel: '   ' },
+            agentConfigManager: null,
+        }),
+        'requested-model'
+    );
+
+    assert.equal(
+        await resolveFollowUpModel({
+            requestedModel: '   ',
+            settings: { defaultModel: '   ' },
+            agentConfigManager: null,
+        }),
+        'gemini-3.1-flash-lite-preview'
+    );
+});

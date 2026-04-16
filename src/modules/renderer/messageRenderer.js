@@ -952,6 +952,7 @@ let mainRendererReferences = {
     currentTopicIdRef: { get: () => null, set: () => { } }, // Ref to string/null
     globalSettingsRef: { get: () => ({ userName: 'User', userAvatarUrl: '../assets/default_user_avatar.png', userAvatarCalculatedColor: null }), set: () => { } }, // Ref to object
     setActiveRequestId: () => { },
+    generateFollowUpsForAssistantMessage: async () => [],
 
     chatMessagesDiv: null,
     electronAPI: null,
@@ -1186,6 +1187,7 @@ function initializeMessageRenderer(refs) {
         renderAttachments: renderAttachments,
         interruptHandler: mainRendererReferences.interruptHandler,
         setActiveRequestId: mainRendererReferences.setActiveRequestId,
+        generateFollowUpsForAssistantMessage: mainRendererReferences.generateFollowUpsForAssistantMessage,
         updateMessageContent: updateMessageContent, // Pass through updateMessageContent.
         extractSpeakableTextFromContentElement: extractSpeakableTextFromContentElement,
     });
