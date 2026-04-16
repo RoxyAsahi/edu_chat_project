@@ -557,6 +557,45 @@ test('notes refresh re-renders flashcard practice when the flashcards panel is a
     assert.equal(renderPracticeCalls, 2);
 });
 
+test('decorateChatMessages only shows favorite and note actions for assistant messages', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [
+                    { id: 'assistant-msg', role: 'assistant', content: '助手回复', favorited: false, noteRefs: [] },
+                    { id: 'user-msg', role: 'user', content: '用户消息', favorited: false, noteRefs: [] },
+                ],
+            },
+        },
+    });
+
+    el.chatMessages.innerHTML = `
+        <div class="message-item assistant" data-message-id="assistant-msg">
+            <div class="details-and-bubble-wrapper">
+                <div class="md-content">助手回复</div>
+            </div>
+        </div>
+        <div class="message-item user" data-message-id="user-msg">
+            <div class="details-and-bubble-wrapper">
+                <div class="md-content">用户消息</div>
+            </div>
+        </div>
+    `;
+
+    controller.decorateChatMessages();
+
+    assert.equal(
+        el.chatMessages.querySelector('.message-item.assistant .study-message-actions')?.children.length,
+        2
+    );
+    assert.equal(
+        el.chatMessages.querySelector('.message-item.user .study-message-actions'),
+        null
+    );
+});
+
 test('right-side notes panel only renders generated content kinds', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 

@@ -13,13 +13,12 @@ test('buildChatContextMenuModel returns assistant actions with regenerate and de
     const { buildChatContextMenuModel } = await loadMessageContextMenuModule();
 
     const model = buildChatContextMenuModel({
-        message: { role: 'assistant' },
         isEditing: false,
         isThinkingOrStreaming: false,
         canRegenerate: true,
     });
 
-    assert.equal(model.header.badge, '助手');
+    assert.equal(Object.prototype.hasOwnProperty.call(model, 'header'), false);
     assert.equal(model.sections.length, 3);
     assert.deepEqual(
         model.sections[0].items.map((item) => item.id),
@@ -39,13 +38,11 @@ test('buildChatContextMenuModel returns editing actions only while editing', asy
     const { buildChatContextMenuModel } = await loadMessageContextMenuModule();
 
     const model = buildChatContextMenuModel({
-        message: { role: 'user' },
         isEditing: true,
         isThinkingOrStreaming: false,
         canRegenerate: false,
     });
 
-    assert.equal(model.header.badge, '编辑');
     assert.equal(model.sections.length, 1);
     assert.deepEqual(
         model.sections[0].items.map((item) => item.id),
@@ -57,13 +54,11 @@ test('buildChatContextMenuModel collapses to interrupt when message is streaming
     const { buildChatContextMenuModel } = await loadMessageContextMenuModule();
 
     const model = buildChatContextMenuModel({
-        message: { role: 'assistant' },
         isEditing: false,
         isThinkingOrStreaming: true,
         canRegenerate: true,
     });
 
-    assert.equal(model.header.badge, '进行中');
     assert.equal(model.sections.length, 1);
     assert.deepEqual(
         model.sections[0].items.map((item) => item.id),
