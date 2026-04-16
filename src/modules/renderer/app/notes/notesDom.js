@@ -554,6 +554,10 @@ function createNotesDom(deps = {}) {
 
             wrapper.querySelector('.study-message-actions')?.remove();
 
+            if (message.role !== 'assistant') {
+                continue;
+            }
+
             const actions = documentObj.createElement('div');
             actions.className = 'study-message-actions';
 

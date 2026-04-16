@@ -82,59 +82,12 @@ function normalizeTextContent(content) {
     return '';
 }
 
-function resolveMenuHeader(message, { isEditing, isThinkingOrStreaming }) {
-    if (isThinkingOrStreaming) {
-        return {
-            badge: '进行中',
-            tone: 'warning',
-            title: '正在生成回复',
-            subtitle: '你可以在这里中断当前输出。',
-        };
-    }
-
-    if (isEditing) {
-        return {
-            badge: '编辑',
-            tone: 'editing',
-            title: '编辑这条消息',
-            subtitle: '快捷执行剪切、粘贴或退出编辑。',
-        };
-    }
-
-    if (message?.role === 'assistant') {
-        return {
-            badge: '助手',
-            tone: 'assistant',
-            title: '助手消息',
-            subtitle: '对这条回复执行查看、复制或重生成。',
-        };
-    }
-
-    if (message?.role === 'user') {
-        return {
-            badge: '你',
-            tone: 'user',
-            title: '我的消息',
-            subtitle: '快速编辑、复制或删除这条发言。',
-        };
-    }
-
-    return {
-        badge: '消息',
-        tone: 'neutral',
-        title: '消息操作',
-        subtitle: '选择一个操作继续。',
-    };
-}
-
 export function buildChatContextMenuModel({
-    message,
     isEditing = false,
     isThinkingOrStreaming = false,
     canRegenerate = false,
 }) {
     const model = {
-        header: resolveMenuHeader(message, { isEditing, isThinkingOrStreaming }),
         sections: [],
     };
 
@@ -145,8 +98,6 @@ export function buildChatContextMenuModel({
                     id: CHAT_CONTEXT_MENU_ACTIONS.interrupt,
                     icon: 'stop_circle',
                     label: '中断生成',
-                    description: '立即停止当前回复流。',
-                    hint: 'Esc',
                     tone: 'danger',
                 },
             ],
@@ -161,22 +112,16 @@ export function buildChatContextMenuModel({
                     id: CHAT_CONTEXT_MENU_ACTIONS.cut,
                     icon: 'content_cut',
                     label: '剪切',
-                    description: '对当前编辑区执行剪切。',
-                    hint: 'Ctrl+X',
                 },
                 {
                     id: CHAT_CONTEXT_MENU_ACTIONS.paste,
                     icon: 'content_paste',
                     label: '粘贴',
-                    description: '把剪贴板内容插入到光标位置。',
-                    hint: 'Ctrl+V',
                 },
                 {
                     id: CHAT_CONTEXT_MENU_ACTIONS.cancelEdit,
                     icon: 'close',
                     label: '取消编辑',
-                    description: '退出当前编辑状态。',
-                    hint: 'Esc',
                 },
             ],
         });
@@ -189,15 +134,11 @@ export function buildChatContextMenuModel({
                 id: CHAT_CONTEXT_MENU_ACTIONS.edit,
                 icon: 'edit',
                 label: '编辑消息',
-                description: '直接修改这条消息内容。',
-                hint: 'Enter 保存',
             },
             {
                 id: CHAT_CONTEXT_MENU_ACTIONS.copy,
                 icon: 'content_copy',
                 label: '复制内容',
-                description: '复制为纯文本，便于再次使用。',
-                hint: 'Ctrl+C',
             },
         ],
     });
@@ -208,8 +149,6 @@ export function buildChatContextMenuModel({
                 id: CHAT_CONTEXT_MENU_ACTIONS.readMode,
                 icon: 'menu_book',
                 label: '阅读模式',
-                description: '在独立窗口查看原始消息内容。',
-                hint: '新窗口',
                 tone: 'info',
             },
             ...(canRegenerate
@@ -218,8 +157,6 @@ export function buildChatContextMenuModel({
                         id: CHAT_CONTEXT_MENU_ACTIONS.regenerate,
                         icon: 'autorenew',
                         label: '重新生成',
-                        description: '基于上文重新请求助手回答。',
-                        hint: '重试',
                         tone: 'success',
                     },
                 ]
@@ -233,32 +170,12 @@ export function buildChatContextMenuModel({
                 id: CHAT_CONTEXT_MENU_ACTIONS.delete,
                 icon: 'delete',
                 label: '删除消息',
-                description: '从当前对话历史中移除这条消息。',
-                hint: '危险',
                 tone: 'danger',
             },
         ],
     });
 
     return model;
-}
-
-function appendMenuHeader(menu, header) {
-    const headerElement = createMenuElement('div', 'context-menu__header');
-    const badge = createMenuElement(
-        'span',
-        `context-menu__badge context-menu__badge--${header.tone || 'neutral'}`,
-        header.badge
-    );
-    const copy = createMenuElement('div', 'context-menu__header-copy');
-    const title = createMenuElement('strong', 'context-menu__title', header.title);
-    const subtitle = createMenuElement('span', 'context-menu__subtitle', header.subtitle);
-
-    copy.appendChild(title);
-    copy.appendChild(subtitle);
-    headerElement.appendChild(badge);
-    headerElement.appendChild(copy);
-    menu.appendChild(headerElement);
 }
 
 function appendMenuDivider(menu) {
@@ -288,17 +205,9 @@ function appendMenuSections(menu, model, actionHandlers) {
             const icon = createMenuElement('span', 'material-symbols-outlined context-menu__icon', item.icon);
             icon.setAttribute('aria-hidden', 'true');
 
-            const labelGroup = createMenuElement('span', 'context-menu__label-group');
-            labelGroup.appendChild(createMenuElement('span', 'context-menu__label', item.label));
-            labelGroup.appendChild(createMenuElement('span', 'context-menu__description', item.description));
-
             main.appendChild(icon);
-            main.appendChild(labelGroup);
+            main.appendChild(createMenuElement('span', 'context-menu__label', item.label));
             button.appendChild(main);
-
-            if (item.hint) {
-                button.appendChild(createMenuElement('span', 'context-menu__hint', item.hint));
-            }
 
             button.addEventListener('click', async () => {
                 const handler = actionHandlers[item.id];
@@ -331,7 +240,6 @@ function showContextMenu(event, messageItem, message) {
     const textarea = isEditing ? messageItem.querySelector('.message-edit-textarea') : null;
     const canRegenerate = message.role === 'assistant' && currentSelectedItemVal.type === 'agent';
     const model = buildChatContextMenuModel({
-        message,
         isEditing,
         isThinkingOrStreaming,
         canRegenerate,
@@ -448,8 +356,6 @@ function showContextMenu(event, messageItem, message) {
         },
     };
 
-    appendMenuHeader(menu, model.header);
-    appendMenuDivider(menu);
     appendMenuSections(menu, model, actionHandlers);
 
     menu.style.visibility = 'hidden';
