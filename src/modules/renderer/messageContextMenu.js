@@ -4,6 +4,20 @@ let mainRefs = {};
 let contextMenuDependencies = {};
 let isInitialized = false;
 
+const CHAT_CONTEXT_MENU_VIEWPORT_GAP = 12;
+
+const CHAT_CONTEXT_MENU_ACTIONS = Object.freeze({
+    interrupt: 'interrupt',
+    edit: 'edit',
+    copy: 'copy',
+    cut: 'cut',
+    paste: 'paste',
+    cancelEdit: 'cancel-edit',
+    readMode: 'read-mode',
+    regenerate: 'regenerate',
+    delete: 'delete',
+});
+
 function initializeContextMenu(refs, dependencies) {
     mainRefs = refs;
     contextMenuDependencies = dependencies;
@@ -11,6 +25,7 @@ function initializeContextMenu(refs, dependencies) {
         return;
     }
     document.addEventListener('click', closeContextMenuOnClickOutside, true);
+    document.addEventListener('keydown', closeContextMenuOnEscape, true);
     isInitialized = true;
 }
 
@@ -20,6 +35,16 @@ function closeContextMenu() {
 
 function closeTopicContextMenu() {
     document.getElementById('topicContextMenu')?.remove();
+}
+
+function closeContextMenuOnEscape(event) {
+    if (event.key !== 'Escape') {
+        return;
+    }
+
+    if (document.getElementById('chatContextMenu')) {
+        closeContextMenu();
+    }
 }
 
 function closeContextMenuOnClickOutside(event) {
@@ -34,15 +59,15 @@ function closeContextMenuOnClickOutside(event) {
     }
 }
 
-function appendMenuItem(menu, label, onClick, className = '') {
-    const item = document.createElement('div');
-    item.className = ['context-menu-item', className].filter(Boolean).join(' ');
-    item.textContent = label;
-    item.onclick = async () => {
-        await onClick();
-    };
-    menu.appendChild(item);
-    return item;
+function createMenuElement(tagName, className, textContent = '') {
+    const element = document.createElement(tagName);
+    if (className) {
+        element.className = className;
+    }
+    if (textContent) {
+        element.textContent = textContent;
+    }
+    return element;
 }
 
 function normalizeTextContent(content) {
@@ -57,23 +82,263 @@ function normalizeTextContent(content) {
     return '';
 }
 
+function resolveMenuHeader(message, { isEditing, isThinkingOrStreaming }) {
+    if (isThinkingOrStreaming) {
+        return {
+            badge: '进行中',
+            tone: 'warning',
+            title: '正在生成回复',
+            subtitle: '你可以在这里中断当前输出。',
+        };
+    }
+
+    if (isEditing) {
+        return {
+            badge: '编辑',
+            tone: 'editing',
+            title: '编辑这条消息',
+            subtitle: '快捷执行剪切、粘贴或退出编辑。',
+        };
+    }
+
+    if (message?.role === 'assistant') {
+        return {
+            badge: '助手',
+            tone: 'assistant',
+            title: '助手消息',
+            subtitle: '对这条回复执行查看、复制或重生成。',
+        };
+    }
+
+    if (message?.role === 'user') {
+        return {
+            badge: '你',
+            tone: 'user',
+            title: '我的消息',
+            subtitle: '快速编辑、复制或删除这条发言。',
+        };
+    }
+
+    return {
+        badge: '消息',
+        tone: 'neutral',
+        title: '消息操作',
+        subtitle: '选择一个操作继续。',
+    };
+}
+
+export function buildChatContextMenuModel({
+    message,
+    isEditing = false,
+    isThinkingOrStreaming = false,
+    canRegenerate = false,
+}) {
+    const model = {
+        header: resolveMenuHeader(message, { isEditing, isThinkingOrStreaming }),
+        sections: [],
+    };
+
+    if (isThinkingOrStreaming) {
+        model.sections.push({
+            items: [
+                {
+                    id: CHAT_CONTEXT_MENU_ACTIONS.interrupt,
+                    icon: 'stop_circle',
+                    label: '中断生成',
+                    description: '立即停止当前回复流。',
+                    hint: 'Esc',
+                    tone: 'danger',
+                },
+            ],
+        });
+        return model;
+    }
+
+    if (isEditing) {
+        model.sections.push({
+            items: [
+                {
+                    id: CHAT_CONTEXT_MENU_ACTIONS.cut,
+                    icon: 'content_cut',
+                    label: '剪切',
+                    description: '对当前编辑区执行剪切。',
+                    hint: 'Ctrl+X',
+                },
+                {
+                    id: CHAT_CONTEXT_MENU_ACTIONS.paste,
+                    icon: 'content_paste',
+                    label: '粘贴',
+                    description: '把剪贴板内容插入到光标位置。',
+                    hint: 'Ctrl+V',
+                },
+                {
+                    id: CHAT_CONTEXT_MENU_ACTIONS.cancelEdit,
+                    icon: 'close',
+                    label: '取消编辑',
+                    description: '退出当前编辑状态。',
+                    hint: 'Esc',
+                },
+            ],
+        });
+        return model;
+    }
+
+    model.sections.push({
+        items: [
+            {
+                id: CHAT_CONTEXT_MENU_ACTIONS.edit,
+                icon: 'edit',
+                label: '编辑消息',
+                description: '直接修改这条消息内容。',
+                hint: 'Enter 保存',
+            },
+            {
+                id: CHAT_CONTEXT_MENU_ACTIONS.copy,
+                icon: 'content_copy',
+                label: '复制内容',
+                description: '复制为纯文本，便于再次使用。',
+                hint: 'Ctrl+C',
+            },
+        ],
+    });
+
+    model.sections.push({
+        items: [
+            {
+                id: CHAT_CONTEXT_MENU_ACTIONS.readMode,
+                icon: 'menu_book',
+                label: '阅读模式',
+                description: '在独立窗口查看原始消息内容。',
+                hint: '新窗口',
+                tone: 'info',
+            },
+            ...(canRegenerate
+                ? [
+                    {
+                        id: CHAT_CONTEXT_MENU_ACTIONS.regenerate,
+                        icon: 'autorenew',
+                        label: '重新生成',
+                        description: '基于上文重新请求助手回答。',
+                        hint: '重试',
+                        tone: 'success',
+                    },
+                ]
+                : []),
+        ],
+    });
+
+    model.sections.push({
+        items: [
+            {
+                id: CHAT_CONTEXT_MENU_ACTIONS.delete,
+                icon: 'delete',
+                label: '删除消息',
+                description: '从当前对话历史中移除这条消息。',
+                hint: '危险',
+                tone: 'danger',
+            },
+        ],
+    });
+
+    return model;
+}
+
+function appendMenuHeader(menu, header) {
+    const headerElement = createMenuElement('div', 'context-menu__header');
+    const badge = createMenuElement(
+        'span',
+        `context-menu__badge context-menu__badge--${header.tone || 'neutral'}`,
+        header.badge
+    );
+    const copy = createMenuElement('div', 'context-menu__header-copy');
+    const title = createMenuElement('strong', 'context-menu__title', header.title);
+    const subtitle = createMenuElement('span', 'context-menu__subtitle', header.subtitle);
+
+    copy.appendChild(title);
+    copy.appendChild(subtitle);
+    headerElement.appendChild(badge);
+    headerElement.appendChild(copy);
+    menu.appendChild(headerElement);
+}
+
+function appendMenuDivider(menu) {
+    menu.appendChild(createMenuElement('div', 'context-menu__divider'));
+}
+
+function appendMenuSections(menu, model, actionHandlers) {
+    model.sections.forEach((section, sectionIndex) => {
+        if (sectionIndex > 0) {
+            appendMenuDivider(menu);
+        }
+
+        const sectionElement = createMenuElement('div', 'context-menu__section');
+        section.items.forEach((item) => {
+            const button = createMenuElement(
+                'button',
+                [
+                    'context-menu__item',
+                    item.tone ? `context-menu__item--${item.tone}` : '',
+                ].filter(Boolean).join(' ')
+            );
+            button.type = 'button';
+            button.setAttribute('role', 'menuitem');
+            button.dataset.action = item.id;
+
+            const main = createMenuElement('span', 'context-menu__item-main');
+            const icon = createMenuElement('span', 'material-symbols-outlined context-menu__icon', item.icon);
+            icon.setAttribute('aria-hidden', 'true');
+
+            const labelGroup = createMenuElement('span', 'context-menu__label-group');
+            labelGroup.appendChild(createMenuElement('span', 'context-menu__label', item.label));
+            labelGroup.appendChild(createMenuElement('span', 'context-menu__description', item.description));
+
+            main.appendChild(icon);
+            main.appendChild(labelGroup);
+            button.appendChild(main);
+
+            if (item.hint) {
+                button.appendChild(createMenuElement('span', 'context-menu__hint', item.hint));
+            }
+
+            button.addEventListener('click', async () => {
+                const handler = actionHandlers[item.id];
+                if (typeof handler === 'function') {
+                    await handler();
+                }
+            });
+
+            sectionElement.appendChild(button);
+        });
+        menu.appendChild(sectionElement);
+    });
+}
+
 function showContextMenu(event, messageItem, message) {
     closeContextMenu();
     closeTopicContextMenu();
 
     const { electronAPI, uiHelper } = mainRefs;
-    const currentSelectedItemVal = mainRefs.currentSelectedItemRef.get();
+    const currentSelectedItemVal = mainRefs.currentSelectedItemRef.get() || {};
     const currentTopicIdVal = mainRefs.currentTopicIdRef.get();
     const menu = document.createElement('div');
     menu.id = 'chatContextMenu';
-    menu.classList.add('context-menu');
+    menu.classList.add('context-menu', 'context-menu--chat');
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', '消息操作菜单');
 
     const isThinkingOrStreaming = message.isThinking || messageItem.classList.contains('streaming');
     const isEditing = messageItem.classList.contains('message-item-editing');
     const textarea = isEditing ? messageItem.querySelector('.message-edit-textarea') : null;
+    const canRegenerate = message.role === 'assistant' && currentSelectedItemVal.type === 'agent';
+    const model = buildChatContextMenuModel({
+        message,
+        isEditing,
+        isThinkingOrStreaming,
+        canRegenerate,
+    });
 
-    if (isThinkingOrStreaming) {
-        appendMenuItem(menu, 'Interrupt', async () => {
+    const actionHandlers = {
+        [CHAT_CONTEXT_MENU_ACTIONS.interrupt]: async () => {
             closeContextMenu();
             const activeMessageId = message.id;
             if (!activeMessageId) {
@@ -83,7 +348,7 @@ function showContextMenu(event, messageItem, message) {
             if (contextMenuDependencies.interruptHandler?.interrupt) {
                 const result = await contextMenuDependencies.interruptHandler.interrupt(activeMessageId);
                 if (result?.success) {
-                    uiHelper.showToastNotification('Interrupt signal sent.', 'success');
+                    uiHelper.showToastNotification('已发送中断信号。', 'success');
                 } else {
                     await contextMenuDependencies.finalizeStreamedMessage?.(activeMessageId, 'cancelled_by_user', {
                         agentId: currentSelectedItemVal.id,
@@ -92,19 +357,15 @@ function showContextMenu(event, messageItem, message) {
                     }, {
                         error: result?.error || 'Interrupted locally',
                     });
-                    uiHelper.showToastNotification(result?.error || 'Interrupted locally.', 'warning');
+                    uiHelper.showToastNotification(result?.error || '已在本地中断。', 'warning');
                 }
             }
-        }, 'danger-item');
-    } else {
-        if (!isEditing) {
-            appendMenuItem(menu, 'Edit', async () => {
-                toggleEditMode(messageItem, message);
-                closeContextMenu();
-            });
-        }
-
-        appendMenuItem(menu, 'Copy', async () => {
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.edit]: async () => {
+            toggleEditMode(messageItem, message);
+            closeContextMenu();
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.copy]: async () => {
             const contentDiv = messageItem.querySelector('.md-content');
             let textToCopy = normalizeTextContent(message.content);
             if (contentDiv) {
@@ -113,35 +374,40 @@ function showContextMenu(event, messageItem, message) {
                 textToCopy = contentClone.innerText.replace(/\n{3,}/g, '\n\n').trim();
             }
             await navigator.clipboard.writeText(textToCopy);
-            uiHelper.showToastNotification('Copied message text.', 'success');
+            uiHelper.showToastNotification('已复制消息内容。', 'success');
             closeContextMenu();
-        });
-
-        if (isEditing && textarea) {
-            appendMenuItem(menu, 'Cut', async () => {
-                textarea.focus();
-                document.execCommand('cut');
-                closeContextMenu();
-            });
-
-            appendMenuItem(menu, 'Paste', async () => {
-                textarea.focus();
-                const text = await electronAPI.readTextFromClipboard().catch(() => '');
-                if (text) {
-                    const start = textarea.selectionStart;
-                    const end = textarea.selectionEnd;
-                    textarea.value = textarea.value.slice(0, start) + text + textarea.value.slice(end);
-                    textarea.selectionStart = textarea.selectionEnd = start + text.length;
-                    textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-                }
-                closeContextMenu();
-            });
-        }
-
-        appendMenuItem(menu, 'Read Mode', async () => {
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.cut]: async () => {
+            if (!textarea) {
+                return;
+            }
+            textarea.focus();
+            document.execCommand('cut');
+            closeContextMenu();
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.paste]: async () => {
+            if (!textarea) {
+                return;
+            }
+            textarea.focus();
+            const text = await electronAPI.readTextFromClipboard().catch(() => '');
+            if (text) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                textarea.value = textarea.value.slice(0, start) + text + textarea.value.slice(end);
+                textarea.selectionStart = textarea.selectionEnd = start + text.length;
+                textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+            }
+            closeContextMenu();
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.cancelEdit]: async () => {
+            toggleEditMode(messageItem, message);
+            closeContextMenu();
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.readMode]: async () => {
             closeContextMenu();
             if (!currentSelectedItemVal.id || !currentTopicIdVal || !message.id) {
-                uiHelper.showToastNotification('Read mode is unavailable for this message.', 'error');
+                uiHelper.showToastNotification('当前消息无法进入阅读模式。', 'error');
                 return;
             }
 
@@ -153,7 +419,7 @@ function showContextMenu(event, messageItem, message) {
             ).catch((error) => ({ success: false, error: error.message }));
 
             if (!result?.success || result.content === undefined) {
-                uiHelper.showToastNotification(`Failed to load original message: ${result?.error || 'Unknown error'}`, 'error');
+                uiHelper.showToastNotification(`读取原始消息失败：${result?.error || '未知错误'}`, 'error');
                 return;
             }
 
@@ -161,33 +427,32 @@ function showContextMenu(event, messageItem, message) {
             const contentString = typeof rawContent === 'string' ? rawContent : (rawContent?.text || '');
             const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
             await electronAPI.openTextInNewWindow(contentString, `Read: ${String(message.id).slice(0, 10)}...`, currentTheme);
-        }, 'info-item');
-
-        if (message.role === 'assistant' && currentSelectedItemVal.type === 'agent') {
-            appendMenuItem(menu, 'Regenerate', async () => {
-                closeContextMenu();
-                await handleRegenerateResponse(message);
-            }, 'regenerate-text');
-        }
-
-        appendMenuItem(menu, 'Delete', async () => {
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.regenerate]: async () => {
+            closeContextMenu();
+            await handleRegenerateResponse(message);
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.delete]: async () => {
             const preview = normalizeTextContent(message.content);
             const confirmed = await uiHelper.showConfirmDialog(
-                `Delete this message?\n\"${preview.substring(0, 50)}${preview.length > 50 ? '...' : ''}\"`,
-                'Delete Message',
-                'Delete',
-                'Cancel',
+                `删除这条消息？\n\"${preview.substring(0, 50)}${preview.length > 50 ? '...' : ''}\"`,
+                '删除消息',
+                '删除',
+                '取消',
                 true
             );
             if (confirmed) {
                 contextMenuDependencies.removeMessageById(message.id, true);
             }
             closeContextMenu();
-        }, 'danger-item');
-    }
+        },
+    };
+
+    appendMenuHeader(menu, model.header);
+    appendMenuDivider(menu);
+    appendMenuSections(menu, model, actionHandlers);
 
     menu.style.visibility = 'hidden';
-    menu.style.position = 'absolute';
     document.body.appendChild(menu);
 
     const menuWidth = menu.offsetWidth;
@@ -198,17 +463,21 @@ function showContextMenu(event, messageItem, message) {
     let top = event.clientY;
     let left = event.clientX;
 
-    if (top + menuHeight > windowHeight) {
-        top = Math.max(5, event.clientY - menuHeight);
+    if (top + menuHeight > windowHeight - CHAT_CONTEXT_MENU_VIEWPORT_GAP) {
+        top = Math.max(CHAT_CONTEXT_MENU_VIEWPORT_GAP, event.clientY - menuHeight);
     }
 
-    if (left + menuWidth > windowWidth) {
-        left = Math.max(5, event.clientX - menuWidth);
+    if (left + menuWidth > windowWidth - CHAT_CONTEXT_MENU_VIEWPORT_GAP) {
+        left = Math.max(CHAT_CONTEXT_MENU_VIEWPORT_GAP, event.clientX - menuWidth);
     }
 
     menu.style.top = `${top}px`;
     menu.style.left = `${left}px`;
     menu.style.visibility = 'visible';
+
+    requestAnimationFrame(() => {
+        menu.classList.add('context-menu--open');
+    });
 }
 
 function toggleEditMode(messageItem, message) {
@@ -264,7 +533,7 @@ function toggleEditMode(messageItem, message) {
     controlsDiv.classList.add('message-edit-controls');
 
     const saveButton = document.createElement('button');
-    saveButton.textContent = 'Save';
+    saveButton.textContent = '保存';
     saveButton.onclick = async () => {
         const newContent = textarea.value;
         const originalTextContent = normalizeTextContent(message.content);
@@ -275,7 +544,7 @@ function toggleEditMode(messageItem, message) {
 
         const messageIndex = currentChatHistoryArray.findIndex((msg) => msg.id === message.id);
         if (messageIndex === -1) {
-            uiHelper.showToastNotification('Message was not found.', 'error');
+            uiHelper.showToastNotification('未找到对应消息。', 'error');
             return;
         }
 
@@ -293,18 +562,18 @@ function toggleEditMode(messageItem, message) {
             if (contextMenuDependencies.updateMessageContent) {
                 contextMenuDependencies.updateMessageContent(message.id, newContent);
             }
-            uiHelper.showToastNotification('Message saved.', 'success');
+            uiHelper.showToastNotification('消息已保存。', 'success');
             toggleEditMode(messageItem, message);
         } catch (error) {
             currentChatHistoryArray[messageIndex].content = originalContent;
             message.content = originalContent;
             mainRefs.currentChatHistoryRef.set([...currentChatHistoryArray]);
-            uiHelper.showToastNotification(`Save failed: ${error.message}`, 'error');
+            uiHelper.showToastNotification(`保存失败：${error.message}`, 'error');
         }
     };
 
     const cancelButton = document.createElement('button');
-    cancelButton.textContent = 'Cancel';
+    cancelButton.textContent = '取消';
     cancelButton.onclick = () => toggleEditMode(messageItem, message);
 
     controlsDiv.appendChild(saveButton);
@@ -415,7 +684,7 @@ async function handleRegenerateResponse(originalAssistantMessage) {
     const globalSettingsVal = mainRefs.globalSettingsRef.get();
 
     if (!currentSelectedItemVal.id || currentSelectedItemVal.type !== 'agent' || !currentTopicIdVal || !originalAssistantMessage || originalAssistantMessage.role !== 'assistant') {
-        uiHelper.showToastNotification('Only assistant replies in agent chats can be regenerated.', 'warning');
+        uiHelper.showToastNotification('只有 agent 对话里的助手回复支持重新生成。', 'warning');
         return;
     }
 

@@ -100,7 +100,7 @@ export function createMessageSkeleton(message, globalSettings, currentSelectedIt
         }
     }
 
-    if (message.role === 'user' || message.role === 'assistant') {
+    if (message.role === 'assistant') {
         avatarImg = document.createElement('img');
         avatarImg.classList.add('chat-avatar');
         avatarImg.src = fixVoiceChatAssetPath(avatarUrlToUse);
@@ -132,6 +132,11 @@ export function createMessageSkeleton(message, globalSettings, currentSelectedIt
         detailsAndBubbleWrapper.appendChild(contentDiv);
 
         messageItem.appendChild(avatarImg);
+        messageItem.appendChild(detailsAndBubbleWrapper);
+    } else if (message.role === 'user') {
+        detailsAndBubbleWrapper = document.createElement('div');
+        detailsAndBubbleWrapper.classList.add('details-and-bubble-wrapper');
+        detailsAndBubbleWrapper.appendChild(contentDiv);
         messageItem.appendChild(detailsAndBubbleWrapper);
     } else { // system messages
         messageItem.appendChild(contentDiv);
