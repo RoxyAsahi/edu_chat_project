@@ -19,6 +19,8 @@ function createNotesController(deps = {}) {
     const documentObj = deps.documentObj || document;
     const setSidePanelTab = deps.setSidePanelTab || (() => {});
     const setRightPanelMode = deps.setRightPanelMode || (() => {});
+    const showManualNotesLibraryPage = deps.showManualNotesLibraryPage || (() => {});
+    const syncWorkspaceView = deps.syncWorkspaceView || (() => {});
     const getCurrentTopic = deps.getCurrentTopic || (() => null);
     const getCurrentTopicDisplayName = deps.getCurrentTopicDisplayName || (() => '请选择一个话题');
     const persistHistory = deps.persistHistory || (async () => {});
@@ -72,6 +74,13 @@ function createNotesController(deps = {}) {
         }));
     }
 
+    function patchLayout(patch) {
+        return store.patchState('layout', (current, rootState) => ({
+            ...current,
+            ...(typeof patch === 'function' ? patch(current, rootState) : patch),
+        }));
+    }
+
     const state = {};
     Object.defineProperties(state, {
         topicNotes: {
@@ -101,6 +110,10 @@ function createNotesController(deps = {}) {
         manualNotesLibraryOpen: {
             get: () => getNotesSlice().manualNotesLibraryOpen === true,
             set: (value) => patchNotes({ manualNotesLibraryOpen: value === true }),
+        },
+        manualNotesLibraryFilter: {
+            get: () => getNotesSlice().manualNotesLibraryFilter || 'all',
+            set: (value) => patchNotes({ manualNotesLibraryFilter: value === 'selected' ? 'selected' : 'all' }),
         },
         noteDetailKind: {
             get: () => getNotesSlice().noteDetailKind,
@@ -636,11 +649,16 @@ function createNotesController(deps = {}) {
         }
     }
 
+    function setManualNotesLibraryFilter(filter = 'all') {
+        state.manualNotesLibraryFilter = filter;
+        notesDomApi.renderManualNotesLibrary();
+    }
+
     async function openManualNotesLibrary(options = {}) {
         if (options.trigger instanceof HTMLElementCtor) {
             manualNotesLibraryTrigger = options.trigger;
         }
-        if (!el.manualNotesLibraryModal) {
+        if (!el.manualNotesLibraryPage) {
             return;
         }
 
@@ -650,10 +668,10 @@ function createNotesController(deps = {}) {
 
         state.manualNotesLibraryOpen = true;
         notesDomApi.renderManualNotesLibrary();
-        el.manualNotesLibraryModal.classList.remove('hidden');
-        el.manualNotesLibraryModal.setAttribute('aria-hidden', 'false');
+        patchLayout({ workspaceViewMode: 'manual-notes' });
+        showManualNotesLibraryPage();
         documentObj.body?.classList.add('manual-notes-library-open');
-        el.manualNotesLibraryCloseBtn?.focus();
+        el.manualNotesLibraryFilterAllBtn?.focus();
 
         // Re-read persisted notes so externally added notes appear without a full app reload.
         void notesOperationsApi.loadAgentNotes();
@@ -662,8 +680,8 @@ function createNotesController(deps = {}) {
 
     function closeManualNotesLibrary(options = {}) {
         state.manualNotesLibraryOpen = false;
-        el.manualNotesLibraryModal?.classList.add('hidden');
-        el.manualNotesLibraryModal?.setAttribute('aria-hidden', 'true');
+        patchLayout({ workspaceViewMode: state.currentSelectedItem?.id ? 'subject' : 'overview' });
+        syncWorkspaceView();
         documentObj.body?.classList.remove('manual-notes-library-open');
         if (
             options.restoreFocus !== false
@@ -772,6 +790,12 @@ function createNotesController(deps = {}) {
         el.manualNotesLibraryBtn?.addEventListener('click', (event) => {
             void openManualNotesLibrary({ trigger: event.currentTarget });
         });
+        el.manualNotesLibraryFilterAllBtn?.addEventListener('click', () => {
+            setManualNotesLibraryFilter('all');
+        });
+        el.manualNotesLibraryFilterSelectedBtn?.addEventListener('click', () => {
+            setManualNotesLibraryFilter('selected');
+        });
         el.saveNoteBtn?.addEventListener('click', () => {
             void notesOperationsApi.saveActiveNote();
         });
@@ -865,8 +889,6 @@ function createNotesController(deps = {}) {
         });
         el.noteDetailCloseBtn?.addEventListener('click', () => closeNoteDetail());
         el.noteDetailModalBackdrop?.addEventListener('click', () => closeNoteDetail());
-        el.manualNotesLibraryCloseBtn?.addEventListener('click', () => closeManualNotesLibrary());
-        el.manualNotesLibraryBackdrop?.addEventListener('click', () => closeManualNotesLibrary());
     }
 
     notesDomApi = createNotesDom({

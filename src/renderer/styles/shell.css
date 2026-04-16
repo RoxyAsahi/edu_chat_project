@@ -137,7 +137,8 @@ textarea:focus, input:focus, select:focus {
 }
 
 body.workspace-view-overview .titlebar__home-btn,
-body.workspace-view-subject #workspaceOpenSubjectBtn {
+body.workspace-view-subject #workspaceOpenSubjectBtn,
+body.workspace-view-manual-notes #manualNotesLibraryBtn {
   background: #ffffff;
   border-color: #e0e3e7;
   box-shadow: none;

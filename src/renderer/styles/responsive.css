@@ -162,6 +162,19 @@
     padding: 16px;
   }
 
+  .manual-notes-library-page {
+    padding: 0 16px 16px;
+  }
+
+  .manual-notes-library-page__inner {
+    gap: 16px;
+    padding-top: 16px;
+  }
+
+  .manual-notes-library-page__header {
+    align-items: flex-start;
+  }
+
   .manual-notes-library-grid {
     grid-template-columns: 1fr;
   }
@@ -639,8 +652,8 @@
     display: none;
   }
 
-  .manual-notes-library-modal__dialog {
-    width: min(960px, calc(100vw - 40px));
+  .manual-notes-library-page__filters {
+    width: 100%;
   }
 }
 
@@ -791,7 +804,16 @@
     gap: 8px;
   }
 
-  .manual-notes-library-modal__dialog {
-    width: calc(100vw - 20px);
+  .manual-notes-library-page__header-main {
+    width: 100%;
+  }
+
+  .manual-notes-library-page__filters {
+    gap: 8px;
+  }
+
+  .manual-notes-library-page__filter {
+    min-height: 36px;
+    padding: 0 12px;
   }
 }

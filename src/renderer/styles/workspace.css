@@ -26,6 +26,111 @@
   margin: 0 auto;
 }
 
+.manual-notes-library-page {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 24px 24px;
+  background: #ffffff;
+}
+
+.manual-notes-library-page__inner {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 20px;
+}
+
+.manual-notes-library-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.manual-notes-library-page__header-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.manual-notes-library-page__header-icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #f1f3f4;
+  color: #202124;
+  font-size: 22px;
+}
+
+.manual-notes-library-page__header h1 {
+  margin: 0;
+  font-size: clamp(28px, 3.2vw, 40px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #202124;
+}
+
+.manual-notes-library-page__subtitle {
+  margin: 6px 0 0;
+  color: #5f6368;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.manual-notes-library-page__filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.manual-notes-library-page__filter {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #e0e3e7;
+  background: #f8f9fa;
+  color: #3c4043;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: none;
+}
+
+.manual-notes-library-page__filter:hover,
+.manual-notes-library-page__filter:focus-visible {
+  background: #f1f3f4;
+  border-color: #dadce0;
+  color: #202124;
+  transform: none;
+  box-shadow: none;
+}
+
+.manual-notes-library-page__filter--active {
+  background: #202124;
+  border-color: #202124;
+  color: #ffffff;
+}
+
+.manual-notes-library-page__filter .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.manual-notes-library-page__body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 4px 0 6px;
+}
+
 .workspace-overview-page__header {
   display: flex;
   align-items: center;

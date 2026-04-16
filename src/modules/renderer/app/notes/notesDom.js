@@ -451,19 +451,27 @@ function createNotesDom(deps = {}) {
             return;
         }
 
-        const manualNotes = getManualLibraryNotes();
+        const allManualNotes = getManualLibraryNotes();
+        const manualNotes = state.manualNotesLibraryFilter === 'selected'
+            ? allManualNotes.filter((note) => state.selectedNoteIds.includes(note.id))
+            : allManualNotes;
         const currentAgentName = state.currentSelectedItem?.name || '当前学科';
         const setGridEmptyState = (empty) => {
             el.manualNotesLibraryGrid.classList.toggle('manual-notes-library-grid--empty', empty);
         };
 
+        el.manualNotesLibraryFilterAllBtn?.classList.toggle('manual-notes-library-page__filter--active', state.manualNotesLibraryFilter !== 'selected');
+        el.manualNotesLibraryFilterAllBtn?.setAttribute('aria-pressed', state.manualNotesLibraryFilter !== 'selected' ? 'true' : 'false');
+        el.manualNotesLibraryFilterSelectedBtn?.classList.toggle('manual-notes-library-page__filter--active', state.manualNotesLibraryFilter === 'selected');
+        el.manualNotesLibraryFilterSelectedBtn?.setAttribute('aria-pressed', state.manualNotesLibraryFilter === 'selected' ? 'true' : 'false');
+
         if (el.manualNotesLibraryTitle) {
             el.manualNotesLibraryTitle.textContent = `${currentAgentName} · 我的笔记`;
         }
         if (el.manualNotesLibrarySubtitle) {
-            const selectedCount = manualNotes.filter((note) => state.selectedNoteIds.includes(note.id)).length;
+            const selectedCount = allManualNotes.filter((note) => state.selectedNoteIds.includes(note.id)).length;
             el.manualNotesLibrarySubtitle.textContent = state.currentSelectedItem?.id
-                ? `这里收纳当前学科下的 ${manualNotes.length} 条手写笔记，已选 ${selectedCount} 条可直接用于 Studio。`
+                ? `这里收纳当前学科下的 ${allManualNotes.length} 条手写笔记，已选 ${selectedCount} 条可直接用于 Studio。`
                 : '选择一个学科后，这里会显示该学科下的所有手写笔记。';
         }
 
@@ -485,8 +493,10 @@ function createNotesDom(deps = {}) {
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
             empty.innerHTML = `
-                <strong>当前学科还没有手写笔记</strong>
-                <span>你可以继续使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。</span>
+                <strong>${state.manualNotesLibraryFilter === 'selected' ? '还没有加入 Studio 的笔记' : '当前学科还没有手写笔记'}</strong>
+                <span>${state.manualNotesLibraryFilter === 'selected'
+                    ? '你可以在卡片右上角把需要的笔记加入 Studio，方便后续生成分析、选择题和闪卡。'
+                    : '你可以继续使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。'}</span>
             `;
             el.manualNotesLibraryGrid.appendChild(empty);
             return;
@@ -538,7 +548,7 @@ function createNotesDom(deps = {}) {
                 if (target instanceof ElementCtor && target.closest('[data-note-menu]')) {
                     return;
                 }
-                openNoteDetail(normalized, { trigger: el.manualNotesLibraryBtn || card });
+                openNoteDetail(normalized, { trigger: card });
             });
 
             card.querySelector('[data-note-menu]')?.addEventListener('click', (event) => {
