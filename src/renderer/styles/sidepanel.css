@@ -1165,17 +1165,22 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 }
 
 .notes-fab {
-  min-width: min(100%, 280px);
-  min-height: 56px;
+  min-width: min(100%, 172px);
+  min-height: 40px;
+  padding: 0 16px;
   border-radius: 999px;
   font-size: 15px;
   font-weight: 600;
-  gap: 8px;
+  gap: 6px;
   box-shadow: none;
 }
 
 .notes-fab.accent-button {
-  background: linear-gradient(180deg, #1a73e8, #1967d2);
+  background: #111111;
+}
+
+.notes-fab .material-symbols-outlined {
+  font-size: 18px;
 }
 
 body.dark-theme .notes-studio {

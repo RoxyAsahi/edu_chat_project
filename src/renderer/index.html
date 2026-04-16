@@ -45,20 +45,14 @@
           <span class="titlebar__tab-text">首页</span>
         </button>
         <div class="titlebar__workspace">
-          <div class="titlebar__context-card titlebar__tab titlebar__tab--context">
-            <span class="material-symbols-outlined titlebar__tab-icon" aria-hidden="true">auto_awesome</span>
-            <div class="titlebar__tab-copy">
-              <span class="titlebar__context-label">智能体</span>
-              <strong id="titlebarCurrentAgent">未选择学科</strong>
-            </div>
-          </div>
-          <div class="titlebar__context-card titlebar__context-card--topic titlebar__tab titlebar__tab--active">
+          <button id="workspaceOpenSubjectBtn" class="ghost-button titlebar__context-card titlebar__context-card--topic titlebar__tab titlebar__tab--active" type="button">
             <span class="material-symbols-outlined titlebar__tab-icon" aria-hidden="true">chat_bubble</span>
             <div class="titlebar__tab-copy">
-              <span class="titlebar__context-label">话题</span>
+              <strong id="titlebarCurrentAgent">未选择学科</strong>
+              <span class="titlebar__context-separator" aria-hidden="true">|</span>
               <strong id="titlebarCurrentTopic">请选择一个话题</strong>
             </div>
-          </div>
+          </button>
           <button id="manualNotesLibraryBtn" class="ghost-button titlebar__context-card titlebar__context-card--action titlebar__tab" type="button">
             <span class="material-symbols-outlined titlebar__tab-icon" aria-hidden="true">event_note</span>
             <div class="titlebar__tab-copy">
@@ -158,6 +152,9 @@
             <div class="workspace-card__titleblock">
               <p class="workspace-card__title">学习主题</p>
             </div>
+            <button id="quickNewTopicBtn" class="ghost-button workspace-card__cta workspace-card__cta--topic-create" type="button" aria-label="新建话题">
+              <span class="material-symbols-outlined" aria-hidden="true">post_add</span>
+            </button>
           </div>
 
           <div class="hidden">
