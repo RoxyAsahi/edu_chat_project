@@ -69,3 +69,17 @@ test('renderer shell tokens reference the shared font assets from the new styles
     assert.equal(css.includes("../../assets/font/MavenPro-ExtraBold.ttf"), true);
     assert.equal(css.includes("../../assets/font/MaterialSymbolsOutlined-latin-wght-normal.woff2"), true);
 });
+
+test('renderer chat stylesheet keeps assistant hover timestamps and bubble-only user messages', async () => {
+    const chatCssPath = path.resolve(__dirname, '../src/renderer/styles/chat.css');
+    const css = await fs.readFile(chatCssPath, 'utf8');
+
+    assert.equal(css.includes('.message-item .name-time-block'), true);
+    assert.equal(css.includes('.message-item.user .chat-avatar'), true);
+    assert.equal(css.includes('.message-item.assistant:hover .message-timestamp'), true);
+    assert.equal(css.includes('background: transparent;'), true);
+    assert.equal(css.includes('border-radius: 0;'), true);
+    assert.equal(css.includes('padding: 0;'), true);
+    assert.equal(css.includes('.context-menu__header'), true);
+    assert.equal(css.includes('.context-menu__item--danger'), true);
+});

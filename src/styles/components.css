@@ -806,6 +806,281 @@ body.light-theme .context-menu {
     color: #F0B840 !important; /* A slightly lighter gold for hover */
 }
 
+#chatContextMenu.context-menu {
+    position: fixed;
+    z-index: 1100;
+    width: min(300px, calc(100vw - 24px));
+    padding: 10px;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(180deg, rgba(38, 40, 46, 0.96), rgba(26, 28, 33, 0.92));
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38), 0 8px 24px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+    transform-origin: top left;
+    transition: opacity 160ms ease, transform 180ms ease;
+}
+
+#chatContextMenu.context-menu.context-menu--open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+body.light-theme #chatContextMenu.context-menu {
+    border-color: rgba(16, 24, 40, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 248, 252, 0.92));
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+#chatContextMenu .context-menu__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 4px 4px 10px;
+}
+
+#chatContextMenu .context-menu__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+#chatContextMenu .context-menu__badge--assistant {
+    background: rgba(110, 168, 254, 0.16);
+    color: #8ab4f8;
+}
+
+#chatContextMenu .context-menu__badge--user {
+    background: rgba(52, 168, 83, 0.16);
+    color: #81c995;
+}
+
+#chatContextMenu .context-menu__badge--warning {
+    background: rgba(251, 188, 4, 0.16);
+    color: #fdd663;
+}
+
+#chatContextMenu .context-menu__badge--editing {
+    background: rgba(174, 124, 255, 0.16);
+    color: #d0bcff;
+}
+
+#chatContextMenu .context-menu__badge--neutral {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.72);
+}
+
+body.light-theme #chatContextMenu .context-menu__badge--assistant {
+    background: rgba(26, 115, 232, 0.12);
+    color: #1558b0;
+}
+
+body.light-theme #chatContextMenu .context-menu__badge--user {
+    background: rgba(52, 168, 83, 0.12);
+    color: #196b44;
+}
+
+body.light-theme #chatContextMenu .context-menu__badge--warning {
+    background: rgba(251, 188, 4, 0.14);
+    color: #9a6700;
+}
+
+body.light-theme #chatContextMenu .context-menu__badge--editing {
+    background: rgba(123, 97, 255, 0.12);
+    color: #5b3a82;
+}
+
+body.light-theme #chatContextMenu .context-menu__badge--neutral {
+    background: rgba(17, 24, 39, 0.06);
+    color: #5f6368;
+}
+
+#chatContextMenu .context-menu__header-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+#chatContextMenu .context-menu__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #f5f7fb;
+    line-height: 1.2;
+}
+
+#chatContextMenu .context-menu__subtitle {
+    color: rgba(255, 255, 255, 0.66);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+body.light-theme #chatContextMenu .context-menu__title {
+    color: #1f2937;
+}
+
+body.light-theme #chatContextMenu .context-menu__subtitle {
+    color: #5f6368;
+}
+
+#chatContextMenu .context-menu__divider {
+    height: 1px;
+    margin: 2px 0;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.light-theme #chatContextMenu .context-menu__divider {
+    background: rgba(17, 24, 39, 0.08);
+}
+
+#chatContextMenu .context-menu__section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 0;
+}
+
+#chatContextMenu .context-menu__item {
+    width: 100%;
+    border: none;
+    background: transparent;
+    border-radius: 16px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    color: #f5f7fb;
+    transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+#chatContextMenu .context-menu__item:hover,
+#chatContextMenu .context-menu__item:focus-visible {
+    background: rgba(138, 180, 248, 0.12);
+    transform: translateY(-1px);
+    box-shadow: inset 0 0 0 1px rgba(138, 180, 248, 0.14);
+    outline: none;
+}
+
+body.light-theme #chatContextMenu .context-menu__item {
+    color: #1f2937;
+}
+
+body.light-theme #chatContextMenu .context-menu__item:hover,
+body.light-theme #chatContextMenu .context-menu__item:focus-visible {
+    background: rgba(26, 115, 232, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(26, 115, 232, 0.1);
+}
+
+#chatContextMenu .context-menu__item-main {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+#chatContextMenu .context-menu__icon {
+    font-size: 18px;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 1px;
+}
+
+body.light-theme #chatContextMenu .context-menu__icon {
+    color: #5f6368;
+}
+
+#chatContextMenu .context-menu__label-group {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#chatContextMenu .context-menu__label {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+#chatContextMenu .context-menu__description {
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+body.light-theme #chatContextMenu .context-menu__description {
+    color: #5f6368;
+}
+
+#chatContextMenu .context-menu__hint {
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.52);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+body.light-theme #chatContextMenu .context-menu__hint {
+    color: #6b7280;
+}
+
+#chatContextMenu .context-menu__item--info .context-menu__icon,
+#chatContextMenu .context-menu__item--info .context-menu__label {
+    color: #8ab4f8;
+}
+
+body.light-theme #chatContextMenu .context-menu__item--info .context-menu__icon,
+body.light-theme #chatContextMenu .context-menu__item--info .context-menu__label {
+    color: #1558b0;
+}
+
+#chatContextMenu .context-menu__item--success .context-menu__icon,
+#chatContextMenu .context-menu__item--success .context-menu__label {
+    color: #81c995;
+}
+
+body.light-theme #chatContextMenu .context-menu__item--success .context-menu__icon,
+body.light-theme #chatContextMenu .context-menu__item--success .context-menu__label {
+    color: #1f8f4d;
+}
+
+#chatContextMenu .context-menu__item--danger .context-menu__icon,
+#chatContextMenu .context-menu__item--danger .context-menu__label,
+#chatContextMenu .context-menu__item--danger .context-menu__hint {
+    color: #f28b82;
+}
+
+body.light-theme #chatContextMenu .context-menu__item--danger .context-menu__icon,
+body.light-theme #chatContextMenu .context-menu__item--danger .context-menu__label,
+body.light-theme #chatContextMenu .context-menu__item--danger .context-menu__hint {
+    color: #c63b32;
+}
+
+#chatContextMenu .context-menu__item--danger:hover,
+#chatContextMenu .context-menu__item--danger:focus-visible {
+    background: rgba(242, 139, 130, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(242, 139, 130, 0.14);
+}
+
+body.light-theme #chatContextMenu .context-menu__item--danger:hover,
+body.light-theme #chatContextMenu .context-menu__item--danger:focus-visible {
+    background: rgba(198, 59, 50, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(198, 59, 50, 0.14);
+}
+
 
 /* --- Switch Toggle Styles --- */
 .switch {
