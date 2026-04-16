@@ -80,6 +80,9 @@ test('renderer chat stylesheet keeps assistant hover timestamps and bubble-only 
     assert.equal(css.includes('background: transparent;'), true);
     assert.equal(css.includes('border-radius: 0;'), true);
     assert.equal(css.includes('padding: 0;'), true);
-    assert.equal(css.includes('.context-menu__header'), true);
+    assert.equal(css.includes('.context-menu__header'), false);
+    assert.equal(css.includes('.context-menu__description'), false);
+    assert.equal(css.includes('.context-menu__hint'), false);
+    assert.equal(css.includes('.context-menu__item-main'), true);
     assert.equal(css.includes('.context-menu__item--danger'), true);
 });

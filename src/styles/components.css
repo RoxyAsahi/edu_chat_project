@@ -809,9 +809,9 @@ body.light-theme .context-menu {
 #chatContextMenu.context-menu {
     position: fixed;
     z-index: 1100;
-    width: min(300px, calc(100vw - 24px));
-    padding: 10px;
-    border-radius: 22px;
+    width: min(150px, calc(100vw - 16px));
+    padding: 4px 5px 4px 2px;
+    border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.14);
     background: linear-gradient(180deg, rgba(38, 40, 46, 0.96), rgba(26, 28, 33, 0.92));
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38), 0 8px 24px rgba(0, 0, 0, 0.22);
@@ -936,7 +936,7 @@ body.light-theme #chatContextMenu .context-menu__subtitle {
 
 #chatContextMenu .context-menu__divider {
     height: 1px;
-    margin: 2px 0;
+    margin: 0;
     background: rgba(255, 255, 255, 0.08);
 }
 
@@ -947,30 +947,27 @@ body.light-theme #chatContextMenu .context-menu__divider {
 #chatContextMenu .context-menu__section {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 6px 0;
+    gap: 1px;
+    padding: 1px 0;
 }
 
 #chatContextMenu .context-menu__item {
     width: 100%;
     border: none;
     background: transparent;
-    border-radius: 16px;
-    padding: 10px 12px;
+    border-radius: 12px;
+    padding: 7px 8px 7px 4px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: center;
     text-align: left;
     color: #f5f7fb;
-    transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    transition: background-color 160ms ease;
 }
 
 #chatContextMenu .context-menu__item:hover,
 #chatContextMenu .context-menu__item:focus-visible {
     background: rgba(138, 180, 248, 0.12);
-    transform: translateY(-1px);
-    box-shadow: inset 0 0 0 1px rgba(138, 180, 248, 0.14);
     outline: none;
 }
 
@@ -981,21 +978,20 @@ body.light-theme #chatContextMenu .context-menu__item {
 body.light-theme #chatContextMenu .context-menu__item:hover,
 body.light-theme #chatContextMenu .context-menu__item:focus-visible {
     background: rgba(26, 115, 232, 0.08);
-    box-shadow: inset 0 0 0 1px rgba(26, 115, 232, 0.1);
 }
 
 #chatContextMenu .context-menu__item-main {
     min-width: 0;
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
 }
 
 #chatContextMenu .context-menu__icon {
-    font-size: 18px;
+    font-size: 17px;
     line-height: 1;
     color: rgba(255, 255, 255, 0.7);
-    margin-top: 1px;
 }
 
 body.light-theme #chatContextMenu .context-menu__icon {
@@ -1010,7 +1006,7 @@ body.light-theme #chatContextMenu .context-menu__icon {
 }
 
 #chatContextMenu .context-menu__label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 1.25;
 }
@@ -1072,13 +1068,11 @@ body.light-theme #chatContextMenu .context-menu__item--danger .context-menu__hin
 #chatContextMenu .context-menu__item--danger:hover,
 #chatContextMenu .context-menu__item--danger:focus-visible {
     background: rgba(242, 139, 130, 0.12);
-    box-shadow: inset 0 0 0 1px rgba(242, 139, 130, 0.14);
 }
 
 body.light-theme #chatContextMenu .context-menu__item--danger:hover,
 body.light-theme #chatContextMenu .context-menu__item--danger:focus-visible {
     background: rgba(198, 59, 50, 0.1);
-    box-shadow: inset 0 0 0 1px rgba(198, 59, 50, 0.14);
 }
 
 
