@@ -127,6 +127,9 @@ function createSettingsController(deps = {}) {
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getBubbleThemePreviewContext = deps.getBubbleThemePreviewContext || (() => ({}));
     let settingsModalTrigger = null;
+    let globalSettingsSaveTimer = null;
+    let isSyncingGlobalSettingsForm = false;
+    let isSavingGlobalSettings = false;
     let placeholderPreviewRequestId = 0;
     let lastFinalSystemPromptPreview = null;
 
@@ -154,9 +157,24 @@ function createSettingsController(deps = {}) {
         }));
     }
 
-    function applyTheme(theme) {
-        documentObj.body.classList.toggle('dark-theme', theme === 'dark');
-        documentObj.body.classList.toggle('light-theme', theme !== 'dark');
+    function applyTheme(_theme) {
+        documentObj.body.classList.remove('dark-theme');
+        documentObj.body.classList.add('light-theme');
+    }
+
+    function setGlobalSettingsSaveStatus(message, tone = '') {
+        if (!el.settingsAutoSaveStatus) {
+            return;
+        }
+        el.settingsAutoSaveStatus.textContent = message;
+        el.settingsAutoSaveStatus.classList.remove(
+            'settings-caption--success',
+            'settings-caption--warning',
+            'settings-caption--info'
+        );
+        if (tone) {
+            el.settingsAutoSaveStatus.classList.add(`settings-caption--${tone}`);
+        }
     }
 
     function applyRendererSettings() {
@@ -678,6 +696,7 @@ function createSettingsController(deps = {}) {
     }
 
     function syncGlobalSettingsForm() {
+        isSyncingGlobalSettingsForm = true;
         const settings = getGlobalSettings();
         el.userNameInput.value = settings.userName || '';
         if (el.studentNameInput) el.studentNameInput.value = settings.studyProfile?.studentName || '';
@@ -698,8 +717,8 @@ function createSettingsController(deps = {}) {
         if (el.promptVariablesInput) el.promptVariablesInput.value = JSON.stringify(settings.promptVariables || {}, null, 2);
         el.vcpServerUrl.value = settings.vcpServerUrl || '';
         el.vcpApiKey.value = settings.vcpApiKey || '';
-        el.kbBaseUrl.value = settings.kbBaseUrl || '';
-        el.kbApiKey.value = settings.kbApiKey || '';
+        if (el.kbBaseUrl) el.kbBaseUrl.value = settings.kbBaseUrl || settings.vcpServerUrl || '';
+        if (el.kbApiKey) el.kbApiKey.value = settings.kbApiKey || settings.vcpApiKey || '';
         el.kbEmbeddingModel.value = settings.kbEmbeddingModel || '';
         el.kbUseRerank.checked = settings.kbUseRerank !== false;
         el.kbRerankModel.value = settings.kbRerankModel || 'BAAI/bge-reranker-v2-m3';
@@ -763,6 +782,7 @@ function createSettingsController(deps = {}) {
         if (themeInput) {
             themeInput.checked = true;
         }
+        isSyncingGlobalSettingsForm = false;
     }
 
     async function loadSettings() {
@@ -775,13 +795,18 @@ function createSettingsController(deps = {}) {
         messageRendererApi?.setUserAvatarColor(getGlobalSettings().userAvatarCalculatedColor || null);
     }
 
-    async function saveGlobalSettings() {
+    async function saveGlobalSettings(options = {}) {
+        if (isSavingGlobalSettings) {
+            return;
+        }
         const promptVariables = parsePromptVariablesInput(el.promptVariablesInput?.value);
         if (promptVariables === null) {
-            ui.showToastNotification('自定义提示词变量必须是有效的 JSON 对象。', 'error');
+            setGlobalSettingsSaveStatus('自动保存暂停：自定义提示词变量需要是有效 JSON。', 'warning');
             return;
         }
         const themeMode = documentObj.querySelector('input[name="themeMode"]:checked')?.value || 'system';
+        const globalServerUrl = el.vcpServerUrl.value.trim();
+        const globalApiKey = el.vcpApiKey.value.trim();
         const patch = {
             userName: el.userNameInput.value.trim() || 'User',
             studyProfile: {
@@ -800,10 +825,10 @@ function createSettingsController(deps = {}) {
                 memoryTopK: Number(el.studyMemoryTopKInput?.value || 4),
                 memoryFallbackTopK: Number(el.studyMemoryFallbackTopKInput?.value || 2),
             },
-            vcpServerUrl: el.vcpServerUrl.value.trim(),
-            vcpApiKey: el.vcpApiKey.value.trim(),
-            kbBaseUrl: el.kbBaseUrl.value.trim(),
-            kbApiKey: el.kbApiKey.value.trim(),
+            vcpServerUrl: globalServerUrl,
+            vcpApiKey: globalApiKey,
+            kbBaseUrl: globalServerUrl,
+            kbApiKey: globalApiKey,
             kbEmbeddingModel: el.kbEmbeddingModel.value.trim(),
             kbUseRerank: el.kbUseRerank.checked,
             kbRerankModel: el.kbRerankModel.value.trim(),
@@ -824,9 +849,12 @@ function createSettingsController(deps = {}) {
             enableSmoothStreaming: el.enableSmoothStreaming.checked,
             currentThemeMode: themeMode,
         };
+        isSavingGlobalSettings = true;
+        setGlobalSettingsSaveStatus('正在自动保存...', 'info');
         const result = await chatAPI.saveSettings(patch);
+        isSavingGlobalSettings = false;
         if (!result?.success) {
-            ui.showToastNotification(`保存设置失败：${result?.error || '未知错误'}`, 'error');
+            setGlobalSettingsSaveStatus(`自动保存失败：${result?.error || '未知错误'}`, 'warning');
             setAgentBubbleThemeCaptionStatus(
                 el.agentBubbleThemePersistStatus,
                 '保存失败，未能验证磁盘中的提示词配置。',
@@ -860,7 +888,7 @@ function createSettingsController(deps = {}) {
                 'success'
             );
             void refreshFinalSystemPromptPreview();
-            ui.showToastNotification('全局设置已保存。', 'success');
+            setGlobalSettingsSaveStatus('所有修改已自动保存。', 'success');
             return;
         }
 
@@ -873,7 +901,24 @@ function createSettingsController(deps = {}) {
         const mismatchDetail = promptToggleMismatches.length > 0
             ? `以下开关未成功写入：${promptToggleMismatches.join('、')}。`
             : '请重新打开设置检查。';
-        ui.showToastNotification(`全局设置已保存，但注入提示词未成功写入磁盘，${mismatchDetail}`, 'error');
+        setGlobalSettingsSaveStatus(`已保存，但部分提示词配置未完全写入：${mismatchDetail}`, 'warning');
+        if (options.showToastOnPartialSave === true) {
+            ui.showToastNotification(`全局设置已保存，但注入提示词未成功写入磁盘，${mismatchDetail}`, 'error');
+        }
+    }
+
+    function scheduleGlobalSettingsSave(delay = 420) {
+        if (isSyncingGlobalSettingsForm) {
+            return;
+        }
+        if (globalSettingsSaveTimer) {
+            windowObj.clearTimeout(globalSettingsSaveTimer);
+        }
+        setGlobalSettingsSaveStatus('检测到修改，准备自动保存...', 'info');
+        globalSettingsSaveTimer = windowObj.setTimeout(() => {
+            globalSettingsSaveTimer = null;
+            void saveGlobalSettings();
+        }, delay);
     }
 
     function switchSettingsModalSection(section) {
@@ -923,7 +968,7 @@ function createSettingsController(deps = {}) {
         el.settingsModal?.classList.add('settings-modal--open');
         el.settingsModal?.setAttribute('aria-hidden', 'false');
         documentObj.body.classList.add('settings-modal-open');
-        el.settingsModalCloseBtn?.focus();
+        (el.settingsModalCloseBtnFloating || el.settingsModalCloseBtn)?.focus();
     }
 
     function closeSettingsModal() {
@@ -1006,6 +1051,7 @@ function createSettingsController(deps = {}) {
             openSettingsModal('global', el.globalSettingsBtn);
         });
         el.settingsModalCloseBtn?.addEventListener('click', closeSettingsModal);
+        el.settingsModalCloseBtnFloating?.addEventListener('click', closeSettingsModal);
         el.settingsModalBackdrop?.addEventListener('click', closeSettingsModal);
         el.settingsNavButtons?.forEach((button) => {
             button.addEventListener('click', () => {
@@ -1023,6 +1069,7 @@ function createSettingsController(deps = {}) {
             input.addEventListener('change', () => {
                 if (input.checked) {
                     chatAPI.setThemeMode(input.value);
+                    scheduleGlobalSettingsSave(0);
                 }
             });
         });
@@ -1031,32 +1078,39 @@ function createSettingsController(deps = {}) {
             syncPromptInjectionState();
             void refreshAgentBubbleThemePreview();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.studyLogEnabledInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.studyLogEnablePromptVariablesInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.studyLogAutoInjectProtocolInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.enableRenderingPromptInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.enableAdaptiveBubbleTipInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.agentBubbleThemePrompt?.addEventListener('input', () => {
             markPromptTextareaCustom(el.agentBubbleThemePrompt);
             setAgentBubbleThemeCaptionStatus(el.agentBubbleThemePersistStatus, '', '');
             void refreshAgentBubbleThemePreview();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.agentBubbleThemePrompt?.addEventListener('blur', () => {
             hydratePromptTextarea(el.agentBubbleThemePrompt, DEFAULT_AGENT_BUBBLE_THEME_PROMPT);
@@ -1067,10 +1121,12 @@ function createSettingsController(deps = {}) {
             }
             void refreshAgentBubbleThemePreview();
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.renderingPromptInput?.addEventListener('input', () => {
             markPromptTextareaCustom(el.renderingPromptInput);
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.renderingPromptInput?.addEventListener('blur', () => {
             hydratePromptTextarea(el.renderingPromptInput, DEFAULT_RENDERING_PROMPT);
@@ -1080,10 +1136,12 @@ function createSettingsController(deps = {}) {
                     : 'false';
             }
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.adaptiveBubbleTipInput?.addEventListener('input', () => {
             markPromptTextareaCustom(el.adaptiveBubbleTipInput);
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.adaptiveBubbleTipInput?.addEventListener('blur', () => {
             hydratePromptTextarea(el.adaptiveBubbleTipInput, DEFAULT_ADAPTIVE_BUBBLE_TIP);
@@ -1093,10 +1151,12 @@ function createSettingsController(deps = {}) {
                     : 'false';
             }
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.dailyNoteGuideInput?.addEventListener('input', () => {
             markPromptTextareaCustom(el.dailyNoteGuideInput);
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.dailyNoteGuideInput?.addEventListener('blur', () => {
             const defaultDailyNotePrompt = getDailyNoteDefaultPromptText();
@@ -1107,14 +1167,45 @@ function createSettingsController(deps = {}) {
                     : 'false';
             }
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
         });
         el.refreshFinalSystemPromptPreviewBtn?.addEventListener('click', () => {
             void refreshFinalSystemPromptPreview();
         });
 
+        [
+            el.userNameInput,
+            el.studentNameInput,
+            el.studyCityInput,
+            el.studyWorkspaceInput,
+            el.workEnvironmentInput,
+            el.studyTimezoneInput,
+            el.promptVariablesInput,
+            el.vcpServerUrl,
+            el.vcpApiKey,
+            el.kbEmbeddingModel,
+            el.kbRerankModel,
+            el.kbTopK,
+            el.kbCandidateTopK,
+            el.kbScoreThreshold,
+            el.chatBubbleMaxWidthWideDefault,
+        ].forEach((node) => {
+            node?.addEventListener('input', () => scheduleGlobalSettingsSave());
+            node?.addEventListener('change', () => scheduleGlobalSettingsSave());
+        });
+
+        [
+            el.kbUseRerank,
+            el.enableWideChatLayout,
+            el.enableSmoothStreaming,
+            el.chatFontPreset,
+            el.chatCodeFontPreset,
+        ].forEach((node) => {
+            node?.addEventListener('change', () => scheduleGlobalSettingsSave());
+        });
+
         el.themeToggleBtn?.addEventListener('click', () => {
-            const nextTheme = documentObj.body.classList.contains('dark-theme') ? 'light' : 'dark';
-            chatAPI.setTheme(nextTheme);
+            applyTheme('light');
         });
     }
 

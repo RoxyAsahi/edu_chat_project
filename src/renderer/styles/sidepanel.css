@@ -55,37 +55,23 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: 32px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--panel) 96%, white 4%), color-mix(in srgb, var(--panel-strong) 94%, transparent)),
-    var(--panel);
-  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.18);
-}
-
-.settings-modal__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 28px 30px 18px;
-  border-bottom: 1px solid var(--line);
-}
-
-.settings-modal__header h2 {
-  margin: 0;
-  font-size: 30px;
-  line-height: 1.1;
-}
-
-.settings-modal__header .settings-caption {
-  margin: 8px 0 0;
-  max-width: 560px;
+  background: color-mix(in srgb, var(--panel) 98%, white 2%);
+  border: none;
+  box-shadow: none;
 }
 
 .settings-modal__close {
   width: 40px;
   height: 40px;
   border-radius: 14px;
+}
+
+.settings-modal__close--floating {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  background: rgba(248, 250, 253, 0.96);
 }
 
 .settings-modal__body {
@@ -100,9 +86,9 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 24px 18px 24px 24px;
-  border-right: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel-strong) 96%, transparent);
+  padding: 18px 18px 20px 20px;
+  border-right: none;
+  background: #f4f6fb;
 }
 
 .settings-modal__nav-button {
@@ -110,27 +96,28 @@
   gap: 12px;
   padding: 14px 16px;
   border-radius: 18px;
-  color: var(--muted);
+  color: #5f6368;
   font-weight: 600;
   text-align: left;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .settings-modal__nav-button:hover {
-  background: color-mix(in srgb, var(--accent-soft) 54%, transparent);
-  color: var(--ink);
+  background: #e9eef6;
+  color: #202124;
 }
 
 .settings-modal__nav-button--active {
-  background: color-mix(in srgb, var(--accent-soft) 78%, var(--panel) 22%);
-  color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+  background: #dfe7f6;
+  color: #202124;
+  box-shadow: none;
 }
 
 .settings-modal__content {
   min-height: 0;
   overflow: auto;
-  padding: 24px 24px 28px;
+  padding: 18px 24px 20px;
+  background: #f8fafd;
 }
 
 .settings-modal__section {
@@ -145,23 +132,20 @@
 
 .settings-card--modal {
   box-shadow: none;
-  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  background: color-mix(in srgb, var(--panel) 97%, transparent);
+  border: none;
+  background: #eef3fb;
 }
 
 .settings-modal__agent-header {
-  margin-bottom: 4px;
+  margin-bottom: 0;
+  padding: 0 4px;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  justify-content: flex-start;
 }
 
-.settings-modal__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 24px 24px;
-  border-top: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 98%, transparent);
-}
+.settings-modal__footer { display: none; }
 
 .settings-modal__footer .settings-caption {
   margin: 0;
@@ -1495,15 +1479,43 @@ body.dark-theme .note-card--studio.note-card--selected {
 .list-item__meta, .settings-caption, .topic-lock { font-size: 12px; color: var(--muted); }
 
 /* Studio / Bento Grid */
-.settings-panel__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--panel); border-radius: 24px; padding: 20px; box-shadow: var(--shadow-elevation-1); }
+.settings-panel__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: transparent; border-radius: 0; padding: 0; box-shadow: none; }
+
+.settings-agent-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.settings-agent-actions__delete {
+  order: 2;
+  padding: 0 16px;
+  min-height: 44px;
+  border-radius: 999px;
+  background: rgba(217, 48, 37, 0.08);
+}
+
+.settings-agent-actions__delete:hover,
+.settings-agent-actions__delete:focus-visible {
+  background: rgba(217, 48, 37, 0.12);
+  box-shadow: none;
+  transform: none;
+}
+
+.settings-agent-actions__save {
+  flex: 0 0 auto;
+  min-width: 220px;
+}
 
 .settings-stack { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 
 .settings-card {
   padding: 20px;
   border-radius: 24px;
-  background: var(--panel);
-  box-shadow: var(--shadow-elevation-1);
+  background: #f2f6fc;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1513,9 +1525,9 @@ body.dark-theme .note-card--studio.note-card--selected {
 
 .settings-card:nth-child(1) { grid-column: span 2; }
 
-.settings-card:nth-child(2) { grid-column: span 2; background: var(--macaron-blue); }
+.settings-card:nth-child(2) { grid-column: span 2; background: #edf4ff; }
 
-.settings-card:nth-child(3) { grid-column: span 2; background: var(--macaron-green); }
+.settings-card:nth-child(3) { grid-column: span 2; background: #eef7f0; }
 
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 
@@ -1533,7 +1545,7 @@ body.dark-theme .note-card--studio.note-card--selected {
 
 .settings-card input[type='checkbox'], .settings-card input[type='radio'] { width: auto; accent-color: var(--accent); }
 
-.settings-card textarea { min-height: 100px; resize: vertical; background: rgba(255,255,255,0.5); }
+.settings-card textarea { min-height: 100px; resize: vertical; background: rgba(255,255,255,0.84); }
 
 body.dark-theme .settings-card textarea { background: rgba(0,0,0,0.1); }
 
@@ -1552,8 +1564,8 @@ body.dark-theme .settings-card textarea { background: rgba(0,0,0,0.1); }
   gap: 14px;
   padding: 16px;
   border-radius: 18px;
-  background: rgba(255,255,255,0.46);
-  border: 1px solid rgba(72, 53, 33, 0.08);
+  background: rgba(255,255,255,0.78);
+  border: none;
 }
 
 body.dark-theme .settings-subsection {
@@ -1561,17 +1573,13 @@ body.dark-theme .settings-subsection {
   border-color: rgba(255,255,255,0.08);
 }
 
-.settings-subsection--primary {
-  background: linear-gradient(135deg, rgba(236, 243, 255, 0.9), rgba(245, 249, 255, 0.72));
-}
+.settings-subsection--primary { background: #e8f0fe; }
 
 body.dark-theme .settings-subsection--primary {
   background: linear-gradient(135deg, rgba(58, 88, 135, 0.22), rgba(255, 255, 255, 0.04));
 }
 
-.settings-subsection--status {
-  background: linear-gradient(135deg, rgba(244, 248, 238, 0.92), rgba(255, 255, 255, 0.62));
-}
+.settings-subsection--status { background: #edf7ed; }
 
 body.dark-theme .settings-subsection--status {
   background: linear-gradient(135deg, rgba(70, 97, 74, 0.22), rgba(255, 255, 255, 0.04));
@@ -1612,8 +1620,8 @@ body.dark-theme .settings-subsection--status {
   gap: 10px;
   padding: 14px;
   border-radius: 20px;
-  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
-  background: color-mix(in srgb, var(--panel) 96%, white 4%);
+  border: none;
+  background: rgba(255, 255, 255, 0.82);
   min-width: 0;
 }
 
@@ -1673,8 +1681,8 @@ body.dark-theme .settings-prompt-editor {
   gap: 6px;
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(72, 53, 33, 0.08);
-  background: color-mix(in srgb, var(--panel) 94%, white 6%);
+  border: none;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 body.dark-theme .settings-token-card {
@@ -1699,8 +1707,8 @@ body.dark-theme .settings-token-card {
 }
 
 .settings-token-card--active {
-  border-color: color-mix(in srgb, var(--accent) 20%, var(--line) 80%);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-soft) 38%, transparent);
+  box-shadow: none;
+  background: #e8f0fe;
 }
 
 .settings-token-card--muted {
@@ -1785,6 +1793,10 @@ body.dark-theme .settings-token-card {
   color: #b06000;
 }
 
+.settings-caption.settings-caption--info {
+  color: #5f6368;
+}
+
 #systemPromptContainer textarea { min-height: 120px; }
 
 #systemPromptContainer .prompt-text-mode-note { margin-bottom: 8px; color: var(--muted); font-size: 12px; }
@@ -1841,18 +1853,18 @@ body.dark-theme .settings-token-card {
 .settings-card input[type="number"], 
 .settings-card input[type="password"], 
 .settings-card select {
-    padding: 8px 12px;
+    padding: 10px 14px;
     font-size: 14px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: transparent;
+    border-radius: 14px;
+    border: none;
+    background: rgba(255,255,255,0.96);
     box-shadow: none;
-    transition: all 0.2s;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .settings-card input:focus, .settings-card select:focus {
-    border-color: var(--accent);
-    background: var(--paper);
+    background: #ffffff;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-soft) 82%, transparent);
 }
 
 body.dark-theme .settings-card input, 
