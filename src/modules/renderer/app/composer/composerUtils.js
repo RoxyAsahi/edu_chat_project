@@ -23,6 +23,16 @@ function normalizeAttachmentList(attachments) {
         : [];
 }
 
+function normalizeFollowUpList(followUps) {
+    return Array.isArray(followUps)
+        ? [...new Set(
+            followUps
+                .map((item) => String(item || '').trim())
+                .filter(Boolean)
+        )].slice(0, 3)
+        : [];
+}
+
 function normalizeHistory(history) {
     return Array.isArray(history)
         ? history.map((message) => ({
@@ -34,6 +44,7 @@ function normalizeHistory(history) {
             selectionContextRefs: Array.isArray(message.selectionContextRefs) ? message.selectionContextRefs : [],
             toolEvents: Array.isArray(message.toolEvents) ? message.toolEvents : [],
             studyMemoryRefs: Array.isArray(message.studyMemoryRefs) ? message.studyMemoryRefs : [],
+            followUps: normalizeFollowUpList(message.followUps),
         }))
         : [];
 }
@@ -167,6 +178,7 @@ export {
     buildSelectionContextTemporaryMessages,
     inferExtensionFromType,
     normalizeAttachmentList,
+    normalizeFollowUpList,
     normalizeHistory,
     normalizeStoredAttachment,
     resolveComposerAvailabilityState,

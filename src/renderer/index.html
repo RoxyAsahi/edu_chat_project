@@ -838,7 +838,7 @@
                   <div class="settings-subsection__header">
                     <div>
                       <h4>高频常用</h4>
-                      <p class="settings-caption">这里只保留最常改的几项：渲染提示、气泡提示和 DailyNote 协议文本。</p>
+                      <p class="settings-caption">这里只保留最常改的几项：渲染提示、气泡提示、DailyNote 协议和追问模板。</p>
                     </div>
                   </div>
                   <div class="field-grid" style="grid-template-columns: 1fr;">
@@ -895,6 +895,30 @@
                           placeholder="这里定义全局 DailyNote 协议文本。启用内建变量或自动注入后，都会使用这里的内容。"
                         ></textarea>
                         <span class="settings-caption">这份文本会作为 <code>{{DailyNoteTool}}</code>、<code>{{VarDailyNoteGuide}}</code> 的展开内容，也会被“自动追加到 system prompt”复用。<code>{{StudyLogTool}}</code> 仅作为兼容别名继续可用。留空时会直接显示并使用默认协议。</span>
+                      </div>
+                      <div class="settings-prompt-editor">
+                        <span class="settings-prompt-editor__title">
+                          <span>追问提示词模板（全局）</span>
+                          <code>{{CHAT_HISTORY}}</code>
+                        </span>
+                        <textarea
+                          id="followUpPromptTemplateInput"
+                          rows="7"
+                          placeholder="这里定义回复完成后自动生成追问时使用的全局模板。"
+                        ></textarea>
+                        <span class="settings-caption">留空时会自动显示并使用内置默认模板。若未显式写入 <code>{{CHAT_HISTORY}}</code>，系统会把裁剪后的最近对话自动追加到模板末尾。</span>
+                      </div>
+                      <div class="settings-prompt-editor">
+                        <span class="settings-prompt-editor__title">
+                          <label><input id="enableTopicTitleGenerationInput" type="checkbox" /> 自动命名话题（全局）</label>
+                          <code>{{CHAT_HISTORY}}</code>
+                        </span>
+                        <textarea
+                          id="topicTitlePromptTemplateInput"
+                          rows="7"
+                          placeholder="这里定义首轮回复完成后自动命名话题时使用的全局模板。"
+                        ></textarea>
+                        <span class="settings-caption">只会在首轮助手回复成功后尝试自动命名。留空时会自动显示并使用内置默认模板，要求模型只返回 <code>{\"title\":\"😀 标题\"}</code> 这种 JSON。</span>
                       </div>
                     </div>
                   </div>

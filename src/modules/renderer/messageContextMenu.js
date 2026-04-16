@@ -712,6 +712,12 @@ async function handleRegenerateResponse(originalAssistantMessage) {
         contextMenuDependencies.removeMessageById(regenerationThinkingMessage.id, false);
         contextMenuDependencies.renderMessage(assistantMessage);
         contextMenuDependencies.setActiveRequestId?.(null);
+        void contextMenuDependencies.generateFollowUpsForAssistantMessage?.({
+            agentId: currentSelectedItemVal.id,
+            topicId: currentTopicIdVal,
+            messageId: assistantMessage.id,
+            historySnapshot: finalHistory,
+        });
         uiHelper.scrollToBottom();
     } catch (error) {
         contextMenuDependencies.setActiveRequestId?.(null);

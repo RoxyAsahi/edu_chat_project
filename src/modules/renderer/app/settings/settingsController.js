@@ -39,7 +39,37 @@ const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
     'Keep answers readable and compact when rich layout is unnecessary.',
     'Only switch to more structured rendering when it clearly helps comprehension.',
 ].join(' ');
+const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
+    '你是 UniStudy 的追问生成助手。',
+    '请基于下面的对话历史，从用户视角生成 3-5 条自然、简洁、紧贴上下文的后续追问。',
+    '要求：',
+    '1. 每条追问都要像用户接下来会继续问助手的话。',
+    '2. 不要重复已经回答过的内容。',
+    '3. 不要输出解释、标题、Markdown 或代码块。',
+    '4. 只返回 JSON。',
+    '输出格式：',
+    '{"follow_ups":["追问1","追问2","追问3"]}',
+    '对话历史：',
+    '{{CHAT_HISTORY}}',
+].join('\n');
+const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
+    '你是 UniStudy 的话题命名助手。',
+    '请根据下面的首轮对话，为当前话题生成一个简洁标题。',
+    '要求：',
+    '1. 标题必须包含 1 个合适的 emoji，并搭配简洁文本。',
+    '2. 优先概括主题，不要过度发挥，不要写成长句。',
+    '3. 使用对话的主要语言；如果混合语言明显，优先使用用户最后一次提问的语言。',
+    '4. 不要输出解释、标题、Markdown 或代码块。',
+    '5. 只返回 JSON。',
+    '输出格式：',
+    '{"title":"😀 标题"}',
+    '对话历史：',
+    '{{CHAT_HISTORY}}',
+].join('\n');
 const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
+    followUpPromptTemplate: '追问提示词模板',
+    enableTopicTitleGeneration: '自动命名话题',
+    topicTitlePromptTemplate: '话题命名提示词模板',
     enableRenderingPrompt: '结构化渲染提示',
     enableAdaptiveBubbleTip: '简洁气泡补充',
     'studyLogPolicy.enableDailyNotePromptVariables': '内建 DailyNote 变量',
@@ -221,6 +251,7 @@ function createSettingsController(deps = {}) {
     function syncPromptInjectionState() {
         syncPromptTextareaState(el.renderingPromptInput, el.enableRenderingPromptInput?.checked !== false);
         syncPromptTextareaState(el.adaptiveBubbleTipInput, el.enableAdaptiveBubbleTipInput?.checked !== false);
+        syncPromptTextareaState(el.topicTitlePromptTemplateInput, el.enableTopicTitleGenerationInput?.checked !== false);
         syncPromptTextareaState(el.agentBubbleThemePrompt, el.enableAgentBubbleTheme?.checked === true);
         const dailyNoteEnabled = (el.studyLogEnabledInput?.checked !== false)
             && ((el.studyLogEnablePromptVariablesInput?.checked !== false)
@@ -788,6 +819,27 @@ function createSettingsController(deps = {}) {
                 markPromptTextareaDefault(el.dailyNoteGuideInput, getDailyNoteDefaultPromptText());
             }
         }
+        if (el.followUpPromptTemplateInput) {
+            const storedFollowUpPromptTemplate = settings.followUpPromptTemplate || '';
+            el.followUpPromptTemplateInput.value = storedFollowUpPromptTemplate || DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE;
+            if (storedFollowUpPromptTemplate.trim()) {
+                markPromptTextareaCustom(el.followUpPromptTemplateInput);
+            } else {
+                markPromptTextareaDefault(el.followUpPromptTemplateInput, DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE);
+            }
+        }
+        if (el.enableTopicTitleGenerationInput) {
+            el.enableTopicTitleGenerationInput.checked = settings.enableTopicTitleGeneration !== false;
+        }
+        if (el.topicTitlePromptTemplateInput) {
+            const storedTopicTitlePromptTemplate = settings.topicTitlePromptTemplate || '';
+            el.topicTitlePromptTemplateInput.value = storedTopicTitlePromptTemplate || DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE;
+            if (storedTopicTitlePromptTemplate.trim()) {
+                markPromptTextareaCustom(el.topicTitlePromptTemplateInput);
+            } else {
+                markPromptTextareaDefault(el.topicTitlePromptTemplateInput, DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE);
+            }
+        }
         el.enableSmoothStreaming.checked = settings.enableSmoothStreaming === true;
         syncPromptInjectionState();
         void refreshAgentBubbleThemePreview();
@@ -862,6 +914,9 @@ function createSettingsController(deps = {}) {
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
             adaptiveBubbleTip: getPromptTextareaRawValue(el.adaptiveBubbleTipInput),
             dailyNoteGuide: getPromptTextareaRawValue(el.dailyNoteGuideInput),
+            followUpPromptTemplate: getPromptTextareaRawValue(el.followUpPromptTemplateInput),
+            enableTopicTitleGeneration: el.enableTopicTitleGenerationInput?.checked !== false,
+            topicTitlePromptTemplate: getPromptTextareaRawValue(el.topicTitlePromptTemplateInput),
             enableSmoothStreaming: el.enableSmoothStreaming.checked,
             currentThemeMode: themeMode,
         };
@@ -893,11 +948,11 @@ function createSettingsController(deps = {}) {
         const mismatchedFields = Array.isArray(persistenceCheck?.mismatchedFields)
             ? persistenceCheck.mismatchedFields
             : [];
-        const promptToggleMismatches = mismatchedFields
+        const persistenceFieldMismatches = mismatchedFields
             .filter((fieldId) => Object.prototype.hasOwnProperty.call(SETTINGS_PERSISTENCE_FIELD_LABELS, fieldId))
             .map((fieldId) => SETTINGS_PERSISTENCE_FIELD_LABELS[fieldId]);
 
-        if (promptPersisted && togglePersisted && promptToggleMismatches.length === 0) {
+        if (promptPersisted && togglePersisted && persistenceFieldMismatches.length === 0) {
             setAgentBubbleThemeCaptionStatus(
                 el.agentBubbleThemePersistStatus,
                 '已验证：提示词配置已写入 settings.json。',
@@ -905,6 +960,9 @@ function createSettingsController(deps = {}) {
             );
             void refreshFinalSystemPromptPreview();
             setGlobalSettingsSaveStatus('所有修改已自动保存。', 'success');
+            if (options.showToastOnSuccess !== false) {
+                ui.showToastNotification('全局设置已保存。', 'success');
+            }
             return;
         }
 
@@ -914,8 +972,8 @@ function createSettingsController(deps = {}) {
             'warning'
         );
         void refreshFinalSystemPromptPreview();
-        const mismatchDetail = promptToggleMismatches.length > 0
-            ? `以下开关未成功写入：${promptToggleMismatches.join('、')}。`
+        const mismatchDetail = persistenceFieldMismatches.length > 0
+            ? `以下字段未成功写入：${persistenceFieldMismatches.join('、')}。`
             : '请重新打开设置检查。';
         setGlobalSettingsSaveStatus(`已保存，但部分提示词配置未完全写入：${mismatchDetail}`, 'warning');
         if (options.showToastOnPartialSave === true) {
@@ -933,7 +991,7 @@ function createSettingsController(deps = {}) {
         setGlobalSettingsSaveStatus('检测到修改，准备自动保存...', 'info');
         globalSettingsSaveTimer = windowObj.setTimeout(() => {
             globalSettingsSaveTimer = null;
-            void saveGlobalSettings();
+            void saveGlobalSettings({ showToastOnSuccess: false });
         }, delay);
     }
 
@@ -1152,6 +1210,10 @@ function createSettingsController(deps = {}) {
             void refreshFinalSystemPromptPreview();
             scheduleGlobalSettingsSave();
         });
+        el.enableTopicTitleGenerationInput?.addEventListener('change', () => {
+            syncPromptInjectionState();
+            scheduleGlobalSettingsSave();
+        });
         el.agentBubbleThemePrompt?.addEventListener('input', () => {
             markPromptTextareaCustom(el.agentBubbleThemePrompt);
             setAgentBubbleThemeCaptionStatus(el.agentBubbleThemePersistStatus, '', '');
@@ -1214,6 +1276,32 @@ function createSettingsController(deps = {}) {
                     : 'false';
             }
             void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
+        });
+        el.followUpPromptTemplateInput?.addEventListener('input', () => {
+            markPromptTextareaCustom(el.followUpPromptTemplateInput);
+            scheduleGlobalSettingsSave();
+        });
+        el.followUpPromptTemplateInput?.addEventListener('blur', () => {
+            hydratePromptTextarea(el.followUpPromptTemplateInput, DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE);
+            if (el.followUpPromptTemplateInput?.value.trim()) {
+                el.followUpPromptTemplateInput.dataset.usingDefaultPrompt = el.followUpPromptTemplateInput.value.trim() === DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE.trim()
+                    ? 'true'
+                    : 'false';
+            }
+            scheduleGlobalSettingsSave();
+        });
+        el.topicTitlePromptTemplateInput?.addEventListener('input', () => {
+            markPromptTextareaCustom(el.topicTitlePromptTemplateInput);
+            scheduleGlobalSettingsSave();
+        });
+        el.topicTitlePromptTemplateInput?.addEventListener('blur', () => {
+            hydratePromptTextarea(el.topicTitlePromptTemplateInput, DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE);
+            if (el.topicTitlePromptTemplateInput?.value.trim()) {
+                el.topicTitlePromptTemplateInput.dataset.usingDefaultPrompt = el.topicTitlePromptTemplateInput.value.trim() === DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE.trim()
+                    ? 'true'
+                    : 'false';
+            }
             scheduleGlobalSettingsSave();
         });
         el.refreshFinalSystemPromptPreviewBtn?.addEventListener('click', () => {

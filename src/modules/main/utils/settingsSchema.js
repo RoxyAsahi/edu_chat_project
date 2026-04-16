@@ -7,6 +7,33 @@ const {
 } = require('../knowledge-base/constants');
 
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{VarDivRender}}';
+const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
+    '你是 UniStudy 的追问生成助手。',
+    '请基于下面的对话历史，从用户视角生成 3-5 条自然、简洁、紧贴上下文的后续追问。',
+    '要求：',
+    '1. 每条追问都要像用户接下来会继续问助手的话。',
+    '2. 不要重复已经回答过的内容。',
+    '3. 不要输出解释、标题、Markdown 或代码块。',
+    '4. 只返回 JSON。',
+    '输出格式：',
+    '{"follow_ups":["追问1","追问2","追问3"]}',
+    '对话历史：',
+    '{{CHAT_HISTORY}}',
+].join('\n');
+const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
+    '你是 UniStudy 的话题命名助手。',
+    '请根据下面的首轮对话，为当前话题生成一个简洁标题。',
+    '要求：',
+    '1. 标题必须包含 1 个合适的 emoji，并搭配简洁文本。',
+    '2. 优先概括主题，不要过度发挥，不要写成长句。',
+    '3. 使用对话的主要语言；如果混合语言明显，优先使用用户最后一次提问的语言。',
+    '4. 不要输出解释、标题、Markdown 或代码块。',
+    '5. 只返回 JSON。',
+    '输出格式：',
+    '{"title":"😀 标题"}',
+    '对话历史：',
+    '{{CHAT_HISTORY}}',
+].join('\n');
 const DEFAULT_STUDY_PROFILE = Object.freeze({
     studentName: '',
     city: '',
@@ -51,6 +78,9 @@ const DEFAULT_SETTINGS = Object.freeze({
     renderingPrompt: '',
     adaptiveBubbleTip: '',
     dailyNoteGuide: '',
+    followUpPromptTemplate: '',
+    enableTopicTitleGeneration: true,
+    topicTitlePromptTemplate: '',
     enableAgentBubbleTheme: false,
     agentBubbleThemePrompt: DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
     enableSmoothStreaming: false,
@@ -195,6 +225,27 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
+    if (typeof sourceSettings.followUpPromptTemplate !== 'string') {
+        validated.followUpPromptTemplate = normalizePromptText(
+            sourceSettings.followUpPromptTemplate,
+            defaultSettings.followUpPromptTemplate
+        );
+        hasIssues = true;
+    }
+
+    if (typeof sourceSettings.enableTopicTitleGeneration !== 'boolean') {
+        validated.enableTopicTitleGeneration = defaultSettings.enableTopicTitleGeneration;
+        hasIssues = true;
+    }
+
+    if (typeof sourceSettings.topicTitlePromptTemplate !== 'string') {
+        validated.topicTitlePromptTemplate = normalizePromptText(
+            sourceSettings.topicTitlePromptTemplate,
+            defaultSettings.topicTitlePromptTemplate
+        );
+        hasIssues = true;
+    }
+
     if (!Array.isArray(validated.combinedItemOrder)) {
         validated.combinedItemOrder = [];
         hasIssues = true;
@@ -264,6 +315,8 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
 
 module.exports = {
     DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
+    DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE,
+    DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE,
     DEFAULT_STUDY_LOG_POLICY,
     DEFAULT_STUDY_PROFILE,
     DEFAULT_SETTINGS,

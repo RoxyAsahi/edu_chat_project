@@ -2,6 +2,9 @@
 const { ipcMain } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
+const {
+    buildDefaultPlaceholderTopic,
+} = require('../utils/topicTitles');
 
 let AGENT_DIR_CACHE; // Cache the agent directory path
 let USER_DATA_DIR_CACHE; // Cache the user data directory path
@@ -75,12 +78,12 @@ async function loadAgents(settingsManager) {
                 agentData.config = config;
                 agentData.topics = (config.topics && Array.isArray(config.topics) && config.topics.length > 0)
                     ? config.topics
-                    : [{ id: "default", name: "主要对话", createdAt: Date.now() }];
+                    : [buildDefaultPlaceholderTopic()];
 
                 agentData.config.id = folderName;
                 agentData.config.agentDataPath = path.join(USER_DATA_DIR_CACHE, folderName);
             } else {
-                agentData.topics = [{ id: "default", name: "主要对话", createdAt: Date.now() }];
+                agentData.topics = [buildDefaultPlaceholderTopic()];
                 agentData.config = {
                     name: folderName,
                     topics: agentData.topics,
@@ -474,13 +477,13 @@ function initialize(context) {
                     temperature: 0.7,
                     contextTokenLimit: 1000000,
                     maxOutputTokens: 60000,
-                    topics: [{ id: "default", name: "主要对话", createdAt: Date.now(), knowledgeBaseId: null }],
+                    topics: [buildDefaultPlaceholderTopic()],
                     disableCustomColors: true,  // 默认启用：禁用自定义颜色（使用主题默认颜色）
                     useThemeColorsInChat: true  // 默认启用：会话中使用主题颜色
                 };
             }
             if (!configToSave.topics || !Array.isArray(configToSave.topics) || configToSave.topics.length === 0) {
-                configToSave.topics = [{ id: "default", name: "主要对话", createdAt: Date.now(), knowledgeBaseId: null }];
+                configToSave.topics = [buildDefaultPlaceholderTopic()];
             }
 
             if (agentConfigManager) {

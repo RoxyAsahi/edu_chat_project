@@ -71,6 +71,66 @@ test('save-settings reports raw persistence checks for agent bubble theme fields
     assert.equal(result.persistenceCheck.enableAgentBubbleThemeMatched, true);
 });
 
+test('save-settings verifies follow-up prompt template persistence', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await manager.writeSettings(DEFAULT_SETTINGS);
+
+    const { settingsHandlers, handleHandlers } = loadSettingsHandlers();
+    settingsHandlers.initialize({
+        SETTINGS_FILE: settingsPath,
+        USER_AVATAR_FILE: path.join(tempRoot, 'user_avatar.png'),
+        AGENT_DIR: path.join(tempRoot, 'Agents'),
+        settingsManager: manager,
+        agentConfigManager: null,
+    });
+
+    const saveSettings = handleHandlers.get('save-settings');
+    const result = await saveSettings({}, {
+        followUpPromptTemplate: 'Follow up with {{CHAT_HISTORY}}',
+    });
+
+    const rawSettings = await fs.readJson(settingsPath);
+    assert.equal(result.success, true);
+    assert.equal(rawSettings.followUpPromptTemplate, 'Follow up with {{CHAT_HISTORY}}');
+    assert.equal(result.persistenceCheck.fieldChecks.followUpPromptTemplate.matched, true);
+    assert.deepEqual(result.persistenceCheck.mismatchedFields, []);
+});
+
+test('save-settings verifies topic title generation fields persist correctly', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await manager.writeSettings(DEFAULT_SETTINGS);
+
+    const { settingsHandlers, handleHandlers } = loadSettingsHandlers();
+    settingsHandlers.initialize({
+        SETTINGS_FILE: settingsPath,
+        USER_AVATAR_FILE: path.join(tempRoot, 'user_avatar.png'),
+        AGENT_DIR: path.join(tempRoot, 'Agents'),
+        settingsManager: manager,
+        agentConfigManager: null,
+    });
+
+    const saveSettings = handleHandlers.get('save-settings');
+    const result = await saveSettings({}, {
+        enableTopicTitleGeneration: false,
+        topicTitlePromptTemplate: 'Title with {{CHAT_HISTORY}}',
+    });
+
+    const rawSettings = await fs.readJson(settingsPath);
+    assert.equal(result.success, true);
+    assert.equal(rawSettings.enableTopicTitleGeneration, false);
+    assert.equal(rawSettings.topicTitlePromptTemplate, 'Title with {{CHAT_HISTORY}}');
+    assert.equal(result.persistenceCheck.fieldChecks.enableTopicTitleGeneration.matched, true);
+    assert.equal(result.persistenceCheck.fieldChecks.topicTitlePromptTemplate.matched, true);
+});
+
 test('preview-agent-bubble-theme-prompt resolves the effective injected text', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
     const settingsPath = path.join(tempRoot, 'settings.json');

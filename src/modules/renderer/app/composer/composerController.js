@@ -36,6 +36,8 @@ function createComposerController(deps = {}) {
     const resolveLivePrompt = deps.resolveLivePrompt || (async () => '');
     const autoResizeTextarea = deps.autoResizeTextarea || (() => {});
     const decorateChatMessages = deps.decorateChatMessages || (() => {});
+    const generateFollowUpsForAssistantMessage = deps.generateFollowUpsForAssistantMessage || (async () => []);
+    const generateTopicTitleForAssistantMessage = deps.generateTopicTitleForAssistantMessage || (async () => '');
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
@@ -284,7 +286,13 @@ function createComposerController(deps = {}) {
         const temporarySystemMessages = Array.isArray(options.temporarySystemMessages)
             ? options.temporarySystemMessages.filter((item) => item && item.content)
             : [];
-        const activePrompt = await chatAPI.getActiveSystemPrompt(state.currentSelectedItem.id).catch(() => ({ success: false, systemPrompt: '' }));
+        const history = Array.isArray(options.historyOverride)
+            ? options.historyOverride
+            : state.currentChatHistory;
+        const agentId = typeof options.agentIdOverride === 'string' && options.agentIdOverride
+            ? options.agentIdOverride
+            : state.currentSelectedItem.id;
+        const activePrompt = await chatAPI.getActiveSystemPrompt(agentId).catch(() => ({ success: false, systemPrompt: '' }));
         const livePrompt = await resolveLivePrompt();
         const systemPrompt = livePrompt || (activePrompt?.success ? activePrompt.systemPrompt : '');
         const messages = [];
@@ -297,7 +305,7 @@ function createComposerController(deps = {}) {
             messages.push(temporaryMessage);
         }
 
-        for (const message of state.currentChatHistory.filter((item) => !item.isThinking)) {
+        for (const message of history.filter((item) => !item.isThinking)) {
             if (message.role !== 'user') {
                 messages.push({ role: message.role, content: message.content, name: message.name });
                 continue;
@@ -354,8 +362,8 @@ function createComposerController(deps = {}) {
         return messages;
     }
 
-    async function buildKnowledgeBaseRetrieval(userMessage) {
-        const currentTopic = getCurrentTopic();
+    async function buildKnowledgeBaseRetrieval(userMessage, topicOverride = null) {
+        const currentTopic = topicOverride || getCurrentTopic();
         const kbId = currentTopic?.knowledgeBaseId;
         const query = buildKnowledgeBaseQuery(userMessage);
 
@@ -419,6 +427,90 @@ function createComposerController(deps = {}) {
         return nextMessage;
     }
 
+    function isCurrentViewContext(context = {}) {
+        return context?.agentId === state.currentSelectedItem.id
+            && context?.topicId === state.currentTopicId;
+    }
+
+    function buildTurnContextSnapshot(topic = null) {
+        return {
+            selectedItem: {
+                ...state.currentSelectedItem,
+                config: state.currentSelectedItem?.config ? { ...state.currentSelectedItem.config } : null,
+            },
+            topicId: state.currentTopicId,
+            topicName: topic?.name || getCurrentTopic()?.name || '',
+            settings: { ...state.settings },
+        };
+    }
+
+    function buildRequestContext(snapshot, extra = {}) {
+        return {
+            agentId: snapshot?.selectedItem?.id || '',
+            topicId: snapshot?.topicId || '',
+            agentName: snapshot?.selectedItem?.name || '',
+            avatarUrl: snapshot?.selectedItem?.avatarUrl || '',
+            avatarColor: snapshot?.selectedItem?.config?.avatarCalculatedColor || null,
+            isGroupMessage: false,
+            ...extra,
+        };
+    }
+
+    function selectVisibleConversationMessages(history = []) {
+        return (Array.isArray(history) ? history : [])
+            .filter((message) => (
+                message
+                && (message.role === 'user' || message.role === 'assistant')
+                && message.isThinking !== true
+            ));
+    }
+
+    function shouldAttemptTopicTitleGeneration(messageId = '', historySnapshot = null) {
+        if (state.settings.enableTopicTitleGeneration === false) {
+            return false;
+        }
+
+        if (!Array.isArray(historySnapshot)) {
+            return true;
+        }
+
+        const visibleMessages = selectVisibleConversationMessages(historySnapshot);
+        return visibleMessages.length === 2
+            && visibleMessages[0]?.role === 'user'
+            && visibleMessages[1]?.role === 'assistant'
+            && visibleMessages[1]?.id === messageId;
+    }
+
+    function triggerPostReplyTasks({
+        agentId = '',
+        topicId = '',
+        messageId = '',
+        model = '',
+        historySnapshot = null,
+    }) {
+        const tasks = [
+            generateFollowUpsForAssistantMessage({
+                agentId,
+                topicId,
+                messageId,
+                model,
+                historySnapshot,
+            }),
+        ];
+
+        if (shouldAttemptTopicTitleGeneration(messageId, historySnapshot)) {
+            tasks.push(generateTopicTitleForAssistantMessage({
+                agentId,
+                topicId,
+                messageId,
+                model,
+                historySnapshot,
+            }));
+        }
+
+        void Promise.allSettled(tasks);
+    }
+
     function applyAssistantResponseMetadata(messageId, payload = {}) {
         if (!messageId) {
             return;
@@ -438,6 +530,151 @@ function createComposerController(deps = {}) {
         }));
     }
 
+    async function submitTurn({
+        text,
+        attachments = [],
+        selectionContextRefs = [],
+        clearComposerDraft = false,
+        topicOverride = null,
+    }) {
+        const trimmedText = String(text || '').trim();
+        const requestTopic = topicOverride || getCurrentTopic();
+        const requestContext = buildTurnContextSnapshot(requestTopic);
+        if (!requestContext.selectedItem.id || !requestContext.topicId) {
+            ui.showToastNotification('请先选择一个智能体和话题。', 'warning');
+            return;
+        }
+
+        const userMessage = {
+            id: createId('user'),
+            role: 'user',
+            content: trimmedText,
+            timestamp: Date.now(),
+            attachments: normalizeAttachmentList(attachments),
+            selectionContextRefs: Array.isArray(selectionContextRefs)
+                ? selectionContextRefs.map((item) => ({ ...item }))
+                : [],
+        };
+
+        updateCurrentChatHistory((history = []) => [...history, userMessage]);
+        await persistHistory();
+        await messageRendererApi.renderMessage(userMessage, false, true);
+        decorateChatMessages();
+
+        if (clearComposerDraft) {
+            el.messageInput.value = '';
+            autoResizeTextarea(el.messageInput);
+            resetState({
+                clearAttachments: true,
+                clearSelectionContext: true,
+                syncAvailability: false,
+            });
+        }
+
+        const assistantMessage = {
+            id: createId('assistant'),
+            role: 'assistant',
+            name: requestContext.selectedItem.name,
+            agentId: requestContext.selectedItem.id,
+            avatarUrl: requestContext.selectedItem.avatarUrl,
+            avatarColor: requestContext.selectedItem.config?.avatarCalculatedColor || null,
+            content: 'Thinking',
+            timestamp: Date.now(),
+            isThinking: true,
+            topicId: requestContext.topicId,
+            toolEvents: [],
+            studyMemoryRefs: [],
+        };
+
+        const retrieval = await buildKnowledgeBaseRetrieval(userMessage, requestTopic);
+        const selectionRefsForCitation = userMessage.selectionContextRefs.map((ref) => ({
+            ...ref,
+            score: null,
+            sourceType: 'reader-selection',
+            snippet: ref.selectionText || ref.snippet || '',
+        }));
+        const combinedRefs = [...selectionRefsForCitation, ...retrieval.refs];
+        if (combinedRefs.length > 0) {
+            assistantMessage.kbContextRefs = combinedRefs;
+        }
+
+        updateCurrentChatHistory((history = []) => [...history, assistantMessage]);
+        await persistHistory();
+        messageRendererApi.startStreamingMessage(assistantMessage);
+        decorateChatMessages();
+
+        const modelConfig = {
+            model: requestContext.selectedItem.config?.model || 'gemini-3.1-flash-lite-preview',
+            temperature: Number(requestContext.selectedItem.config?.temperature ?? 0.7),
+            max_tokens: Number(requestContext.selectedItem.config?.maxOutputTokens ?? 1000),
+            top_p: requestContext.selectedItem.config?.top_p,
+            top_k: requestContext.selectedItem.config?.top_k,
+            stream: requestContext.selectedItem.config?.streamOutput !== false,
+        };
+
+        state.activeRequestId = assistantMessage.id;
+        updateSendButtonState();
+
+        const requestPayloadContext = buildRequestContext(requestContext, {
+            topicName: requestContext.topicName,
+            lastUserMessageId: userMessage.id,
+            assistantMessageId: assistantMessage.id,
+            model: modelConfig.model,
+        });
+        const historyForRequest = state.currentChatHistory;
+        const response = await chatAPI.sendToVCP({
+            requestId: assistantMessage.id,
+            endpoint: requestContext.settings.vcpServerUrl,
+            apiKey: requestContext.settings.vcpApiKey,
+            messages: await buildApiMessages({
+                agentIdOverride: requestContext.selectedItem.id,
+                historyOverride: historyForRequest,
+                temporarySystemMessages: [
+                    ...buildSelectionContextTemporaryMessages(userMessage.selectionContextRefs, getReaderLocatorLabel),
+                    ...retrieval.temporarySystemMessages,
+                ],
+            }),
+            modelConfig,
+            context: requestPayloadContext,
+        });
+
+        if (response?.error) {
+            await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'error', requestPayloadContext, {
+                error: response.error,
+            });
+            state.activeRequestId = null;
+            updateSendButtonState();
+            ui.showToastNotification(`请求失败：${response.error}`, 'error');
+            return;
+        }
+
+        applyAssistantResponseMetadata(assistantMessage.id, response);
+        await persistHistory();
+
+        if (!modelConfig.stream && response?.response) {
+            const content = response.response?.choices?.[0]?.message?.content || '';
+            patchCurrentHistoryMessage(assistantMessage.id, (entry) => ({
+                ...entry,
+                isThinking: false,
+                content,
+            }));
+            await persistHistory();
+            await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'completed', requestPayloadContext, {
+                fullResponse: content,
+            });
+            decorateChatMessages();
+            state.activeRequestId = null;
+            updateSendButtonState();
+            triggerPostReplyTasks({
+                agentId: requestContext.selectedItem.id,
+                topicId: requestContext.topicId,
+                messageId: assistantMessage.id,
+                model: modelConfig.model,
+                historySnapshot: isCurrentViewContext(requestPayloadContext) ? state.currentChatHistory : null,
+            });
+        }
+    }
+
     async function sendMessage(prefillText) {
         if (typeof prefillText === 'string') {
             el.messageInput.value = prefillText;
@@ -445,6 +682,24 @@ function createComposerController(deps = {}) {
         }
 
         return handleSend();
+    }
+
+    async function sendFollowUp(prompt) {
+        if (state.activeRequestId) {
+            return;
+        }
+
+        const text = String(prompt || '').trim();
+        if (!text) {
+            return;
+        }
+
+        return submitTurn({
+            text,
+            attachments: [],
+            selectionContextRefs: [],
+            clearComposerDraft: false,
+        });
     }
 
     async function handleSend() {
@@ -486,120 +741,13 @@ function createComposerController(deps = {}) {
         const selectionContextRefsForTurn = Array.isArray(state.pendingSelectionContextRefs)
             ? state.pendingSelectionContextRefs.map((item) => ({ ...item }))
             : [];
-        const userMessage = {
-            id: createId('user'),
-            role: 'user',
-            content: text,
-            timestamp: Date.now(),
+
+        return submitTurn({
+            text,
             attachments,
             selectionContextRefs: selectionContextRefsForTurn,
-        };
-
-        updateCurrentChatHistory((history = []) => [...history, userMessage]);
-        await persistHistory();
-        await messageRendererApi.renderMessage(userMessage, false, true);
-        decorateChatMessages();
-
-        el.messageInput.value = '';
-        autoResizeTextarea(el.messageInput);
-        resetState({
-            clearAttachments: true,
-            clearSelectionContext: true,
-            syncAvailability: false,
+            clearComposerDraft: true,
         });
-
-        const assistantMessage = {
-            id: createId('assistant'),
-            role: 'assistant',
-            name: state.currentSelectedItem.name,
-            agentId: state.currentSelectedItem.id,
-            avatarUrl: state.currentSelectedItem.avatarUrl,
-            avatarColor: state.currentSelectedItem.config?.avatarCalculatedColor || null,
-            content: 'Thinking',
-            timestamp: Date.now(),
-            isThinking: true,
-            topicId: state.currentTopicId,
-            toolEvents: [],
-            studyMemoryRefs: [],
-        };
-
-        const retrieval = await buildKnowledgeBaseRetrieval(userMessage);
-        const selectionRefsForCitation = selectionContextRefsForTurn.map((ref) => ({
-            ...ref,
-            score: null,
-            sourceType: 'reader-selection',
-            snippet: ref.selectionText || ref.snippet || '',
-        }));
-        const combinedRefs = [...selectionRefsForCitation, ...retrieval.refs];
-        if (combinedRefs.length > 0) {
-            assistantMessage.kbContextRefs = combinedRefs;
-        }
-
-        updateCurrentChatHistory((history = []) => [...history, assistantMessage]);
-        await persistHistory();
-        messageRendererApi.startStreamingMessage(assistantMessage);
-        decorateChatMessages();
-
-        const modelConfig = {
-            model: state.currentSelectedItem.config?.model || 'gemini-3.1-flash-lite-preview',
-            temperature: Number(state.currentSelectedItem.config?.temperature ?? 0.7),
-            max_tokens: Number(state.currentSelectedItem.config?.maxOutputTokens ?? 1000),
-            top_p: state.currentSelectedItem.config?.top_p,
-            top_k: state.currentSelectedItem.config?.top_k,
-            stream: state.currentSelectedItem.config?.streamOutput !== false,
-        };
-
-        state.activeRequestId = assistantMessage.id;
-        updateSendButtonState();
-
-        const response = await chatAPI.sendToVCP({
-            requestId: assistantMessage.id,
-            endpoint: state.settings.vcpServerUrl,
-            apiKey: state.settings.vcpApiKey,
-            messages: await buildApiMessages({
-                temporarySystemMessages: [
-                    ...buildSelectionContextTemporaryMessages(selectionContextRefsForTurn, getReaderLocatorLabel),
-                    ...retrieval.temporarySystemMessages,
-                ],
-            }),
-            modelConfig,
-            context: {
-                ...buildTopicContext(),
-                topicName: getCurrentTopic()?.name || '',
-                lastUserMessageId: userMessage.id,
-                assistantMessageId: assistantMessage.id,
-                model: modelConfig.model,
-            },
-        });
-
-        if (response?.error) {
-            await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'error', buildTopicContext(), {
-                error: response.error,
-            });
-            state.activeRequestId = null;
-            updateSendButtonState();
-            ui.showToastNotification(`请求失败：${response.error}`, 'error');
-            return;
-        }
-
-        applyAssistantResponseMetadata(assistantMessage.id, response);
-        await persistHistory();
-
-        if (!modelConfig.stream && response?.response) {
-            const content = response.response?.choices?.[0]?.message?.content || '';
-            patchCurrentHistoryMessage(assistantMessage.id, (entry) => ({
-                ...entry,
-                isThinking: false,
-                content,
-            }));
-            await persistHistory();
-            await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'completed', buildTopicContext(), {
-                fullResponse: content,
-            });
-            decorateChatMessages();
-            state.activeRequestId = null;
-            updateSendButtonState();
-        }
     }
 
     async function handleStreamEvent(eventData) {
@@ -635,6 +783,15 @@ function createComposerController(deps = {}) {
             state.activeRequestId = null;
             updateSendButtonState();
             await persistHistory();
+            if (!error && !timedOut && !interrupted && resolvedFinishReason === 'completed') {
+                triggerPostReplyTasks({
+                    agentId: context?.agentId || '',
+                    topicId: context?.topicId || '',
+                    messageId: requestId,
+                    model: context?.model || '',
+                    historySnapshot: isCurrentViewContext(context) ? state.currentChatHistory : null,
+                });
+            }
             await loadTopics();
             await loadAgents();
             return;
@@ -697,6 +854,7 @@ function createComposerController(deps = {}) {
         renderSelectionContextPreview,
         resetState,
         sendMessage,
+        sendFollowUp,
         setActiveRequestId,
         syncComposerAvailability,
         updateSendButtonState,

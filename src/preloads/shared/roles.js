@@ -52,6 +52,8 @@ const SESSION_KEYS = [
     'handleTextPasteAsFile',
     'handleFileDrop',
     'sendToVCP',
+    'generateFollowUps',
+    'generateTopicTitle',
     'onVCPStreamEvent',
     'interruptVcpRequest',
     'exportTopicAsMarkdown',

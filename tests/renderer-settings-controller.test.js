@@ -70,6 +70,9 @@ function createDom() {
           <textarea id="renderingPromptInput"></textarea>
           <textarea id="adaptiveBubbleTipInput"></textarea>
           <textarea id="dailyNoteGuideInput"></textarea>
+          <textarea id="followUpPromptTemplateInput"></textarea>
+          <input id="enableTopicTitleGenerationInput" type="checkbox" />
+          <textarea id="topicTitlePromptTemplateInput"></textarea>
           <div id="promptSegmentPreview"></div>
           <textarea id="finalSystemPromptPreview"></textarea>
           <div id="finalSystemPromptPreviewMeta"></div>
@@ -146,6 +149,9 @@ function createElementMap(documentObj) {
         renderingPromptInput: documentObj.getElementById('renderingPromptInput'),
         adaptiveBubbleTipInput: documentObj.getElementById('adaptiveBubbleTipInput'),
         dailyNoteGuideInput: documentObj.getElementById('dailyNoteGuideInput'),
+        followUpPromptTemplateInput: documentObj.getElementById('followUpPromptTemplateInput'),
+        enableTopicTitleGenerationInput: documentObj.getElementById('enableTopicTitleGenerationInput'),
+        topicTitlePromptTemplateInput: documentObj.getElementById('topicTitlePromptTemplateInput'),
         promptSegmentPreview: documentObj.getElementById('promptSegmentPreview'),
         finalSystemPromptPreview: documentObj.getElementById('finalSystemPromptPreview'),
         finalSystemPromptPreviewMeta: documentObj.getElementById('finalSystemPromptPreviewMeta'),
@@ -240,6 +246,9 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     renderingPrompt: 'rendering prompt',
                     adaptiveBubbleTip: 'adaptive tip',
                     dailyNoteGuide: 'daily guide',
+                    followUpPromptTemplate: 'follow-up template with {{CHAT_HISTORY}}',
+                    enableTopicTitleGeneration: false,
+                    topicTitlePromptTemplate: 'title template with {{CHAT_HISTORY}}',
                     enableAgentBubbleTheme: false,
                     agentBubbleThemePrompt: 'Custom bubble prompt: {{VarDivRender}}',
                     enableWideChatLayout: true,
@@ -364,6 +373,8 @@ test('settingsController loads native toolbox settings, previews placeholders, a
             },
         },
         windowObj: {
+            setTimeout: dom.window.setTimeout.bind(dom.window),
+            clearTimeout: dom.window.clearTimeout.bind(dom.window),
             emoticonManager: {
                 reload() {
                     reloadCount += 1;
@@ -397,22 +408,35 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.renderingPromptInput.value, 'rendering prompt');
     assert.equal(el.adaptiveBubbleTipInput.value, 'adaptive tip');
     assert.equal(el.dailyNoteGuideInput.value, 'daily guide');
+    assert.equal(el.followUpPromptTemplateInput.value, 'follow-up template with {{CHAT_HISTORY}}');
+    assert.equal(el.enableTopicTitleGenerationInput.checked, false);
+    assert.equal(el.topicTitlePromptTemplateInput.value, 'title template with {{CHAT_HISTORY}}');
+    assert.equal(el.topicTitlePromptTemplateInput.readOnly, true);
+    assert.equal(el.topicTitlePromptTemplateInput.classList.contains('settings-textarea--readonly'), true);
     assert.match(el.finalSystemPromptPreview.value, /RENDER::rendering prompt/);
     assert.match(el.promptSegmentPreview.textContent, /结构化渲染/);
 
     el.enableAgentBubbleTheme.checked = true;
     el.enableAgentBubbleTheme.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    el.enableTopicTitleGenerationInput.checked = true;
+    el.enableTopicTitleGenerationInput.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
     await flushAsyncWork();
     assert.equal(el.agentBubbleThemePrompt.readOnly, false);
     assert.equal(el.agentBubbleThemePrompt.classList.contains('settings-textarea--readonly'), false);
     assert.equal(el.agentBubbleThemeResolvedPreview.value, 'PREVIEW::Custom bubble prompt: DIV_RENDER');
     assert.equal(el.agentBubbleThemePreviewMeta.textContent, '这里显示的是主进程实际会追加到 system 消息中的最终文本。');
+    assert.equal(el.topicTitlePromptTemplateInput.readOnly, false);
+    assert.equal(el.topicTitlePromptTemplateInput.classList.contains('settings-textarea--readonly'), false);
 
     el.agentBubbleThemePrompt.value = 'Editable prompt: {{VarDivRender}}';
     el.agentBubbleThemePrompt.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     el.renderingPromptInput.value = 'native rendering text';
     el.adaptiveBubbleTipInput.value = 'native adaptive tip';
     el.dailyNoteGuideInput.value = 'native daily guide';
+    el.followUpPromptTemplateInput.value = 'native follow-up template';
+    el.followUpPromptTemplateInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    el.topicTitlePromptTemplateInput.value = 'native topic title template';
+    el.topicTitlePromptTemplateInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     el.refreshFinalSystemPromptPreviewBtn.click();
     await flushAsyncWork();
     assert.match(el.finalSystemPromptPreview.value, /BUBBLE::Editable prompt: DIV_RENDER/);
@@ -428,6 +452,9 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(savedPatch.renderingPrompt, 'native rendering text');
     assert.equal(savedPatch.adaptiveBubbleTip, 'native adaptive tip');
     assert.equal(savedPatch.dailyNoteGuide, 'native daily guide');
+    assert.equal(savedPatch.followUpPromptTemplate, 'native follow-up template');
+    assert.equal(savedPatch.enableTopicTitleGeneration, true);
+    assert.equal(savedPatch.topicTitlePromptTemplate, 'native topic title template');
     assert.equal(savedThemeMode, 'dark');
     assert.equal(reloadCount, 1);
     assert.equal(el.agentBubbleThemeResolvedPreview.value, 'PREVIEW::Editable prompt: DIV_RENDER');
@@ -439,6 +466,121 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.deepEqual(toasts, [
         { message: '全局设置已保存。', type: 'success' },
     ]);
+});
+
+test('settingsController shows the default follow-up template in the UI but saves an empty raw value when left untouched', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    let savedPatch = null;
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+    const store = createStore({
+        currentThemeMode: 'system',
+    });
+
+    const controller = createSettingsController({
+        store,
+        el,
+        chatAPI: {
+            async loadSettings() {
+                return {
+                    kbUseRerank: true,
+                    kbTopK: 6,
+                    kbCandidateTopK: 20,
+                    kbScoreThreshold: 0.25,
+                    chatFontPreset: 'system',
+                    chatCodeFontPreset: 'consolas',
+                    chatBubbleMaxWidthWideDefault: 92,
+                    enableSmoothStreaming: false,
+                    enableTopicTitleGeneration: true,
+                    currentThemeMode: 'system',
+                    enableAgentBubbleTheme: false,
+                };
+            },
+            async saveSettings(patch) {
+                savedPatch = patch;
+                return {
+                    success: true,
+                    settings: { ...patch },
+                    persistenceCheck: {
+                        agentBubbleThemePromptMatched: true,
+                        enableAgentBubbleThemeMatched: true,
+                        mismatchedFields: [],
+                    },
+                };
+            },
+            async previewAgentBubbleThemePrompt() {
+                return {
+                    enabled: false,
+                    willInject: false,
+                    resolvedPrompt: '',
+                    unresolvedTokens: [],
+                    substitutions: {},
+                    variableSources: {},
+                };
+            },
+            async previewFinalSystemPrompt() {
+                return {
+                    success: true,
+                    preview: {
+                        agentName: '',
+                        topicName: '',
+                        hasBasePrompt: false,
+                        basePrompt: '',
+                        finalSystemPrompt: '',
+                        unresolvedTokens: [],
+                        substitutions: {},
+                        variableSources: {},
+                        segments: {
+                            rendering: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
+                            adaptiveBubbleTip: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
+                            dailyNoteVariable: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
+                            dailyNoteAutoInject: { enabled: true, source: 'default', appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
+                            bubbleTheme: { enabled: false, source: 'default', appended: false, rawPrompt: '', resolvedPrompt: '' },
+                        },
+                    },
+                };
+            },
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+        messageRendererApi: {
+            setUserAvatar() {},
+            setUserAvatarColor() {},
+        },
+        syncLayoutSettings() {},
+    });
+
+    await controller.loadSettings();
+    await flushAsyncWork();
+
+    assert.match(el.followUpPromptTemplateInput.value, /{{CHAT_HISTORY}}/);
+    assert.equal(el.followUpPromptTemplateInput.dataset.usingDefaultPrompt, 'true');
+    assert.match(el.topicTitlePromptTemplateInput.value, /{\"title\":\"😀 标题\"}/);
+    assert.equal(el.topicTitlePromptTemplateInput.dataset.usingDefaultPrompt, 'true');
+
+    await controller.saveGlobalSettings({ showToastOnSuccess: false });
+
+    assert.ok(savedPatch);
+    assert.equal(savedPatch.followUpPromptTemplate, '');
+    assert.equal(savedPatch.topicTitlePromptTemplate, '');
 });
 
 test('settingsController saves native agent VCP fields', async (t) => {

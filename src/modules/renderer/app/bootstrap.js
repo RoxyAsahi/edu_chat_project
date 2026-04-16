@@ -58,6 +58,7 @@ async function initializeAppRuntime(deps = {}) {
     const messageRendererApi = deps.messageRendererApi;
     const interruptRequest = deps.interruptRequest;
     const appendAttachments = deps.appendAttachments;
+    const generateFollowUpsForAssistantMessage = deps.generateFollowUpsForAssistantMessage || (async () => []);
     const setActiveRequestId = deps.setActiveRequestId || (() => {});
     const windowObj = deps.windowObj || window;
 
@@ -95,6 +96,7 @@ async function initializeAppRuntime(deps = {}) {
         markedInstance,
         uiHelper: ui,
         interruptHandler: { interrupt: interruptRequest },
+        generateFollowUpsForAssistantMessage,
         summarizeTopicFromMessages: async () => null,
     });
 

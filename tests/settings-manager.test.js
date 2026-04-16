@@ -41,6 +41,7 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
     assert.equal(settings.userName, DEFAULT_SETTINGS.userName);
     assert.equal(settings.kbEmbeddingModel, DEFAULT_SETTINGS.kbEmbeddingModel);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
+    assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);
     assert.equal(settings.enableThoughtChainInjection, false);
 });
 
@@ -59,6 +60,9 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.userName, 'Legacy User');
     assert.equal(settings.enableAgentBubbleTheme, true);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
+    assert.equal(settings.followUpPromptTemplate, DEFAULT_SETTINGS.followUpPromptTemplate);
+    assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);
+    assert.equal(settings.topicTitlePromptTemplate, DEFAULT_SETTINGS.topicTitlePromptTemplate);
 });
 
 test('readSettings promotes legacy vcpLite prompt fields to top-level native settings', async (t) => {
@@ -113,12 +117,16 @@ test('writeSettings persists normalized content and refreshes the cache', async 
         ...DEFAULT_SETTINGS,
         userName: 'Writer',
         sidebarWidth: 50,
+        followUpPromptTemplate: 'Custom follow-up template',
+        topicTitlePromptTemplate: 'Custom title template',
         rogueField: 'remove-me',
     });
 
     const written = await fs.readJson(settingsPath);
     assert.equal(written.userName, 'Writer');
     assert.equal(written.sidebarWidth, DEFAULT_SETTINGS.sidebarWidth);
+    assert.equal(written.followUpPromptTemplate, 'Custom follow-up template');
+    assert.equal(written.topicTitlePromptTemplate, 'Custom title template');
     assert.equal('rogueField' in written, false);
 
     const cached = await manager.readSettings();

@@ -277,6 +277,107 @@
   background: rgba(255, 194, 102, 0.18);
 }
 
+.message-follow-ups {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-follow-ups__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.message-follow-ups__button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  width: auto;
+  max-width: min(100%, 560px);
+  display: inline-block;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  border: none !important;
+  border-color: transparent !important;
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--ink);
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 0;
+  transition: none;
+  filter: none;
+  outline: none;
+  text-shadow: none;
+  transform: none !important;
+  box-shadow: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.message-follow-ups__button-surface {
+  width: auto;
+  max-width: min(100%, 560px);
+  box-sizing: border-box;
+  border: none;
+  border-radius: 16px;
+  background-color: #f1f1f1;
+  background-image: none;
+  color: var(--ink);
+  padding: 8px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 0;
+  overflow: hidden;
+  isolation: isolate;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.message-follow-ups__button:hover .message-follow-ups__button-surface {
+  background-color: #e8e8e8;
+}
+
+.message-follow-ups__button:focus,
+.message-follow-ups__button:focus-visible {
+  outline: none;
+  box-shadow: none !important;
+}
+
+.message-follow-ups__button:focus-visible .message-follow-ups__button-surface {
+  outline: 2px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  outline-offset: 2px;
+  background-color: #f1f1f1;
+}
+
+.message-follow-ups__button:active .message-follow-ups__button-surface {
+  background-color: #e2e2e2;
+}
+
+.message-follow-ups__button:not(:hover):not(:active):not(:focus-visible) .message-follow-ups__button-surface {
+  background-color: #f1f1f1;
+}
+
+.message-follow-ups__button-label {
+  min-width: 0;
+}
+
+.message-follow-ups__button-arrow {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--muted) 82%, var(--ink) 18%);
+  font-size: 20px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
 /* Chat Input */
 .chat-input-area {
   padding: 0 20px 20px;

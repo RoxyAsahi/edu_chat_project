@@ -6,9 +6,18 @@ const contextSanitizer = require('../contextSanitizer');
 const knowledgeBase = require('../knowledge-base');
 const vcpClient = require('../vcpClient');
 const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
-const { DEFAULT_AGENT_BUBBLE_THEME_PROMPT } = require('../utils/settingsSchema');
+const {
+    DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
+    DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE,
+    DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE,
+} = require('../utils/settingsSchema');
 const { createStudyServices } = require('../study');
 const {
+    buildDefaultPlaceholderTopic,
+    buildPlaceholderTopicName,
+} = require('../utils/topicTitles');
+const {
+    extractResponseContent,
     resolveDailyNoteToolInstruction,
     rewriteLegacyStudyLogPromptText,
 } = require('../study/toolProtocol');
@@ -26,6 +35,118 @@ const {
  */
 let ipcHandlersRegistered = false;
 let studyServices = null;
+const DEFAULT_CHAT_MODEL = 'gemini-3.1-flash-lite-preview';
+const FOLLOW_UP_HISTORY_LIMIT = 6;
+const FOLLOW_UP_RESULT_LIMIT = 5;
+const FOLLOW_UP_MESSAGE_CHAR_LIMIT = 900;
+const FOLLOW_UP_HISTORY_CHAR_LIMIT = 2600;
+const FOLLOW_UP_MAX_ATTEMPTS = 3;
+const TOPIC_TITLE_HISTORY_LIMIT = 2;
+const TOPIC_TITLE_FALLBACK_LIMIT = 60;
+const FOLLOW_UP_TOOL_BLOCK_REGEX = /<<<\[TOOL_REQUEST\]>>>[\s\S]*?<<<\[END_TOOL_REQUEST\]>>>/g;
+const FOLLOW_UP_CODE_FENCE_REGEX = /```[\s\S]*?```/g;
+const FOLLOW_UP_HTML_BLOCK_REGEX = /<(style|script|svg|canvas|iframe)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const FOLLOW_UP_BUTTON_REGEX = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
+const FOLLOW_UP_BLOCK_TAG_REGEX = /<\/?(address|article|aside|blockquote|br|caption|dd|details|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)\b[^>]*>/gi;
+
+function decodeFollowUpEntities(text = '') {
+    return String(text || '')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'");
+}
+
+function stripFollowUpHtml(text = '') {
+    return decodeFollowUpEntities(text)
+        .replace(FOLLOW_UP_HTML_BLOCK_REGEX, ' ')
+        .replace(FOLLOW_UP_BUTTON_REGEX, (_match, label) => {
+            const normalizedLabel = decodeFollowUpEntities(String(label || ''))
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            return normalizedLabel
+                ? `\n[交互按钮：${normalizedLabel}]\n`
+                : '\n[交互按钮已省略]\n';
+        })
+        .replace(FOLLOW_UP_BLOCK_TAG_REGEX, '\n')
+        .replace(/<[^>]+>/g, ' ');
+}
+
+function truncateFollowUpText(text = '', limit = FOLLOW_UP_MESSAGE_CHAR_LIMIT) {
+    const normalized = String(text || '').trim();
+    if (!normalized || !Number.isFinite(limit) || limit <= 0 || normalized.length <= limit) {
+        return normalized;
+    }
+
+    const ellipsis = '\n[...省略...]\n';
+    const headLength = Math.max(120, Math.ceil(limit * 0.65));
+    const tailLength = Math.max(80, limit - headLength - ellipsis.length);
+
+    return `${normalized.slice(0, headLength).trim()}${ellipsis}${normalized.slice(-tailLength).trim()}`.trim();
+}
+
+function sanitizeFollowUpText(text = '', limit = FOLLOW_UP_MESSAGE_CHAR_LIMIT) {
+    const normalized = contextSanitizer.stripThoughtChains(String(text || ''))
+        .replace(/\r/g, '')
+        .replace(FOLLOW_UP_TOOL_BLOCK_REGEX, '\n[工具调用已省略]\n')
+        .replace(FOLLOW_UP_CODE_FENCE_REGEX, '\n[代码块已省略]\n');
+
+    return truncateFollowUpText(
+        stripFollowUpHtml(normalized)
+            .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/__(.*?)__/g, '$1')
+            .replace(/`([^`]+)`/g, '$1')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
+            .replace(/[ \t\f\v]+/g, ' ')
+            .replace(/\n[ \t]+/g, '\n')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim(),
+        limit
+    );
+}
+
+function enforceFollowUpHistoryBudget(messages = [], maxChars = FOLLOW_UP_HISTORY_CHAR_LIMIT) {
+    const normalizedMessages = (Array.isArray(messages) ? messages : []).map((message) => ({
+        ...message,
+        content: String(message?.content || '').trim(),
+    }));
+    const currentTotal = normalizedMessages.reduce((sum, message) => sum + message.content.length, 0);
+    if (currentTotal <= maxChars || normalizedMessages.length === 0) {
+        return normalizedMessages;
+    }
+
+    const perMessageLimit = Math.max(180, Math.floor(maxChars / normalizedMessages.length));
+    const compactMessages = normalizedMessages.map((message) => ({
+        ...message,
+        content: truncateFollowUpText(message.content, Math.min(FOLLOW_UP_MESSAGE_CHAR_LIMIT, perMessageLimit)),
+    }));
+    const compactTotal = compactMessages.reduce((sum, message) => sum + message.content.length, 0);
+    if (compactTotal <= maxChars) {
+        return compactMessages;
+    }
+
+    const emergencyLimit = Math.max(120, Math.floor(maxChars / compactMessages.length) - 24);
+    return compactMessages.map((message) => ({
+        ...message,
+        content: truncateFollowUpText(message.content, emergencyLimit),
+    }));
+}
+
+function buildFollowUpRetryPrompt(prompt = '') {
+    const reminder = [
+        '上一次输出不符合要求。',
+        '请重新生成 3 条简短追问，并且只返回一个完整、可解析的 JSON 对象。',
+        '禁止输出解释、标题、Markdown、代码块或多余文本。',
+    ].join('\n');
+
+    return `${String(prompt || '').trim()}\n\n${reminder}`.trim();
+}
 
 function normalizeMessageForPreprocessing(message) {
     if (!message || typeof message !== 'object') {
@@ -210,6 +331,299 @@ async function buildPromptResolutionOptions({ settings, context, modelConfig, ag
         context: nextContext,
         modelConfig,
     };
+}
+
+function flattenFollowUpMessageContent(content) {
+    if (typeof content === 'string') {
+        return sanitizeFollowUpText(content);
+    }
+
+    if (Array.isArray(content)) {
+        return sanitizeFollowUpText(content
+            .map((part) => {
+                if (part?.type === 'text' && typeof part.text === 'string') {
+                    return part.text.trim();
+                }
+                if (part?.type === 'image_url') {
+                    return '[图片]';
+                }
+                if (typeof part?.content === 'string') {
+                    return part.content.trim();
+                }
+                return '';
+            })
+            .filter(Boolean)
+            .join('\n')
+            .trim());
+    }
+
+    if (content && typeof content === 'object') {
+        if (typeof content.text === 'string') {
+            return sanitizeFollowUpText(content.text);
+        }
+
+        try {
+            return sanitizeFollowUpText(JSON.stringify(content));
+        } catch (_error) {
+            return sanitizeFollowUpText(String(content));
+        }
+    }
+
+    if (content === null || content === undefined) {
+        return '';
+    }
+
+    return sanitizeFollowUpText(String(content));
+}
+
+function selectVisibleFollowUpMessages(messages = [], limit = FOLLOW_UP_HISTORY_LIMIT) {
+    const visibleMessages = (Array.isArray(messages) ? messages : [])
+        .filter((message) => (
+            message
+            && (message.role === 'user' || message.role === 'assistant')
+            && message.isThinking !== true
+        ))
+        .map((message) => ({
+            role: message.role,
+            content: flattenFollowUpMessageContent(message.content),
+        }))
+        .filter((message) => message.content)
+        .slice(-limit);
+
+    return enforceFollowUpHistoryBudget(visibleMessages);
+}
+
+function formatFollowUpChatHistory(messages = []) {
+    return selectVisibleFollowUpMessages(messages)
+        .map((message, index) => {
+            const speaker = message.role === 'user' ? '用户' : '助手';
+            return `[${index + 1}] ${speaker}:\n${message.content}`;
+        })
+        .join('\n\n')
+        .trim();
+}
+
+function buildFollowUpPrompt(template = '', messages = []) {
+    const chatHistory = formatFollowUpChatHistory(messages);
+    const promptTemplate = typeof template === 'string' && template.trim()
+        ? template
+        : DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE;
+
+    if (!chatHistory) {
+        return promptTemplate.replace(/{{CHAT_HISTORY}}/g, '');
+    }
+
+    if (promptTemplate.includes('{{CHAT_HISTORY}}')) {
+        return promptTemplate.replace(/{{CHAT_HISTORY}}/g, chatHistory);
+    }
+
+    return `${promptTemplate.trim()}\n\n${chatHistory}`.trim();
+}
+
+function buildTopicTitlePrompt(template = '', messages = []) {
+    const chatHistory = formatFollowUpChatHistory(messages);
+    const promptTemplate = typeof template === 'string' && template.trim()
+        ? template
+        : DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE;
+
+    if (!chatHistory) {
+        return promptTemplate.replace(/{{CHAT_HISTORY}}/g, '');
+    }
+
+    if (promptTemplate.includes('{{CHAT_HISTORY}}')) {
+        return promptTemplate.replace(/{{CHAT_HISTORY}}/g, chatHistory);
+    }
+
+    return `${promptTemplate.trim()}\n\n${chatHistory}`.trim();
+}
+
+function stripJsonCodeFence(text = '') {
+    const trimmed = String(text || '').trim();
+    const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    return fencedMatch ? fencedMatch[1].trim() : trimmed;
+}
+
+function normalizeFollowUps(followUps = []) {
+    return [...new Set(
+        (Array.isArray(followUps) ? followUps : [])
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+    )].slice(0, FOLLOW_UP_RESULT_LIMIT);
+}
+
+function extractJsonCandidates(text = '') {
+    const normalized = stripJsonCodeFence(text);
+    const candidates = [normalized];
+    const objectStart = normalized.indexOf('{');
+    const objectEnd = normalized.lastIndexOf('}');
+    if (objectStart !== -1 && objectEnd > objectStart) {
+        candidates.push(normalized.slice(objectStart, objectEnd + 1));
+    }
+
+    const arrayStart = normalized.indexOf('[');
+    const arrayEnd = normalized.lastIndexOf(']');
+    if (arrayStart !== -1 && arrayEnd > arrayStart) {
+        candidates.push(normalized.slice(arrayStart, arrayEnd + 1));
+    }
+
+    return [...new Set(candidates.map((candidate) => candidate.trim()).filter(Boolean))];
+}
+
+function parseFollowUpsResponse(responseText = '') {
+    for (const candidate of extractJsonCandidates(responseText)) {
+        try {
+            const parsed = JSON.parse(candidate);
+            if (Array.isArray(parsed)) {
+                return normalizeFollowUps(parsed);
+            }
+            if (parsed && typeof parsed === 'object') {
+                if (Array.isArray(parsed.follow_ups)) {
+                    return normalizeFollowUps(parsed.follow_ups);
+                }
+                if (Array.isArray(parsed.followUps)) {
+                    return normalizeFollowUps(parsed.followUps);
+                }
+            }
+        } catch (_error) {
+            // Ignore invalid candidates and keep trying.
+        }
+    }
+
+    return [];
+}
+
+function normalizeTopicTitle(title = '') {
+    return String(title || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function extractFirstUserTitleFallback(messages = [], maxLength = TOPIC_TITLE_FALLBACK_LIMIT) {
+    const firstUserMessage = (Array.isArray(messages) ? messages : [])
+        .find((message) => message?.role === 'user');
+    const normalized = normalizeTopicTitle(flattenFollowUpMessageContent(firstUserMessage?.content));
+    if (!normalized) {
+        return '';
+    }
+
+    if (!Number.isFinite(maxLength) || maxLength <= 0 || normalized.length <= maxLength) {
+        return normalized;
+    }
+
+    return `${normalized.slice(0, maxLength).trim()}...`;
+}
+
+function parseTopicTitleResponse(responseText = '', fallbackTitle = '') {
+    for (const candidate of extractJsonCandidates(responseText)) {
+        try {
+            const parsed = JSON.parse(candidate);
+            if (typeof parsed === 'string') {
+                const normalizedStringTitle = normalizeTopicTitle(parsed);
+                if (normalizedStringTitle) {
+                    return normalizedStringTitle;
+                }
+            }
+
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                const normalizedObjectTitle = normalizeTopicTitle(parsed.title);
+                if (normalizedObjectTitle) {
+                    return normalizedObjectTitle;
+                }
+            }
+        } catch (_error) {
+            // Ignore invalid candidates and keep trying.
+        }
+    }
+
+    return normalizeTopicTitle(fallbackTitle);
+}
+
+async function requestFollowUpsOnce({
+    attempt = 1,
+    requestIdBase = '',
+    endpoint = '',
+    apiKey = '',
+    prompt = '',
+    model = '',
+    context = {},
+}) {
+    const response = await vcpClient.send({
+        requestId: `${requestIdBase}_attempt_${attempt}`,
+        round: attempt,
+        endpoint,
+        apiKey,
+        messages: [{
+            role: 'user',
+            content: attempt === 1 ? prompt : buildFollowUpRetryPrompt(prompt),
+        }],
+        modelConfig: {
+            model,
+            stream: false,
+            temperature: 0,
+            max_tokens: 1200,
+            response_format: { type: 'json_object' },
+        },
+        context,
+        timeoutMs: 120000,
+    });
+
+    if (response?.error) {
+        return {
+            error: response.error,
+            followUps: [],
+            rawContent: '',
+        };
+    }
+
+    const rawContent = extractResponseContent(response?.response || {});
+    return {
+        rawContent,
+        followUps: parseFollowUpsResponse(rawContent),
+    };
+}
+
+async function resolveTaskModel({
+    agentId = '',
+    requestedModel = '',
+    settings = {},
+    agentConfigManager = null,
+    logLabel = 'task',
+}) {
+    if (agentId && agentConfigManager && typeof agentConfigManager.readAgentConfig === 'function') {
+        try {
+            const agentConfig = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
+            if (typeof agentConfig?.model === 'string' && agentConfig.model.trim()) {
+                return agentConfig.model.trim();
+            }
+        } catch (error) {
+            console.warn(`[Main - ${logLabel}] Failed to read agent config for ${agentId}:`, error);
+        }
+    }
+
+    if (typeof settings?.defaultModel === 'string' && settings.defaultModel.trim()) {
+        return settings.defaultModel.trim();
+    }
+
+    if (typeof requestedModel === 'string' && requestedModel.trim()) {
+        return requestedModel.trim();
+    }
+
+    return DEFAULT_CHAT_MODEL;
+}
+
+async function resolveFollowUpModel({
+    agentId = '',
+    requestedModel = '',
+    settings = {},
+    agentConfigManager = null,
+}) {
+    return resolveTaskModel({
+        agentId,
+        requestedModel,
+        settings,
+        agentConfigManager,
+        logLabel: 'generate-follow-ups',
+    });
 }
 
 function initialize(mainWindow, context) {
@@ -431,7 +845,9 @@ function initialize(mainWindow, context) {
 
                 const newTopic = {
                     id: newTopicId,
-                    name: topicName || `New Topic ${existingTopics.length + 1}`,
+                    name: typeof topicName === 'string' && topicName.trim()
+                        ? topicName.trim()
+                        : buildPlaceholderTopicName(existingTopics),
                     createdAt: timestamp,
                     locked: locked,
                     unread: false,
@@ -477,7 +893,7 @@ function initialize(mainWindow, context) {
                 await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
                     let filtered = (existingConfig.topics || []).filter(topic => topic.id !== topicIdToDelete);
                     if (filtered.length === 0) {
-                        filtered = [{ id: "default", name: "Main Conversation", createdAt: Date.now(), knowledgeBaseId: null }];
+                        filtered = [buildDefaultPlaceholderTopic()];
                     }
                     remainingTopics = filtered;
                     return { ...existingConfig, topics: filtered };
@@ -880,6 +1296,173 @@ function initialize(mainWindow, context) {
         };
     });
 
+    ipcMain.handle('generate-follow-ups', async (_event, payload) => {
+        try {
+            const requestPayload = payload && typeof payload === 'object' && !Array.isArray(payload)
+                ? payload
+                : {};
+            const visibleMessages = selectVisibleFollowUpMessages(requestPayload.messages);
+            if (visibleMessages.length === 0) {
+                return { success: true, followUps: [] };
+            }
+
+            const settings = settingsManager && typeof settingsManager.readSettings === 'function'
+                ? await settingsManager.readSettings()
+                : {};
+            if (settings.enableTopicTitleGeneration === false) {
+                return {
+                    success: true,
+                    generated: false,
+                    title: fallbackTitle,
+                };
+            }
+            const endpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
+            const apiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
+            if (!endpoint || !apiKey) {
+                return { success: false, error: 'VCP 服务配置不完整。', followUps: [] };
+            }
+
+            const model = await resolveFollowUpModel({
+                agentId: requestPayload.agentId,
+                requestedModel: requestPayload.model,
+                settings,
+                agentConfigManager,
+            });
+            const prompt = buildFollowUpPrompt(settings.followUpPromptTemplate, visibleMessages);
+            const requestIdBase = `follow_up_${requestPayload.messageId || Date.now()}_${Date.now()}`;
+            const followUpContext = {
+                source: 'follow-up-generation',
+                agentId: requestPayload.agentId || '',
+                topicId: requestPayload.topicId || '',
+                messageId: requestPayload.messageId || '',
+            };
+
+            for (let attempt = 1; attempt <= FOLLOW_UP_MAX_ATTEMPTS; attempt += 1) {
+                const result = await requestFollowUpsOnce({
+                    attempt,
+                    requestIdBase,
+                    endpoint,
+                    apiKey,
+                    prompt,
+                    model,
+                    context: followUpContext,
+                });
+
+                if (result.error) {
+                    return { success: false, error: result.error, followUps: [] };
+                }
+
+                if (result.followUps.length > 0) {
+                    return { success: true, followUps: result.followUps };
+                }
+
+                const rawPreview = String(result.rawContent || '').trim();
+                console.warn(
+                    `[Main - generate-follow-ups] Attempt ${attempt} returned ${rawPreview ? 'unparseable' : 'empty'} content for ${followUpContext.messageId || requestIdBase}.`
+                );
+                if (rawPreview) {
+                    console.warn(`[Main - generate-follow-ups] Raw preview: ${rawPreview.slice(0, 240)}`);
+                }
+            }
+
+            return { success: true, followUps: [] };
+        } catch (error) {
+            console.error('[Main - generate-follow-ups] Failed:', error);
+            return { success: false, error: error.message, followUps: [] };
+        }
+    });
+
+    ipcMain.handle('generate-topic-title', async (_event, payload) => {
+        try {
+            const requestPayload = payload && typeof payload === 'object' && !Array.isArray(payload)
+                ? payload
+                : {};
+            const visibleMessages = selectVisibleFollowUpMessages(
+                requestPayload.messages,
+                TOPIC_TITLE_HISTORY_LIMIT
+            );
+            const fallbackTitle = extractFirstUserTitleFallback(requestPayload.messages);
+            if (visibleMessages.length === 0) {
+                return { success: true, generated: false, title: fallbackTitle };
+            }
+
+            const settings = settingsManager && typeof settingsManager.readSettings === 'function'
+                ? await settingsManager.readSettings()
+                : {};
+            const endpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
+            const apiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
+            if (!endpoint || !apiKey) {
+                return {
+                    success: true,
+                    generated: false,
+                    title: fallbackTitle,
+                    error: 'VCP 服务配置不完整。',
+                };
+            }
+
+            const model = await resolveTaskModel({
+                agentId: requestPayload.agentId,
+                requestedModel: requestPayload.model,
+                settings,
+                agentConfigManager,
+                logLabel: 'generate-topic-title',
+            });
+            const prompt = buildTopicTitlePrompt(settings.topicTitlePromptTemplate, visibleMessages);
+            const response = await vcpClient.send({
+                requestId: `topic_title_${requestPayload.messageId || Date.now()}_${Date.now()}`,
+                endpoint,
+                apiKey,
+                messages: [{
+                    role: 'user',
+                    content: prompt,
+                }],
+                modelConfig: {
+                    model,
+                    stream: false,
+                    temperature: 0.1,
+                    max_tokens: 200,
+                },
+                context: {
+                    source: 'topic-title-generation',
+                    agentId: requestPayload.agentId || '',
+                    topicId: requestPayload.topicId || '',
+                    messageId: requestPayload.messageId || '',
+                },
+                timeoutMs: 120000,
+            });
+
+            if (response?.error) {
+                return {
+                    success: true,
+                    generated: false,
+                    title: fallbackTitle,
+                    model,
+                    prompt,
+                    error: response.error,
+                };
+            }
+
+            const rawContent = extractResponseContent(response?.response || {});
+            const title = parseTopicTitleResponse(rawContent, fallbackTitle) || fallbackTitle;
+            return {
+                success: true,
+                generated: title !== fallbackTitle,
+                title,
+                model,
+                prompt,
+                rawContent,
+            };
+        } catch (error) {
+            console.error('[Main - generate-topic-title] Failed:', error);
+            return {
+                success: true,
+                generated: false,
+                title: extractFirstUserTitleFallback(payload?.messages),
+                error: error.message,
+            };
+        }
+    });
+
     ipcMain.handle('interrupt-vcp-request', async (_event, request) => {
         if (!request || typeof request !== 'object' || Array.isArray(request)) {
             return { success: false, error: 'interrupt-vcp-request expects a request object.' };
@@ -1120,5 +1703,18 @@ function initialize(mainWindow, context) {
 }
 
 module.exports = {
+    __testUtils: {
+        buildFollowUpPrompt,
+        buildTopicTitlePrompt,
+        extractFirstUserTitleFallback,
+        formatFollowUpChatHistory,
+        parseFollowUpsResponse,
+        parseTopicTitleResponse,
+        resolveFollowUpModel,
+        resolveTaskModel,
+        sanitizeFollowUpText,
+        selectVisibleFollowUpMessages,
+        requestFollowUpsOnce,
+    },
     initialize
 };
