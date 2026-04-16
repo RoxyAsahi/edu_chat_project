@@ -32,7 +32,7 @@
   </div>
   <div class="window-shell">
     <header class="titlebar">
-      <div class="titlebar__brand">
+      <div class="titlebar__tabs" aria-label="主导航">
         <div class="titlebar__brand-main">
           <img class="brand-mark" src="../assets/brand-logo.png" alt="UniStudy logo" />
           <div>
@@ -40,23 +40,33 @@
             <div class="titlebar__subtitle">个人 AI 学习终端</div>
           </div>
         </div>
-        <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn titlebar__home-btn" type="button">
-          <span class="material-symbols-outlined">home</span> 首页
+        <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn titlebar__home-btn titlebar__tab" type="button">
+          <span class="material-symbols-outlined">home</span>
+          <span class="titlebar__tab-text">首页</span>
         </button>
-      </div>
-      <div class="titlebar__workspace">
-        <div class="titlebar__context-card">
-          <span class="titlebar__context-label">当前学科</span>
-          <strong id="titlebarCurrentAgent">未选择学科</strong>
+        <div class="titlebar__workspace">
+          <div class="titlebar__context-card titlebar__tab titlebar__tab--context">
+            <span class="material-symbols-outlined titlebar__tab-icon" aria-hidden="true">auto_awesome</span>
+            <div class="titlebar__tab-copy">
+              <span class="titlebar__context-label">智能体</span>
+              <strong id="titlebarCurrentAgent">未选择学科</strong>
+            </div>
+          </div>
+          <div class="titlebar__context-card titlebar__context-card--topic titlebar__tab titlebar__tab--active">
+            <span class="material-symbols-outlined titlebar__tab-icon" aria-hidden="true">chat_bubble</span>
+            <div class="titlebar__tab-copy">
+              <span class="titlebar__context-label">话题</span>
+              <strong id="titlebarCurrentTopic">请选择一个话题</strong>
+            </div>
+          </div>
+          <button id="manualNotesLibraryBtn" class="ghost-button titlebar__context-card titlebar__context-card--action titlebar__tab" type="button">
+            <span class="material-symbols-outlined titlebar__tab-icon" aria-hidden="true">event_note</span>
+            <div class="titlebar__tab-copy">
+              <span class="titlebar__context-label">笔记</span>
+              <strong>我的笔记</strong>
+            </div>
+          </button>
         </div>
-        <div class="titlebar__context-card titlebar__context-card--topic">
-          <span class="titlebar__context-label">当前话题</span>
-          <strong id="titlebarCurrentTopic">请选择一个话题</strong>
-        </div>
-        <button id="manualNotesLibraryBtn" class="ghost-button titlebar__context-card titlebar__context-card--action" type="button">
-          <span class="titlebar__context-label">手写笔记</span>
-          <strong>我的笔记</strong>
-        </button>
       </div>
       <div class="titlebar__meta">
         <button id="openDiaryWallBtn" class="ghost-button icon-btn" title="日记墙"><span class="material-symbols-outlined">auto_stories</span></button>

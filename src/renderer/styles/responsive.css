@@ -155,11 +155,12 @@
   .titlebar {
     flex-wrap: nowrap;
     align-items: center;
-    padding: 12px 12px 8px;
+    min-height: 56px;
+    padding: 10px 12px 8px;
     gap: 10px;
   }
 
-  .titlebar__brand {
+  .titlebar__tabs {
     gap: 10px;
     min-width: 0;
   }
@@ -173,11 +174,11 @@
   }
 
   .titlebar__home-btn {
-    padding: 7px 14px;
+    padding: 0 12px;
   }
 
   .titlebar__workspace {
-    display: none;
+    gap: 8px;
   }
 
   .workspace-overview-page__header {
@@ -726,7 +727,7 @@
 }
 
 @media (max-width: 700px) {
-  .titlebar__brand {
+  .titlebar__tabs {
     gap: 8px;
   }
 
@@ -745,7 +746,7 @@
   }
 
   .titlebar__context-card {
-    padding: 4px 10px;
+    padding: 0 10px;
     max-width: 150px;
   }
 
