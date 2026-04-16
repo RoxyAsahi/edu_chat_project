@@ -139,6 +139,43 @@
         </div>
       </section>
 
+      <section id="manualNotesLibraryPage" class="manual-notes-library-page hidden" aria-labelledby="manualNotesLibraryTitle">
+        <div class="manual-notes-library-page__inner">
+          <header class="manual-notes-library-page__header">
+            <div class="manual-notes-library-page__header-main">
+              <span class="material-symbols-outlined manual-notes-library-page__header-icon" aria-hidden="true">event_note</span>
+              <div>
+                <h1 id="manualNotesLibraryTitle">我的笔记</h1>
+                <p id="manualNotesLibrarySubtitle" class="manual-notes-library-page__subtitle">这里会收纳当前学科下的所有手写笔记。</p>
+              </div>
+            </div>
+            <div class="manual-notes-library-page__filters" aria-label="笔记筛选">
+              <button
+                id="manualNotesLibraryFilterAllBtn"
+                class="ghost-button manual-notes-library-page__filter manual-notes-library-page__filter--active"
+                type="button"
+                aria-pressed="true"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>
+                <span>全部</span>
+              </button>
+              <button
+                id="manualNotesLibraryFilterSelectedBtn"
+                class="ghost-button manual-notes-library-page__filter"
+                type="button"
+                aria-pressed="false"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">star</span>
+                <span>已加入 Studio</span>
+              </button>
+            </div>
+          </header>
+          <div class="manual-notes-library-page__body">
+            <section id="manualNotesLibraryGrid" class="manual-notes-library-grid" aria-live="polite"></section>
+          </div>
+        </div>
+      </section>
+
       <main id="workspaceSubjectPage" class="layout hidden">
       <nav class="mobile-workspace-tabs" aria-label="窄态工作区导航">
         <button id="mobileWorkspaceSourceTabBtn" class="mobile-workspace-tab mobile-workspace-tab--active" type="button">来源</button>
@@ -625,29 +662,6 @@
               </button>
             </div>
           </section>
-        </div>
-      </div>
-    </div>
-
-    <div id="manualNotesLibraryModal" class="manual-notes-library-modal hidden" aria-hidden="true">
-      <div id="manualNotesLibraryBackdrop" class="manual-notes-library-modal__backdrop"></div>
-      <div class="manual-notes-library-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="manualNotesLibraryTitle">
-        <div class="manual-notes-library-modal__header">
-          <div class="note-detail-modal__header-main">
-            <div>
-              <p class="eyebrow">手写笔记库</p>
-              <h2 id="manualNotesLibraryTitle">我的笔记</h2>
-              <p id="manualNotesLibrarySubtitle" class="settings-caption">这里会收纳当前学科下的所有手写笔记。</p>
-            </div>
-          </div>
-          <div class="panel__actions manual-notes-library-modal__actions">
-            <button id="manualNotesLibraryCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭手写笔记库">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-          </div>
-        </div>
-        <div class="manual-notes-library-modal__body">
-          <section id="manualNotesLibraryGrid" class="manual-notes-library-grid" aria-live="polite"></section>
         </div>
       </div>
     </div>

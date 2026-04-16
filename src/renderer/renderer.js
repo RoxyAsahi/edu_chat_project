@@ -213,6 +213,8 @@ notesController = createNotesController({
     documentObj: document,
     setSidePanelTab,
     setRightPanelMode,
+    showManualNotesLibraryPage: (...args) => workspaceController?.showManualNotesLibrary?.(...args),
+    syncWorkspaceView: (...args) => workspaceController?.syncWorkspaceView?.(...args),
     getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
     getCurrentTopicId: () => getSessionSlice().currentTopicId,
     getCurrentChatHistory: () => getSessionSlice().currentChatHistory,

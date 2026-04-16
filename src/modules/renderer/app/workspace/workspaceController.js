@@ -312,25 +312,43 @@ function createWorkspaceController(deps = {}) {
         syncWorkspaceView();
     }
 
+    function showManualNotesLibrary() {
+        state.workspaceViewMode = 'manual-notes';
+        syncWorkspaceView();
+    }
+
     function syncWorkspaceView() {
-        const isOverview = state.workspaceViewMode !== 'subject';
+        const mode = state.workspaceViewMode || 'overview';
+        const isOverview = mode === 'overview';
+        const isSubject = mode === 'subject';
+        const isManualNotes = mode === 'manual-notes';
+
         el.workspaceOverviewPage?.classList.toggle('hidden', !isOverview);
-        el.workspaceSubjectPage?.classList.toggle('hidden', isOverview);
+        el.workspaceSubjectPage?.classList.toggle('hidden', !isSubject);
+        el.manualNotesLibraryPage?.classList.toggle('hidden', !isManualNotes);
         el.settingsModal?.classList.add('hidden');
         el.settingsModal?.classList.remove('settings-page--open');
         el.workspaceBackToOverviewBtn?.classList.toggle('titlebar__tab--active', isOverview);
-        el.workspaceOpenSubjectBtn?.classList.toggle('titlebar__tab--active', !isOverview);
+        el.workspaceOpenSubjectBtn?.classList.toggle('titlebar__tab--active', isSubject);
+        el.manualNotesLibraryBtn?.classList.toggle('titlebar__tab--active', isManualNotes);
         documentObj.body?.classList?.toggle('workspace-view-overview', isOverview);
-        documentObj.body?.classList?.toggle('workspace-view-subject', !isOverview);
+        documentObj.body?.classList?.toggle('workspace-view-subject', isSubject);
+        documentObj.body?.classList?.toggle('workspace-view-manual-notes', isManualNotes);
         documentObj.body?.classList?.remove('workspace-view-settings');
         documentObj.body?.classList?.remove('settings-page-open');
+        if (!isManualNotes) {
+            store.patchState('notes', (current) => ({
+                ...current,
+                manualNotesLibraryOpen: false,
+            }));
+        }
         if (isOverview) {
             ensureOverviewClockTimer();
         } else {
             clearOverviewClockTimer();
         }
         syncMobileWorkspaceLayout();
-        if (!isOverview) {
+        if (isSubject) {
             refreshWorkspaceLayout({
                 frames: 2,
                 resetDesktopLayout: true,
@@ -1070,6 +1088,7 @@ function createWorkspaceController(deps = {}) {
         selectTopic,
         selectAgent,
         showSubjectWorkspace,
+        showManualNotesLibrary,
         syncWorkspaceView,
         exportCurrentTopic,
         createAgent,

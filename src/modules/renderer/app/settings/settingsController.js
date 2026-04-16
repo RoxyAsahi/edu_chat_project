@@ -983,6 +983,9 @@ function createSettingsController(deps = {}) {
     }
 
     function detectCurrentWorkspaceView() {
+        if (!el.manualNotesLibraryPage?.classList.contains('hidden')) {
+            return 'manual-notes';
+        }
         if (!el.workspaceSubjectPage?.classList.contains('hidden')) {
             return 'subject';
         }
@@ -1012,10 +1015,13 @@ function createSettingsController(deps = {}) {
         documentObj.body.classList.remove('settings-page-open');
         documentObj.body.classList.remove('workspace-view-settings');
         const returnToSubject = settingsPageReturnView === 'subject';
-        el.workspaceOverviewPage?.classList.toggle('hidden', returnToSubject);
+        const returnToManualNotes = settingsPageReturnView === 'manual-notes';
+        el.workspaceOverviewPage?.classList.toggle('hidden', returnToSubject || returnToManualNotes);
         el.workspaceSubjectPage?.classList.toggle('hidden', !returnToSubject);
-        documentObj.body.classList.toggle('workspace-view-overview', !returnToSubject);
+        el.manualNotesLibraryPage?.classList.toggle('hidden', !returnToManualNotes);
+        documentObj.body.classList.toggle('workspace-view-overview', !returnToSubject && !returnToManualNotes);
         documentObj.body.classList.toggle('workspace-view-subject', returnToSubject);
+        documentObj.body.classList.toggle('workspace-view-manual-notes', returnToManualNotes);
         if (settingsModalTrigger instanceof HTMLElement && documentObj.body.contains(settingsModalTrigger)) {
             settingsModalTrigger.focus();
         }
