@@ -21,13 +21,6 @@ function formatOverviewClock(date = new Date()) {
     return `${hours}:${minutes}`;
 }
 
-function formatOverviewClockDate(date = new Date()) {
-    const weekdayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    return `${month}月${day}日 ${weekdayNames[date.getDay()]}`;
-}
-
 function createWorkspaceController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -151,16 +144,11 @@ function createWorkspaceController(deps = {}) {
     }
 
     function syncOverviewClockText() {
-        const clockTimeElement = el.subjectOverviewGrid?.querySelector('#overviewClockTime');
-        if (!clockTimeElement) {
+        const clockElement = el.subjectOverviewGrid?.querySelector('#overviewClockTime');
+        if (!clockElement) {
             return;
         }
-        const currentTime = nowProvider();
-        clockTimeElement.textContent = formatOverviewClock(currentTime);
-        const clockDateElement = el.subjectOverviewGrid?.querySelector('#overviewClockDate');
-        if (clockDateElement) {
-            clockDateElement.textContent = formatOverviewClockDate(currentTime);
-        }
+        clockElement.textContent = formatOverviewClock(nowProvider());
     }
 
     function ensureOverviewClockTimer() {
@@ -377,17 +365,6 @@ function createWorkspaceController(deps = {}) {
                     return;
                 }
                 void selectAgent(agentId);
-            });
-        });
-        el.subjectOverviewGrid.querySelectorAll('[data-delete-subject-card]').forEach((button) => {
-            button.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                const { agentId, agentName } = button.dataset;
-                if (!agentId) {
-                    return;
-                }
-                void deleteAgentById(agentId, { agentName });
             });
         });
 
@@ -933,76 +910,54 @@ function createWorkspaceController(deps = {}) {
         await selectTopic(result.topicId);
     }
 
-    async function deleteAgentById(agentId, options = {}) {
-        if (!agentId) {
-            return false;
+    async function deleteCurrentAgent() {
+        if (!state.currentSelectedItem.id) {
+            return;
         }
-
-        const isCurrentAgent = agentId === state.currentSelectedItem.id;
-        const fallbackAgent = state.agents.find((agent) => agent.id === agentId) || null;
-        const agentLabel = options.agentName || fallbackAgent?.name || fallbackAgent?.id || agentId;
 
         closeTopicActionMenu();
         const confirmed = await ui.showConfirmDialog(
-            `确定删除学科 ${agentLabel} 吗？这会删除该学科下的全部话题、笔记和资料。`,
-            '删除学科',
+            `确定删除智能体 ${state.currentSelectedItem.name || state.currentSelectedItem.id} 吗？`,
+            '删除智能体',
             '删除',
             '取消',
             true,
         );
         if (!confirmed) {
-            return false;
+            return;
         }
 
-        if (isCurrentAgent) {
-            await stopHistoryWatcher();
-        }
-
-        const result = await chatAPI.deleteAgent(agentId);
+        await stopHistoryWatcher();
+        const result = await chatAPI.deleteAgent(state.currentSelectedItem.id);
         if (result?.error) {
             ui.showToastNotification(result.error, 'error');
-            return false;
+            return;
         }
 
-        if (isCurrentAgent) {
-            state.currentSelectedItem = { id: null, type: 'agent', name: null, avatarUrl: null, config: null };
-            state.currentTopicId = null;
-            state.currentChatHistory = [];
-            clearTopicKnowledgeBaseDocuments();
-            resetNotesState({
-                clearTopicNotes: true,
-                clearAgentNotes: true,
-                clearSelection: true,
-                clearActiveNote: true,
-                closeDetailView: true,
-                clearFlashcards: true,
-            });
-            resetComposerState({
-                clearAttachments: true,
-                clearSelectionContext: true,
-            });
-            syncWorkspaceContext();
-            setPromptVisible(false);
-        }
-
-        await loadAgents();
-
-        if (isCurrentAgent) {
-            showWorkspaceOverview();
-            renderTopics();
-            syncCurrentTopicKnowledgeBaseControls();
-            await renderCurrentHistory();
-        }
-
-        await refreshLogs();
-        ui.showToastNotification(`已删除学科 ${agentLabel}。`, 'success');
-        return true;
-    }
-
-    async function deleteCurrentAgent() {
-        await deleteAgentById(state.currentSelectedItem.id, {
-            agentName: state.currentSelectedItem.name || state.currentSelectedItem.id,
+        state.currentSelectedItem = { id: null, type: 'agent', name: null, avatarUrl: null, config: null };
+        state.currentTopicId = null;
+        state.currentChatHistory = [];
+        clearTopicKnowledgeBaseDocuments();
+        resetNotesState({
+            clearTopicNotes: true,
+            clearAgentNotes: true,
+            clearSelection: true,
+            clearActiveNote: true,
+            closeDetailView: true,
+            clearFlashcards: true,
         });
+        resetComposerState({
+            clearAttachments: true,
+            clearSelectionContext: true,
+        });
+        syncWorkspaceContext();
+        setPromptVisible(false);
+        await loadAgents();
+        showWorkspaceOverview();
+        renderTopics();
+        syncCurrentTopicKnowledgeBaseControls();
+        await renderCurrentHistory();
+        await refreshLogs();
     }
 
     function bindEvents() {

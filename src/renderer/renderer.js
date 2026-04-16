@@ -10,7 +10,6 @@ import { collectRootElements } from '../modules/renderer/app/dom/collectRootElem
 import { createLayoutController } from '../modules/renderer/app/layout/layoutController.js';
 import { createMobileWorkspaceController } from '../modules/renderer/app/layout/mobileWorkspaceController.js';
 import { createDiaryWallController } from '../modules/renderer/app/diaryWall/diaryWallController.js';
-import { createDynamicIslandController } from '../modules/renderer/app/dynamicIsland/dynamicIslandController.js';
 import { createLogsController } from '../modules/renderer/app/logs/logsController.js';
 import { createNotesController } from '../modules/renderer/app/notes/notesController.js';
 import { createReaderController } from '../modules/renderer/app/reader/readerController.js';
@@ -23,9 +22,16 @@ import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime 
 const chatAPI = window.chatAPI || window.electronAPI;
 const ui = window.uiHelperFunctions;
 const store = createAppStore(createInitialAppState());
+
 const el = collectRootElements(document);
-let sourceController = null, workspaceController = null, readerController = null, flashcardController = null;
-let notesController = null, logsController = null, diaryWallController = null, dynamicIslandController = null, composerController = null;
+let sourceController = null;
+let workspaceController = null;
+let readerController = null;
+let flashcardController = null;
+let notesController = null;
+let logsController = null;
+let diaryWallController = null;
+let composerController = null;
 const mobileWorkspaceController = createMobileWorkspaceController({
     store,
     el,
@@ -302,17 +308,6 @@ const {
     closeTopicActionMenu,
     bindEvents: bindWorkspaceEvents,
 } = workspaceController;
-dynamicIslandController = createDynamicIslandController({
-    store,
-    el,
-    ui,
-    windowObj: window,
-    documentObj: document,
-    showSubjectWorkspace: (...args) => workspaceController?.showSubjectWorkspace?.(...args),
-});
-const {
-    bindEvents: bindDynamicIslandEvents,
-} = dynamicIslandController;
 const {
     bindEvents: bindNotesEvents,
 } = notesController;
@@ -604,6 +599,7 @@ function rememberSourceListScrollPosition() {
         });
     }
 }
+
 function restoreSourceListScrollPosition() {
     if (!el.topicKnowledgeBaseFiles) {
         return;
@@ -621,6 +617,7 @@ function setLeftReaderTab(tab) {
     store.patchState('layout', {
         leftReaderActiveTab: nextTab,
     });
+
     el.leftReaderGuideTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'guide');
     el.leftReaderContentTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'content');
     el.readerGuidePane?.classList.toggle('hidden', nextTab !== 'guide');
@@ -635,6 +632,7 @@ function setLeftSidebarMode(mode) {
     if (nextMode === 'reader') {
         rememberSourceListScrollPosition();
     }
+
     store.patchState('layout', {
         leftSidebarMode: nextMode,
     });
@@ -660,9 +658,11 @@ function extractPromptTextFromLegacyConfig(config = {}) {
     if (typeof config.originalSystemPrompt === 'string' && config.originalSystemPrompt.trim()) {
         return config.originalSystemPrompt;
     }
+
     if (typeof config.systemPrompt === 'string' && config.systemPrompt.trim()) {
         return config.systemPrompt;
     }
+
     if (config.promptMode === 'modular') {
         const advancedPrompt = config.advancedSystemPrompt;
         if (typeof advancedPrompt === 'string' && advancedPrompt.trim()) {
@@ -683,11 +683,14 @@ function extractPromptTextFromLegacyConfig(config = {}) {
                 .join('');
         }
     }
+
     if (config.promptMode === 'preset' && typeof config.presetSystemPrompt === 'string') {
         return config.presetSystemPrompt;
     }
+
     return '';
 }
+
 async function ensurePromptModule() {
     if (getPromptModule() || !window.OriginalPromptModule) return;
     store.patchState('settings', (current) => ({
@@ -700,6 +703,7 @@ async function ensurePromptModule() {
 
 async function syncPromptModule(agentId, config) {
     await ensurePromptModule();
+
     const activePrompt = await chatAPI.getActiveSystemPrompt(agentId).catch(() => null);
     const resolvedPrompt = activePrompt?.success
         ? (activePrompt.systemPrompt || '')
@@ -713,6 +717,7 @@ async function syncPromptModule(agentId, config) {
         `;
         return;
     }
+
     promptModule.updateContext(agentId, {
         ...config,
         promptMode: 'original',
@@ -726,6 +731,7 @@ async function syncPromptModule(agentId, config) {
     note.textContent = 'UniStudy 当前仅开放文本提示词模式，旧版模块化或预设提示词会在这里被展开为纯文本。';
     el.systemPromptContainer.prepend(note);
 }
+
 async function populateAgentForm(config) {
     const session = getSessionSlice();
     el.editingAgentId.value = session.currentSelectedItem.id;
@@ -762,6 +768,7 @@ async function renderCurrentHistory() {
     const releaseChatLoading = shouldShowLoading
         ? setChatLoading(true, { ticket: ++chatLoadingTicket })
         : () => {};
+
     try {
         messageRenderer.clearChat({ preserveHistory: true });
         if (session.currentChatHistory.length === 0) {
@@ -777,6 +784,7 @@ async function renderCurrentHistory() {
         releaseChatLoading();
     }
 }
+
 function buildTopicContext() {
     const session = getSessionSlice();
     return {
@@ -794,7 +802,9 @@ async function persistHistory() {
     if (!session.currentSelectedItem.id || !session.currentTopicId) return;
     await chatAPI.saveChatHistory(session.currentSelectedItem.id, session.currentTopicId, session.currentChatHistory);
 }
+
 window.sendMessage = async (prefillText) => composerController?.sendMessage?.(prefillText);
+
 window.__unistudyDebugState = () => {
     const session = getSessionSlice();
     const composer = getComposerSlice();
@@ -806,32 +816,40 @@ window.__unistudyDebugState = () => {
         topicCount: session.topics.length,
     };
 };
+
 window.updateSendButtonState = (...args) => composerController?.updateSendButtonState?.(...args);
+
 let storeSubscriptionsBound = false;
+
 function bindStoreSubscriptions() {
     if (storeSubscriptionsBound) {
         return;
     }
+
     storeSubscriptionsBound = true;
+
     store.subscribe('settings', (nextSettingsSlice) => {
         applyRendererSettings();
     });
+
     store.subscribe('session', () => {
         syncComposerAvailability();
     });
+
     store.subscribe('source', () => {
         syncCurrentTopicKnowledgeBaseControls();
     });
+
     store.subscribe('composer', () => {
         renderSelectionContextPreview();
         updateSendButtonState();
     });
 }
+
 function bindFeatureEvents() {
     bindStoreSubscriptions();
     bindLayoutEvents();
     bindSettingsEvents();
-    bindDynamicIslandEvents();
     bindReaderEvents();
     bindSourceEvents();
     bindWorkspaceEvents();
@@ -852,19 +870,24 @@ function bindShellEvents() {
             }
         }
     });
+
     el.agentAvatarInput?.addEventListener('change', () => {
         const file = el.agentAvatarInput.files?.[0];
         if (!file) return;
         el.agentAvatarPreview.src = file.path ? `file://${file.path.replace(/\\/g, '/')}` : URL.createObjectURL(file);
     });
+
     el.sidePanelNotesTabBtn?.addEventListener('click', () => {
         setSidePanelTab('notes');
     });
+
     el.minimizeBtn?.addEventListener('click', () => chatAPI.minimizeWindow());
     el.maximizeBtn?.addEventListener('click', () => chatAPI.maximizeWindow());
     el.closeBtn?.addEventListener('click', () => chatAPI.closeWindow());
 }
+
 setAppBootLoading(true);
+
 bootstrap()
     .catch((error) => {
         console.error('[UniStudyRenderer] bootstrap failed:', error);

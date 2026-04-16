@@ -28,9 +28,6 @@ test('createInitialAppState groups renderer state into the expected slices', asy
     assert.equal(state.settings.settings.agentBubbleThemePrompt, 'Output formatting requirement: {{VarDivRender}}');
     assert.equal(state.settings.settings.studyProfile.timezone, 'Asia/Hong_Kong');
     assert.equal(state.layout.sidePanelTab, 'notes');
-    assert.equal(state.layout.dynamicIslandExpanded, false);
-    assert.equal(state.layout.pomodoroStatus, 'idle');
-    assert.equal(state.layout.pomodoroDurationMinutes, 25);
     assert.equal(state.session.currentTopicId, null);
     assert.equal(state.source.selectedKnowledgeBaseId, null);
     assert.equal(state.notes.notesScope, 'topic');
