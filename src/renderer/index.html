@@ -71,7 +71,7 @@
       <div class="titlebar__meta">
         <button id="openDiaryWallBtn" class="ghost-button icon-btn" title="日记墙"><span class="material-symbols-outlined">auto_stories</span></button>
         <button id="globalSettingsBtn" class="ghost-button icon-btn" title="设置"><span class="material-symbols-outlined">settings</span></button>
-        <button id="themeToggleBtn" class="ghost-button icon-btn" title="切换主题"><span class="material-symbols-outlined">dark_mode</span></button>
+        <button id="themeToggleBtn" class="ghost-button icon-btn hidden" title="切换主题" aria-hidden="true" tabindex="-1"><span class="material-symbols-outlined">dark_mode</span></button>
         <button id="minimize-btn" class="window-button"><span class="material-symbols-outlined" style="font-size: 16px;">remove</span></button>
         <button id="maximize-btn" class="window-button"><span class="material-symbols-outlined" style="font-size: 14px;">crop_square</span></button>
         <button id="close-btn" class="window-button window-button--danger"><span class="material-symbols-outlined" style="font-size: 18px;">close</span></button>
@@ -619,16 +619,14 @@
     <div id="settingsModal" class="settings-modal hidden" aria-hidden="true">
       <div id="settingsModalBackdrop" class="settings-modal__backdrop"></div>
       <div class="settings-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
-        <div class="settings-modal__header">
-          <div>
-            <p class="eyebrow">工作台设置</p>
-            <h2 id="settingsModalTitle">设置</h2>
-            <p id="settingsModalSubtitle" class="settings-caption">统一管理全局连接、智能体参数与 Source 配置。</p>
-          </div>
-          <button id="settingsModalCloseBtn" class="ghost-button icon-btn settings-modal__close" type="button" aria-label="关闭设置">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
+        <h2 id="settingsModalTitle" class="hidden">设置</h2>
+        <p id="settingsModalSubtitle" class="settings-caption hidden">统一管理全局连接、智能体参数与 Source 配置。</p>
+        <button id="settingsModalCloseBtn" class="ghost-button icon-btn settings-modal__close hidden" type="button" aria-label="关闭设置" tabindex="-1" aria-hidden="true">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+        <button id="settingsModalCloseBtnFloating" class="ghost-button icon-btn settings-modal__close settings-modal__close--floating" type="button" aria-label="关闭设置">
+          <span class="material-symbols-outlined">close</span>
+        </button>
 
         <div class="settings-modal__body">
           <nav class="settings-modal__nav" aria-label="设置分类">
@@ -663,6 +661,43 @@
                     <span>API Key</span>
                     <input id="vcpApiKey" type="password" />
                   </label>
+                </div>
+                <div class="settings-subsection settings-subsection--primary">
+                  <div class="settings-subsection__header">
+                    <div>
+                      <h4>来源检索</h4>
+                      <p class="settings-caption">来源检索会复用上面的全局连接，只在这里保留检索与重排配置。</p>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <input id="kbBaseUrl" type="hidden" />
+                    <input id="kbApiKey" type="hidden" />
+                    <label>
+                      <span>Embedding Model</span>
+                      <input id="kbEmbeddingModel" type="text" placeholder="BAAI/bge-m3" />
+                    </label>
+                    <label>
+                      <span>Rerank Model</span>
+                      <input id="kbRerankModel" type="text" placeholder="BAAI/bge-reranker-v2-m3" />
+                    </label>
+                    <div class="checkbox-row" style="grid-column: span 2;">
+                      <label>
+                        <input id="kbUseRerank" type="checkbox" />
+                        <span>启用 Rerank 重排</span>
+                      </label>
+                    </div>
+                    <label>
+                      <span>Top K / Threshold</span>
+                      <div class="kb-inline-fields">
+                        <input id="kbTopK" type="number" min="1" step="1" />
+                        <input id="kbScoreThreshold" type="number" min="0" max="1" step="0.01" />
+                      </div>
+                    </label>
+                    <label>
+                      <span>Candidate Top K</span>
+                      <input id="kbCandidateTopK" type="number" min="1" step="1" />
+                    </label>
+                  </div>
                 </div>
               </section>
 
@@ -850,24 +885,14 @@
                 </div>
               </section>
 
-              <section class="settings-card settings-card--modal">
-                <h3><span class="material-symbols-outlined bento-icon">contrast</span> 主题</h3>
-                <div class="radio-row">
-                  <label><input type="radio" name="themeMode" value="light" /> 浅色</label>
-                  <label><input type="radio" name="themeMode" value="dark" /> 深色</label>
-                  <label><input type="radio" name="themeMode" value="system" checked /> 跟随系统</label>
-                </div>
-              </section>
             </section>
 
             <section id="settingsModalSectionAgent" class="settings-modal__section hidden" data-settings-section="agent">
               <div class="settings-panel__header settings-modal__agent-header">
                 <div>
-                  <p class="eyebrow">配置</p>
                   <h2 id="agentSettingsContainerTitle">智能体设置</h2>
-                  <p id="selectedAgentNameForSettings" class="settings-caption"></p>
+                  <p id="selectedAgentNameForSettings" class="settings-caption hidden"></p>
                 </div>
-                <button id="deleteAgentBtn" class="ghost-button ghost-button--danger" type="button">删除</button>
               </div>
 
               <div id="selectAgentPromptForSettings" class="empty-state">
@@ -988,53 +1013,18 @@
                 </section>
 
                 <section class="settings-card bento-actions" style="background: transparent; box-shadow: none; padding: 0;">
-                  <button id="saveAgentSettingsBtn" class="accent-button" style="width: 100%; height: 48px; border-radius: 24px;">保存智能体设置</button>
+                  <div class="settings-agent-actions">
+                    <button id="saveAgentSettingsBtn" class="accent-button settings-agent-actions__save" style="height: 48px; border-radius: 24px;">保存智能体设置</button>
+                    <button id="deleteAgentBtn" class="ghost-button ghost-button--danger settings-agent-actions__delete" type="button">删除智能体</button>
+                  </div>
                 </section>
               </div>
             </section>
 
             <section id="settingsModalSectionKnowledgeBase" class="settings-modal__section hidden" data-settings-section="knowledge-base">
               <section class="settings-card settings-card--modal">
-                <h3><span class="material-symbols-outlined bento-icon">hub</span> 来源模型</h3>
-                <div class="field-grid">
-                  <label>
-                    <span>Source Base URL</span>
-                    <input id="kbBaseUrl" type="text" placeholder="http://host:port/v1" />
-                  </label>
-                  <label>
-                    <span>Source API Key</span>
-                    <input id="kbApiKey" type="password" />
-                  </label>
-                  <label>
-                    <span>Embedding Model</span>
-                    <input id="kbEmbeddingModel" type="text" placeholder="BAAI/bge-m3" />
-                  </label>
-                  <div class="checkbox-row" style="grid-column: span 2;">
-                    <label>
-                      <input id="kbUseRerank" type="checkbox" />
-                      <span>启用 Rerank 重排</span>
-                    </label>
-                  </div>
-                  <label>
-                    <span>Rerank Model</span>
-                    <input id="kbRerankModel" type="text" placeholder="BAAI/bge-reranker-v2-m3" />
-                  </label>
-                  <label>
-                    <span>Top K / Threshold</span>
-                    <div class="kb-inline-fields">
-                      <input id="kbTopK" type="number" min="1" step="1" />
-                      <input id="kbScoreThreshold" type="number" min="0" max="1" step="0.01" />
-                    </div>
-                  </label>
-                  <label>
-                    <span>Candidate Top K</span>
-                    <input id="kbCandidateTopK" type="number" min="1" step="1" />
-                  </label>
-                </div>
-              </section>
-
-              <section class="settings-card settings-card--modal">
                 <h3><span class="material-symbols-outlined bento-icon">database</span> 来源管理</h3>
+                <p class="settings-caption">这里专注管理来源库本身。连接与检索模型已经复用全局连接中的配置。</p>
                 <div class="field-grid">
                   <label style="grid-column: span 2;">
                     <span>Source 名称</span>
@@ -1076,9 +1066,9 @@
           </div>
         </div>
 
-        <div id="settingsModalFooter" class="settings-modal__footer">
-          <p class="settings-caption">全局设置和 Source 模型配置会一起保存。</p>
-          <button id="saveGlobalSettingsBtn" class="accent-button" type="button">保存全局与来源设置</button>
+        <div id="settingsModalFooter" class="settings-modal__footer hidden">
+          <p id="settingsAutoSaveStatus" class="settings-caption hidden">修改后会自动保存。</p>
+          <button id="saveGlobalSettingsBtn" class="accent-button hidden" type="button" aria-hidden="true" tabindex="-1">保存全局与来源设置</button>
         </div>
       </div>
     </div>
