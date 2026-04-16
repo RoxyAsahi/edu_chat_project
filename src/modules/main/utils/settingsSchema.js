@@ -61,6 +61,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     vcpApiKey: '',
     guideModel: '',
     defaultModel: '',
+    followUpDefaultModel: '',
+    topicTitleDefaultModel: '',
     lastModel: '',
     kbBaseUrl: '',
     kbApiKey: '',

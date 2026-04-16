@@ -42,6 +42,8 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
     assert.equal(settings.kbEmbeddingModel, DEFAULT_SETTINGS.kbEmbeddingModel);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
     assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);
+    assert.equal(settings.followUpDefaultModel, DEFAULT_SETTINGS.followUpDefaultModel);
+    assert.equal(settings.topicTitleDefaultModel, DEFAULT_SETTINGS.topicTitleDefaultModel);
     assert.equal(settings.enableThoughtChainInjection, false);
 });
 
@@ -60,8 +62,10 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.userName, 'Legacy User');
     assert.equal(settings.enableAgentBubbleTheme, true);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
+    assert.equal(settings.followUpDefaultModel, DEFAULT_SETTINGS.followUpDefaultModel);
     assert.equal(settings.followUpPromptTemplate, DEFAULT_SETTINGS.followUpPromptTemplate);
     assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);
+    assert.equal(settings.topicTitleDefaultModel, DEFAULT_SETTINGS.topicTitleDefaultModel);
     assert.equal(settings.topicTitlePromptTemplate, DEFAULT_SETTINGS.topicTitlePromptTemplate);
 });
 
@@ -117,7 +121,9 @@ test('writeSettings persists normalized content and refreshes the cache', async 
         ...DEFAULT_SETTINGS,
         userName: 'Writer',
         sidebarWidth: 50,
+        followUpDefaultModel: 'follow-model',
         followUpPromptTemplate: 'Custom follow-up template',
+        topicTitleDefaultModel: 'title-model',
         topicTitlePromptTemplate: 'Custom title template',
         rogueField: 'remove-me',
     });
@@ -125,7 +131,9 @@ test('writeSettings persists normalized content and refreshes the cache', async 
     const written = await fs.readJson(settingsPath);
     assert.equal(written.userName, 'Writer');
     assert.equal(written.sidebarWidth, DEFAULT_SETTINGS.sidebarWidth);
+    assert.equal(written.followUpDefaultModel, 'follow-model');
     assert.equal(written.followUpPromptTemplate, 'Custom follow-up template');
+    assert.equal(written.topicTitleDefaultModel, 'title-model');
     assert.equal(written.topicTitlePromptTemplate, 'Custom title template');
     assert.equal('rogueField' in written, false);
 

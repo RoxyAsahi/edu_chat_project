@@ -174,6 +174,7 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
         settingsManager: {
             async readSettings() {
                 return {
+                    topicTitleDefaultModel: 'topic-title-model',
                     defaultModel: 'global-model',
                     vcpServerUrl: 'http://example.com/v1/chat/completions',
                     vcpApiKey: 'secret',
@@ -198,7 +199,7 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
 
     assert.equal(result.success, true);
     assert.equal(result.title, '📘 线性函数复习');
-    assert.equal(capturedRequest.modelConfig.model, 'agent-model');
+    assert.equal(capturedRequest.modelConfig.model, 'topic-title-model');
     assert.match(capturedRequest.messages[0].content, /自定义标题模板/);
     assert.match(capturedRequest.messages[0].content, /\[1\] 用户:/);
 });

@@ -163,6 +163,8 @@ function collectRootElements(rootDocument = document) {
         useThemeColorsInChat: rootDocument.getElementById('useThemeColorsInChat'),
         userNameInput: rootDocument.getElementById('userNameInput'),
         defaultModelInput: rootDocument.getElementById('defaultModelInput'),
+        followUpDefaultModelInput: rootDocument.getElementById('followUpDefaultModelInput'),
+        topicTitleDefaultModelInput: rootDocument.getElementById('topicTitleDefaultModelInput'),
         studentNameInput: rootDocument.getElementById('studentNameInput'),
         studyCityInput: rootDocument.getElementById('studyCityInput'),
         studyWorkspaceInput: rootDocument.getElementById('studyWorkspaceInput'),

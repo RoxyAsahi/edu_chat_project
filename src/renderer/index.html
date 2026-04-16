@@ -771,8 +771,16 @@
                     <span>默认模型</span>
                     <input id="defaultModelInput" type="text" placeholder="gemini-3.1-flash-lite-preview" />
                   </label>
+                  <label>
+                    <span>追问默认模型</span>
+                    <input id="followUpDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
+                  </label>
+                  <label>
+                    <span>话题命名默认模型</span>
+                    <input id="topicTitleDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
+                  </label>
                 </div>
-                <p class="settings-caption">新建智能体或未显式指定模型时，会优先使用这里的默认模型。</p>
+                <p class="settings-caption">默认模型会作为通用回退使用。追问和话题命名模型留空时，会先跟随当前学科模型，再回退到这里的默认模型。</p>
               </section>
             </section>
 
