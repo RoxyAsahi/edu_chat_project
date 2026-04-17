@@ -451,6 +451,38 @@ function transformSpecialBlocks(text, codeBlockMap) {
         return html;
     });
 
+    const renderDiaryBubble = ({ title = '学习日志 Learning Log', notebook = '', date = '', content = '' }) => {
+        let html = `<div class="learning-diary-bubble">`;
+        html += `<div class="diary-header">`;
+        html += `<span class="diary-title">${escapeHtml(title)}</span>`;
+        if (date) {
+            html += `<span class="diary-date">${escapeHtml(date)}</span>`;
+        }
+        html += `</div>`;
+
+        if (notebook) {
+            html += `<div class="diary-notebook-info">`;
+            html += `<span class="diary-notebook-label">日志本:</span> `;
+            html += `<span class="diary-notebook-name">${escapeHtml(notebook)}</span>`;
+            html += `</div>`;
+        }
+
+        let processedDiaryContent;
+        if (mainRendererReferences.markedInstance) {
+            try {
+                processedDiaryContent = mainRendererReferences.markedInstance.parse(restoreBlocks(content));
+            } catch (e) {
+                processedDiaryContent = escapeHtml(restoreBlocks(content));
+            }
+        } else {
+            processedDiaryContent = escapeHtml(restoreBlocks(content));
+        }
+
+        html += `<div class="diary-content">${processedDiaryContent}</div>`;
+        html += `</div>`;
+        return html;
+    };
+
     // Process Tool Requests
     processed = processed.replace(TOOL_REGEX, (match, content) => {
         const readLineValue = (source, key) => {
@@ -480,51 +512,57 @@ function transformSpecialBlocks(text, codeBlockMap) {
             return '';
         };
 
-        // Check if this is a DailyNote tool call with the 'create' command
+        const normalizeWrappedValue = (value) => {
+            const textValue = String(value || '').trim();
+            const wrappedMatch = textValue.match(/^「始」([\s\S]*?)「末」,?$/);
+            return wrappedMatch ? wrappedMatch[1].trim() : textValue.replace(/,$/, '').trim();
+        };
+
         const toolNameFromContent = readBlockValue(content, 'tool_name') || readLineValue(content, 'tool_name');
         const commandFromContent = readBlockValue(content, 'command') || readLineValue(content, 'command');
-        const isDailyNoteCreate = /DailyNote/i.test(toolNameFromContent) && /create/i.test(commandFromContent);
+        const normalizedToolName = normalizeWrappedValue(toolNameFromContent);
+        const normalizedCommand = normalizeWrappedValue(commandFromContent).toLowerCase();
+        const isDailyNoteTool = /DailyNote/i.test(normalizedToolName);
+        const isDailyNoteCreate = isDailyNoteTool && normalizedCommand === 'create';
+        const isDailyNoteUpdate = isDailyNoteTool && normalizedCommand === 'update';
 
-        if (isDailyNoteCreate) {
-            // --- It's a DailyNote Tool, render it as a diary bubble ---
-            const maid = readLineValue(content, 'maid') || readLineValue(content, 'maidName');
-            const date = readLineValue(content, 'date') || readLineValue(content, 'Date');
-            const diaryContent = readBlockValue(content, 'Content') || '[Diary content unavailable]';
+        if (isDailyNoteCreate || isDailyNoteUpdate) {
+            const notebook = normalizeWrappedValue(readLineValue(content, 'maid') || readLineValue(content, 'maidName'));
+            const date = normalizeWrappedValue(readLineValue(content, 'date') || readLineValue(content, 'Date'));
 
-            let html = `<div class="maid-diary-bubble">`;
-            html += `<div class="diary-header">`;
-            html += `<span class="diary-title">Maid's Diary</span>`;
-            if (date) {
-                html += `<span class="diary-date">${escapeHtml(date)}</span>`;
-            }
-            html += `</div>`;
-
-            if (maid) {
-                html += `<div class="diary-maid-info">`;
-                html += `<span class="diary-maid-label">Maid:</span> `;
-                html += `<span class="diary-maid-name">${escapeHtml(maid)}</span>`;
-                html += `</div>`;
+            if (isDailyNoteCreate) {
+                const diaryContent = normalizeWrappedValue(readBlockValue(content, 'Content')) || '[Diary content unavailable]';
+                return renderDiaryBubble({
+                    title: '学习日志 Learning Log',
+                    notebook,
+                    date,
+                    content: diaryContent,
+                });
             }
 
-            let processedDiaryContent;
-            if (mainRendererReferences.markedInstance) {
-                try {
-                    processedDiaryContent = mainRendererReferences.markedInstance.parse(restoreBlocks(diaryContent));
-                } catch (e) {
-                    processedDiaryContent = escapeHtml(restoreBlocks(diaryContent));
-                }
-            } else {
-                processedDiaryContent = escapeHtml(restoreBlocks(diaryContent));
-            }
-            html += `<div class="diary-content">${processedDiaryContent}</div>`;
-            html += `</div>`;
+            const target = normalizeWrappedValue(readBlockValue(content, 'target')) || '[Original content unavailable]';
+            const replace = normalizeWrappedValue(readBlockValue(content, 'replace')) || '[Updated content unavailable]';
+            const updateContent = [
+                '**Original**',
+                '',
+                target,
+                '',
+                '**Updated**',
+                '',
+                replace,
+            ].join('\n');
 
-            return html;
+            return renderDiaryBubble({
+                title: '学习日志更新 Learning Log Update',
+                notebook,
+                date,
+                content: updateContent,
+            });
         } else {
             // --- It's a regular tool call, render it normally ---
             let toolName = 'Processing...';
-            if (toolNameFromContent) {
-                const extractedName = toolNameFromContent.replace(/,$/, '').trim();
+            if (normalizedToolName) {
+                const extractedName = normalizedToolName;
                 if (extractedName) {
                     toolName = extractedName;
                 }
@@ -544,7 +582,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
     // Process Daily Notes
     processed = processed.replace(NOTE_REGEX, (match, rawContent) => {
         const content = rawContent.trim();
-        const maidRegex = /Maid:\s*([^\n\r]*)/;
+        const maidRegex = /(?:Maid|日志本):\s*([^\n\r]*)/;
         const dateRegex = /Date:\s*([^\n\r]*)/;
         const contentRegex = /Content:\s*([\s\S]*)/;
 
@@ -552,23 +590,23 @@ function transformSpecialBlocks(text, codeBlockMap) {
         const dateMatch = content.match(dateRegex);
         const contentMatch = content.match(contentRegex);
 
-        const maid = maidMatch ? maidMatch[1].trim() : '';
+        const notebook = maidMatch ? maidMatch[1].trim() : '';
         const date = dateMatch ? dateMatch[1].trim() : '';
         // The rest of the text after "Content:", or the full text if "Content:" is not found
         const diaryContent = contentMatch ? contentMatch[1].trim() : content;
 
-        let html = `<div class="maid-diary-bubble">`;
+        let html = `<div class="learning-diary-bubble">`;
         html += `<div class="diary-header">`;
-        html += `<span class="diary-title">Maid's Diary</span>`;
+        html += `<span class="diary-title">学习日志 Learning Log</span>`;
         if (date) {
             html += `<span class="diary-date">${escapeHtml(date)}</span>`;
         }
         html += `</div>`;
 
-        if (maid) {
-            html += `<div class="diary-maid-info">`;
-            html += `<span class="diary-maid-label">Maid:</span> `;
-            html += `<span class="diary-maid-name">${escapeHtml(maid)}</span>`;
+        if (notebook) {
+            html += `<div class="diary-notebook-info">`;
+            html += `<span class="diary-notebook-label">日志本:</span> `;
+            html += `<span class="diary-notebook-name">${escapeHtml(notebook)}</span>`;
             html += `</div>`;
         }
 
@@ -675,7 +713,7 @@ function extractSpeakableTextFromContentElement(contentElement) {
 
     const contentClone = contentElement.cloneNode(true);
     contentClone.querySelectorAll(
-        '.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .maid-diary-bubble, .unistudy-role-divider, .vcp-thought-chain-bubble, style, script'
+        '.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble, .unistudy-role-divider, .vcp-thought-chain-bubble, style, script'
     ).forEach(el => el.remove());
 
     return (contentClone.innerText || '')

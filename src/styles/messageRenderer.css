@@ -292,10 +292,10 @@
 
 /* Hide "VCP工具调用:" strong tag if it was ever added */
 
-/* --- Maid Diary Bubble Redesign --- */
+/* --- Learning Diary Bubble --- */
 
 /* Main container for the diary entry */
-.maid-diary-bubble {
+.learning-diary-bubble {
     background: #fdfaf6 !important;
     /* A very light, warm parchment color */
     border: 1px solid #eaddd0;
@@ -333,7 +333,7 @@
 }
 
 /* The decorative icon on the top left, changed to a quill */
-.maid-diary-bubble::before {
+.learning-diary-bubble::before {
     content: "✒️";
     position: absolute;
     top: 14px;
@@ -348,7 +348,7 @@
 }
 
 /* Removing the animated border for a cleaner look */
-.maid-diary-bubble::after {
+.learning-diary-bubble::after {
     display: none !important;
 }
 
@@ -363,7 +363,7 @@
     margin-bottom: 10px;
 }
 
-/* "Maid's Diary" title */
+/* Diary title */
 .diary-title {
     font-weight: bold;
     font-size: 1.1em;
@@ -380,18 +380,18 @@
     font-style: italic;
 }
 
-/* Container for the Maid's name info */
-.diary-maid-info {
+/* Container for the notebook info */
+.diary-notebook-info {
     margin-bottom: 12px;
     font-size: 0.9em;
     color: #8d6e63;
 }
 
-.diary-maid-label {
+.diary-notebook-label {
     font-weight: bold;
 }
 
-.diary-maid-name {
+.diary-notebook-name {
     font-style: italic;
     color: #a1887f;
     background: rgba(161, 136, 127, 0.08);
@@ -410,12 +410,12 @@
 }
 
 /* Hide copy button as it's not a code block */
-.maid-diary-bubble>.code-copy {
+.learning-diary-bubble>.code-copy {
     display: none !important;
 }
 
-/* --- Maid Diary Dark Theme Overrides --- */
-body:not(.light-theme) .maid-diary-bubble {
+/* --- Learning Diary Dark Theme Overrides --- */
+body:not(.light-theme) .learning-diary-bubble {
     background: #2c2a3a !important;
     /* A deep, slightly magical purple-gray */
     border-color: #4a485f;
@@ -438,11 +438,11 @@ body:not(.light-theme) .diary-date {
     /* A muted gray for secondary info */
 }
 
-body:not(.light-theme) .diary-maid-info {
+body:not(.light-theme) .diary-notebook-info {
     color: #b0bec5;
 }
 
-body:not(.light-theme) .diary-maid-name {
+body:not(.light-theme) .diary-notebook-name {
     color: #ffcc80;
     /* Lighter shade of the title color */
     background: rgba(255, 183, 77, 0.1);

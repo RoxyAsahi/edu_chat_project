@@ -639,8 +639,8 @@
             margin-left: 2px;
         }
 
-        /* Maid Diary Bubble Redesign */
-        .maid-diary-bubble {
+        /* Learning Diary Bubble */
+        .learning-diary-bubble {
             background: #fdfaf6 !important;
             border: 1px solid #eaddd0;
             border-radius: 8px !important;
@@ -656,7 +656,7 @@
             font-family: 'Georgia', 'Times New Roman', serif !important;
             font-size: 1em !important;
         }
-        .maid-diary-bubble::before {
+        .learning-diary-bubble::before {
             content: "鉁掞笍";
             position: absolute;
             top: 14px;
@@ -685,15 +685,15 @@
             color: #a1887f;
             font-style: italic;
         }
-        .diary-maid-info {
+        .diary-notebook-info {
             margin-bottom: 12px;
             font-size: 0.9em;
             color: #8d6e63;
         }
-        .diary-maid-label {
+        .diary-notebook-label {
             font-weight: bold;
         }
-        .diary-maid-name {
+        .diary-notebook-name {
             font-style: italic;
             color: #a1887f;
             background: rgba(161, 136, 127, 0.08);
@@ -706,8 +706,8 @@
             white-space: pre-wrap;
             word-break: break-word;
         }
-        /* --- Maid Diary Dark Theme Overrides --- */
-        body:not(.light-theme) .maid-diary-bubble {
+        /* --- Learning Diary Dark Theme Overrides --- */
+        body:not(.light-theme) .learning-diary-bubble {
             background: #2c2a3a !important; /* A deep, slightly magical purple-gray */
             border-color: #4a485f;
             color: #d8d2c9 !important; /* A soft, parchment-like off-white */
@@ -726,11 +726,11 @@
             color: #a0a0b0; /* A muted gray for secondary info */
         }
 
-        body:not(.light-theme) .diary-maid-info {
+        body:not(.light-theme) .diary-notebook-info {
             color: #b0bec5;
         }
 
-        body:not(.light-theme) .diary-maid-name {
+        body:not(.light-theme) .diary-notebook-name {
             color: #ffcc80; /* Lighter shade of the title color */
             background: rgba(255, 183, 77, 0.1);
         }

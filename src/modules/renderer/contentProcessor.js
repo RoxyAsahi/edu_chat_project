@@ -183,6 +183,12 @@ function extractToolNameFromRequest(toolContent) {
     return match ? match[1] : null;
 }
 
+function extractToolFieldFromRequest(toolContent, fieldName) {
+    const escapedFieldName = String(fieldName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = String(toolContent || '').match(new RegExp(`${escapedFieldName}:\\s*「始」([\\s\\S]*?)「末」`, 'i'));
+    return match ? match[1].trim() : '';
+}
+
 /**
  * Prettifies a single <pre> code block for DailyNote or VCP ToolUse.
  * @param {HTMLElement} preElement - The <pre> element to prettify.
@@ -190,7 +196,7 @@ function extractToolNameFromRequest(toolContent) {
  * @param {string} relevantContent - The relevant text content for the block.
  */
 function prettifySinglePreElement(preElement, type, relevantContent) {
-    if (!preElement || preElement.dataset.vcpPrettified === "true" || preElement.dataset.maidDiaryPrettified === "true") {
+    if (!preElement || preElement.dataset.vcpPrettified === "true" || preElement.dataset.learningDiaryPrettified === "true") {
         return;
     }
 
@@ -208,8 +214,52 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
     }
 
     if (type === 'vcptool') {
-        preElement.classList.add('vcp-tool-use-bubble');
         const toolName = extractToolNameFromRequest(relevantContent);
+        const command = extractToolFieldFromRequest(relevantContent, 'command').toLowerCase();
+
+        if (toolName === 'DailyNote' && (command === 'create' || command === 'update')) {
+            preElement.classList.add('learning-diary-bubble');
+
+            const notebook = extractToolFieldFromRequest(relevantContent, 'maid')
+                || extractToolFieldFromRequest(relevantContent, 'maidName');
+            const date = extractToolFieldFromRequest(relevantContent, 'Date')
+                || extractToolFieldFromRequest(relevantContent, 'date');
+            const diaryTitle = command === 'update'
+                ? '学习日志更新 Learning Log Update'
+                : '学习日志 Learning Log';
+            const diaryContent = command === 'update'
+                ? [
+                    '<strong>Original</strong>',
+                    '',
+                    escapeHtml(extractToolFieldFromRequest(relevantContent, 'target') || '[Original content unavailable]'),
+                    '',
+                    '<strong>Updated</strong>',
+                    '',
+                    escapeHtml(extractToolFieldFromRequest(relevantContent, 'replace') || '[Updated content unavailable]'),
+                ].join('<br>')
+                : escapeHtml(extractToolFieldFromRequest(relevantContent, 'Content') || '[Diary content unavailable]').replace(/\n/g, '<br>');
+
+            let html = `<div class="diary-header">`;
+            html += `<span class="diary-title">${escapeHtml(diaryTitle)}</span>`;
+            if (date) {
+                html += `<span class="diary-date">${escapeHtml(date)}</span>`;
+            }
+            html += `</div>`;
+
+            if (notebook) {
+                html += `<div class="diary-notebook-info">`;
+                html += `<span class="diary-notebook-label">日志本:</span> `;
+                html += `<span class="diary-notebook-name">${escapeHtml(notebook)}</span>`;
+                html += `</div>`;
+            }
+
+            html += `<div class="diary-content">${diaryContent}</div>`;
+            preElement.innerHTML = html;
+            preElement.dataset.learningDiaryPrettified = "true";
+            return;
+        }
+
+        preElement.classList.add('vcp-tool-use-bubble');
 
         let newInnerHtml = `<span class="unistudy-tool-label">Tool Use:</span>`;
         if (toolName) {
@@ -222,25 +272,25 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
         preElement.dataset.vcpPrettified = "true";
 
     } else if (type === 'dailynote') {
-        preElement.classList.add('maid-diary-bubble');
+        preElement.classList.add('learning-diary-bubble');
         let actualNoteContent = relevantContent.trim();
 
         let finalHtml = "";
         const lines = actualNoteContent.split('\n');
         const firstLineTrimmed = lines[0] ? lines[0].trim() : "";
 
-        if (firstLineTrimmed.startsWith('Maid:')) {
-            finalHtml = `<span class="maid-label">${lines.shift().trim()}</span>`;
+        if (firstLineTrimmed.startsWith('Maid:') || firstLineTrimmed.startsWith('日志本:')) {
+            finalHtml = `<span class="diary-notebook-inline-label">${lines.shift().trim()}</span>`;
             finalHtml += lines.join('\n');
-        } else if (firstLineTrimmed.startsWith('Maid')) {
-            finalHtml = `<span class="maid-label">${lines.shift().trim()}</span>`;
+        } else if (firstLineTrimmed.startsWith('Maid') || firstLineTrimmed.startsWith('日志本')) {
+            finalHtml = `<span class="diary-notebook-inline-label">${lines.shift().trim()}</span>`;
             finalHtml += lines.join('\n');
         } else {
             finalHtml = actualNoteContent;
         }
 
         preElement.innerHTML = finalHtml.replace(/\n/g, '<br>');
-        preElement.dataset.maidDiaryPrettified = "true";
+        preElement.dataset.learningDiaryPrettified = "true";
     }
 }
 
@@ -382,14 +432,14 @@ function processAllPreBlocksInContentDiv(contentDiv) {
         if (!preElement || !preElement.parentElement) return;
 
         if (preElement.dataset.vcpPrettified === "true" ||
-            preElement.dataset.maidDiaryPrettified === "true" ||
+            preElement.dataset.learningDiaryPrettified === "true" ||
             preElement.dataset.vcpHtmlPreview === "true" ||
             preElement.dataset.vcpHtmlPreview === "blocked") {
             return; // Already processed or blocked
         }
 
         // 🟢 首先检查是否在 VCP 气泡内
-        const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .maid-diary-bubble');
+        const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble');
         if (isInsideRichBubble) {
             // 在气泡内的 pre 不应该被处理为可预览的 HTML
             preElement.dataset.vcpHtmlPreview = "blocked";
@@ -431,7 +481,7 @@ function setupHtmlPreview(preElement, htmlContent) {
         preElement.dataset.vcpHtmlPreview === "blocked") return;
 
     // 🟢 核心修复：检查是否在 VCP 气泡内
-    const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .maid-diary-bubble');
+    const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble');
     if (isInsideRichBubble) {
         console.log('[ContentProcessor] Skipping HTML preview: inside rich-render bubble');
         preElement.dataset.vcpHtmlPreview = "blocked";
@@ -831,7 +881,7 @@ function processRenderedContent(contentDiv, settings = {}) {
             // 在嵌套的 code block 场景下，外层 block 的高亮可能会导致内层 block 被移出 DOM
             if (block && block.parentElement) {
                 // Only highlight if the block hasn't been specially prettified (e.g., DailyNote or VCP ToolUse)
-                if (!block.parentElement.dataset.vcpPrettified && !block.parentElement.dataset.maidDiaryPrettified) {
+                if (!block.parentElement.dataset.vcpPrettified && !block.parentElement.dataset.learningDiaryPrettified) {
                     window.hljs.highlightElement(block);
                 }
             }

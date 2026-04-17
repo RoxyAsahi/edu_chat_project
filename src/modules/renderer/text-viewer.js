@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Process Daily Notes - Viewer Mode (Styled)
         processed = processed.replace(noteRegex, (match, rawContent) => {
             const content = rawContent.trim();
-            const maidRegex = /Maid:\s*([^\n\r]*)/;
+            const maidRegex = /(?:Maid|日志本):\s*([^\n\r]*)/;
             const dateRegex = /Date:\s*([^\n\r]*)/;
             const contentRegex = /Content:\s*([\s\S]*)/;
 
@@ -248,22 +248,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             const dateMatch = content.match(dateRegex);
             const contentMatch = content.match(contentRegex);
 
-            const maid = maidMatch ? maidMatch[1].trim() : '';
+            const notebook = maidMatch ? maidMatch[1].trim() : '';
             const date = dateMatch ? dateMatch[1].trim() : '';
             const diaryContent = contentMatch ? contentMatch[1].trim() : content;
 
-            let html = `<div class="maid-diary-bubble">`;
+            let html = `<div class="learning-diary-bubble">`;
             html += `<div class="diary-header">`;
-            html += `<span class="diary-title">Maid's Diary</span>`;
+            html += `<span class="diary-title">学习日志 Learning Log</span>`;
             if (date) {
                 html += `<span class="diary-date">${escapeHtml(date)}</span>`;
             }
             html += `</div>`;
             
-            if (maid) {
-                html += `<div class="diary-maid-info">`;
-                html += `<span class="diary-maid-label">Maid:</span> `;
-                html += `<span class="diary-maid-name">${escapeHtml(maid)}</span>`;
+            if (notebook) {
+                html += `<div class="diary-notebook-info">`;
+                html += `<span class="diary-notebook-label">日志本:</span> `;
+                html += `<span class="diary-notebook-name">${escapeHtml(notebook)}</span>`;
                 html += `</div>`;
             }
 
