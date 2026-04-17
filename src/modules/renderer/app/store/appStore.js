@@ -1,5 +1,20 @@
+function createDefaultModelService() {
+    return {
+        version: 1,
+        providers: [],
+        defaults: {
+            chat: null,
+            followUp: null,
+            topicTitle: null,
+            embedding: null,
+            rerank: null,
+        },
+    };
+}
+
 const DEFAULT_SETTINGS = Object.freeze({
     userName: 'User',
+    modelService: createDefaultModelService(),
     vcpServerUrl: '',
     vcpApiKey: '',
     kbBaseUrl: '',
@@ -83,7 +98,10 @@ function createInitialReaderState() {
 function createInitialAppState() {
     return {
         settings: {
-            settings: { ...DEFAULT_SETTINGS },
+            settings: {
+                ...DEFAULT_SETTINGS,
+                modelService: createDefaultModelService(),
+            },
             settingsModalSection: 'global',
             promptModule: null,
         },
@@ -222,6 +240,7 @@ function createAppStore(initialState = createInitialAppState()) {
 export {
     DEFAULT_SETTINGS,
     SLICE_NAMES,
+    createDefaultModelService,
     createInitialAppState,
     createInitialReaderState,
     createAppStore,

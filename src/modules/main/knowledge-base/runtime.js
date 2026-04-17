@@ -5,6 +5,7 @@ const {
     closeDatabase,
 } = require('./db');
 const { pickFirstNonEmptyString } = require('./helpers');
+const { resolveExecutionConfig } = require('../utils/modelService');
 
 function createInitialState() {
     return {
@@ -132,6 +133,11 @@ function createKnowledgeBaseRuntime(deps = {}) {
     }
 
     async function resolveGuideModel(settings = {}) {
+        const modelServiceExecution = resolveExecutionConfig(settings, { purpose: 'chat' });
+        if (modelServiceExecution?.model?.id) {
+            return modelServiceExecution.model.id;
+        }
+
         const directModel = pickFirstNonEmptyString(
             settings?.guideModel,
             settings?.defaultModel,

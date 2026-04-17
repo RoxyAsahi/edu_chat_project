@@ -55,6 +55,15 @@ function createDom() {
           <input id="kbBaseUrl" />
           <input id="kbApiKey" />
           <input id="kbEmbeddingModel" />
+          <div id="modelServiceWorkbench">
+            <input id="modelServiceProviderSearchInput" />
+            <div id="modelServicePresetActions"></div>
+            <button id="modelServiceAddProviderBtn" type="button">add-provider</button>
+            <div id="modelServiceProviderList"></div>
+            <div id="modelServiceProviderDetail"></div>
+            <div id="modelServiceModelsPanel"></div>
+            <div id="modelServiceDefaultSelectors"></div>
+          </div>
           <input id="kbUseRerank" type="checkbox" />
           <input id="kbRerankModel" />
           <input id="kbTopK" />
@@ -86,6 +95,7 @@ function createDom() {
           <input type="radio" name="themeMode" value="dark" />
           <input type="radio" name="themeMode" value="system" checked />
           <button id="saveGlobalSettingsBtn" type="button">save</button>
+          <div id="modal-container"></div>
 
           <input id="editingAgentId" />
           <input id="agentNameInput" />
@@ -137,6 +147,14 @@ function createElementMap(documentObj) {
         kbBaseUrl: documentObj.getElementById('kbBaseUrl'),
         kbApiKey: documentObj.getElementById('kbApiKey'),
         kbEmbeddingModel: documentObj.getElementById('kbEmbeddingModel'),
+        modelServiceWorkbench: documentObj.getElementById('modelServiceWorkbench'),
+        modelServiceProviderSearchInput: documentObj.getElementById('modelServiceProviderSearchInput'),
+        modelServicePresetActions: documentObj.getElementById('modelServicePresetActions'),
+        modelServiceAddProviderBtn: documentObj.getElementById('modelServiceAddProviderBtn'),
+        modelServiceProviderList: documentObj.getElementById('modelServiceProviderList'),
+        modelServiceProviderDetail: documentObj.getElementById('modelServiceProviderDetail'),
+        modelServiceModelsPanel: documentObj.getElementById('modelServiceModelsPanel'),
+        modelServiceDefaultSelectors: documentObj.getElementById('modelServiceDefaultSelectors'),
         kbUseRerank: documentObj.getElementById('kbUseRerank'),
         kbRerankModel: documentObj.getElementById('kbRerankModel'),
         kbTopK: documentObj.getElementById('kbTopK'),
@@ -205,6 +223,47 @@ function createElementMap(documentObj) {
 
 async function flushAsyncWork() {
     await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function dispatchDomEvent(node, dom, type) {
+    node.dispatchEvent(new dom.window.Event(type, { bubbles: true }));
+}
+
+function setFieldValue(node, value, dom, eventType = 'input') {
+    node.value = value;
+    dispatchDomEvent(node, dom, eventType);
+}
+
+async function addModelThroughWorkbench(el, dom, modelId, modelName = modelId) {
+    const addButton = el.modelServiceModelsPanel.querySelector('[data-model-service-action="add-model"]');
+    assert.ok(addButton, 'expected add-model button to be rendered');
+    addButton.click();
+    await flushAsyncWork();
+
+    let idInput = dom.window.document.querySelector('[data-model-service-popup="model-editor"] [data-model-service-popup-field="draft.id"]');
+    assert.ok(idInput, 'expected model id field to be rendered');
+    setFieldValue(idInput, modelId, dom);
+    await flushAsyncWork();
+
+    let nameInput = dom.window.document.querySelector('[data-model-service-popup="model-editor"] [data-model-service-popup-field="draft.name"]');
+    assert.ok(nameInput, 'expected model name field to be rendered');
+    setFieldValue(nameInput, modelName, dom);
+    await flushAsyncWork();
+
+    const saveButton = dom.window.document.querySelector('[data-model-service-popup="model-editor"] [data-model-service-popup-action="save-model-editor"]');
+    assert.ok(saveButton, 'expected model editor save button to be rendered');
+    saveButton.click();
+    await flushAsyncWork();
+}
+
+async function selectDefaultModel(el, dom, taskKey, modelId) {
+    const selector = el.modelServiceDefaultSelectors.querySelector(`[data-model-service-default="${taskKey}"]`);
+    assert.ok(selector, `expected selector for ${taskKey}`);
+    const option = Array.from(selector.options).find((entry) => entry.value.endsWith(`::${modelId}`));
+    assert.ok(option, `expected option for ${taskKey}:${modelId}`);
+    selector.value = option.value;
+    dispatchDomEvent(selector, dom, 'change');
+    await flushAsyncWork();
 }
 
 test('settingsController loads native toolbox settings, previews placeholders, and saves bubble theme prompt', async (t) => {
@@ -417,6 +476,23 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.defaultModelInput.value, 'chat-default-model');
     assert.equal(el.followUpDefaultModelInput.value, 'follow-up-default-model');
     assert.equal(el.topicTitleDefaultModelInput.value, 'topic-title-default-model');
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chat"]')?.value || '',
+        /::chat-default-model$/
+    );
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="followUp"]')?.value || '',
+        /::follow-up-default-model$/
+    );
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="topicTitle"]')?.value || '',
+        /::topic-title-default-model$/
+    );
+    assert.equal(el.modelServiceProviderDetail.querySelector('[data-model-service-provider-field="name"]'), null);
+    assert.equal(el.modelServiceProviderDetail.querySelector('[data-model-service-check-model]'), null);
+    assert.equal(el.modelServiceProviderDetail.querySelector('.model-service-preview-item'), null);
+    assert.equal(el.modelServiceModelsPanel.querySelector('[data-model-service-health-timeout]'), null);
+    assert.equal(el.modelServiceModelsPanel.querySelector('[data-model-service-model-field="id"]'), null);
     assert.equal(el.renderingPromptInput.value, 'rendering prompt');
     assert.equal(el.adaptiveBubbleTipInput.value, 'adaptive tip');
     assert.equal(el.dailyNoteGuideInput.value, 'daily guide');
@@ -427,6 +503,16 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.topicTitlePromptTemplateInput.classList.contains('settings-textarea--readonly'), true);
     assert.match(el.finalSystemPromptPreview.value, /RENDER::rendering prompt/);
     assert.match(el.promptSegmentPreview.textContent, /结构化渲染/);
+    el.modelServiceAddProviderBtn.click();
+    await flushAsyncWork();
+    assert.ok(documentObj.querySelector('[data-model-service-popup="provider-editor"]'));
+    documentObj.querySelector('[data-model-service-popup-close]')?.click();
+    await flushAsyncWork();
+    el.modelServiceProviderDetail.querySelector('[data-model-service-action="check-provider"]')?.click();
+    await flushAsyncWork();
+    assert.ok(documentObj.querySelector('[data-model-service-popup="check-provider"]'));
+    documentObj.querySelector('[data-model-service-popup-close]')?.click();
+    await flushAsyncWork();
 
     el.enableAgentBubbleTheme.checked = true;
     el.enableAgentBubbleTheme.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
@@ -442,9 +528,15 @@ test('settingsController loads native toolbox settings, previews placeholders, a
 
     el.agentBubbleThemePrompt.value = 'Editable prompt: {{VarDivRender}}';
     el.agentBubbleThemePrompt.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
-    el.defaultModelInput.value = 'updated-chat-default-model';
-    el.followUpDefaultModelInput.value = 'updated-follow-up-model';
-    el.topicTitleDefaultModelInput.value = 'updated-topic-title-model';
+    await addModelThroughWorkbench(el, dom, 'updated-chat-default-model', 'Updated Chat Default Model');
+    await addModelThroughWorkbench(el, dom, 'updated-follow-up-model', 'Updated Follow-up Model');
+    await addModelThroughWorkbench(el, dom, 'updated-topic-title-model', 'Updated Topic Title Model');
+    await selectDefaultModel(el, dom, 'chat', 'updated-chat-default-model');
+    await selectDefaultModel(el, dom, 'followUp', 'updated-follow-up-model');
+    await selectDefaultModel(el, dom, 'topicTitle', 'updated-topic-title-model');
+    assert.equal(el.defaultModelInput.value, 'updated-chat-default-model');
+    assert.equal(el.followUpDefaultModelInput.value, 'updated-follow-up-model');
+    assert.equal(el.topicTitleDefaultModelInput.value, 'updated-topic-title-model');
     el.renderingPromptInput.value = 'native rendering text';
     el.adaptiveBubbleTipInput.value = 'native adaptive tip';
     el.dailyNoteGuideInput.value = 'native daily guide';
@@ -465,6 +557,12 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(savedPatch.defaultModel, 'updated-chat-default-model');
     assert.equal(savedPatch.followUpDefaultModel, 'updated-follow-up-model');
     assert.equal(savedPatch.topicTitleDefaultModel, 'updated-topic-title-model');
+    assert.equal(savedPatch.modelService.defaults.chat.modelId, 'updated-chat-default-model');
+    assert.equal(savedPatch.modelService.defaults.followUp.modelId, 'updated-follow-up-model');
+    assert.equal(savedPatch.modelService.defaults.topicTitle.modelId, 'updated-topic-title-model');
+    assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-chat-default-model'));
+    assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-follow-up-model'));
+    assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-topic-title-model'));
     assert.equal(savedPatch.enableAgentBubbleTheme, true);
     assert.equal(savedPatch.agentBubbleThemePrompt, 'Editable prompt: {{VarDivRender}}');
     assert.equal(savedPatch.renderingPrompt, 'native rendering text');

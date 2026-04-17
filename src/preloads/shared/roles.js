@@ -1,6 +1,9 @@
 const SHELL_KEYS = [
     'loadSettings',
     'saveSettings',
+    'fetchModelServiceModels',
+    'checkModelServiceProvider',
+    'checkModelServiceHealth',
     'previewAgentBubbleThemePrompt',
     'previewFinalSystemPrompt',
     'saveAvatarColor',

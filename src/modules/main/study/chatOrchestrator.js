@@ -202,6 +202,7 @@ function createChatOrchestrator(options = {}) {
             requestId,
             endpoint,
             apiKey,
+            extraHeaders = {},
             messages,
             modelConfig = {},
             context,
@@ -241,6 +242,7 @@ function createChatOrchestrator(options = {}) {
                 requestId,
                 endpoint,
                 apiKey,
+                extraHeaders,
                 messages: currentMessages,
                 round: round + 1,
                 modelConfig: {

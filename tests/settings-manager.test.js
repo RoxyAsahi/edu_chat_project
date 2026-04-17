@@ -31,6 +31,125 @@ test('validateSettings normalizes unknown keys, types, and bounds', () => {
     assert.equal('rogueField' in validated, false);
   });
 
+test('validateSettings preserves legacy model service fields when modelService is absent', () => {
+    const { validated } = validateSettings({
+        userName: 'Legacy Model User',
+        vcpServerUrl: 'https://chat.example.com/proxy/v1/chat/completions',
+        vcpApiKey: 'chat-key',
+        defaultModel: 'gpt-4o',
+        followUpDefaultModel: 'gpt-4.1-mini',
+        topicTitleDefaultModel: 'gpt-4.1-nano',
+        kbBaseUrl: 'https://kb.example.com/openai/v1/embeddings',
+        kbApiKey: 'kb-key',
+        kbEmbeddingModel: 'bge-m3',
+        kbRerankModel: 'bge-reranker-v2',
+    });
+
+    assert.equal(validated.modelService.providers.length, 0);
+    assert.equal(validated.modelService.defaults.chat, null);
+    assert.equal(validated.modelService.defaults.followUp, null);
+    assert.equal(validated.modelService.defaults.topicTitle, null);
+    assert.equal(validated.modelService.defaults.embedding, null);
+    assert.equal(validated.modelService.defaults.rerank, null);
+    assert.equal(validated.vcpServerUrl, 'https://chat.example.com/proxy/v1/chat/completions');
+    assert.equal(validated.kbBaseUrl, 'https://kb.example.com/openai/v1/embeddings');
+});
+
+test('validateSettings mirrors explicit modelService back into legacy compatibility fields', () => {
+    const { validated } = validateSettings({
+        ...DEFAULT_SETTINGS,
+        modelService: {
+            version: 1,
+            providers: [
+                {
+                    id: 'chat-provider',
+                    presetId: 'custom-openai-compatible',
+                    name: 'Chat Provider',
+                    protocol: 'openai-compatible',
+                    enabled: true,
+                    apiBaseUrl: 'https://chat.example.com/proxy',
+                    apiKeys: ['chat-key-1', 'chat-key-2'],
+                    extraHeaders: {},
+                    models: [
+                        {
+                            id: 'gpt-4o',
+                            name: 'gpt-4o',
+                            group: 'chat',
+                            capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
+                            enabled: true,
+                            source: 'manual',
+                        },
+                        {
+                            id: 'gpt-4.1-mini',
+                            name: 'gpt-4.1-mini',
+                            group: 'chat',
+                            capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+                            enabled: true,
+                            source: 'manual',
+                        },
+                        {
+                            id: 'gpt-4.1-nano',
+                            name: 'gpt-4.1-nano',
+                            group: 'chat',
+                            capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: false },
+                            enabled: true,
+                            source: 'manual',
+                        },
+                    ],
+                },
+                {
+                    id: 'kb-provider',
+                    presetId: 'custom-openai-compatible',
+                    name: 'Knowledge Base Provider',
+                    protocol: 'openai-compatible',
+                    enabled: true,
+                    apiBaseUrl: 'https://kb.example.com/openai',
+                    apiKeys: ['kb-key-1'],
+                    extraHeaders: {},
+                    models: [
+                        {
+                            id: 'bge-m3',
+                            name: 'bge-m3',
+                            group: 'embedding',
+                            capabilities: { chat: false, embedding: true, rerank: false, vision: false, reasoning: false },
+                            enabled: true,
+                            source: 'manual',
+                        },
+                        {
+                            id: 'bge-reranker-v2',
+                            name: 'bge-reranker-v2',
+                            group: 'rerank',
+                            capabilities: { chat: false, embedding: false, rerank: true, vision: false, reasoning: false },
+                            enabled: true,
+                            source: 'manual',
+                        },
+                    ],
+                },
+            ],
+            defaults: {
+                chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
+                followUp: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
+                topicTitle: { providerId: 'chat-provider', modelId: 'gpt-4.1-nano' },
+                embedding: { providerId: 'kb-provider', modelId: 'bge-m3' },
+                rerank: { providerId: 'kb-provider', modelId: 'bge-reranker-v2' },
+            },
+        },
+        vcpServerUrl: 'https://legacy.example.com/ignored',
+        kbBaseUrl: 'https://legacy-kb.example.com/ignored',
+    });
+
+    assert.equal(validated.modelService.providers.length, 2);
+    assert.equal(validated.vcpServerUrl, 'https://chat.example.com/proxy/v1/chat/completions');
+    assert.equal(validated.vcpApiKey, 'chat-key-1');
+    assert.equal(validated.defaultModel, 'gpt-4o');
+    assert.equal(validated.followUpDefaultModel, 'gpt-4.1-mini');
+    assert.equal(validated.topicTitleDefaultModel, 'gpt-4.1-nano');
+    assert.equal(validated.kbBaseUrl, 'https://kb.example.com/openai');
+    assert.equal(validated.kbApiKey, 'kb-key-1');
+    assert.equal(validated.kbEmbeddingModel, 'bge-m3');
+    assert.equal(validated.kbRerankModel, 'bge-reranker-v2');
+});
+
 test('readSettings falls back to defaults when the file is missing', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');

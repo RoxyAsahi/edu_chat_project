@@ -1,5 +1,6 @@
 const { normalizeEmbeddingEndpoint } = require('../knowledge-base/embeddings');
 const { normalizeRerankEndpoint } = require('../knowledge-base/rerank');
+const { resolveExecutionConfig } = require('./modelService');
 
 function normalizeChatEndpoint(endpoint) {
     if (typeof endpoint !== 'string' || endpoint.trim() === '') {
@@ -19,8 +20,16 @@ function buildInterruptEndpoint(endpoint) {
 
 function describeUpstreamCapabilities(settings = {}) {
     const warnings = [];
-    const chatEndpoint = String(settings?.vcpServerUrl || '').trim();
-    const kbBaseUrl = String(settings?.kbBaseUrl || '').trim();
+    const chatExecution = resolveExecutionConfig(settings, { purpose: 'chat' });
+    const embeddingExecution = resolveExecutionConfig(settings, { purpose: 'embedding' });
+    const rerankExecution = resolveExecutionConfig(settings, { purpose: 'rerank' });
+    const chatEndpoint = String(chatExecution?.endpoint || settings?.vcpServerUrl || '').trim();
+    const kbBaseUrl = String(
+        embeddingExecution?.provider?.apiBaseUrl
+        || rerankExecution?.provider?.apiBaseUrl
+        || settings?.kbBaseUrl
+        || ''
+    ).trim();
 
     const capabilities = {
         chat: {
@@ -68,17 +77,20 @@ function describeUpstreamCapabilities(settings = {}) {
         }
     }
 
-    if (kbBaseUrl) {
+    if (embeddingExecution?.endpoint || kbBaseUrl) {
         try {
-            const embeddingsEndpoint = normalizeEmbeddingEndpoint(kbBaseUrl);
+            const embeddingsEndpoint = embeddingExecution?.endpoint || normalizeEmbeddingEndpoint(kbBaseUrl);
             capabilities.embeddings.supported = true;
             capabilities.embeddings.endpoint = embeddingsEndpoint;
         } catch (error) {
             warnings.push(`Invalid kbBaseUrl for embeddings: ${error.message}`);
         }
 
+    }
+
+    if (rerankExecution?.endpoint || kbBaseUrl) {
         try {
-            const rerankEndpoint = normalizeRerankEndpoint(kbBaseUrl);
+            const rerankEndpoint = rerankExecution?.endpoint || normalizeRerankEndpoint(kbBaseUrl);
             capabilities.rerank.supported = true;
             capabilities.rerank.endpoint = rerankEndpoint;
         } catch (error) {

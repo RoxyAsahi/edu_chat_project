@@ -1,11 +1,15 @@
 const SETTINGS_MODAL_META = Object.freeze({
     services: {
         title: '模型服务',
-        subtitle: '管理全局连接、检索模型和来源服务参数。',
+        subtitle: '管理全局 Provider、API 连接和模型清单。',
     },
     'default-model': {
         title: '默认模型',
         subtitle: '统一设置通用默认模型，以及追问与话题命名任务各自优先使用的模型。',
+    },
+    retrieval: {
+        title: '检索调优',
+        subtitle: '单独维护知识库检索参数，不与模型服务主界面混放。',
     },
     prompts: {
         title: '提示词设置',
@@ -77,6 +81,750 @@ const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
     'studyLogPolicy.enableDailyNotePromptVariables': '内建 DailyNote 变量',
     'studyLogPolicy.autoInjectDailyNoteProtocol': '自动注入 DailyNote 协议',
 });
+const MODEL_SERVICE_VERSION = 1;
+const MODEL_SERVICE_TASK_META = Object.freeze({
+    chat: { label: '默认聊天模型', capability: 'chat', description: '普通对话与大部分聊天任务的兜底模型。' },
+    followUp: { label: '追问模型', capability: 'chat', description: '自动生成追问时优先使用。' },
+    topicTitle: { label: '话题命名模型', capability: 'chat', description: '首轮回复后的自动命名任务使用。' },
+    embedding: { label: 'Embedding 模型', capability: 'embedding', description: '知识库向量化时使用，可独立于聊天 Provider。' },
+    rerank: { label: 'Rerank 模型', capability: 'rerank', description: '知识库重排时使用，可独立于聊天 Provider。' },
+});
+const MODEL_SERVICE_GROUP_OPTIONS = Object.freeze([
+    { value: 'chat', label: 'Chat' },
+    { value: 'embedding', label: 'Embedding' },
+    { value: 'rerank', label: 'Rerank' },
+]);
+const MODEL_SERVICE_CAPABILITY_LABELS = Object.freeze({
+    chat: 'Chat',
+    embedding: 'Embedding',
+    rerank: 'Rerank',
+    vision: 'Vision',
+    reasoning: 'Reasoning',
+});
+const MODEL_SERVICE_PRESETS = Object.freeze([
+    { presetId: 'openai', name: 'OpenAI', apiBaseUrl: 'https://api.openai.com' },
+    { presetId: 'openrouter', name: 'OpenRouter', apiBaseUrl: 'https://openrouter.ai/api' },
+    { presetId: 'deepseek', name: 'DeepSeek', apiBaseUrl: 'https://api.deepseek.com' },
+    { presetId: 'siliconflow', name: 'SiliconFlow', apiBaseUrl: 'https://api.siliconflow.cn' },
+    { presetId: 'dashscope-compatible', name: 'DashScope Compatible', apiBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode' },
+    { presetId: 'ollama', name: 'Ollama', apiBaseUrl: 'http://127.0.0.1:11434' },
+    { presetId: 'lm-studio', name: 'LM Studio', apiBaseUrl: 'http://127.0.0.1:1234' },
+    { presetId: 'oneapi-compatible', name: 'OneAPI/NewAPI Compatible', apiBaseUrl: 'http://127.0.0.1:3000' },
+    { presetId: 'custom-openai-compatible', name: 'Custom OpenAI-Compatible', apiBaseUrl: '' },
+]);
+
+function createDefaultModelService() {
+    return {
+        version: MODEL_SERVICE_VERSION,
+        providers: [],
+        defaults: {
+            chat: null,
+            followUp: null,
+            topicTitle: null,
+            embedding: null,
+            rerank: null,
+        },
+    };
+}
+
+function normalizeModelServiceText(value, fallback = '') {
+    const text = String(value ?? '').trim();
+    return text || fallback;
+}
+
+function normalizeModelServiceBaseUrl(value) {
+    const rawValue = normalizeModelServiceText(value);
+    if (!rawValue) {
+        return '';
+    }
+
+    let url;
+    try {
+        url = new URL(rawValue);
+    } catch (_error) {
+        return rawValue;
+    }
+
+    const lowerPathname = url.pathname.toLowerCase().replace(/\/+$/, '');
+    const suffixes = [
+        '/v1/chat/completions',
+        '/chat/completions',
+        '/v1/embeddings',
+        '/embeddings',
+        '/v1/rerank',
+        '/rerank',
+        '/v1/models',
+        '/models',
+        '/v1/interrupt',
+        '/interrupt',
+    ];
+
+    let pathname = url.pathname.replace(/\/+$/, '');
+    for (const suffix of suffixes) {
+        if (lowerPathname.endsWith(suffix)) {
+            pathname = pathname.slice(0, pathname.length - suffix.length);
+            break;
+        }
+    }
+
+    url.pathname = pathname || '/';
+    url.search = '';
+    url.hash = '';
+    let serialized = url.toString();
+    if (!url.search && !url.hash && serialized.endsWith('/')) {
+        serialized = serialized.slice(0, -1);
+    }
+    return serialized;
+}
+
+function buildModelServiceEndpoint(apiBaseUrl, suffix) {
+    const baseUrl = normalizeModelServiceBaseUrl(apiBaseUrl);
+    if (!baseUrl) {
+        return '';
+    }
+
+    try {
+        const url = new URL(baseUrl);
+        const pathname = url.pathname.replace(/\/+$/, '');
+        const normalizedSuffix = suffix.startsWith('/') ? suffix : `/${suffix}`;
+        url.pathname = pathname.endsWith('/v1') && normalizedSuffix.startsWith('/v1/')
+            ? `${pathname}${normalizedSuffix.slice(3)}`
+            : `${pathname}${normalizedSuffix}`;
+        url.search = '';
+        url.hash = '';
+        let serialized = url.toString();
+        if (!url.search && !url.hash && serialized.endsWith('/')) {
+            serialized = serialized.slice(0, -1);
+        }
+        return serialized;
+    } catch (_error) {
+        return '';
+    }
+}
+
+function parseModelServiceApiKeysInput(value) {
+    return [...new Set(
+        String(value || '')
+            .split(/[,\n]/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+    )];
+}
+
+function stringifyModelServiceApiKeys(apiKeys = []) {
+    return (Array.isArray(apiKeys) ? apiKeys : [])
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+        .join('\n');
+}
+
+function parseModelServiceHeadersInput(value) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) {
+        return {};
+    }
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return Object.fromEntries(
+                Object.entries(parsed)
+                    .map(([key, headerValue]) => [String(key || '').trim(), String(headerValue || '').trim()])
+                    .filter(([key, headerValue]) => key && headerValue)
+            );
+        }
+    } catch (_error) {
+        // Fall through to line parsing.
+    }
+
+    return Object.fromEntries(
+        trimmed
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => {
+                const separatorIndex = line.indexOf(':');
+                if (separatorIndex === -1) {
+                    return ['', ''];
+                }
+                return [
+                    line.slice(0, separatorIndex).trim(),
+                    line.slice(separatorIndex + 1).trim(),
+                ];
+            })
+            .filter(([key, headerValue]) => key && headerValue)
+    );
+}
+
+function stringifyModelServiceHeaders(headers = {}) {
+    return Object.entries(headers && typeof headers === 'object' && !Array.isArray(headers) ? headers : {})
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\n');
+}
+
+function createModelServiceId(prefix = 'provider', existingItems = []) {
+    const normalizedPrefix = normalizeModelServiceText(prefix, 'item')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'item';
+    const existingIds = new Set((Array.isArray(existingItems) ? existingItems : []).map((item) => item.id));
+    let candidate = normalizedPrefix;
+    let suffix = 2;
+    while (existingIds.has(candidate)) {
+        candidate = `${normalizedPrefix}-${suffix}`;
+        suffix += 1;
+    }
+    return candidate;
+}
+
+function detectModelServiceCapabilities(modelName = '') {
+    const normalizedName = normalizeModelServiceText(modelName).toLowerCase();
+    const capabilities = {
+        chat: true,
+        embedding: false,
+        rerank: false,
+        vision: false,
+        reasoning: false,
+    };
+
+    if (/(embed|embedding)/i.test(normalizedName)) {
+        capabilities.chat = false;
+        capabilities.embedding = true;
+    } else if (/rerank/i.test(normalizedName)) {
+        capabilities.chat = false;
+        capabilities.rerank = true;
+    }
+
+    if (/(vision|vl|multimodal|llava|gpt-4o|qwen-vl|internvl|gemini)/i.test(normalizedName)) {
+        capabilities.vision = true;
+    }
+
+    if (/(reason|reasoning|thinking|deepthink|o1|o3|r1)/i.test(normalizedName)) {
+        capabilities.reasoning = true;
+    }
+
+    return capabilities;
+}
+
+function normalizeModelServiceModel(model = {}, fallback = {}) {
+    const id = normalizeModelServiceText(model.id, normalizeModelServiceText(fallback.id, normalizeModelServiceText(model.name, fallback.name || '')));
+    const name = normalizeModelServiceText(model.name, normalizeModelServiceText(fallback.name, id));
+    const detectedCapabilities = detectModelServiceCapabilities(name || id);
+    const sourceCapabilities = model.capabilities && typeof model.capabilities === 'object' && !Array.isArray(model.capabilities)
+        ? model.capabilities
+        : {};
+    const capabilities = Object.fromEntries(
+        Object.keys(MODEL_SERVICE_CAPABILITY_LABELS).map((key) => [
+            key,
+            typeof sourceCapabilities[key] === 'boolean' ? sourceCapabilities[key] : detectedCapabilities[key],
+        ])
+    );
+
+    return {
+        id,
+        name: name || id,
+        group: normalizeModelServiceText(model.group, capabilities.embedding ? 'embedding' : capabilities.rerank ? 'rerank' : 'chat'),
+        capabilities,
+        enabled: model.enabled !== false,
+        source: normalizeModelServiceText(model.source, normalizeModelServiceText(fallback.source, 'manual')) === 'remote' ? 'remote' : 'manual',
+    };
+}
+
+function mergeModelServiceModels(models = []) {
+    const merged = [];
+    const indexes = new Map();
+
+    (Array.isArray(models) ? models : []).forEach((model) => {
+        const normalized = normalizeModelServiceModel(model);
+        if (!normalized.id) {
+            return;
+        }
+
+        const existingIndex = indexes.get(normalized.id);
+        if (existingIndex === undefined) {
+            indexes.set(normalized.id, merged.length);
+            merged.push(normalized);
+            return;
+        }
+
+        const current = merged[existingIndex];
+        if (current.source === 'manual' && normalized.source === 'remote') {
+            return;
+        }
+
+        merged[existingIndex] = normalizeModelServiceModel({
+            ...current,
+            ...normalized,
+            capabilities: {
+                ...current.capabilities,
+                ...normalized.capabilities,
+            },
+        }, current);
+    });
+
+    return merged;
+}
+
+function normalizeModelServiceProvider(provider = {}, index = 0) {
+    const preset = MODEL_SERVICE_PRESETS.find((item) => item.presetId === provider.presetId) || null;
+    const normalized = {
+        id: normalizeModelServiceText(provider.id),
+        presetId: normalizeModelServiceText(provider.presetId, preset?.presetId || 'custom-openai-compatible'),
+        name: normalizeModelServiceText(provider.name, preset?.name || `Provider ${index + 1}`),
+        protocol: 'openai-compatible',
+        enabled: provider.enabled !== false,
+        apiBaseUrl: normalizeModelServiceBaseUrl(provider.apiBaseUrl || preset?.apiBaseUrl || ''),
+        apiKeys: Array.isArray(provider.apiKeys) ? provider.apiKeys : parseModelServiceApiKeysInput(provider.apiKeys),
+        extraHeaders: provider.extraHeaders && typeof provider.extraHeaders === 'object' && !Array.isArray(provider.extraHeaders)
+            ? Object.fromEntries(
+                Object.entries(provider.extraHeaders)
+                    .map(([key, value]) => [String(key || '').trim(), String(value || '').trim()])
+                    .filter(([key, value]) => key && value)
+            )
+            : {},
+        models: mergeModelServiceModels(provider.models),
+    };
+
+    if (!normalized.id) {
+        normalized.id = createModelServiceId(normalized.name || normalized.presetId || `provider-${index + 1}`, []);
+    }
+
+    return normalized;
+}
+
+function normalizeModelServiceRef(ref) {
+    if (!ref || typeof ref !== 'object' || Array.isArray(ref)) {
+        return null;
+    }
+
+    const providerId = normalizeModelServiceText(ref.providerId);
+    const modelId = normalizeModelServiceText(ref.modelId);
+    if (!providerId || !modelId) {
+        return null;
+    }
+    return { providerId, modelId };
+}
+
+function normalizeModelServiceDefaults(defaults = {}, providers = []) {
+    return Object.keys(MODEL_SERVICE_TASK_META).reduce((acc, key) => {
+        const normalized = normalizeModelServiceRef(defaults?.[key]);
+        if (!normalized) {
+            acc[key] = null;
+            return acc;
+        }
+
+        const provider = (providers || []).find((item) => item.id === normalized.providerId);
+        const model = provider?.models?.find((item) => item.id === normalized.modelId) || null;
+        acc[key] = provider && model
+            ? normalized
+            : null;
+        return acc;
+    }, {});
+}
+
+function normalizeModelService(service = {}) {
+    const source = service && typeof service === 'object' && !Array.isArray(service)
+        ? service
+        : createDefaultModelService();
+    const providers = (Array.isArray(source.providers) ? source.providers : [])
+        .map((provider, index) => normalizeModelServiceProvider(provider, index))
+        .filter((provider) => provider.id || provider.name || provider.apiBaseUrl || provider.models.length > 0);
+    const dedupedProviders = [];
+    const usedIds = new Set();
+    providers.forEach((provider, index) => {
+        const nextProvider = { ...provider };
+        if (!nextProvider.id || usedIds.has(nextProvider.id)) {
+            nextProvider.id = createModelServiceId(
+                nextProvider.name || nextProvider.presetId || `provider-${index + 1}`,
+                dedupedProviders
+            );
+        }
+        usedIds.add(nextProvider.id);
+        dedupedProviders.push(nextProvider);
+    });
+
+    return {
+        version: MODEL_SERVICE_VERSION,
+        providers: dedupedProviders,
+        defaults: normalizeModelServiceDefaults(source.defaults, dedupedProviders),
+    };
+}
+
+function findModelServiceProvider(service = {}, providerId = '') {
+    return (service.providers || []).find((provider) => provider.id === providerId) || null;
+}
+
+function findModelServiceModel(provider = {}, modelId = '') {
+    return (provider.models || []).find((model) => model.id === modelId) || null;
+}
+
+function resolveModelServiceRef(service = {}, ref = null, options = {}) {
+    const normalizedRef = normalizeModelServiceRef(ref);
+    if (!normalizedRef) {
+        return null;
+    }
+
+    const provider = findModelServiceProvider(service, normalizedRef.providerId);
+    const model = findModelServiceModel(provider, normalizedRef.modelId);
+    if (!provider || !model) {
+        return null;
+    }
+
+    if (options.onlyEnabled === true && (provider.enabled === false || model.enabled === false)) {
+        return null;
+    }
+
+    if (options.capability && model.capabilities?.[options.capability] !== true) {
+        return null;
+    }
+
+    return {
+        provider,
+        model,
+        ref: normalizedRef,
+    };
+}
+
+function listModelServiceModels(service = {}, options = {}) {
+    const items = [];
+    (service.providers || []).forEach((provider) => {
+        if (options.onlyEnabled === true && provider.enabled === false) {
+            return;
+        }
+
+        (provider.models || []).forEach((model) => {
+            if (options.onlyEnabled === true && model.enabled === false) {
+                return;
+            }
+            if (options.capability && model.capabilities?.[options.capability] !== true) {
+                return;
+            }
+            items.push({
+                provider,
+                model,
+                ref: {
+                    providerId: provider.id,
+                    modelId: model.id,
+                },
+            });
+        });
+    });
+    return items;
+}
+
+function buildModelServiceMirror(service = {}, currentSettings = {}) {
+    const normalizedService = normalizeModelService(service);
+    const chatDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.chat);
+    const followUpDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.followUp) || chatDefault;
+    const topicTitleDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.topicTitle) || chatDefault;
+    const embeddingDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.embedding);
+    const rerankDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.rerank);
+    const kbDefault = embeddingDefault || rerankDefault;
+
+    return {
+        vcpServerUrl: chatDefault ? buildModelServiceEndpoint(chatDefault.provider.apiBaseUrl, '/v1/chat/completions') : '',
+        vcpApiKey: chatDefault ? String(chatDefault.provider.apiKeys?.[0] || '') : '',
+        defaultModel: chatDefault?.model?.id || '',
+        followUpDefaultModel: followUpDefault?.model?.id || '',
+        topicTitleDefaultModel: topicTitleDefault?.model?.id || '',
+        kbBaseUrl: kbDefault?.provider?.apiBaseUrl || normalizeModelServiceBaseUrl(currentSettings.kbBaseUrl || ''),
+        kbApiKey: kbDefault ? String(kbDefault.provider.apiKeys?.[0] || '') : '',
+        kbEmbeddingModel: embeddingDefault?.model?.id || normalizeModelServiceText(currentSettings.kbEmbeddingModel),
+        kbRerankModel: rerankDefault?.model?.id || normalizeModelServiceText(currentSettings.kbRerankModel),
+    };
+}
+
+function createProviderFromPreset(presetId = '', service = {}) {
+    const preset = MODEL_SERVICE_PRESETS.find((item) => item.presetId === presetId)
+        || MODEL_SERVICE_PRESETS.find((item) => item.presetId === 'custom-openai-compatible');
+    return normalizeModelServiceProvider({
+        id: createModelServiceId(preset.name || preset.presetId || 'provider', service.providers || []),
+        presetId: preset.presetId,
+        name: preset.name,
+        protocol: 'openai-compatible',
+        enabled: true,
+        apiBaseUrl: preset.apiBaseUrl,
+        apiKeys: [],
+        extraHeaders: {},
+        models: [],
+    }, (service.providers || []).length);
+}
+
+function createManualModelForProvider(provider = {}) {
+    return normalizeModelServiceModel({
+        id: createModelServiceId('model', provider.models || []),
+        name: 'new-model',
+        group: 'chat',
+        capabilities: {
+            chat: true,
+            embedding: false,
+            rerank: false,
+            vision: false,
+            reasoning: false,
+        },
+        enabled: true,
+        source: 'manual',
+    });
+}
+
+function mergeFetchedModelsLocally(provider = {}, fetchedModels = []) {
+    return {
+        ...provider,
+        models: mergeModelServiceModels([
+            ...(provider.models || []),
+            ...(Array.isArray(fetchedModels) ? fetchedModels.map((model) => ({
+                ...model,
+                source: 'remote',
+            })) : []),
+        ]),
+    };
+}
+
+function hasConfiguredLocalModelService(service = {}) {
+    if (!service || typeof service !== 'object') {
+        return false;
+    }
+
+    if (Array.isArray(service.providers) && service.providers.length > 0) {
+        return true;
+    }
+
+    return Object.values(service.defaults || {}).some((value) => Boolean(value?.providerId && value?.modelId));
+}
+
+function createBootstrapProvider({
+    id,
+    name,
+    apiBaseUrl,
+    apiKeys,
+    models,
+}) {
+    return normalizeModelServiceProvider({
+        id,
+        presetId: 'custom-openai-compatible',
+        name,
+        protocol: 'openai-compatible',
+        enabled: true,
+        apiBaseUrl,
+        apiKeys,
+        extraHeaders: {},
+        models,
+    });
+}
+
+function buildBootstrapModelService(settings = {}) {
+    const explicitModelService = settings?.modelService
+        ? normalizeModelService(settings.modelService)
+        : createDefaultModelService();
+    if (hasConfiguredLocalModelService(explicitModelService)) {
+        return explicitModelService;
+    }
+
+    const service = createDefaultModelService();
+    const chatModels = [
+        settings.defaultModel,
+        settings.followUpDefaultModel,
+        settings.topicTitleDefaultModel,
+        settings.lastModel,
+        settings.guideModel,
+    ].filter((value) => normalizeModelServiceText(value));
+    const kbModels = [
+        settings.kbEmbeddingModel,
+        settings.kbRerankModel,
+    ].filter((value) => normalizeModelServiceText(value));
+
+    const chatProvider = createBootstrapProvider({
+        id: 'custom-provider',
+        presetId: 'custom-openai-compatible',
+        name: 'Custom Provider',
+        protocol: 'openai-compatible',
+        enabled: true,
+        apiBaseUrl: settings.vcpServerUrl,
+        apiKeys: parseModelServiceApiKeysInput(settings.vcpApiKey),
+        extraHeaders: {},
+        models: chatModels.map((modelId) => ({
+            id: modelId,
+            name: modelId,
+            group: 'chat',
+            capabilities: {
+                chat: true,
+                embedding: false,
+                rerank: false,
+                vision: false,
+                reasoning: false,
+            },
+            enabled: true,
+            source: 'manual',
+        })),
+    }, 0);
+
+    const needsSeparateKbProvider = Boolean(
+        normalizeModelServiceText(settings.kbBaseUrl || settings.kbApiKey)
+        && (
+            normalizeModelServiceBaseUrl(settings.kbBaseUrl || '') !== normalizeModelServiceBaseUrl(settings.vcpServerUrl || '')
+            || normalizeModelServiceText(settings.kbApiKey || '') !== normalizeModelServiceText(settings.vcpApiKey || '')
+        )
+    );
+
+    if (chatProvider.apiBaseUrl || chatProvider.apiKeys.length > 0 || chatProvider.models.length > 0) {
+        service.providers.push(chatProvider);
+    }
+
+    if (kbModels.length > 0) {
+        const kbProvider = needsSeparateKbProvider
+            ? createBootstrapProvider({
+                id: 'knowledge-base-provider',
+                presetId: 'custom-openai-compatible',
+                name: 'Knowledge Base Provider',
+                protocol: 'openai-compatible',
+                enabled: true,
+                apiBaseUrl: settings.kbBaseUrl || settings.vcpServerUrl || '',
+                apiKeys: parseModelServiceApiKeysInput(settings.kbApiKey || settings.vcpApiKey || ''),
+                extraHeaders: {},
+                models: [
+                    settings.kbEmbeddingModel ? {
+                        id: settings.kbEmbeddingModel,
+                        name: settings.kbEmbeddingModel,
+                        group: 'embedding',
+                        capabilities: { chat: false, embedding: true, rerank: false, vision: false, reasoning: false },
+                        enabled: true,
+                        source: 'manual',
+                    } : null,
+                    settings.kbRerankModel ? {
+                        id: settings.kbRerankModel,
+                        name: settings.kbRerankModel,
+                        group: 'rerank',
+                        capabilities: { chat: false, embedding: false, rerank: true, vision: false, reasoning: false },
+                        enabled: true,
+                        source: 'manual',
+                    } : null,
+                ].filter(Boolean),
+            }, service.providers.length)
+            : mergeFetchedModelsLocally(chatProvider, [
+                settings.kbEmbeddingModel ? {
+                    id: settings.kbEmbeddingModel,
+                    name: settings.kbEmbeddingModel,
+                    group: 'embedding',
+                    capabilities: { chat: false, embedding: true, rerank: false, vision: false, reasoning: false },
+                    enabled: true,
+                    source: 'manual',
+                } : null,
+                settings.kbRerankModel ? {
+                    id: settings.kbRerankModel,
+                    name: settings.kbRerankModel,
+                    group: 'rerank',
+                    capabilities: { chat: false, embedding: false, rerank: true, vision: false, reasoning: false },
+                    enabled: true,
+                    source: 'manual',
+                } : null,
+            ].filter(Boolean));
+
+        if (needsSeparateKbProvider) {
+            service.providers.push(kbProvider);
+        } else if (service.providers.length > 0) {
+            service.providers[0] = kbProvider;
+        } else {
+            service.providers.push(kbProvider);
+        }
+    }
+
+    const primaryProvider = service.providers[0] || null;
+    const kbProvider = service.providers.find((provider) => provider.id === 'knowledge-base-provider') || primaryProvider;
+
+    service.defaults.chat = primaryProvider && normalizeModelServiceText(settings.defaultModel)
+        ? { providerId: primaryProvider.id, modelId: settings.defaultModel }
+        : null;
+    service.defaults.followUp = primaryProvider && normalizeModelServiceText(settings.followUpDefaultModel)
+        ? { providerId: primaryProvider.id, modelId: settings.followUpDefaultModel }
+        : null;
+    service.defaults.topicTitle = primaryProvider && normalizeModelServiceText(settings.topicTitleDefaultModel)
+        ? { providerId: primaryProvider.id, modelId: settings.topicTitleDefaultModel }
+        : null;
+    service.defaults.embedding = kbProvider && normalizeModelServiceText(settings.kbEmbeddingModel)
+        ? { providerId: kbProvider.id, modelId: settings.kbEmbeddingModel }
+        : null;
+    service.defaults.rerank = kbProvider && normalizeModelServiceText(settings.kbRerankModel)
+        ? { providerId: kbProvider.id, modelId: settings.kbRerankModel }
+        : null;
+
+    return normalizeModelService(service);
+}
+
+function composeSettingsWithModelService(settings = {}) {
+    const modelService = buildBootstrapModelService(settings);
+    return {
+        ...settings,
+        modelService,
+        ...buildModelServiceMirror(modelService, settings),
+    };
+}
+
+function getModelServiceAvatarTone(seed = '') {
+    const text = normalizeModelServiceText(seed, 'provider');
+    let hash = 0;
+    for (let index = 0; index < text.length; index += 1) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(index);
+        hash |= 0;
+    }
+
+    const hue = Math.abs(hash) % 360;
+    return {
+        background: `hsl(${hue} 54% 58%)`,
+        foreground: hue >= 40 && hue <= 110 ? '#1b2818' : '#ffffff',
+    };
+}
+
+function renderModelServiceAvatar(seed = '', fallback = 'P') {
+    const label = normalizeModelServiceText(seed).slice(0, 1).toUpperCase() || fallback;
+    const tone = getModelServiceAvatarTone(seed || fallback);
+    return `
+        <span
+          class="model-service-avatar"
+          style="background:${escapeHtml(tone.background)};color:${escapeHtml(tone.foreground)};"
+          aria-hidden="true"
+        >
+          ${escapeHtml(label)}
+        </span>
+    `;
+}
+
+function getModelServiceGroupMeta(group = 'chat') {
+    if (group === 'embedding') {
+        return { label: 'Embedding', icon: 'deployed_code_history' };
+    }
+    if (group === 'rerank') {
+        return { label: 'Rerank', icon: 'swap_vert' };
+    }
+    return { label: 'Chat', icon: 'forum' };
+}
+
+function renderModelServiceModelLead(model = {}) {
+    const label = normalizeModelServiceText(model.name || model.id).slice(0, 1).toUpperCase() || 'M';
+    const tone = getModelServiceAvatarTone(model.name || model.id || 'M');
+    return `
+        <span
+          class="model-service-model-lead model-service-model-lead--${escapeHtml(model.group || 'chat')}"
+          style="background:${escapeHtml(tone.background)};color:${escapeHtml(tone.foreground)};"
+          aria-hidden="true"
+        >
+          ${escapeHtml(label)}
+        </span>
+    `;
+}
+
+function getModelServiceProviderHostLabel(apiBaseUrl = '') {
+    const baseUrl = normalizeModelServiceBaseUrl(apiBaseUrl);
+    if (!baseUrl) {
+        return '';
+    }
+
+    try {
+        const url = new URL(baseUrl);
+        return url.host || baseUrl;
+    } catch (_error) {
+        return baseUrl;
+    }
+}
 
 function escapeHtml(text) {
     return String(text || '')
@@ -181,6 +929,19 @@ function createSettingsController(deps = {}) {
     let isSavingGlobalSettings = false;
     let placeholderPreviewRequestId = 0;
     let lastFinalSystemPromptPreview = null;
+    const modelServiceUiState = {
+        providerSearch: '',
+        modelSearch: '',
+        selectedProviderId: '',
+        selectedModelId: '',
+        providerMenuId: '',
+        showModelSearch: false,
+        showApiKeys: false,
+        collapsedGroups: {},
+        providerStatus: null,
+        popup: null,
+    };
+    let modelServiceDialogHost = null;
 
     function getSettingsSlice() {
         return store.getState().settings;
@@ -204,6 +965,1293 @@ function createSettingsController(deps = {}) {
                 ...(typeof patch === 'function' ? patch(current.settings, rootState) : patch),
             },
         }));
+    }
+
+    function getNormalizedModelService() {
+        return normalizeModelService(getGlobalSettings().modelService);
+    }
+
+    function syncLegacyModelServiceFields(settings = getGlobalSettings()) {
+        const mirrors = buildModelServiceMirror(settings.modelService || createDefaultModelService(), settings);
+
+        if (el.vcpServerUrl) el.vcpServerUrl.value = mirrors.vcpServerUrl || '';
+        if (el.vcpApiKey) el.vcpApiKey.value = mirrors.vcpApiKey || '';
+        if (el.kbBaseUrl) el.kbBaseUrl.value = mirrors.kbBaseUrl || '';
+        if (el.kbApiKey) el.kbApiKey.value = mirrors.kbApiKey || '';
+        if (el.kbEmbeddingModel) el.kbEmbeddingModel.value = mirrors.kbEmbeddingModel || '';
+        if (el.kbRerankModel) el.kbRerankModel.value = mirrors.kbRerankModel || '';
+        if (el.defaultModelInput) el.defaultModelInput.value = mirrors.defaultModel || '';
+        if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = mirrors.followUpDefaultModel || '';
+        if (el.topicTitleDefaultModelInput) el.topicTitleDefaultModelInput.value = mirrors.topicTitleDefaultModel || '';
+    }
+
+    function ensureModelServiceUiSelections(service = getNormalizedModelService()) {
+        const providers = Array.isArray(service.providers) ? service.providers : [];
+        if (providers.length === 0) {
+            modelServiceUiState.selectedProviderId = '';
+            modelServiceUiState.selectedModelId = '';
+            return null;
+        }
+
+        let provider = findModelServiceProvider(service, modelServiceUiState.selectedProviderId);
+        if (!provider) {
+            provider = providers[0];
+            modelServiceUiState.selectedProviderId = provider.id;
+        }
+
+        const models = Array.isArray(provider.models) ? provider.models : [];
+        let model = findModelServiceModel(provider, modelServiceUiState.selectedModelId);
+        if (!model && models.length > 0) {
+            model = models[0];
+            modelServiceUiState.selectedModelId = model.id;
+        } else if (!model) {
+            modelServiceUiState.selectedModelId = '';
+        }
+
+        return provider;
+    }
+
+    function commitModelService(service, options = {}) {
+        const normalizedService = normalizeModelService(service);
+        const mirrored = buildModelServiceMirror(normalizedService, getGlobalSettings());
+        patchGlobalSettings({
+            modelService: normalizedService,
+            ...mirrored,
+        });
+        ensureModelServiceUiSelections(normalizedService);
+        syncLegacyModelServiceFields({
+            ...getGlobalSettings(),
+            modelService: normalizedService,
+            ...mirrored,
+        });
+        renderModelServiceWorkbench();
+        renderModelServiceDefaultSelectors();
+        if (options.scheduleSave === true) {
+            scheduleGlobalSettingsSave(options.delay ?? 160);
+        }
+    }
+
+    function updateModelService(mutator, options = {}) {
+        const nextService = typeof mutator === 'function'
+            ? mutator(normalizeModelService(getNormalizedModelService()))
+            : mutator;
+        commitModelService(nextService, {
+            scheduleSave: options.scheduleSave !== false,
+            delay: options.delay,
+        });
+    }
+
+    function setModelServiceStatus(status = null) {
+        modelServiceUiState.providerStatus = status;
+        renderModelServiceProviderDetail();
+        renderModelServicePopup();
+    }
+
+    function getSelectedModelServiceProvider(service = getNormalizedModelService()) {
+        const ensured = ensureModelServiceUiSelections(service);
+        if (ensured) {
+            return ensured;
+        }
+        return null;
+    }
+
+    function getSelectedModelServiceModel(provider = getSelectedModelServiceProvider()) {
+        if (!provider) {
+            return null;
+        }
+        ensureModelServiceUiSelections({
+            version: MODEL_SERVICE_VERSION,
+            providers: [provider],
+            defaults: createDefaultModelService().defaults,
+        });
+        return findModelServiceModel(provider, modelServiceUiState.selectedModelId) || null;
+    }
+
+    function toggleModelServiceGroup(groupName = '') {
+        const nextState = { ...(modelServiceUiState.collapsedGroups || {}) };
+        nextState[groupName] = !nextState[groupName];
+        modelServiceUiState.collapsedGroups = nextState;
+        renderModelServiceModelsPanel();
+    }
+
+    function ensureModelServiceDialogHost() {
+        if (modelServiceDialogHost && modelServiceDialogHost.isConnected) {
+            return modelServiceDialogHost;
+        }
+
+        modelServiceDialogHost = documentObj.createElement('div');
+        modelServiceDialogHost.id = 'modelServiceDialogHost';
+        (documentObj.getElementById('modal-container') || documentObj.body).appendChild(modelServiceDialogHost);
+        return modelServiceDialogHost;
+    }
+
+    function setModelServicePopup(popup = null) {
+        modelServiceUiState.popup = popup;
+        renderModelServicePopup();
+    }
+
+    function patchModelServicePopup(patch, shouldRender = true) {
+        if (!modelServiceUiState.popup) {
+            return;
+        }
+
+        modelServiceUiState.popup = typeof patch === 'function'
+            ? patch(modelServiceUiState.popup)
+            : {
+                ...modelServiceUiState.popup,
+                ...(patch || {}),
+            };
+        if (shouldRender) {
+            renderModelServicePopup();
+        }
+    }
+
+    function getModelServicePopupProvider(popup = modelServiceUiState.popup, service = getNormalizedModelService()) {
+        if (!popup) {
+            return null;
+        }
+
+        if (popup.providerId) {
+            return findModelServiceProvider(service, popup.providerId) || null;
+        }
+
+        return getSelectedModelServiceProvider(service);
+    }
+
+    function maskModelServiceSecret(value = '') {
+        const text = String(value || '').trim();
+        if (!text) {
+            return '未填写';
+        }
+        if (text.length <= 8) {
+            return `${text.slice(0, 2)}••••`;
+        }
+        return `${text.slice(0, 4)}••••${text.slice(-4)}`;
+    }
+
+    function createModelServiceDraft(model = {}) {
+        return {
+            ...normalizeModelServiceModel(model),
+            capabilities: {
+                ...detectModelServiceCapabilities(model.name || model.id || ''),
+                ...(model.capabilities || {}),
+            },
+        };
+    }
+
+    function openModelServiceProviderEditorPopup(options = {}) {
+        const service = getNormalizedModelService();
+        const provider = options.providerId
+            ? findModelServiceProvider(service, options.providerId)
+            : null;
+
+        setModelServicePopup({
+            type: 'provider-editor',
+            mode: provider ? 'edit' : 'create',
+            providerId: provider?.id || '',
+            name: provider?.name || '',
+            presetId: provider?.presetId || options.presetId || MODEL_SERVICE_PRESETS[0]?.presetId || 'openai',
+            error: '',
+        });
+    }
+
+    function saveModelServiceProviderEditorPopup() {
+        const popup = modelServiceUiState.popup;
+        if (!popup || popup.type !== 'provider-editor') {
+            return;
+        }
+
+        const trimmedName = normalizeModelServiceText(popup.name);
+        if (!trimmedName) {
+            patchModelServicePopup({ error: 'Provider 名称不能为空。' });
+            return;
+        }
+
+        if (popup.mode === 'edit' && popup.providerId) {
+            modelServiceUiState.selectedProviderId = popup.providerId;
+            updateModelService((currentService) => ({
+                ...currentService,
+                providers: (currentService.providers || []).map((provider) => (
+                    provider.id === popup.providerId
+                        ? { ...provider, name: trimmedName }
+                        : provider
+                )),
+            }));
+            setModelServicePopup(null);
+            return;
+        }
+
+        const service = getNormalizedModelService();
+        const provider = createProviderFromPreset(popup.presetId || 'custom-openai-compatible', service);
+        provider.name = trimmedName;
+        modelServiceUiState.selectedProviderId = provider.id;
+        modelServiceUiState.selectedModelId = '';
+        modelServiceUiState.providerMenuId = '';
+        modelServiceUiState.showApiKeys = false;
+        updateModelService((currentService) => ({
+            ...currentService,
+            providers: [...(currentService.providers || []), provider],
+        }));
+        setModelServicePopup(null);
+    }
+
+    function openModelServiceHeadersPopup() {
+        const provider = getSelectedModelServiceProvider();
+        if (!provider) {
+            return;
+        }
+
+        setModelServicePopup({
+            type: 'headers',
+            providerId: provider.id,
+            value: stringifyModelServiceHeaders(provider.extraHeaders),
+        });
+    }
+
+    function openModelServiceCheckPopup() {
+        const provider = getSelectedModelServiceProvider();
+        if (!provider) {
+            return;
+        }
+
+        const checkableModels = (provider.models || []).filter((model) => model.enabled !== false && model.capabilities?.chat === true);
+        if (checkableModels.length === 0) {
+            setModelServiceStatus({
+                tone: 'warning',
+                title: '没有可检测模型',
+                message: '当前 Provider 还没有可用的聊天模型，请先拉取 /models 或手动添加模型。',
+            });
+            return;
+        }
+
+        setModelServicePopup({
+            type: 'check-provider',
+            providerId: provider.id,
+            modelId: checkableModels[0]?.id || '',
+        });
+    }
+
+    function openModelServiceHealthCheckPopup() {
+        const provider = getSelectedModelServiceProvider();
+        if (!provider) {
+            return;
+        }
+
+        const apiKeys = Array.isArray(provider.apiKeys) ? provider.apiKeys.filter(Boolean) : [];
+        setModelServicePopup({
+            type: 'health-check',
+            providerId: provider.id,
+            keyMode: apiKeys.length > 1 ? 'all' : 'single',
+            selectedKeyIndex: 0,
+            executionMode: 'parallel',
+            timeoutMs: 15000,
+            running: false,
+            results: [],
+            error: '',
+        });
+    }
+
+    function openModelServiceManageModelsPopup(search = '') {
+        const provider = getSelectedModelServiceProvider();
+        if (!provider) {
+            return;
+        }
+
+        setModelServicePopup({
+            type: 'manage-models',
+            providerId: provider.id,
+            search,
+        });
+    }
+
+    function openModelServiceModelEditorPopup(options = {}) {
+        const provider = getSelectedModelServiceProvider();
+        if (!provider) {
+            return;
+        }
+
+        const sourceModel = options.modelId
+            ? findModelServiceModel(provider, options.modelId)
+            : createManualModelForProvider(provider);
+        if (!sourceModel) {
+            return;
+        }
+
+        modelServiceUiState.selectedModelId = sourceModel.id;
+        setModelServicePopup({
+            type: 'model-editor',
+            providerId: provider.id,
+            mode: options.modelId ? 'edit' : 'create',
+            originalModelId: options.modelId || '',
+            returnToManage: options.returnToManage === true,
+            manageSearch: options.manageSearch || '',
+            error: '',
+            draft: createModelServiceDraft(sourceModel),
+        });
+    }
+
+    function deleteModelServiceModel(modelId = '') {
+        const provider = getSelectedModelServiceProvider();
+        if (!provider || !modelId) {
+            return;
+        }
+
+        updateModelService((currentService) => ({
+            ...currentService,
+            providers: (currentService.providers || []).map((item) => (
+                item.id === provider.id
+                    ? {
+                        ...item,
+                        models: (item.models || []).filter((model) => model.id !== modelId),
+                    }
+                    : item
+            )),
+            defaults: Object.fromEntries(
+                Object.entries(currentService.defaults || {}).map(([taskKey, ref]) => [
+                    taskKey,
+                    ref && ref.providerId === provider.id && ref.modelId === modelId ? null : ref,
+                ])
+            ),
+        }));
+
+        if (modelServiceUiState.selectedModelId === modelId) {
+            modelServiceUiState.selectedModelId = '';
+        }
+
+        if (modelServiceUiState.popup?.type === 'manage-models') {
+            renderModelServicePopup();
+        }
+    }
+
+    function saveModelServiceModelEditorPopup() {
+        const popup = modelServiceUiState.popup;
+        if (!popup || popup.type !== 'model-editor') {
+            return;
+        }
+
+        const provider = getModelServicePopupProvider(popup);
+        if (!provider) {
+            setModelServicePopup(null);
+            return;
+        }
+
+        const draft = createModelServiceDraft({
+            ...(popup.draft || {}),
+            source: popup.mode === 'edit' ? popup.draft?.source : 'manual',
+        });
+        if (!draft.id) {
+            patchModelServicePopup({ error: '模型 ID 不能为空。' });
+            return;
+        }
+
+        const duplicated = (provider.models || []).some((model) => model.id === draft.id && model.id !== popup.originalModelId);
+        if (duplicated) {
+            patchModelServicePopup({ error: `模型 ID "${draft.id}" 已存在。` });
+            return;
+        }
+
+        updateModelService((currentService) => ({
+            ...currentService,
+            providers: (currentService.providers || []).map((item) => {
+                if (item.id !== provider.id) {
+                    return item;
+                }
+
+                const existingModels = item.models || [];
+                const nextModels = popup.mode === 'edit'
+                    ? existingModels.map((model) => (model.id === popup.originalModelId ? draft : model))
+                    : [...existingModels, draft];
+                return {
+                    ...item,
+                    models: mergeModelServiceModels(nextModels),
+                };
+            }),
+            defaults: popup.mode === 'edit' && popup.originalModelId && popup.originalModelId !== draft.id
+                ? Object.fromEntries(
+                    Object.entries(currentService.defaults || {}).map(([taskKey, ref]) => [
+                        taskKey,
+                        ref && ref.providerId === provider.id && ref.modelId === popup.originalModelId
+                            ? { providerId: provider.id, modelId: draft.id }
+                            : ref,
+                    ])
+                )
+                : currentService.defaults,
+        }));
+
+        modelServiceUiState.selectedModelId = draft.id;
+        if (popup.returnToManage === true) {
+            openModelServiceManageModelsPopup(popup.manageSearch || '');
+            return;
+        }
+        setModelServicePopup(null);
+    }
+
+    function renderModelServicePopup(service = getNormalizedModelService()) {
+        const host = ensureModelServiceDialogHost();
+        const popup = modelServiceUiState.popup;
+        if (!popup) {
+            host.innerHTML = '';
+            return;
+        }
+
+        const provider = popup.type === 'provider-editor' && popup.mode === 'create'
+            ? null
+            : getModelServicePopupProvider(popup, service);
+        if (popup.type !== 'provider-editor' && !provider) {
+            modelServiceUiState.popup = null;
+            host.innerHTML = '';
+            return;
+        }
+
+        if (popup.type === 'provider-editor') {
+            const avatarSeed = popup.name || MODEL_SERVICE_PRESETS.find((preset) => preset.presetId === popup.presetId)?.name || 'P';
+            host.innerHTML = `
+                <div class="model-service-modal-overlay" data-model-service-popup-overlay>
+                  <div class="model-service-modal model-service-modal--provider" role="dialog" aria-modal="true" data-model-service-popup="provider-editor">
+                    <div class="model-service-modal__header">
+                      <div class="model-service-modal__titleblock">
+                        <strong>${popup.mode === 'edit' ? '编辑提供商' : '添加提供商'}</strong>
+                      </div>
+                      <button class="model-service-modal__close" type="button" data-model-service-popup-close aria-label="关闭">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div class="model-service-divider"></div>
+                    <div class="model-service-modal__body model-service-modal__body--provider">
+                      <div class="model-service-provider-avatar-shell">
+                        ${renderModelServiceAvatar(avatarSeed, 'P').replace('class="model-service-avatar"', 'class="model-service-avatar model-service-avatar--popup"')}
+                      </div>
+                      <label class="model-service-stack-field">
+                        <span>提供商名称</span>
+                        <input class="model-service-control" type="text" data-model-service-popup-field="providerName" value="${escapeHtml(popup.name || '')}" maxlength="32" placeholder="My Provider" />
+                      </label>
+                      <label class="model-service-stack-field">
+                        <span>提供商类型</span>
+                        <select class="model-service-control" data-model-service-popup-field="providerPresetId" ${popup.mode === 'edit' ? 'disabled' : ''}>
+                          ${MODEL_SERVICE_PRESETS.map((preset) => `
+                            <option value="${escapeHtml(preset.presetId)}" ${preset.presetId === popup.presetId ? 'selected' : ''}>${escapeHtml(preset.name)}</option>
+                          `).join('')}
+                        </select>
+                      </label>
+                      ${popup.error ? `<div class="model-service-popup-error">${escapeHtml(popup.error)}</div>` : ''}
+                    </div>
+                    <div class="model-service-modal__footer">
+                      <button class="model-service-button" type="button" data-model-service-popup-close>取消</button>
+                      <button class="model-service-button model-service-button--primary" type="button" data-model-service-popup-action="save-provider-editor">确定</button>
+                    </div>
+                  </div>
+                </div>
+            `;
+            return;
+        }
+
+        if (popup.type === 'check-provider') {
+            const models = (provider.models || []).filter((model) => model.enabled !== false && model.capabilities?.chat === true);
+            host.innerHTML = `
+                <div class="model-service-modal-overlay" data-model-service-popup-overlay>
+                  <div class="model-service-modal" role="dialog" aria-modal="true" data-model-service-popup="check-provider">
+                    <div class="model-service-modal__header">
+                      <div class="model-service-modal__titleblock">
+                        <strong>检测模型</strong>
+                        <span>${escapeHtml(provider.name)}</span>
+                      </div>
+                      <button class="model-service-modal__close" type="button" data-model-service-popup-close aria-label="关闭">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div class="model-service-modal__body">
+                      <div class="model-service-setting-subtitle">选择一个聊天模型进行检测</div>
+                      <label class="model-service-stack-field">
+                        <select class="model-service-control" data-model-service-popup-field="modelId">
+                          ${models.map((model) => `
+                            <option value="${escapeHtml(model.id)}" ${model.id === popup.modelId ? 'selected' : ''}>${escapeHtml(model.name)}</option>
+                          `).join('')}
+                        </select>
+                      </label>
+                      <div class="model-service-popup-help">检测会使用当前 Provider 的 Base URL 和 API Key 发起一次最小请求。</div>
+                    </div>
+                    <div class="model-service-modal__footer">
+                      <button class="model-service-button" type="button" data-model-service-popup-close>取消</button>
+                      <button class="model-service-button model-service-button--primary" type="button" data-model-service-popup-action="confirm-check-provider">开始检测</button>
+                    </div>
+                  </div>
+                </div>
+            `;
+            return;
+        }
+
+        if (popup.type === 'headers') {
+            host.innerHTML = `
+                <div class="model-service-modal-overlay" data-model-service-popup-overlay>
+                  <div class="model-service-modal model-service-modal--headers" role="dialog" aria-modal="true" data-model-service-popup="headers">
+                    <div class="model-service-modal__header">
+                      <div class="model-service-modal__titleblock">
+                        <strong>高级请求头</strong>
+                        <span>${escapeHtml(provider.name)}</span>
+                      </div>
+                      <button class="model-service-modal__close" type="button" data-model-service-popup-close aria-label="关闭">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div class="model-service-modal__body">
+                      <label class="model-service-stack-field">
+                        <span>支持 JSON 或 Header: Value 每行一条</span>
+                        <textarea class="model-service-control model-service-control--multiline model-service-control--popup" rows="8" data-model-service-popup-field="value" placeholder='{"HTTP-Referer":"https://example.com"}'>${escapeHtml(popup.value || '')}</textarea>
+                      </label>
+                    </div>
+                    <div class="model-service-modal__footer">
+                      <button class="model-service-button" type="button" data-model-service-popup-close>取消</button>
+                      <button class="model-service-button model-service-button--primary" type="button" data-model-service-popup-action="save-headers">保存</button>
+                    </div>
+                  </div>
+                </div>
+            `;
+            return;
+        }
+
+        if (popup.type === 'health-check') {
+            const apiKeys = Array.isArray(provider.apiKeys) ? provider.apiKeys.filter(Boolean) : [];
+            const selectedKey = apiKeys[popup.selectedKeyIndex] || '';
+            host.innerHTML = `
+                <div class="model-service-modal-overlay" data-model-service-popup-overlay>
+                  <div class="model-service-modal model-service-modal--health-check" role="dialog" aria-modal="true" data-model-service-popup="health-check">
+                    <div class="model-service-modal__header">
+                      <div class="model-service-modal__titleblock">
+                        <strong>健康检查</strong>
+                        <span>${escapeHtml(provider.name)}</span>
+                      </div>
+                      <button class="model-service-modal__close" type="button" data-model-service-popup-close aria-label="关闭">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div class="model-service-modal__body">
+                      <div class="model-service-popup-alert">配置只在当前窗口生效，不会写入设置。</div>
+                      <div class="model-service-popup-grid">
+                        <label class="model-service-stack-field">
+                          <span>API Key</span>
+                          <select class="model-service-control" data-model-service-popup-field="keyMode">
+                            <option value="single" ${popup.keyMode === 'single' ? 'selected' : ''}>单个 Key</option>
+                            <option value="all" ${popup.keyMode === 'all' ? 'selected' : ''}>全部 Key</option>
+                          </select>
+                        </label>
+                        <label class="model-service-stack-field">
+                          <span>执行模式</span>
+                          <select class="model-service-control" data-model-service-popup-field="executionMode">
+                            <option value="parallel" ${popup.executionMode === 'parallel' ? 'selected' : ''}>并行</option>
+                            <option value="serial" ${popup.executionMode === 'serial' ? 'selected' : ''}>串行</option>
+                          </select>
+                        </label>
+                        <label class="model-service-stack-field">
+                          <span>超时</span>
+                          <input class="model-service-control" type="number" min="5" step="1" data-model-service-popup-field="timeoutSeconds" value="${escapeHtml(String(Math.max(5, Math.round(Number(popup.timeoutMs || 15000) / 1000))))}" />
+                        </label>
+                      </div>
+                      ${popup.keyMode === 'single' && apiKeys.length > 1 ? `
+                        <div class="model-service-popup-keylist">
+                          ${apiKeys.map((key, index) => `
+                            <label class="model-service-popup-keyitem">
+                              <input type="radio" name="modelServiceHealthKey" value="${escapeHtml(String(index))}" data-model-service-popup-field="selectedKeyIndex" ${index === popup.selectedKeyIndex ? 'checked' : ''} />
+                              <span>${escapeHtml(maskModelServiceSecret(key))}</span>
+                            </label>
+                          `).join('')}
+                        </div>
+                      ` : `
+                        <div class="model-service-popup-help">${apiKeys.length === 0 ? '当前没有可用 API Key，健康检查大概率会失败。' : `当前将使用 ${escapeHtml(maskModelServiceSecret(selectedKey || apiKeys[0] || ''))}${popup.keyMode === 'all' && apiKeys.length > 1 ? ` 以及另外 ${apiKeys.length - 1} 个 Key` : ''}。`}</div>
+                      `}
+                      ${popup.error ? `<div class="model-service-popup-error">${escapeHtml(popup.error)}</div>` : ''}
+                      ${Array.isArray(popup.results) && popup.results.length > 0 ? `
+                        <div class="model-service-popup-results">
+                          ${popup.results.map((item) => `
+                            <article class="model-service-health-item ${item.success ? 'model-service-health-item--ok' : 'model-service-health-item--error'}">
+                              <strong>${escapeHtml(item.modelId || '未知模型')}</strong>
+                              <span>Key #${Number(item.apiKeyIndex || 0) + 1} · ${escapeHtml(String(item.latencyMs || 0))} ms</span>
+                              <span>${escapeHtml(item.success ? '连接正常' : (item.error || '检测失败'))}</span>
+                            </article>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+                    </div>
+                    <div class="model-service-modal__footer">
+                      <button class="model-service-button" type="button" data-model-service-popup-close ${popup.running ? 'disabled' : ''}>关闭</button>
+                      <button class="model-service-button model-service-button--primary" type="button" data-model-service-popup-action="start-health-check" ${popup.running ? 'disabled' : ''}>${popup.running ? '检测中...' : '开始检测'}</button>
+                    </div>
+                  </div>
+                </div>
+            `;
+            return;
+        }
+
+        if (popup.type === 'manage-models') {
+            const query = normalizeModelServiceText(popup.search).toLowerCase();
+            const visibleModels = (provider.models || []).filter((model) => (
+                !query || [model.id, model.name, model.group].some((value) => String(value || '').toLowerCase().includes(query))
+            ));
+            host.innerHTML = `
+                <div class="model-service-modal-overlay" data-model-service-popup-overlay>
+                  <div class="model-service-modal model-service-modal--manage-models" role="dialog" aria-modal="true" data-model-service-popup="manage-models">
+                    <div class="model-service-modal__header">
+                      <div class="model-service-modal__titleblock">
+                        <strong>管理模型</strong>
+                        <span>${escapeHtml(provider.name)} · ${escapeHtml(String((provider.models || []).length))} 个模型</span>
+                      </div>
+                      <button class="model-service-modal__close" type="button" data-model-service-popup-close aria-label="关闭">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div class="model-service-modal__body">
+                      <label class="model-service-toolbar-search model-service-toolbar-search--popup">
+                        <span class="material-symbols-outlined">search</span>
+                        <input type="search" data-model-service-popup-field="search" value="${escapeHtml(popup.search || '')}" placeholder="搜索模型" />
+                      </label>
+                      <div class="model-service-popup-list">
+                        ${visibleModels.length > 0 ? visibleModels.map((model) => `
+                          <article class="model-service-popup-model-row">
+                            ${renderModelServiceModelLead(model)}
+                            <span class="model-service-model-row__main">
+                              <span class="model-service-model-row__title">
+                                <strong>${escapeHtml(model.name)}</strong>
+                                <span class="model-service-badge ${model.source === 'remote' ? 'model-service-badge--soft' : 'model-service-badge--manual'}">${model.source === 'remote' ? 'REMOTE' : 'MANUAL'}</span>
+                                <span class="model-service-badge">${escapeHtml(getModelServiceGroupMeta(model.group).label)}</span>
+                              </span>
+                              <span class="model-service-model-row__id">${escapeHtml(model.id)}</span>
+                            </span>
+                            <span class="model-service-model-row__actions model-service-model-row__actions--visible">
+                              <button class="model-service-model-tool" type="button" data-model-service-popup-action="edit-model" data-model-id="${escapeHtml(model.id)}" title="编辑模型">
+                                <span class="material-symbols-outlined">edit</span>
+                              </button>
+                              <button class="model-service-model-tool" type="button" data-model-service-popup-action="delete-model" data-model-id="${escapeHtml(model.id)}" title="删除模型">
+                                <span class="material-symbols-outlined">delete</span>
+                              </button>
+                            </span>
+                          </article>
+                        `).join('') : `
+                          <div class="empty-list-state">
+                            <strong>没有匹配的模型</strong>
+                            <span>可以直接添加一个手动模型，或者先回主界面拉取 /models。</span>
+                          </div>
+                        `}
+                      </div>
+                    </div>
+                    <div class="model-service-modal__footer">
+                      <button class="model-service-button" type="button" data-model-service-popup-close>关闭</button>
+                      <button class="model-service-button model-service-button--primary" type="button" data-model-service-popup-action="open-add-model">添加模型</button>
+                    </div>
+                  </div>
+                </div>
+            `;
+            return;
+        }
+
+        if (popup.type === 'model-editor') {
+            const draft = popup.draft || createModelServiceDraft(createManualModelForProvider(provider));
+            host.innerHTML = `
+                <div class="model-service-modal-overlay" data-model-service-popup-overlay>
+                  <div class="model-service-modal model-service-modal--model-editor" role="dialog" aria-modal="true" data-model-service-popup="model-editor">
+                    <div class="model-service-modal__header">
+                      <div class="model-service-modal__titleblock">
+                        <strong>${popup.mode === 'edit' ? '编辑模型' : '添加模型'}</strong>
+                        <span>${escapeHtml(provider.name)}</span>
+                      </div>
+                      <button class="model-service-modal__close" type="button" data-model-service-popup-close aria-label="关闭">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div class="model-service-modal__body">
+                      <div class="model-service-popup-grid">
+                        <label class="model-service-stack-field">
+                          <span>模型 ID</span>
+                          <input class="model-service-control" type="text" data-model-service-popup-field="draft.id" value="${escapeHtml(draft.id)}" ${draft.source === 'remote' ? 'readonly aria-readonly="true"' : ''} />
+                        </label>
+                        <label class="model-service-stack-field">
+                          <span>显示名称</span>
+                          <input class="model-service-control" type="text" data-model-service-popup-field="draft.name" value="${escapeHtml(draft.name)}" />
+                        </label>
+                        <label class="model-service-stack-field">
+                          <span>分组</span>
+                          <select class="model-service-control" data-model-service-popup-field="draft.group">
+                            ${MODEL_SERVICE_GROUP_OPTIONS.map((option) => `
+                              <option value="${escapeHtml(option.value)}" ${draft.group === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>
+                            `).join('')}
+                          </select>
+                        </label>
+                        <label class="model-service-stack-field">
+                          <span>启用</span>
+                          <label class="model-service-popup-checkbox">
+                            <input type="checkbox" data-model-service-popup-field="draft.enabled" ${draft.enabled !== false ? 'checked' : ''} />
+                            <span>在默认模型选择器中可见</span>
+                          </label>
+                        </label>
+                      </div>
+                      <div class="model-service-capability-grid model-service-capability-grid--popup">
+                        ${Object.entries(MODEL_SERVICE_CAPABILITY_LABELS).map(([key, label]) => `
+                          <label class="model-service-capability-pill">
+                            <input type="checkbox" data-model-service-popup-capability="${escapeHtml(key)}" ${draft.capabilities?.[key] === true ? 'checked' : ''} />
+                            <span>${escapeHtml(label)}</span>
+                          </label>
+                        `).join('')}
+                      </div>
+                      ${popup.error ? `<div class="model-service-popup-error">${escapeHtml(popup.error)}</div>` : ''}
+                    </div>
+                    <div class="model-service-modal__footer">
+                      <button class="model-service-button" type="button" data-model-service-popup-close>取消</button>
+                      <button class="model-service-button model-service-button--primary" type="button" data-model-service-popup-action="save-model-editor">保存</button>
+                    </div>
+                  </div>
+                </div>
+            `;
+            return;
+        }
+
+        host.innerHTML = '';
+    }
+
+    function renderModelServiceCapabilityBadges(model = {}) {
+        return Object.entries(MODEL_SERVICE_CAPABILITY_LABELS)
+            .filter(([key]) => model.capabilities?.[key] === true)
+            .map(([, label]) => `<span class="model-service-badge model-service-badge--capability">${escapeHtml(label)}</span>`)
+            .join('');
+    }
+
+    function renderModelServicePresetActions(service = getNormalizedModelService()) {
+        if (el.modelServiceAddProviderBtn) {
+            el.modelServiceAddProviderBtn.classList.remove('model-service-add-button--active');
+            el.modelServiceAddProviderBtn.setAttribute('aria-expanded', 'false');
+            el.modelServiceAddProviderBtn.innerHTML = `
+                <span class="material-symbols-outlined">add</span>
+                <span>添加</span>
+            `;
+        }
+
+        if (el.modelServicePresetActions) {
+            el.modelServicePresetActions.innerHTML = '';
+        }
+    }
+
+    function renderModelServiceProviderList(service = getNormalizedModelService()) {
+        if (!el.modelServiceProviderList) {
+            return;
+        }
+
+        ensureModelServiceUiSelections(service);
+        const query = normalizeModelServiceText(modelServiceUiState.providerSearch).toLowerCase();
+        const providers = (service.providers || []).filter((provider) => {
+            if (!query) {
+                return true;
+            }
+            return [
+                provider.name,
+                provider.presetId,
+                provider.apiBaseUrl,
+            ].some((item) => String(item || '').toLowerCase().includes(query));
+        });
+
+        if (providers.length === 0) {
+            el.modelServiceProviderList.innerHTML = `
+                <div class="empty-list-state">
+                  <strong>没有匹配的 Provider</strong>
+                  <span>试试调整搜索词，或者点击底部按钮新增一个 Provider。</span>
+                </div>
+            `;
+            return;
+        }
+
+        el.modelServiceProviderList.innerHTML = providers.map((provider) => {
+            const menuOpen = provider.id === modelServiceUiState.providerMenuId;
+            return `
+                <article
+                  class="model-service-provider-row ${provider.id === modelServiceUiState.selectedProviderId ? 'model-service-provider-row--active' : ''} ${menuOpen ? 'model-service-provider-row--menu-open' : ''} ${provider.enabled === false ? 'model-service-provider-row--disabled' : ''}"
+                  data-model-service-provider-menu-root="${escapeHtml(provider.id)}"
+                >
+                  <button
+                    class="model-service-provider-row__main"
+                    type="button"
+                    data-model-service-provider-select="${escapeHtml(provider.id)}"
+                  >
+                    <span class="material-symbols-outlined model-service-provider-row__drag" aria-hidden="true">drag_indicator</span>
+                    ${renderModelServiceAvatar(provider.name || provider.presetId, 'P')}
+                    <span class="model-service-provider-row__content">
+                      <strong class="model-service-provider-row__name">${escapeHtml(provider.name)}</strong>
+                    </span>
+                  </button>
+                  <button
+                    class="model-service-provider-row__menu"
+                    type="button"
+                    data-model-service-provider-menu-toggle="${escapeHtml(provider.id)}"
+                    aria-expanded="${menuOpen ? 'true' : 'false'}"
+                    title="更多操作"
+                  >
+                    <span class="material-symbols-outlined">more_horiz</span>
+                  </button>
+                  ${menuOpen ? `
+                    <div class="model-service-provider-menu" data-model-service-provider-menu="${escapeHtml(provider.id)}">
+                      <button class="model-service-provider-menu__item" type="button" data-model-service-provider-menu-action="edit" data-provider-id="${escapeHtml(provider.id)}">
+                        <span class="material-symbols-outlined">edit</span>
+                        <span>编辑</span>
+                      </button>
+                      <button class="model-service-provider-menu__item" type="button" data-model-service-provider-menu-action="fetch" data-provider-id="${escapeHtml(provider.id)}">
+                        <span class="material-symbols-outlined">download</span>
+                        <span>拉取模型</span>
+                      </button>
+                      <button class="model-service-provider-menu__item model-service-provider-menu__item--danger" type="button" data-model-service-provider-menu-action="delete" data-provider-id="${escapeHtml(provider.id)}">
+                        <span class="material-symbols-outlined">delete</span>
+                        <span>删除</span>
+                      </button>
+                    </div>
+                  ` : ''}
+                </article>
+            `;
+        }).join('');
+    }
+
+    function renderModelServiceProviderDetail(service = getNormalizedModelService()) {
+        if (!el.modelServiceProviderDetail) {
+            return;
+        }
+
+        const provider = getSelectedModelServiceProvider(service);
+        if (!provider) {
+            el.modelServiceProviderDetail.innerHTML = `
+                <div class="empty-list-state">
+                  <strong>先创建一个 Provider</strong>
+                  <span>左侧选择预置模板后，这里会展示 Base URL、API Key、检测和拉取模型工具。</span>
+                </div>
+            `;
+            return;
+        }
+
+        const status = modelServiceUiState.providerStatus;
+        const presetLabel = MODEL_SERVICE_PRESETS.find((preset) => preset.presetId === provider.presetId)?.name || provider.presetId || 'Custom';
+        const headerCount = Object.keys(provider.extraHeaders || {}).length;
+        const hasChatModel = (provider.models || []).some((model) => model.enabled !== false && model.capabilities?.chat === true);
+        const apiPreview = buildModelServiceEndpoint(provider.apiBaseUrl, '/v1/chat/completions');
+        const apiKeysValue = (Array.isArray(provider.apiKeys) ? provider.apiKeys : []).join(', ');
+
+        el.modelServiceProviderDetail.innerHTML = `
+            <div class="model-service-detail">
+              <div class="model-service-setting-title">
+                <div class="model-service-setting-title__main">
+                  <span class="model-service-setting-title__heading">
+                    <strong>${escapeHtml(provider.name)}</strong>
+                  </span>
+                  <span>${escapeHtml(presetLabel)} · OpenAI-compatible</span>
+                </div>
+                <label class="model-service-toggle" title="启用 Provider">
+                  <input type="checkbox" data-model-service-provider-field="enabled" aria-label="启用 Provider" ${provider.enabled !== false ? 'checked' : ''} />
+                </label>
+              </div>
+              <div class="model-service-divider"></div>
+
+              ${status ? `
+                <div class="model-service-status model-service-status--${escapeHtml(status.tone || 'info')}">
+                  <strong>${escapeHtml(status.title || '提示')}</strong>
+                  <span>${escapeHtml(status.message || '')}</span>
+                </div>
+              ` : ''}
+
+              <section class="model-service-setting-group">
+                <div class="model-service-setting-subtitle">API 密钥</div>
+                <div class="model-service-input-row model-service-input-row--key">
+                  <input class="model-service-control" type="${modelServiceUiState.showApiKeys === true ? 'text' : 'password'}" data-model-service-provider-field="apiKeys" value="${escapeHtml(apiKeysValue)}" placeholder="sk-xxx, sk-yyy" spellcheck="false" autocomplete="off" />
+                  <button class="model-service-icon-button" type="button" data-model-service-action="toggle-api-keys-visibility" title="${modelServiceUiState.showApiKeys === true ? '隐藏 API Key' : '显示 API Key'}">
+                    <span class="material-symbols-outlined">${modelServiceUiState.showApiKeys === true ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                  <button class="model-service-button ${provider.apiKeys?.length ? 'model-service-button--primary' : ''}" type="button" data-model-service-action="check-provider">
+                    检测
+                  </button>
+                </div>
+                <div class="model-service-help-row model-service-help-row--spread">
+                  <span>支持逗号或换行录入多个 Key。</span>
+                  <span>${Array.isArray(provider.apiKeys) && provider.apiKeys.length > 0 ? `${provider.apiKeys.length} Keys` : 'No API Key'}</span>
+                </div>
+                ${hasChatModel ? '' : `<div class="model-service-help-row"><span>当前还没有可检测的聊天模型。</span></div>`}
+              </section>
+
+              <section class="model-service-setting-group">
+                <div class="model-service-setting-subtitle-row">
+                  <div class="model-service-setting-subtitle">API 地址</div>
+                  <div class="model-service-setting-actions">
+                    <button class="model-service-icon-button ${headerCount > 0 ? 'model-service-icon-button--active' : ''}" type="button" data-model-service-action="edit-headers" title="高级请求头">
+                      <span class="material-symbols-outlined">settings</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="model-service-input-row model-service-input-row--api">
+                  <input class="model-service-control" type="text" data-model-service-provider-field="apiBaseUrl" value="${escapeHtml(provider.apiBaseUrl)}" placeholder="https://api.example.com" />
+                </div>
+                <div class="model-service-popup-help">
+                  ${escapeHtml(apiPreview || '只填写 Base URL，具体接口路径会自动补全为 /v1/chat/completions。')}
+                </div>
+              </section>
+            </div>
+        `;
+    }
+
+    function renderModelServiceModelsPanel(service = getNormalizedModelService()) {
+        if (!el.modelServiceModelsPanel) {
+            return;
+        }
+
+        const provider = getSelectedModelServiceProvider(service);
+        if (!provider) {
+            el.modelServiceModelsPanel.innerHTML = `
+                <div class="empty-list-state">
+                  <strong>这里会显示模型列表</strong>
+                  <span>先选择一个 Provider，然后拉取 /models 或手动新增模型。</span>
+                </div>
+            `;
+            return;
+        }
+
+        const modelQuery = normalizeModelServiceText(modelServiceUiState.modelSearch).toLowerCase();
+        const visibleModels = (provider.models || []).filter((model) => {
+            if (!modelQuery) {
+                return true;
+            }
+            return [model.id, model.name, model.group]
+                .some((value) => String(value || '').toLowerCase().includes(modelQuery));
+        });
+        const groupedModels = visibleModels.reduce((groups, model) => {
+            const groupName = model.group || 'chat';
+            if (!groups[groupName]) {
+                groups[groupName] = [];
+            }
+            groups[groupName].push(model);
+            return groups;
+        }, {});
+        const groupOrder = Array.from(new Set([
+            ...MODEL_SERVICE_GROUP_OPTIONS.map((option) => option.value),
+            ...Object.keys(groupedModels),
+        ]));
+        const orderedGroups = groupOrder
+            .map((groupName) => ({
+                groupName,
+                models: groupedModels[groupName] || [],
+            }))
+            .filter((entry) => entry.models.length > 0);
+        const showModelSearch = modelServiceUiState.showModelSearch === true || Boolean(modelServiceUiState.modelSearch);
+
+        el.modelServiceModelsPanel.innerHTML = `
+            <div class="model-service-models">
+              <div class="model-service-setting-subtitle-row model-service-setting-subtitle-row--models">
+                <div class="model-service-models__headline">
+                  <div class="model-service-setting-subtitle model-service-setting-subtitle--models">Models</div>
+                  <span class="model-service-models__count">${escapeHtml(String(visibleModels.length))}</span>
+                </div>
+                <div class="model-service-setting-actions">
+                  <button class="model-service-icon-button ${showModelSearch ? 'model-service-icon-button--active' : ''}" type="button" data-model-service-action="toggle-model-search" title="搜索模型">
+                    <span class="material-symbols-outlined">search</span>
+                  </button>
+                  <button class="model-service-icon-button" type="button" data-model-service-action="run-health-check" title="健康检查">
+                    <span class="material-symbols-outlined">monitor_heart</span>
+                  </button>
+                </div>
+              </div>
+
+              ${showModelSearch ? `
+                <label class="model-service-toolbar-search">
+                  <span class="material-symbols-outlined">search</span>
+                  <input type="search" data-model-service-model-search value="${escapeHtml(modelServiceUiState.modelSearch)}" placeholder="Search models" />
+                </label>
+              ` : ''}
+
+              <div class="model-service-model-groups">
+                ${orderedGroups.length > 0
+                    ? orderedGroups.map(({ groupName, models }) => {
+                        const groupMeta = getModelServiceGroupMeta(groupName);
+                        const isCollapsed = modelServiceUiState.collapsedGroups?.[groupName] === true;
+                        return `
+                            <section class="model-service-group ${isCollapsed ? '' : 'model-service-group--open'}">
+                              <button
+                                class="model-service-group__header"
+                                type="button"
+                                data-model-service-group-toggle="${escapeHtml(groupName)}"
+                                aria-expanded="${isCollapsed ? 'false' : 'true'}"
+                              >
+                                <span class="model-service-group__title">
+                                  <span class="material-symbols-outlined model-service-group__chevron">${isCollapsed ? 'chevron_right' : 'expand_more'}</span>
+                                  <strong>${escapeHtml(groupMeta.label)}</strong>
+                                </span>
+                                <span class="model-service-badge">${escapeHtml(String(models.length))}</span>
+                              </button>
+                              ${isCollapsed ? '' : `
+                                <div class="model-service-group__list">
+                                  ${models.map((model) => `
+                                      <article
+                                        class="model-service-model-row ${model.id === modelServiceUiState.selectedModelId ? 'model-service-model-row--active' : ''}"
+                                        data-model-service-model-select="${escapeHtml(model.id)}"
+                                      >
+                                        ${renderModelServiceModelLead(model)}
+                                        <span class="model-service-model-row__main">
+                                          <span class="model-service-model-row__title">
+                                            <strong>${escapeHtml(model.name)}</strong>
+                                            <span class="model-service-badge ${model.source === 'remote' ? 'model-service-badge--soft' : 'model-service-badge--manual'}">${model.source === 'remote' ? 'REMOTE' : 'MANUAL'}</span>
+                                            ${model.enabled === false ? '<span class="model-service-badge model-service-badge--muted">OFF</span>' : ''}
+                                          </span>
+                                          <span class="model-service-model-row__id">${escapeHtml(model.id)}</span>
+                                        </span>
+                                        <span class="model-service-model-row__actions">
+                                          <button class="model-service-model-tool" type="button" data-model-service-action="edit-model" data-model-id="${escapeHtml(model.id)}" title="编辑模型">
+                                            <span class="material-symbols-outlined">edit</span>
+                                          </button>
+                                          <button class="model-service-model-tool" type="button" data-model-service-action="delete-model" data-model-id="${escapeHtml(model.id)}" title="删除模型">
+                                            <span class="material-symbols-outlined">delete</span>
+                                          </button>
+                                        </span>
+                                      </article>
+                                  `).join('')}
+                                </div>
+                              `}
+                            </section>
+                        `;
+                    }).join('')
+                    : `<div class="empty-list-state"><strong>没有匹配的模型</strong><span>可以拉取 /models，或者先手动新增一个模型。</span></div>`
+                }
+              </div>
+              <div class="model-service-model-actions">
+                <button class="model-service-button model-service-button--primary" type="button" data-model-service-action="manage-models">管理</button>
+                <button class="model-service-button" type="button" data-model-service-action="add-model">添加</button>
+              </div>
+            </div>
+        `;
+    }
+
+    function renderModelServiceDefaultSelectors(service = getNormalizedModelService()) {
+        if (!el.modelServiceDefaultSelectors) {
+            return;
+        }
+
+        const optionsByTask = Object.entries(MODEL_SERVICE_TASK_META).map(([taskKey, meta]) => {
+            const currentRef = service.defaults?.[taskKey];
+            const availableModels = listModelServiceModels(service, {
+                capability: meta.capability,
+                onlyEnabled: true,
+            });
+            return {
+                taskKey,
+                meta,
+                currentRef,
+                availableModels,
+            };
+        });
+
+        el.modelServiceDefaultSelectors.innerHTML = `
+            <div class="model-service-default-list">
+              ${optionsByTask.map(({ taskKey, meta, currentRef, availableModels }) => `
+                  <article class="model-service-default-row">
+                    <div class="model-service-default-row__meta">
+                      <strong>${escapeHtml(meta.label)}</strong>
+                      <span>${escapeHtml(meta.description)}</span>
+                    </div>
+                    <label class="model-service-default-row__control">
+                      <select data-model-service-default="${escapeHtml(taskKey)}" ${availableModels.length === 0 ? 'disabled' : ''}>
+                        <option value="">未设置</option>
+                        ${availableModels.map((item) => {
+                            const optionValue = `${item.ref.providerId}::${item.ref.modelId}`;
+                            const isSelected = currentRef
+                                && currentRef.providerId === item.ref.providerId
+                                && currentRef.modelId === item.ref.modelId;
+                            return `
+                              <option value="${escapeHtml(optionValue)}" ${isSelected ? 'selected' : ''}>
+                                ${escapeHtml(item.provider.name)} · ${escapeHtml(item.model.name)}
+                              </option>
+                            `;
+                        }).join('')}
+                      </select>
+                      <span>${availableModels.length > 0 ? `${availableModels.length} 个可选模型 · ${meta.capability}` : `暂无可用 ${meta.capability} 模型`}</span>
+                    </label>
+                  </article>
+              `).join('')}
+            </div>
+        `;
+    }
+
+    function renderModelServiceWorkbench() {
+        const service = getNormalizedModelService();
+        ensureModelServiceUiSelections(service);
+        renderModelServicePresetActions(service);
+        renderModelServiceProviderList(service);
+        renderModelServiceProviderDetail(service);
+        renderModelServiceModelsPanel(service);
+        renderModelServicePopup(service);
+        syncLegacyModelServiceFields({
+            ...getGlobalSettings(),
+            modelService: service,
+        });
+    }
+
+    async function detectSelectedModelServiceProvider(modelId = '') {
+        const service = getNormalizedModelService();
+        const provider = getSelectedModelServiceProvider(service);
+        if (!provider) {
+            return;
+        }
+
+        if (typeof chatAPI.checkModelServiceProvider !== 'function') {
+            setModelServiceStatus({
+                tone: 'warning',
+                title: '当前预加载接口不可用',
+                message: '本次运行环境没有暴露 Provider 检测能力。',
+            });
+            return;
+        }
+
+        setModelServiceStatus({
+            tone: 'info',
+            title: '正在检测',
+            message: `正在检测 ${provider.name} 的可用性...`,
+        });
+
+        const result = await chatAPI.checkModelServiceProvider({
+            provider,
+            modelId: modelId || '',
+        }).catch((error) => ({
+            success: false,
+            error: error.message,
+        }));
+
+        if (result?.success) {
+            setModelServiceStatus({
+                tone: 'success',
+                title: '检测成功',
+                message: `响应正常，延迟约 ${result.latencyMs || 0} ms。`,
+            });
+            return;
+        }
+
+        setModelServiceStatus({
+            tone: 'warning',
+            title: result?.needsModelSelection ? '需要先选择聊天模型' : '检测失败',
+            message: result?.error || '未能完成连接检测。',
+        });
+    }
+
+    async function fetchSelectedModelServiceModels() {
+        const service = getNormalizedModelService();
+        const provider = getSelectedModelServiceProvider(service);
+        if (!provider) {
+            return;
+        }
+
+        if (typeof chatAPI.fetchModelServiceModels !== 'function') {
+            setModelServiceStatus({
+                tone: 'warning',
+                title: '当前预加载接口不可用',
+                message: '本次运行环境没有暴露模型拉取能力。',
+            });
+            return;
+        }
+
+        setModelServiceStatus({
+            tone: 'info',
+            title: '正在拉取 /models',
+            message: `正在从 ${provider.name} 拉取远端模型列表...`,
+        });
+
+        const result = await chatAPI.fetchModelServiceModels({
+            provider,
+        }).catch((error) => ({
+            success: false,
+            error: error.message,
+            models: [],
+        }));
+
+        if (!result?.success) {
+            setModelServiceStatus({
+                tone: 'warning',
+                title: '拉取失败',
+                message: result?.error || '未能获取远端模型列表。',
+            });
+            return;
+        }
+
+        updateModelService((currentService) => ({
+            ...currentService,
+            providers: (currentService.providers || []).map((item) => (
+                item.id === provider.id
+                    ? mergeFetchedModelsLocally(item, result.models || [])
+                    : item
+            )),
+        }));
+
+        setModelServiceStatus({
+            tone: 'success',
+            title: '模型已更新',
+            message: `共导入 ${Number(result.itemCount || 0)} 个远端模型，手动模型已保留。`,
+        });
+    }
+
+    async function runSelectedModelServiceHealthCheck(options = {}) {
+        const service = getNormalizedModelService();
+        const provider = getSelectedModelServiceProvider(service);
+        if (!provider) {
+            return;
+        }
+
+        if (typeof chatAPI.checkModelServiceHealth !== 'function') {
+            setModelServiceStatus({
+                tone: 'warning',
+                title: '当前预加载接口不可用',
+                message: '本次运行环境没有暴露批量健康检查能力。',
+            });
+            return;
+        }
+
+        const apiKeys = Array.isArray(options.apiKeys) ? options.apiKeys.filter(Boolean) : [];
+        const executionMode = options.executionMode || 'parallel';
+        const timeoutMs = Number(options.timeoutMs || 15000);
+        patchModelServicePopup((popup) => (
+            popup?.type === 'health-check'
+                ? {
+                    ...popup,
+                    running: true,
+                    error: '',
+                    results: [],
+                }
+                : popup
+        ));
+        setModelServiceStatus({
+            tone: 'info',
+            title: '正在批量检查',
+            message: `按 ${executionMode === 'serial' ? '串行' : '并行'} 模式检测 ${provider.name}...`,
+        });
+
+        const result = await chatAPI.checkModelServiceHealth({
+            provider: apiKeys.length > 0 ? { ...provider, apiKeys } : provider,
+            timeoutMs,
+            executionMode,
+        }).catch((error) => ({
+            success: false,
+            error: error.message,
+            results: [],
+        }));
+
+        patchModelServicePopup((popup) => (
+            popup?.type === 'health-check'
+                ? {
+                    ...popup,
+                    running: false,
+                    error: result?.success ? '' : (result?.error || '未能完成批量检测。'),
+                    results: Array.isArray(result?.results) ? result.results : [],
+                }
+                : popup
+        ));
+
+        if (result?.success) {
+            const healthResults = Array.isArray(result?.results) ? result.results : [];
+            const successCount = healthResults.filter((item) => item.success).length;
+            setModelServiceStatus({
+                tone: successCount === healthResults.length ? 'success' : 'warning',
+                title: '健康检查完成',
+                message: `${successCount}/${healthResults.length} 个组合检测通过。`,
+            });
+            return;
+        }
+
+        setModelServiceStatus({
+            tone: 'warning',
+            title: '健康检查失败',
+            message: result?.error || '未能完成批量检测。',
+        });
     }
 
     function applyTheme(_theme) {
@@ -746,7 +2794,7 @@ function createSettingsController(deps = {}) {
 
     function syncGlobalSettingsForm() {
         isSyncingGlobalSettingsForm = true;
-        const settings = getGlobalSettings();
+        const settings = composeSettingsWithModelService(getGlobalSettings());
         el.userNameInput.value = settings.userName || '';
         if (el.defaultModelInput) el.defaultModelInput.value = settings.defaultModel || '';
         if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = settings.followUpDefaultModel || '';
@@ -767,13 +2815,13 @@ function createSettingsController(deps = {}) {
         if (el.studyMemoryTopKInput) el.studyMemoryTopKInput.value = settings.studyLogPolicy?.memoryTopK ?? 4;
         if (el.studyMemoryFallbackTopKInput) el.studyMemoryFallbackTopKInput.value = settings.studyLogPolicy?.memoryFallbackTopK ?? 2;
         if (el.promptVariablesInput) el.promptVariablesInput.value = JSON.stringify(settings.promptVariables || {}, null, 2);
-        el.vcpServerUrl.value = settings.vcpServerUrl || '';
-        el.vcpApiKey.value = settings.vcpApiKey || '';
+        if (el.vcpServerUrl) el.vcpServerUrl.value = settings.vcpServerUrl || '';
+        if (el.vcpApiKey) el.vcpApiKey.value = settings.vcpApiKey || '';
         if (el.kbBaseUrl) el.kbBaseUrl.value = settings.kbBaseUrl || settings.vcpServerUrl || '';
         if (el.kbApiKey) el.kbApiKey.value = settings.kbApiKey || settings.vcpApiKey || '';
-        el.kbEmbeddingModel.value = settings.kbEmbeddingModel || '';
+        if (el.kbEmbeddingModel) el.kbEmbeddingModel.value = settings.kbEmbeddingModel || '';
         el.kbUseRerank.checked = settings.kbUseRerank !== false;
-        el.kbRerankModel.value = settings.kbRerankModel || 'BAAI/bge-reranker-v2-m3';
+        if (el.kbRerankModel) el.kbRerankModel.value = settings.kbRerankModel || 'BAAI/bge-reranker-v2-m3';
         el.kbTopK.value = settings.kbTopK ?? 6;
         el.kbCandidateTopK.value = settings.kbCandidateTopK ?? 20;
         el.kbScoreThreshold.value = settings.kbScoreThreshold ?? 0.25;
@@ -854,12 +2902,18 @@ function createSettingsController(deps = {}) {
         if (themeInput) {
             themeInput.checked = true;
         }
+        if (el.modelServiceProviderSearchInput) {
+            el.modelServiceProviderSearchInput.value = modelServiceUiState.providerSearch;
+        }
+        syncLegacyModelServiceFields(settings);
+        renderModelServiceWorkbench();
+        renderModelServiceDefaultSelectors();
         isSyncingGlobalSettingsForm = false;
     }
 
     async function loadSettings() {
         const loaded = await chatAPI.loadSettings();
-        patchGlobalSettings(loaded || {});
+        patchGlobalSettings(composeSettingsWithModelService(loaded || {}));
         syncGlobalSettingsForm();
         applyRendererSettings();
         syncLayoutSettings(getGlobalSettings());
@@ -877,13 +2931,14 @@ function createSettingsController(deps = {}) {
             return;
         }
         const themeMode = documentObj.querySelector('input[name="themeMode"]:checked')?.value || 'system';
-        const globalServerUrl = el.vcpServerUrl.value.trim();
-        const globalApiKey = el.vcpApiKey.value.trim();
+        const modelService = normalizeModelService(getGlobalSettings().modelService);
+        const modelServiceMirror = buildModelServiceMirror(modelService, getGlobalSettings());
         const patch = {
             userName: el.userNameInput.value.trim() || 'User',
-            defaultModel: el.defaultModelInput?.value.trim() || '',
-            followUpDefaultModel: el.followUpDefaultModelInput?.value.trim() || '',
-            topicTitleDefaultModel: el.topicTitleDefaultModelInput?.value.trim() || '',
+            modelService,
+            defaultModel: modelServiceMirror.defaultModel || '',
+            followUpDefaultModel: modelServiceMirror.followUpDefaultModel || '',
+            topicTitleDefaultModel: modelServiceMirror.topicTitleDefaultModel || '',
             studyProfile: {
                 studentName: el.studentNameInput?.value.trim() || '',
                 city: el.studyCityInput?.value.trim() || '',
@@ -900,13 +2955,13 @@ function createSettingsController(deps = {}) {
                 memoryTopK: Number(el.studyMemoryTopKInput?.value || 4),
                 memoryFallbackTopK: Number(el.studyMemoryFallbackTopKInput?.value || 2),
             },
-            vcpServerUrl: globalServerUrl,
-            vcpApiKey: globalApiKey,
-            kbBaseUrl: globalServerUrl,
-            kbApiKey: globalApiKey,
-            kbEmbeddingModel: el.kbEmbeddingModel.value.trim(),
+            vcpServerUrl: modelServiceMirror.vcpServerUrl || '',
+            vcpApiKey: modelServiceMirror.vcpApiKey || '',
+            kbBaseUrl: modelServiceMirror.kbBaseUrl || '',
+            kbApiKey: modelServiceMirror.kbApiKey || '',
+            kbEmbeddingModel: modelServiceMirror.kbEmbeddingModel || '',
             kbUseRerank: el.kbUseRerank.checked,
-            kbRerankModel: el.kbRerankModel.value.trim(),
+            kbRerankModel: modelServiceMirror.kbRerankModel || '',
             kbTopK: Number(el.kbTopK.value || 6),
             kbCandidateTopK: Number(el.kbCandidateTopK.value || 20),
             kbScoreThreshold: Number(el.kbScoreThreshold.value || 0.25),
@@ -941,7 +2996,7 @@ function createSettingsController(deps = {}) {
         }
 
         const persistedSettings = result?.settings && typeof result.settings === 'object'
-            ? result.settings
+            ? composeSettingsWithModelService(result.settings)
             : patch;
         patchGlobalSettings(persistedSettings);
         syncGlobalSettingsForm();
@@ -1019,6 +3074,7 @@ function createSettingsController(deps = {}) {
         const sections = [
             ['services', el.settingsModalSectionServices],
             ['default-model', el.settingsModalSectionDefaultModel],
+            ['retrieval', el.settingsModalSectionRetrieval],
             ['prompts', el.settingsModalSectionPrompts],
             ['display', el.settingsModalSectionDisplay],
             ['agent', el.settingsModalSectionAgent],
@@ -1183,6 +3239,429 @@ function createSettingsController(deps = {}) {
                     scheduleGlobalSettingsSave(0);
                 }
             });
+        });
+
+        el.modelServiceProviderSearchInput?.addEventListener('input', () => {
+            modelServiceUiState.providerSearch = el.modelServiceProviderSearchInput.value || '';
+            renderModelServiceProviderList();
+        });
+
+        el.modelServiceAddProviderBtn?.addEventListener('click', () => {
+            modelServiceUiState.providerMenuId = '';
+            openModelServiceProviderEditorPopup();
+        });
+
+        el.modelServiceProviderList?.addEventListener('click', (event) => {
+            const menuToggle = event.target.closest('[data-model-service-provider-menu-toggle]');
+            if (menuToggle) {
+                const providerId = menuToggle.dataset.modelServiceProviderMenuToggle || '';
+                modelServiceUiState.providerMenuId = modelServiceUiState.providerMenuId === providerId ? '' : providerId;
+                renderModelServiceProviderList();
+                return;
+            }
+
+            const menuAction = event.target.closest('[data-model-service-provider-menu-action]');
+            if (menuAction) {
+                const providerId = menuAction.dataset.providerId || '';
+                modelServiceUiState.providerMenuId = '';
+                if (menuAction.dataset.modelServiceProviderMenuAction === 'edit') {
+                    openModelServiceProviderEditorPopup({ providerId });
+                    return;
+                }
+                if (menuAction.dataset.modelServiceProviderMenuAction === 'fetch') {
+                    modelServiceUiState.selectedProviderId = providerId;
+                    void fetchSelectedModelServiceModels();
+                    return;
+                }
+                if (menuAction.dataset.modelServiceProviderMenuAction === 'delete') {
+                    modelServiceUiState.selectedProviderId = providerId;
+                    updateModelService((currentService) => ({
+                        ...currentService,
+                        providers: (currentService.providers || []).filter((provider) => provider.id !== providerId),
+                        defaults: Object.fromEntries(
+                            Object.entries(currentService.defaults || {}).map(([taskKey, ref]) => [
+                                taskKey,
+                                ref && ref.providerId === providerId ? null : ref,
+                            ])
+                        ),
+                    }));
+                    modelServiceUiState.providerStatus = null;
+                    modelServiceUiState.popup = null;
+                    return;
+                }
+            }
+
+            const button = event.target.closest('[data-model-service-provider-select]');
+            if (!button) {
+                return;
+            }
+
+            modelServiceUiState.selectedProviderId = button.dataset.modelServiceProviderSelect || '';
+            modelServiceUiState.selectedModelId = '';
+            modelServiceUiState.providerMenuId = '';
+            modelServiceUiState.showModelSearch = false;
+            modelServiceUiState.showApiKeys = false;
+            modelServiceUiState.providerStatus = null;
+            modelServiceUiState.popup = null;
+            renderModelServiceWorkbench();
+        });
+
+        el.modelServiceProviderDetail?.addEventListener('input', (event) => {
+            const field = event.target.dataset?.modelServiceProviderField;
+            if (!field) {
+                return;
+            }
+
+            updateModelService((currentService) => ({
+                ...currentService,
+                providers: (currentService.providers || []).map((provider) => {
+                    if (provider.id !== modelServiceUiState.selectedProviderId) {
+                        return provider;
+                    }
+
+                    const nextProvider = { ...provider };
+                    if (field === 'name') {
+                        nextProvider.name = event.target.value;
+                    } else if (field === 'apiBaseUrl') {
+                        nextProvider.apiBaseUrl = normalizeModelServiceBaseUrl(event.target.value);
+                    } else if (field === 'apiKeys') {
+                        nextProvider.apiKeys = parseModelServiceApiKeysInput(event.target.value);
+                    }
+                    return nextProvider;
+                }),
+            }));
+        });
+
+        el.modelServiceProviderDetail?.addEventListener('change', (event) => {
+            const providerField = event.target.dataset?.modelServiceProviderField;
+            if (providerField === 'enabled') {
+                updateModelService((currentService) => ({
+                    ...currentService,
+                    providers: (currentService.providers || []).map((provider) => (
+                        provider.id === modelServiceUiState.selectedProviderId
+                            ? { ...provider, enabled: event.target.checked }
+                            : provider
+                    )),
+                }));
+            }
+        });
+
+        el.modelServiceProviderDetail?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-model-service-action]');
+            if (!button) {
+                return;
+            }
+
+            const action = button.dataset.modelServiceAction;
+            if (action === 'check-provider') {
+                openModelServiceCheckPopup();
+                return;
+            }
+            if (action === 'toggle-api-keys-visibility') {
+                modelServiceUiState.showApiKeys = !modelServiceUiState.showApiKeys;
+                renderModelServiceProviderDetail();
+                return;
+            }
+            if (action === 'edit-headers') {
+                openModelServiceHeadersPopup();
+                return;
+            }
+        });
+
+        el.modelServiceModelsPanel?.addEventListener('input', (event) => {
+            if (event.target.dataset?.modelServiceModelSearch !== undefined) {
+                modelServiceUiState.modelSearch = event.target.value || '';
+                renderModelServiceModelsPanel();
+            }
+        });
+
+        el.modelServiceModelsPanel?.addEventListener('click', (event) => {
+            const groupToggleButton = event.target.closest('[data-model-service-group-toggle]');
+            if (groupToggleButton) {
+                toggleModelServiceGroup(groupToggleButton.dataset.modelServiceGroupToggle || '');
+                return;
+            }
+
+            const button = event.target.closest('[data-model-service-action]');
+            if (button) {
+                const action = button.dataset.modelServiceAction;
+                if (action === 'run-health-check') {
+                    openModelServiceHealthCheckPopup();
+                    return;
+                }
+                if (action === 'toggle-model-search') {
+                    modelServiceUiState.showModelSearch = !modelServiceUiState.showModelSearch;
+                    renderModelServiceModelsPanel();
+                    return;
+                }
+                if (action === 'manage-models') {
+                    openModelServiceManageModelsPopup();
+                    return;
+                }
+                if (action === 'add-model') {
+                    openModelServiceModelEditorPopup();
+                    return;
+                }
+                if (action === 'edit-model') {
+                    openModelServiceModelEditorPopup({
+                        modelId: button.dataset.modelId || '',
+                    });
+                    return;
+                }
+
+                if (action === 'delete-model') {
+                    deleteModelServiceModel(button.dataset.modelId || modelServiceUiState.selectedModelId);
+                    return;
+                }
+            }
+
+            const modelSelectButton = event.target.closest('[data-model-service-model-select]');
+            if (modelSelectButton) {
+                modelServiceUiState.selectedModelId = modelSelectButton.dataset.modelServiceModelSelect || '';
+                renderModelServiceModelsPanel();
+            }
+        });
+
+        ensureModelServiceDialogHost().addEventListener('click', (event) => {
+            const overlay = event.target.closest('[data-model-service-popup-overlay]');
+            const modal = event.target.closest('[data-model-service-popup]');
+            if (overlay && !modal) {
+                setModelServicePopup(null);
+                return;
+            }
+
+            if (event.target.closest('[data-model-service-popup-close]')) {
+                setModelServicePopup(null);
+                return;
+            }
+
+            const button = event.target.closest('[data-model-service-popup-action]');
+            if (!button) {
+                return;
+            }
+
+            const popup = modelServiceUiState.popup;
+            const action = button.dataset.modelServicePopupAction;
+            if (action === 'save-provider-editor') {
+                saveModelServiceProviderEditorPopup();
+                return;
+            }
+            if (action === 'confirm-check-provider') {
+                const modelId = popup?.type === 'check-provider' ? popup.modelId || '' : '';
+                setModelServicePopup(null);
+                void detectSelectedModelServiceProvider(modelId);
+                return;
+            }
+            if (action === 'save-headers') {
+                if (popup?.type === 'headers') {
+                    const provider = getModelServicePopupProvider(popup);
+                    if (provider) {
+                        updateModelService((currentService) => ({
+                            ...currentService,
+                            providers: (currentService.providers || []).map((item) => (
+                                item.id === provider.id
+                                    ? { ...item, extraHeaders: parseModelServiceHeadersInput(popup.value || '') }
+                                    : item
+                            )),
+                        }));
+                    }
+                }
+                setModelServicePopup(null);
+                return;
+            }
+            if (action === 'start-health-check') {
+                if (popup?.type === 'health-check') {
+                    const provider = getModelServicePopupProvider(popup);
+                    const providerApiKeys = Array.isArray(provider?.apiKeys) ? provider.apiKeys.filter(Boolean) : [];
+                    const selectedKeys = popup.keyMode === 'single'
+                        ? [providerApiKeys[popup.selectedKeyIndex]].filter(Boolean)
+                        : providerApiKeys;
+                    void runSelectedModelServiceHealthCheck({
+                        apiKeys: selectedKeys,
+                        timeoutMs: popup.timeoutMs,
+                        executionMode: popup.executionMode,
+                    });
+                }
+                return;
+            }
+            if (action === 'open-add-model') {
+                openModelServiceModelEditorPopup({
+                    returnToManage: popup?.type === 'manage-models',
+                    manageSearch: popup?.type === 'manage-models' ? popup.search || '' : '',
+                });
+                return;
+            }
+            if (action === 'edit-model') {
+                openModelServiceModelEditorPopup({
+                    modelId: button.dataset.modelId || '',
+                    returnToManage: popup?.type === 'manage-models',
+                    manageSearch: popup?.type === 'manage-models' ? popup.search || '' : '',
+                });
+                return;
+            }
+            if (action === 'delete-model') {
+                deleteModelServiceModel(button.dataset.modelId || '');
+                return;
+            }
+            if (action === 'save-model-editor') {
+                saveModelServiceModelEditorPopup();
+            }
+        });
+
+        ensureModelServiceDialogHost().addEventListener('input', (event) => {
+            const field = event.target.dataset?.modelServicePopupField;
+            if (modelServiceUiState.popup?.type === 'provider-editor') {
+                if (field === 'providerName') {
+                    patchModelServicePopup({ name: event.target.value || '', error: '' }, false);
+                    return;
+                }
+                if (field === 'providerPresetId') {
+                    patchModelServicePopup({ presetId: event.target.value || 'custom-openai-compatible', error: '' });
+                    return;
+                }
+            }
+            if (field === 'value' && modelServiceUiState.popup?.type === 'headers') {
+                patchModelServicePopup({ value: event.target.value }, false);
+                return;
+            }
+            if (field === 'search' && modelServiceUiState.popup?.type === 'manage-models') {
+                patchModelServicePopup({ search: event.target.value || '' });
+                return;
+            }
+            if (!field || modelServiceUiState.popup?.type !== 'model-editor') {
+                return;
+            }
+
+            if (field === 'draft.enabled') {
+                patchModelServicePopup((popup) => ({
+                    ...popup,
+                    error: '',
+                    draft: {
+                        ...(popup.draft || {}),
+                        enabled: event.target.checked,
+                    },
+                }), false);
+                return;
+            }
+
+            if (!field.startsWith('draft.')) {
+                return;
+            }
+
+            const draftField = field.slice(6);
+            patchModelServicePopup((popup) => ({
+                ...popup,
+                error: '',
+                draft: {
+                    ...(popup.draft || {}),
+                    [draftField]: event.target.value,
+                },
+            }), false);
+        });
+
+        ensureModelServiceDialogHost().addEventListener('change', (event) => {
+            const popup = modelServiceUiState.popup;
+            const field = event.target.dataset?.modelServicePopupField;
+            if (popup?.type === 'provider-editor') {
+                if (field === 'providerPresetId') {
+                    patchModelServicePopup({ presetId: event.target.value || 'custom-openai-compatible', error: '' });
+                }
+                return;
+            }
+            if (popup?.type === 'check-provider' && field === 'modelId') {
+                patchModelServicePopup({ modelId: event.target.value || '' });
+                return;
+            }
+            if (popup?.type === 'health-check') {
+                if (field === 'keyMode') {
+                    patchModelServicePopup({
+                        keyMode: event.target.value || 'all',
+                        selectedKeyIndex: 0,
+                    });
+                    return;
+                }
+                if (field === 'executionMode') {
+                    patchModelServicePopup({ executionMode: event.target.value || 'parallel' });
+                    return;
+                }
+                if (field === 'selectedKeyIndex') {
+                    patchModelServicePopup({ selectedKeyIndex: Number(event.target.value || 0) });
+                    return;
+                }
+                if (field === 'timeoutSeconds') {
+                    patchModelServicePopup({ timeoutMs: Math.max(5, Number(event.target.value || 15)) * 1000 });
+                    return;
+                }
+            }
+
+            if (popup?.type === 'model-editor') {
+                if (field === 'draft.group') {
+                    const nextGroup = event.target.value || 'chat';
+                    patchModelServicePopup((currentPopup) => ({
+                        ...currentPopup,
+                        error: '',
+                        draft: {
+                            ...(currentPopup.draft || {}),
+                            group: nextGroup,
+                        },
+                    }), false);
+                    return;
+                }
+                if (field === 'draft.enabled') {
+                    patchModelServicePopup((currentPopup) => ({
+                        ...currentPopup,
+                        error: '',
+                        draft: {
+                            ...(currentPopup.draft || {}),
+                            enabled: event.target.checked,
+                        },
+                    }), false);
+                    return;
+                }
+            }
+
+            const capabilityKey = event.target.dataset?.modelServicePopupCapability;
+            if (popup?.type === 'model-editor' && capabilityKey) {
+                patchModelServicePopup((currentPopup) => ({
+                    ...currentPopup,
+                    error: '',
+                    draft: {
+                        ...(currentPopup.draft || {}),
+                        capabilities: {
+                            ...(currentPopup.draft?.capabilities || {}),
+                            [capabilityKey]: event.target.checked,
+                        },
+                    },
+                }), false);
+            }
+        });
+
+        documentObj.addEventListener('click', (event) => {
+            if (!modelServiceUiState.providerMenuId) {
+                return;
+            }
+            if (event.target.closest('[data-model-service-provider-menu-root]')) {
+                return;
+            }
+            modelServiceUiState.providerMenuId = '';
+            renderModelServiceProviderList();
+        });
+
+        el.modelServiceDefaultSelectors?.addEventListener('change', (event) => {
+            const taskKey = event.target.dataset?.modelServiceDefault;
+            if (!taskKey) {
+                return;
+            }
+
+            const rawValue = event.target.value || '';
+            const [providerId, modelId] = rawValue.split('::');
+            updateModelService((currentService) => ({
+                ...currentService,
+                defaults: {
+                    ...(currentService.defaults || {}),
+                    [taskKey]: providerId && modelId ? { providerId, modelId } : null,
+                },
+            }));
         });
 
         el.enableAgentBubbleTheme?.addEventListener('change', () => {

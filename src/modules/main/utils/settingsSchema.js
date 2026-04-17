@@ -5,6 +5,11 @@ const {
     DEFAULT_KB_CANDIDATE_TOP_K,
     DEFAULT_KB_SCORE_THRESHOLD,
 } = require('../knowledge-base/constants');
+const {
+    buildLegacySettingsMirror,
+    createDefaultModelService,
+    normalizeModelService,
+} = require('./modelService');
 
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{VarDivRender}}';
 const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
@@ -57,6 +62,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     layoutRightWidth: 400,
     layoutLeftTopHeight: 360,
     userName: 'User',
+    modelService: createDefaultModelService(),
     vcpServerUrl: '',
     vcpApiKey: '',
     guideModel: '',
@@ -119,9 +125,22 @@ const DEFAULT_SETTINGS = Object.freeze({
     studyLogPolicy: { ...DEFAULT_STUDY_LOG_POLICY },
 });
 
+function hasConfiguredModelService(modelService = {}) {
+    if (!modelService || typeof modelService !== 'object') {
+        return false;
+    }
+
+    if (Array.isArray(modelService.providers) && modelService.providers.length > 0) {
+        return true;
+    }
+
+    return Object.values(modelService.defaults || {}).some((value) => Boolean(value?.providerId && value?.modelId));
+}
+
 function cloneDefaultSettings() {
     return {
         ...DEFAULT_SETTINGS,
+        modelService: createDefaultModelService(),
         studyProfile: { ...DEFAULT_STUDY_PROFILE },
         promptVariables: {},
         studyLogPolicy: { ...DEFAULT_STUDY_LOG_POLICY },
@@ -310,6 +329,46 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
                 ? Math.max(1, Number(validated.studyLogPolicy.memoryFallbackTopK))
                 : DEFAULT_STUDY_LOG_POLICY.memoryFallbackTopK,
         };
+    }
+
+    const normalizedSourceModelService = sourceSettings?.modelService
+        && typeof sourceSettings.modelService === 'object'
+        && !Array.isArray(sourceSettings.modelService)
+        ? normalizeModelService(sourceSettings.modelService)
+        : createDefaultModelService();
+    const normalizedModelService = normalizedSourceModelService;
+
+    if (JSON.stringify(validated.modelService) !== JSON.stringify(normalizedModelService)) {
+        validated.modelService = normalizedModelService;
+        hasIssues = true;
+    } else {
+        validated.modelService = normalizedModelService;
+    }
+
+    if (hasConfiguredModelService(validated.modelService)) {
+        const legacyMirror = buildLegacySettingsMirror(validated.modelService, {
+            ...sourceSettings,
+            ...validated,
+        });
+
+        [
+            'vcpServerUrl',
+            'vcpApiKey',
+            'defaultModel',
+            'followUpDefaultModel',
+            'topicTitleDefaultModel',
+            'kbBaseUrl',
+            'kbApiKey',
+            'kbEmbeddingModel',
+            'kbRerankModel',
+            'guideModel',
+            'lastModel',
+        ].forEach((key) => {
+            if (validated[key] !== legacyMirror[key]) {
+                validated[key] = legacyMirror[key];
+                hasIssues = true;
+            }
+        });
     }
 
     return { validated, hasIssues };

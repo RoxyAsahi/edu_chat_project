@@ -1,6 +1,8 @@
 const {
     DEFAULT_KB_CANDIDATE_TOP_K,
 } = require('./constants');
+const { resolveExecutionConfig } = require('../utils/modelService');
+const { buildRequestHeaders } = require('../vcpClient');
 
 const DEFAULT_RERANK_TIMEOUT_MS = 15000;
 
@@ -64,27 +66,26 @@ async function requestRerank(settings, query, documents) {
         return [];
     }
 
-    if (typeof settings?.kbApiKey !== 'string' || settings.kbApiKey.trim() === '') {
-        throw new Error('KB API Key is required.');
-    }
-
-    if (typeof settings?.kbRerankModel !== 'string' || settings.kbRerankModel.trim() === '') {
-        throw new Error('KB Rerank Model is required.');
-    }
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), DEFAULT_RERANK_TIMEOUT_MS);
 
     try {
-        const endpoint = normalizeRerankEndpoint(settings.kbBaseUrl);
+        const execution = resolveExecutionConfig(settings, { purpose: 'rerank' });
+        const endpoint = execution?.endpoint || normalizeRerankEndpoint(settings?.kbBaseUrl);
+        const modelId = execution?.model?.id || String(settings?.kbRerankModel || '').trim();
+        if (!modelId) {
+            throw new Error('KB Rerank Model is required.');
+        }
+
+        if (!endpoint) {
+            throw new Error('KB Base URL is required.');
+        }
+
         const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${settings.kbApiKey.trim()}`,
-            },
+            headers: buildRequestHeaders(execution?.apiKey || settings?.kbApiKey || '', execution?.extraHeaders),
             body: JSON.stringify({
-                model: settings.kbRerankModel.trim(),
+                model: modelId,
                 query: cleanQuery,
                 documents,
             }),

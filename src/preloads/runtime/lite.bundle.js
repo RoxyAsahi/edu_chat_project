@@ -110,6 +110,9 @@ function createShellCatalog(ops) {
     return {
         loadSettings: query(() => ops.invoke('load-settings')),
         saveSettings: query((settings) => ops.invoke('save-settings', settings)),
+        fetchModelServiceModels: query((payload) => ops.invoke('model-service:fetch-models', payload)),
+        checkModelServiceProvider: query((payload) => ops.invoke('model-service:check-provider', payload)),
+        checkModelServiceHealth: query((payload) => ops.invoke('model-service:check-health', payload)),
         previewAgentBubbleThemePrompt: query((payload) => ops.invoke('preview-agent-bubble-theme-prompt', payload)),
         previewFinalSystemPrompt: query((payload) => ops.invoke('preview-final-system-prompt', payload)),
         saveAvatarColor: query((data) => ops.invoke('save-avatar-color', data)),
@@ -252,6 +255,9 @@ const ROLE_API_NAME = "chatAPI";
 const ALLOWED_KEYS = [
     "loadSettings",
     "saveSettings",
+    "fetchModelServiceModels",
+    "checkModelServiceProvider",
+    "checkModelServiceHealth",
     "previewAgentBubbleThemePrompt",
     "previewFinalSystemPrompt",
     "saveAvatarColor",
