@@ -5,10 +5,23 @@
   "layoutRightWidth": 400,
   "layoutLeftTopHeight": 360,
   "userName": "Fixture User",
+  "modelService": {
+    "version": 1,
+    "providers": [],
+    "defaults": {
+      "chat": null,
+      "followUp": null,
+      "topicTitle": null,
+      "embedding": null,
+      "rerank": null
+    }
+  },
   "vcpServerUrl": "http://127.0.0.1:18080/v1/chat/completions",
   "vcpApiKey": "fixture-api-key",
   "guideModel": "fixture-model",
   "defaultModel": "fixture-model",
+  "followUpDefaultModel": "",
+  "topicTitleDefaultModel": "",
   "lastModel": "fixture-model",
   "kbBaseUrl": "",
   "kbApiKey": "",
@@ -21,6 +34,14 @@
   "vcpLogUrl": "",
   "vcpLogKey": "",
   "networkNotesPaths": [],
+  "enableRenderingPrompt": true,
+  "enableAdaptiveBubbleTip": true,
+  "renderingPrompt": "",
+  "adaptiveBubbleTip": "",
+  "dailyNoteGuide": "",
+  "followUpPromptTemplate": "",
+  "enableTopicTitleGeneration": true,
+  "topicTitlePromptTemplate": "",
   "enableAgentBubbleTheme": false,
   "agentBubbleThemePrompt": "Output formatting requirement: {{VarDivRender}}",
   "enableSmoothStreaming": false,
@@ -43,13 +64,33 @@
   "showUserMetaInChatBubbleUi": true,
   "minChunkBufferSize": 1,
   "smoothStreamIntervalMs": 25,
-  "lastOpenItemId": "fixture-agent-001",
+  "lastOpenItemId": "contest_demo_math",
   "lastOpenItemType": "agent",
-  "lastOpenTopicId": "fixture-topic-001",
+  "lastOpenTopicId": "contest_demo_math_topic",
   "userAvatarCalculatedColor": null,
   "combinedItemOrder": [],
-  "agentOrder": [],
+  "agentOrder": [
+    "contest_demo_math",
+    "contest_demo_english",
+    "contest_demo_growth"
+  ],
   "currentThemeMode": "system",
   "themeLastUpdated": 0,
-  "enableThoughtChainInjection": false
+  "enableThoughtChainInjection": false,
+  "studyProfile": {
+    "studentName": "",
+    "city": "",
+    "studyWorkspace": "",
+    "workEnvironment": "",
+    "timezone": "Asia/Hong_Kong"
+  },
+  "promptVariables": {},
+  "studyLogPolicy": {
+    "enabled": true,
+    "enableDailyNotePromptVariables": true,
+    "autoInjectDailyNoteProtocol": true,
+    "maxToolRounds": 3,
+    "memoryTopK": 4,
+    "memoryFallbackTopK": 2
+  }
 }

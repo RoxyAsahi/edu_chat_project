@@ -1,0 +1,130 @@
+[
+  {
+    "id": "contest_demo_math_note_message",
+    "agentId": "contest_demo_math",
+    "topicId": "contest_demo_math_topic",
+    "title": "AI 回答摘录｜为什么先配方再谈范围",
+    "contentMarkdown": "## 结论\n\n参数型二次函数压轴题，常常先配方再谈范围，因为题目本质上在考顶点、最值和区间之间的关系。\n\n## 记忆句\n\n- 先把函数看成图像。\n- 再把范围题写成条件。\n- 顶点在区间内时，顶点优先于端点。",
+    "sourceMessageIds": [
+      "contest_demo_math_assistant_1"
+    ],
+    "sourceDocumentRefs": [
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_blueprint",
+        "chunkId": "contest_demo_math_doc_blueprint_preview",
+        "documentName": "二次函数压轴突破图.md",
+        "chunkIndex": 0,
+        "contentType": "markdown",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "# 二次函数压轴突破图 ## 先抓住函数骨架 二次函数题目的第一步，不是立刻代数运算，而是先确认三个骨架量： - 开口方向由 `a` 的正负决定。 - 对称轴由 `x = -b / 2a` 决定。 - 顶点坐标由对称轴和函数值共同确定。 只要骨架判断清楚，后续的最值、交点、范围题都会更稳定。 ## 三种常用表达式 ### 标准式 `y = ax^2 + bx...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_mistakes",
+        "chunkId": "contest_demo_math_doc_mistakes_preview",
+        "documentName": "二次函数常见失分点.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "二次函数常见失分点清单 1. 求对称轴时把 x = -b/2a 写成了 -b/2 + a。 2. 配方时忘记把提出去的系数 a 乘回去。 3. 已经转成顶点式，却还在用大量代点替代图像分析。 4. 题目问“在区间内恒成立”，只检查端点，没有检查顶点是否落在区间内部。 5. 把“有两个交点”和“有两个不同实数根”混用，却没有检查判别式大于 0。 6. 已知两个...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ],
+    "kind": "message-note",
+    "createdAt": 1776215130000,
+    "updatedAt": 1776215130000
+  },
+  {
+    "id": "contest_demo_math_note_strategy",
+    "agentId": "contest_demo_math",
+    "topicId": "contest_demo_math_topic",
+    "title": "抛物线压轴三步模板",
+    "contentMarkdown": "## 第一步：定骨架\n\n- 看 `a` 的正负，判断开口方向。\n- 写出对称轴，确认图像重心。\n\n## 第二步：换形式\n\n- 问最值、范围、区间恒成立时优先配方。\n- 问交点时再考虑判别式和交点式。\n\n## 第三步：列条件\n\n- 顶点在区间内时先看顶点。\n- 端点只负责补边界。\n- 最后再整理参数范围。",
+    "sourceMessageIds": [],
+    "sourceDocumentRefs": [
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_blueprint",
+        "chunkId": "contest_demo_math_doc_blueprint_preview",
+        "documentName": "二次函数压轴突破图.md",
+        "chunkIndex": 0,
+        "contentType": "markdown",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "# 二次函数压轴突破图 ## 先抓住函数骨架 二次函数题目的第一步，不是立刻代数运算，而是先确认三个骨架量： - 开口方向由 `a` 的正负决定。 - 对称轴由 `x = -b / 2a` 决定。 - 顶点坐标由对称轴和函数值共同确定。 只要骨架判断清楚，后续的最值、交点、范围题都会更稳定。 ## 三种常用表达式 ### 标准式 `y = ax^2 + bx...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_mistakes",
+        "chunkId": "contest_demo_math_doc_mistakes_preview",
+        "documentName": "二次函数常见失分点.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "二次函数常见失分点清单 1. 求对称轴时把 x = -b/2a 写成了 -b/2 + a。 2. 配方时忘记把提出去的系数 a 乘回去。 3. 已经转成顶点式，却还在用大量代点替代图像分析。 4. 题目问“在区间内恒成立”，只检查端点，没有检查顶点是否落在区间内部。 5. 把“有两个交点”和“有两个不同实数根”混用，却没有检查判别式大于 0。 6. 已知两个...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ],
+    "kind": "note",
+    "createdAt": 1776215280000,
+    "updatedAt": 1776215280000
+  },
+  {
+    "id": "contest_demo_math_note_analysis",
+    "agentId": "contest_demo_math",
+    "topicId": "contest_demo_math_topic",
+    "title": "深度分析报告｜二次函数压轴救援",
+    "contentMarkdown": "# 核心结论\n\n这组材料的真正目标，不是让学生背更多公式，而是建立“图像优先”的压轴题思维顺序。\n\n# 关键知识点\n\n- 顶点式负责最值判断。\n- 对称轴负责定位图像重心。\n- 判别式只在交点信息真正关键时再上场。\n\n# 关联关系\n\n题目一旦出现参数、区间、恒成立，这三类词通常说明“顶点”和“边界”都要参与判断，但主导者往往是顶点。\n\n# 疑难点\n\n- 学生容易把端点检查当作全部检查。\n- 学生容易看到参数题就条件反射去算判别式。\n\n# 后续学习建议\n\n下一步适合把这份笔记送入 Studio 继续生成选择题，专门练“什么时候先看顶点”。",
+    "sourceMessageIds": [
+      "contest_demo_math_assistant_1",
+      "contest_demo_math_assistant_2"
+    ],
+    "sourceDocumentRefs": [
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_blueprint",
+        "chunkId": "contest_demo_math_doc_blueprint_preview",
+        "documentName": "二次函数压轴突破图.md",
+        "chunkIndex": 0,
+        "contentType": "markdown",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "# 二次函数压轴突破图 ## 先抓住函数骨架 二次函数题目的第一步，不是立刻代数运算，而是先确认三个骨架量： - 开口方向由 `a` 的正负决定。 - 对称轴由 `x = -b / 2a` 决定。 - 顶点坐标由对称轴和函数值共同确定。 只要骨架判断清楚，后续的最值、交点、范围题都会更稳定。 ## 三种常用表达式 ### 标准式 `y = ax^2 + bx...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_mistakes",
+        "chunkId": "contest_demo_math_doc_mistakes_preview",
+        "documentName": "二次函数常见失分点.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "二次函数常见失分点清单 1. 求对称轴时把 x = -b/2a 写成了 -b/2 + a。 2. 配方时忘记把提出去的系数 a 乘回去。 3. 已经转成顶点式，却还在用大量代点替代图像分析。 4. 题目问“在区间内恒成立”，只检查端点，没有检查顶点是否落在区间内部。 5. 把“有两个交点”和“有两个不同实数根”混用，却没有检查判别式大于 0。 6. 已知两个...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ],
+    "kind": "analysis",
+    "createdAt": 1776215340000,
+    "updatedAt": 1776215340000
+  }
+]

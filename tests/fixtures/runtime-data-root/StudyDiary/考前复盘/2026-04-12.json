@@ -1,0 +1,51 @@
+{
+  "id": "study_diary_考前复盘_2026-04-12",
+  "notebookId": "考前复盘",
+  "notebookName": "考前复盘",
+  "dateKey": "2026-04-12",
+  "createdAt": 1776003300000,
+  "updatedAt": 1776003300000,
+  "lastEntryAt": 1776003300000,
+  "entryIds": [
+    "study_log_1776456349929_i9yxqx"
+  ],
+  "entryRefs": [
+    {
+      "agentId": "contest_demo_growth",
+      "topicId": "contest_demo_growth_topic",
+      "entryId": "study_log_1776456349929_i9yxqx"
+    }
+  ],
+  "entryCount": 1,
+  "recallCount": 0,
+  "lastRecalledAt": 0,
+  "tags": [
+    "产出导向",
+    "执行力"
+  ],
+  "topicIds": [
+    "contest_demo_growth_topic"
+  ],
+  "topics": {
+    "contest_demo_growth_topic": {
+      "topicId": "contest_demo_growth_topic",
+      "topicName": "🌙 考前一周复盘",
+      "entryIds": [
+        "study_log_1776456349929_i9yxqx"
+      ],
+      "count": 1
+    }
+  },
+  "agentIds": [
+    "contest_demo_growth"
+  ],
+  "agentNames": [
+    "展示案例｜学习成长"
+  ],
+  "sourceMessageIds": [],
+  "maidSignatures": [
+    "Reflection Coach"
+  ],
+  "isPublicNotebook": false,
+  "contentMarkdown": "# DailyNote 2026-04-12\n\n> 日记本：[考前复盘]\n\n## 🌙 考前一周复盘\n\n#### 22:15:00 · Reflection Coach\n[22:15] 把今晚的目标从学两小时改成了解决三道圆锥曲线的第一问，完成后的掌控感确实比盲目刷题要强很多。\nTag: 产出导向, 执行力\n\n\nMaid: [考前复盘]Reflection Coach\n\n\nTags: #产出导向 #执行力"
+}

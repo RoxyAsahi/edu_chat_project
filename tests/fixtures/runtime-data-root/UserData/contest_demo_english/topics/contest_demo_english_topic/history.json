@@ -1,0 +1,127 @@
+[
+  {
+    "id": "contest_demo_english_assistant_intro",
+    "role": "assistant",
+    "content": "# 展示建议卡\n\n- 先点左侧 Source 打开 docx 阅读材料，看看“来源指南”和原文是否能联动。\n- 回到聊天区，观察 AI 如何拆句、定位和排除干扰项。\n- 最后去右侧 Studio，用现有笔记继续生成闪卡做抽认。\n\n这个案例想展示：\n\n1. DOCX 资料可以被真正读懂，而不是只当上传附件。\n2. 回答不仅给结论，还会告诉你定位句和错误选项为什么错。\n3. 阅读过程能沉淀成笔记，再转成训练内容。",
+    "timestamp": 1776216780000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": [],
+    "name": "展示案例｜英语",
+    "agentId": "contest_demo_english",
+    "avatarUrl": "assets/default_avatar.png",
+    "isThinking": false,
+    "topicId": "contest_demo_english_topic",
+    "isGroupMessage": false,
+    "finishReason": "completed",
+    "kbContextRefs": []
+  },
+  {
+    "id": "contest_demo_english_user_1",
+    "role": "user",
+    "content": "这句 Because every student had a clear responsibility... 为什么对主旨这么关键？",
+    "timestamp": 1776216840000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": []
+  },
+  {
+    "id": "contest_demo_english_assistant_1",
+    "role": "assistant",
+    "content": "你好！你抓得非常准。这句话其实是整篇文章的“逻辑枢纽”。\n\n在阅读理解中，我们经常说“细节服务于主旨”，而这句话恰恰解释了学生行为转变的**根本原因**。让我们把它拆开来看：\n\n### 1. 定位句与逻辑拆解\n*   **定位句**：*“Because every student had a clear responsibility, attendance on gardening days became noticeably better.”*\n*   **逻辑连接词**：**Because** (引导原因)。\n*   **因果链条**：\n    *   **因 (Cause)**：每个学生都有明确的责任（clear responsibility）。\n    *   **果 (Effect)**：出勤率明显好转（attendance became better），参与度提高。\n\n### 2. 为什么它对主旨至关重要？\n这篇文章的主旨并不是教你怎么种西红柿，而是关于**“社区参与感如何改变人”**。\n\n这句话直接呼应了文章结尾的总结：*“The project improved participation because the work was shared...”*。它告诉读者，花园项目的成功不是因为植物长得好，而是因为**责任制（Responsibility）**让每个学生觉得自己是被需要的。\n\n### 3. 干扰项特征排除\n在针对这段话出题时，干扰项通常会这样设置：\n*   **干扰项 A：花园的主要目的是为了收获蔬菜。**\n    *   *排除理由*：文中明确说了 “The harvest itself was not the most important result.”（收获本身不是最重要的结果）。\n*   **干扰项 B：只有科学社团的学生才需要负责花园。**\n    *   *排除理由*：文中提到 “At first, many students thought... but teachers invited every class to take part in it.”（起初大家这么想，但后来是全员参与）。\n\n### 4. 核心词汇锦囊 (来自 Vocabulary Lab)\n*   **Responsibility (责任)**：这是改变发生的动力。\n*   **Participation (参与)**：这是文章观察到的最终结果。\n*   **As a result (结果是)**：虽然句子里用了 Because，但在做题时，你要能反应过来这描述的是一个因果关系。\n\n---\n\n### 💡 这里的阅读策略可以记在笔记本上：\n> **“抓因果，定主旨”**：当你在文中看到 Because, Since 或 As a result 时，它后面的内容往往就是作者想要强调的“核心逻辑”。如果一个选项只讲了“做了什么”而忽略了“为什么这么做”，那它通常只是个局部细节，不是主旨。\n\n你觉得如果把“明确的责任”换成“随意的帮忙”，学生们的出勤率还会变好吗？这就是逻辑的力量。加油！",
+    "timestamp": 1776216900000,
+    "attachments": [],
+    "favorited": true,
+    "favoriteAt": 1776216900000,
+    "noteRefs": [
+      "contest_demo_english_note_message"
+    ],
+    "selectionContextRefs": [],
+    "name": "展示案例｜英语",
+    "agentId": "contest_demo_english",
+    "avatarUrl": "assets/default_avatar.png",
+    "isThinking": false,
+    "topicId": "contest_demo_english_topic",
+    "isGroupMessage": false,
+    "finishReason": "completed",
+    "kbContextRefs": [
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_passage",
+        "chunkId": "contest_demo_english_doc_passage_preview",
+        "documentName": "Community Garden Reading Lab.docx",
+        "chunkIndex": 0,
+        "contentType": "docx-text",
+        "sectionTitle": "Community Garden Reading Lab",
+        "pageNumber": null,
+        "paragraphIndex": 1,
+        "snippet": "At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project would only belong to the scie...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_vocab",
+        "chunkId": "contest_demo_english_doc_vocab_preview",
+        "documentName": "Community Garden Vocabulary.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ]
+  },
+  {
+    "id": "contest_demo_english_user_2",
+    "role": "user",
+    "content": "老师，文章结尾提到的 'shared, visible, and connected to real records' 这三个词是如何进一步支撑‘责任感’这个核心逻辑的？",
+    "timestamp": 1776216960000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": []
+  },
+  {
+    "id": "contest_demo_english_assistant_2",
+    "role": "assistant",
+    "content": "问得太深入了！你已经从“看到因果”进步到“拆解逻辑细节”了。\n\n这三个词其实是作者给“责任感”下的**具体定义**。在阅读理解中，作者经常先抛出一个抽象概念（如 responsibility），然后在结尾用几个具体的形容词来“落地”。\n\n我们来拆解这三个词是如何像支架一样，撑起“责任感”的：\n\n### 1. 定位句与逻辑拆解\n*   **定位句**：*“The project improved participation because the work was shared, visible, and connected to real records instead of abstract homework alone.”*\n*   **逻辑结构**：这句使用了**并列结构 (Parallel Structure)**。\n    *   **Shared (分享/共担)** $\\rightarrow$ 对应文中 *“take turns”*。如果活儿是大家的，我就不能偷懒，因为我的那一环会影响整体。\n    *   **Visible (可见的)** $\\rightarrow$ 对应文中 *“measuring... writing notes”*。植物长得好不好，笔记记没记，大家一眼就能看到。这种“被看见”的压力转化为了动力。\n    *   **Connected to real records (与真实记录挂钩)** $\\rightarrow$ 对应文中 *“instead of abstract homework”*。这说明责任不是虚无缥缈的作业，而是实实在在的生命生长。\n\n### 2. 它们如何支撑“责任感”？\n这三个词把“责任感”从一个口号变成了**可操作的制度**：\n*   因为 **Shared**，所以学生明白这是 **Community**（社区/集体）的事。\n*   因为 **Visible**，所以学生学会了 **Observe**（观察）和被观察，产生了荣誉感。\n*   因为 **Real records**，所以学生觉得自己在 **In charge of**（负责）一个真实的生命，而不是在应付老师。\n\n### 3. 干扰项特征排除\n在阅读题中，如果选项出现以下表述，通常是**错误**的，因为它们违背了这三个词的逻辑：\n*   **干扰项 C：学生们努力工作是因为他们害怕老师的惩罚。**\n    *   *排除理由*：文中强调的是 *shared* 和 *visible* 带来的自我驱动，而不是外部惩罚。\n*   **干扰项 D：这个项目成功是因为它比普通作业更简单、更轻松。**\n    *   *排除理由*：文中说它优于 *abstract homework*（抽象作业），是因为它更 *real*（真实），而不是因为更简单。\n\n### 4. 核心词汇关联 (来自 Vocabulary Lab)\n*   **Observe (观察)**：对应 *Visible*，只有观察到的细节才是可见的。\n*   **Take turns (轮流)**：对应 *Shared*，体现了责任的分配。\n*   **In charge of (负责)**：这是 *Real records* 带来的心理状态。\n\n---\n\n### 💡 这里的阅读策略可以记在笔记本上：\n> **“抽象概念具体化”**：当你读到结尾出现一串并列的形容词（如 A, B, and C）时，它们通常是对文中核心矛盾的“药方”。**主旨题的正确答案，往往就是这些具体词汇的提炼。** 比如，如果题目问“为什么花园能改变学生？”，答案里如果包含“实际参与”或“共同承担”，那基本就是它了。\n\n你觉得这三个词里，哪一个最能触动那些“平时很少在班里说话”的学生开始主动发言？（提示：看看文中关于 *explaining records* 的描述）",
+    "timestamp": 1776217020000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": [],
+    "name": "展示案例｜英语",
+    "agentId": "contest_demo_english",
+    "avatarUrl": "assets/default_avatar.png",
+    "isThinking": false,
+    "topicId": "contest_demo_english_topic",
+    "isGroupMessage": false,
+    "finishReason": "completed",
+    "kbContextRefs": [
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_passage",
+        "chunkId": "contest_demo_english_doc_passage_preview",
+        "documentName": "Community Garden Reading Lab.docx",
+        "chunkIndex": 0,
+        "contentType": "docx-text",
+        "sectionTitle": "Community Garden Reading Lab",
+        "pageNumber": null,
+        "paragraphIndex": 1,
+        "snippet": "At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project would only belong to the scie...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ]
+  }
+]

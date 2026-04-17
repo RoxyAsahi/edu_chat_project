@@ -1,0 +1,51 @@
+{
+  "id": "study_diary_考前复盘_2026-04-13",
+  "notebookId": "考前复盘",
+  "notebookName": "考前复盘",
+  "dateKey": "2026-04-13",
+  "createdAt": 1776088200000,
+  "updatedAt": 1776088200000,
+  "lastEntryAt": 1776088200000,
+  "entryIds": [
+    "study_log_1776456349935_ykhsfs"
+  ],
+  "entryRefs": [
+    {
+      "agentId": "contest_demo_growth",
+      "topicId": "contest_demo_growth_topic",
+      "entryId": "study_log_1776456349935_ykhsfs"
+    }
+  ],
+  "entryCount": 1,
+  "recallCount": 0,
+  "lastRecalledAt": 0,
+  "tags": [
+    "时间管理",
+    "止损策略"
+  ],
+  "topicIds": [
+    "contest_demo_growth_topic"
+  ],
+  "topics": {
+    "contest_demo_growth_topic": {
+      "topicId": "contest_demo_growth_topic",
+      "topicName": "🌙 考前一周复盘",
+      "entryIds": [
+        "study_log_1776456349935_ykhsfs"
+      ],
+      "count": 1
+    }
+  },
+  "agentIds": [
+    "contest_demo_growth"
+  ],
+  "agentNames": [
+    "展示案例｜学习成长"
+  ],
+  "sourceMessageIds": [],
+  "maidSignatures": [
+    "Reflection Coach"
+  ],
+  "isPublicNotebook": false,
+  "contentMarkdown": "# DailyNote 2026-04-13\n\n> 日记本：[考前复盘]\n\n## 🌙 考前一周复盘\n\n#### 21:50:00 · Reflection Coach\n[21:50] 练习时强制执行了15分钟跳出策略，不再为一个思路不通的压轴题耗费整个晚上，这种及时止损让心态稳了不少。\nTag: 时间管理, 止损策略\n\n\nMaid: [考前复盘]Reflection Coach\n\n\nTags: #时间管理 #止损策略"
+}
