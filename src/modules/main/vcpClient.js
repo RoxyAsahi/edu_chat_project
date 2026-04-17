@@ -46,6 +46,28 @@ function normalizeEndpoint(endpoint) {
     return new URL(endpoint.trim()).toString();
 }
 
+function buildRequestHeaders(apiKey = '', extraHeaders = {}) {
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(
+            extraHeaders
+            && typeof extraHeaders === 'object'
+            && !Array.isArray(extraHeaders)
+                ? extraHeaders
+                : {}
+        ),
+    };
+
+    const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
+    if (normalizedApiKey) {
+        headers.Authorization = `Bearer ${normalizedApiKey}`;
+    } else {
+        delete headers.Authorization;
+    }
+
+    return headers;
+}
+
 function normalizeMessage(message) {
     if (!message || typeof message !== 'object') {
         return { role: 'system', content: '[Invalid message]' };
@@ -374,6 +396,7 @@ async function send(request) {
         requestId,
         endpoint,
         apiKey,
+        extraHeaders = {},
         messages,
         modelConfig = {},
         context = null,
@@ -385,10 +408,6 @@ async function send(request) {
 
     if (!requestId || typeof requestId !== 'string') {
         return { error: 'requestId is required.' };
-    }
-
-    if (typeof apiKey !== 'string' || apiKey.trim() === '') {
-        return { error: 'API key is required.' };
     }
 
     let finalEndpoint;
@@ -419,6 +438,7 @@ async function send(request) {
         requestId,
         endpoint: finalEndpoint,
         apiKey,
+        extraHeaders,
         controller: new AbortController(),
         context,
         webContents,
@@ -452,10 +472,7 @@ async function send(request) {
 
         const response = await fetch(finalEndpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-            },
+            headers: buildRequestHeaders(apiKey, extraHeaders),
             body: serializedBody,
             signal: requestState.controller.signal,
         });
@@ -538,16 +555,14 @@ async function interrupt(request = {}) {
         const settings = await readSettings();
         const endpoint = requestState?.endpoint || settings?.vcpServerUrl;
         const apiKey = requestState?.apiKey || settings?.vcpApiKey;
+        const extraHeaders = requestState?.extraHeaders || {};
 
-        if (endpoint && apiKey) {
+        if (endpoint) {
             remoteAttempted = true;
             try {
                 const response = await fetch(buildInterruptUrl(endpoint), {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`,
-                    },
+                    headers: buildRequestHeaders(apiKey, extraHeaders),
                     body: JSON.stringify({ requestId }),
                 });
 
@@ -596,6 +611,7 @@ function getActiveRequestCount() {
 }
 
 module.exports = {
+    buildRequestHeaders,
     initialize,
     send,
     interrupt,

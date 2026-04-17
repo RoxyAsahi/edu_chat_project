@@ -366,42 +366,110 @@
     display: none !important;
   }
   .settings-modal {
-    padding: 12px;
+    padding: 10px 10px 12px;
   }
 
   .settings-modal__dialog {
     width: 100%;
-    max-height: calc(100vh - 24px);
-    border-radius: 24px;
-  }
-
-  .settings-modal__header {
-    padding: 22px 20px 16px;
-  }
-
-  .settings-modal__header h2 {
-    font-size: 24px;
+    max-height: calc(100vh - 22px);
+    border-radius: 0;
   }
 
   .settings-modal__body {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .settings-modal__nav {
     flex-direction: row;
     overflow: auto;
-    padding: 16px 16px 12px;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
+    padding: 10px;
+    border-right: 0.5px solid var(--color-border);
+    border-bottom: 0.5px solid var(--color-border);
+  }
+
+  .settings-modal__panel-header--nav {
+    display: none;
+  }
+
+  .settings-modal__nav-list {
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .settings-modal__nav-group {
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .settings-modal__nav-divider {
+    width: 1px;
+    height: auto;
+    margin: 6px 2px;
   }
 
   .settings-modal__nav-button {
     flex: 0 0 auto;
-    min-width: 140px;
+    min-width: 132px;
   }
 
   .settings-modal__content {
-    padding: 16px;
+    padding: 12px 14px;
+  }
+
+  .settings-modal__content-scroll {
+    padding-top: 12px;
+  }
+
+  .model-service-workbench {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .model-service-provider-pane {
+    border-right: none;
+    border-bottom: 0.5px solid var(--color-border);
+  }
+
+  .model-service-preset-host {
+    position: static;
+    padding: 0 8px 8px;
+  }
+
+  .model-service-setting-pane {
+    padding: 15px 16px 18px;
+  }
+
+  .model-service-preview-list {
+    grid-template-columns: 1fr;
+  }
+
+  .model-service-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .model-service-default-row {
+    flex-direction: column;
+  }
+
+  .model-service-default-row__control {
+    min-width: 0;
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .model-service-setting-title,
+  .model-service-setting-subtitle-row,
+  .model-service-health-toolbar,
+  .model-service-model-actions,
+  .model-service-help-row--spread {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .model-service-setting-actions {
+    align-items: stretch;
+    justify-content: flex-start;
   }
 
   .settings-modal__footer {

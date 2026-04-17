@@ -11,6 +11,12 @@ const {
     DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE,
     DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE,
 } = require('../utils/settingsSchema');
+const {
+    TASK_KEY_BY_LEGACY_SETTINGS_KEY,
+    normalizeModelService,
+    resolveDefaultModelRef,
+    resolveExecutionConfig,
+} = require('../utils/modelService');
 const { createStudyServices } = require('../study');
 const {
     buildDefaultPlaceholderTopic,
@@ -543,6 +549,7 @@ async function requestFollowUpsOnce({
     requestIdBase = '',
     endpoint = '',
     apiKey = '',
+    extraHeaders = {},
     prompt = '',
     model = '',
     context = {},
@@ -552,6 +559,7 @@ async function requestFollowUpsOnce({
         round: attempt,
         endpoint,
         apiKey,
+        extraHeaders,
         messages: [{
             role: 'user',
             content: attempt === 1 ? prompt : buildFollowUpRetryPrompt(prompt),
@@ -582,6 +590,16 @@ async function requestFollowUpsOnce({
     };
 }
 
+function resolvePreferredTaskKey(preferredSettingsKeys = []) {
+    for (const settingsKey of Array.isArray(preferredSettingsKeys) ? preferredSettingsKeys : []) {
+        const taskKey = TASK_KEY_BY_LEGACY_SETTINGS_KEY[settingsKey];
+        if (taskKey) {
+            return taskKey;
+        }
+    }
+    return null;
+}
+
 async function resolveTaskModel({
     agentId = '',
     requestedModel = '',
@@ -590,6 +608,15 @@ async function resolveTaskModel({
     logLabel = 'task',
     preferredSettingsKeys = [],
 }) {
+    const preferredTaskKey = resolvePreferredTaskKey(preferredSettingsKeys);
+    if (preferredTaskKey && settings?.modelService) {
+        const modelService = normalizeModelService(settings.modelService);
+        const resolvedDefault = resolveDefaultModelRef(modelService, preferredTaskKey);
+        if (resolvedDefault?.model?.id) {
+            return resolvedDefault.model.id;
+        }
+    }
+
     for (const settingsKey of Array.isArray(preferredSettingsKeys) ? preferredSettingsKeys : []) {
         if (typeof settings?.[settingsKey] === 'string' && settings[settingsKey].trim()) {
             return settings[settingsKey].trim();
@@ -1189,6 +1216,18 @@ function initialize(mainWindow, context) {
             console.error('[Main - sendToVCP] Failed to read settings:', error);
         }
 
+        const executionConfig = resolveExecutionConfig(settings, {
+            purpose: 'chat',
+            requestedModel: modelConfig?.model,
+            fallbackEndpoint: endpoint,
+            fallbackApiKey: apiKey,
+            fallbackModel: modelConfig?.model,
+        });
+        const finalModelConfig = {
+            ...modelConfig,
+            ...(executionConfig?.model?.id ? { model: executionConfig.model.id } : {}),
+        };
+
         let promptVariableResolution = {
             unresolvedTokens: [],
             substitutions: {},
@@ -1198,14 +1237,14 @@ function initialize(mainWindow, context) {
             settings,
             agentConfig: null,
             context: { ...(context || {}) },
-            modelConfig,
+            modelConfig: finalModelConfig,
         };
 
         try {
             promptResolutionOptions = await buildPromptResolutionOptions({
                 settings,
                 context,
-                modelConfig,
+                modelConfig: finalModelConfig,
                 agentConfigManager,
             });
         } catch (error) {
@@ -1234,9 +1273,9 @@ function initialize(mainWindow, context) {
         }
 
         try {
-            if (modelConfig && modelConfig.model) {
+            if (finalModelConfig && finalModelConfig.model) {
                 const modelUsageTracker = require('../modelUsageTracker');
-                await modelUsageTracker.recordModelUsage(modelConfig.model);
+                await modelUsageTracker.recordModelUsage(finalModelConfig.model);
             }
         } catch (error) {
             console.error('[ModelUsage] Failed to record model usage:', error);
@@ -1266,7 +1305,7 @@ function initialize(mainWindow, context) {
             || new Date().toISOString().slice(0, 10);
         const enrichedContext = {
             ...(context || {}),
-            model: modelConfig?.model || context?.model || '',
+            model: finalModelConfig?.model || context?.model || '',
             topicName: promptVariableResolution.substitutions.TopicName || context?.topicName || '',
             agentName: promptVariableResolution.substitutions.AgentName || context?.agentName || '',
             studentName: studyProfile.studentName || settings.userName || '',
@@ -1277,10 +1316,11 @@ function initialize(mainWindow, context) {
 
         const orchestrationResult = await studyServices.chatOrchestrator.runRequest({
             requestId,
-            endpoint,
-            apiKey,
+            endpoint: executionConfig?.endpoint || endpoint,
+            apiKey: executionConfig?.apiKey || apiKey,
+            extraHeaders: executionConfig?.extraHeaders || {},
             messages: processedMessages,
-            modelConfig,
+            modelConfig: finalModelConfig,
             context: enrichedContext,
             settings,
             webContents: event.sender,
@@ -1317,11 +1357,8 @@ function initialize(mainWindow, context) {
             const settings = settingsManager && typeof settingsManager.readSettings === 'function'
                 ? await settingsManager.readSettings()
                 : {};
-            const endpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
-            const apiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
-            if (!endpoint || !apiKey) {
-                return { success: false, error: 'VCP 服务配置不完整。', followUps: [] };
-            }
+            const legacyEndpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
+            const legacyApiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
 
             const model = await resolveFollowUpModel({
                 agentId: requestPayload.agentId,
@@ -1329,6 +1366,19 @@ function initialize(mainWindow, context) {
                 settings,
                 agentConfigManager,
             });
+            const executionConfig = resolveExecutionConfig(settings, {
+                purpose: 'followUp',
+                requestedModel: model,
+                fallbackEndpoint: legacyEndpoint,
+                fallbackApiKey: legacyApiKey,
+                fallbackModel: model,
+            });
+            const endpoint = executionConfig?.endpoint || legacyEndpoint;
+            const apiKey = executionConfig?.apiKey || legacyApiKey;
+            if (!endpoint) {
+                return { success: false, error: 'VCP 服务配置不完整。', followUps: [] };
+            }
+
             const prompt = buildFollowUpPrompt(settings.followUpPromptTemplate, visibleMessages);
             const requestIdBase = `follow_up_${requestPayload.messageId || Date.now()}_${Date.now()}`;
             const followUpContext = {
@@ -1344,6 +1394,7 @@ function initialize(mainWindow, context) {
                     requestIdBase,
                     endpoint,
                     apiKey,
+                    extraHeaders: executionConfig?.extraHeaders || {},
                     prompt,
                     model,
                     context: followUpContext,
@@ -1390,16 +1441,8 @@ function initialize(mainWindow, context) {
             const settings = settingsManager && typeof settingsManager.readSettings === 'function'
                 ? await settingsManager.readSettings()
                 : {};
-            const endpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
-            const apiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
-            if (!endpoint || !apiKey) {
-                return {
-                    success: true,
-                    generated: false,
-                    title: fallbackTitle,
-                    error: 'VCP 服务配置不完整。',
-                };
-            }
+            const legacyEndpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
+            const legacyApiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
 
             const model = await resolveTaskModel({
                 agentId: requestPayload.agentId,
@@ -1409,11 +1452,30 @@ function initialize(mainWindow, context) {
                 logLabel: 'generate-topic-title',
                 preferredSettingsKeys: ['topicTitleDefaultModel'],
             });
+            const executionConfig = resolveExecutionConfig(settings, {
+                purpose: 'topicTitle',
+                requestedModel: model,
+                fallbackEndpoint: legacyEndpoint,
+                fallbackApiKey: legacyApiKey,
+                fallbackModel: model,
+            });
+            const endpoint = executionConfig?.endpoint || legacyEndpoint;
+            const apiKey = executionConfig?.apiKey || legacyApiKey;
+            if (!endpoint) {
+                return {
+                    success: true,
+                    generated: false,
+                    title: fallbackTitle,
+                    error: 'VCP 服务配置不完整。',
+                };
+            }
+
             const prompt = buildTopicTitlePrompt(settings.topicTitlePromptTemplate, visibleMessages);
             const response = await vcpClient.send({
                 requestId: `topic_title_${requestPayload.messageId || Date.now()}_${Date.now()}`,
                 endpoint,
                 apiKey,
+                extraHeaders: executionConfig?.extraHeaders || {},
                 messages: [{
                     role: 'user',
                     content: prompt,

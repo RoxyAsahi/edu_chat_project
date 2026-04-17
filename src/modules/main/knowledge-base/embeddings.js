@@ -2,6 +2,8 @@ const {
     DEFAULT_KB_SCORE_THRESHOLD,
     DEFAULT_KB_TOP_K,
 } = require('./constants');
+const { resolveExecutionConfig } = require('../utils/modelService');
+const { buildRequestHeaders } = require('../vcpClient');
 
 const DEFAULT_EMBEDDING_BATCH_SIZE = 64;
 
@@ -46,15 +48,17 @@ async function requestEmbeddings(settings, inputs) {
         return [];
     }
 
-    if (typeof settings?.kbApiKey !== 'string' || settings.kbApiKey.trim() === '') {
-        throw new Error('KB API Key is required.');
-    }
-
-    if (typeof settings?.kbEmbeddingModel !== 'string' || settings.kbEmbeddingModel.trim() === '') {
+    const execution = resolveExecutionConfig(settings, { purpose: 'embedding' });
+    const endpoint = execution?.endpoint || normalizeEmbeddingEndpoint(settings?.kbBaseUrl);
+    const modelId = execution?.model?.id || String(settings?.kbEmbeddingModel || '').trim();
+    if (!modelId) {
         throw new Error('KB Embedding Model is required.');
     }
 
-    const endpoint = normalizeEmbeddingEndpoint(settings.kbBaseUrl);
+    if (!endpoint) {
+        throw new Error('KB Base URL is required.');
+    }
+
     const batchSize = Math.max(1, Number(settings?.kbEmbeddingBatchSize) || DEFAULT_EMBEDDING_BATCH_SIZE);
     const allVectors = [];
 
@@ -62,12 +66,9 @@ async function requestEmbeddings(settings, inputs) {
         const batchInputs = inputs.slice(start, start + batchSize);
         const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${settings.kbApiKey.trim()}`,
-            },
+            headers: buildRequestHeaders(execution?.apiKey || settings?.kbApiKey || '', execution?.extraHeaders),
             body: JSON.stringify({
-                model: settings.kbEmbeddingModel.trim(),
+                model: modelId,
                 input: batchInputs,
             }),
         });

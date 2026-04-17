@@ -4,6 +4,7 @@ const {
     truncateText,
 } = require('./helpers');
 const { splitReaderParagraphs } = require('./readerProjection');
+const { resolveExecutionConfig } = require('../utils/modelService');
 
 function buildGuideSegments(parsed) {
     if (parsed?.structure?.type === 'pdf') {
@@ -176,11 +177,12 @@ function createGuideService(deps = {}) {
 
     async function requestGuideFromModel(document, parsed, prompt, requestSuffix) {
         const settings = await runtime.readSettings();
-        const endpoint = String(settings?.vcpServerUrl || '').trim();
-        const apiKey = String(settings?.vcpApiKey || '').trim();
+        const execution = resolveExecutionConfig(settings, { purpose: 'chat' });
+        const endpoint = String(execution?.endpoint || settings?.vcpServerUrl || '').trim();
+        const apiKey = String(execution?.apiKey || settings?.vcpApiKey || '').trim();
         const model = await runtime.resolveGuideModel(settings);
 
-        if (!endpoint || !apiKey) {
+        if (!endpoint) {
             throw new Error('VCP 服务配置不完整，无法生成来源指南。');
         }
 
@@ -188,6 +190,7 @@ function createGuideService(deps = {}) {
             requestId: makeId(`guide_${requestSuffix}`),
             endpoint,
             apiKey,
+            extraHeaders: execution?.extraHeaders || {},
             messages: [
                 {
                     role: 'system',

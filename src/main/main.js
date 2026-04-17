@@ -75,6 +75,7 @@ function installSafeConsoleWrite() {
 installSafeConsoleWrite();
 
 const settingsHandlers = require('../modules/main/ipc/settingsHandlers');
+const modelServiceHandlers = require('../modules/main/ipc/modelServiceHandlers');
 const fileDialogHandlers = require('../modules/main/ipc/fileDialogHandlers');
 const { getAgentConfigById, ...agentHandlers } = require('../modules/main/ipc/agentHandlers');
 const chatHandlers = require('../modules/main/ipc/chatHandlers');
@@ -448,6 +449,7 @@ async function registerDomainIpc() {
         settingsManager,
         agentConfigManager,
     });
+    modelServiceHandlers.initialize();
 
     fileDialogHandlers.initialize(getMainWindow, {
         getMainWindow,
