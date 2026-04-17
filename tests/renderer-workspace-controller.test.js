@@ -162,6 +162,7 @@ function createOverviewDom() {
             <section id="workspaceOverviewPage"></section>
             <main id="workspaceSubjectPage" class="hidden"></main>
             <button id="workspaceOverviewCreateAgentBtn"></button>
+            <section class="workspace-overview-page__island-row"><div id="dynamicIsland"></div></section>
             <section id="subjectOverviewGrid"></section>
         </body>
     `);
@@ -173,6 +174,8 @@ function createOverviewDom() {
             workspaceOverviewPage: dom.window.document.getElementById('workspaceOverviewPage'),
             workspaceSubjectPage: dom.window.document.getElementById('workspaceSubjectPage'),
             workspaceOverviewCreateAgentBtn: dom.window.document.getElementById('workspaceOverviewCreateAgentBtn'),
+            workspaceOverviewIslandRow: dom.window.document.querySelector('.workspace-overview-page__island-row'),
+            dynamicIsland: dom.window.document.getElementById('dynamicIsland'),
             subjectOverviewGrid: dom.window.document.getElementById('subjectOverviewGrid'),
         },
     };
@@ -248,6 +251,7 @@ test('renderSubjectOverview starts a single clock timer and clears it when leavi
 
     assert.equal(intervalCalls, 1);
     assert.equal(document.getElementById('overviewClockTime').textContent, '09:05');
+    assert.equal(document.querySelector('.overview-clock-panel')?.nextElementSibling?.className, 'workspace-overview-page__island-row');
 
     controller.showSubjectWorkspace();
 

@@ -142,6 +142,15 @@ function createWorkspaceController(deps = {}) {
     let agentOverviewStats = {};
     let overviewClockTimerId = null;
 
+    function buildOverviewStats() {
+        const statsEntries = Object.values(agentOverviewStats || {});
+        return {
+            subjectCount: Array.isArray(state.agents) ? state.agents.length : 0,
+            topicCount: statsEntries.reduce((sum, stats) => sum + Number(stats?.topicCount || 0), 0),
+            pendingCount: statsEntries.reduce((sum, stats) => sum + Number(stats?.unreadCount || 0), 0),
+        };
+    }
+
     function clearOverviewClockTimer() {
         if (overviewClockTimerId == null) {
             return;
@@ -384,6 +393,7 @@ function createWorkspaceController(deps = {}) {
             agents: state.agents,
             statsByAgent: agentOverviewStats,
             selectedAgentId: state.currentSelectedItem.id,
+            overviewStats: buildOverviewStats(),
         });
 
         if (el.subjectOverviewHeadline) {
@@ -394,6 +404,10 @@ function createWorkspaceController(deps = {}) {
         }
 
         el.subjectOverviewGrid.innerHTML = `${markup.clockMarkup || ''}${markup.statsRowMarkup || ''}${markup.gridMarkup || ''}`;
+        const overviewClockPanel = el.subjectOverviewGrid.querySelector('.overview-clock-panel');
+        if (overviewClockPanel && el.workspaceOverviewIslandRow) {
+            overviewClockPanel.insertAdjacentElement('afterend', el.workspaceOverviewIslandRow);
+        }
         el.subjectOverviewGrid.querySelectorAll('[data-subject-card]').forEach((button) => {
             button.addEventListener('click', () => {
                 const { agentId } = button.dataset;

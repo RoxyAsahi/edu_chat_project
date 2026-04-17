@@ -7,6 +7,7 @@ function collectRootElements(rootDocument = document) {
         workspaceOverviewCreateAgentBtn: rootDocument.getElementById('workspaceOverviewCreateAgentBtn'),
         workspaceBackToOverviewBtn: rootDocument.getElementById('workspaceBackToOverviewBtn'),
         workspaceOpenSubjectBtn: rootDocument.getElementById('workspaceOpenSubjectBtn'),
+        workspaceOverviewIslandRow: rootDocument.querySelector('.workspace-overview-page__island-row'),
         dynamicIsland: rootDocument.getElementById('dynamicIsland'),
         dynamicIslandStatusBtn: rootDocument.getElementById('dynamicIslandStatusBtn'),
         dynamicIslandStatusEyebrow: rootDocument.getElementById('dynamicIslandStatusEyebrow'),
