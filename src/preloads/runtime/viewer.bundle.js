@@ -149,6 +149,7 @@ function createShellCatalog(ops) {
 
 function createSessionCatalog(ops) {
     return {
+        reportRendererFatalError: command((payload) => ops.invoke('renderer:fatal-error', payload)),
         getAgents: query(() => ops.invoke('get-agents')),
         getAgentConfig: query((agentId) => ops.invoke('get-agent-config', agentId)),
         saveAgentConfig: query((agentId, config) => ops.invoke('save-agent-config', agentId, config)),
