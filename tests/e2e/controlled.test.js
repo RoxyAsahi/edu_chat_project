@@ -133,6 +133,10 @@ async function triggerShortcut(app, keyCode, modifiers = []) {
     }, { keyCode, modifiers });
 }
 
+function getCommandOrControlModifier() {
+    return process.platform === 'darwin' ? 'meta' : 'control';
+}
+
 test('controlled Electron E2E covers shortcuts, viewer flow, topic KB binding, and watcher guard', { timeout: 120000 }, async () => {
     const repoRoot = path.resolve(__dirname, '../..');
     const fixtureRoot = await ensureFixtureDataRoot(resolveFixtureDataRoot({ repoRoot }));
@@ -147,6 +151,7 @@ test('controlled Electron E2E covers shortcuts, viewer flow, topic KB binding, a
         const page = await waitForFirstWindow(app, 30000);
         await page.waitForLoadState('domcontentloaded');
         await waitForRendererBridge(page, 30000);
+        const commandOrControl = getCommandOrControlModifier();
 
         await installReloadCounter(app);
 
@@ -157,19 +162,19 @@ test('controlled Electron E2E covers shortcuts, viewer flow, topic KB binding, a
         await waitForRendererBridge(page, 30000);
         await delay(500);
 
-        await triggerShortcut(app, 'R', ['control']);
+        await triggerShortcut(app, 'R', [commandOrControl]);
         reloadCount = await waitForReloadIncrement(app, reloadCount);
         await page.waitForLoadState('domcontentloaded');
         await waitForRendererBridge(page, 30000);
         await delay(500);
 
-        await triggerShortcut(app, 'R', ['control', 'shift']);
+        await triggerShortcut(app, 'R', [commandOrControl, 'shift']);
         reloadCount = await waitForReloadIncrement(app, reloadCount);
         await page.waitForLoadState('domcontentloaded');
         await waitForRendererBridge(page, 30000);
         await delay(500);
 
-        await triggerShortcut(app, 'I', ['control', 'shift']);
+        await triggerShortcut(app, 'I', [commandOrControl, 'shift']);
         await delay(1000);
 
         const devToolsOpen = await app.evaluate(({ BrowserWindow }) => {
