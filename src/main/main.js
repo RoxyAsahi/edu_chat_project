@@ -265,6 +265,27 @@ function registerWindowHandlers() {
         ipcMain.handle(channel, () => process.platform);
     });
 
+    ipcMain.handle('renderer:fatal-error', (_event, payload = {}) => {
+        const phase = typeof payload.phase === 'string' && payload.phase.trim()
+            ? payload.phase.trim()
+            : 'runtime';
+        const message = typeof payload.message === 'string' && payload.message.trim()
+            ? payload.message.trim()
+            : 'Unknown renderer fatal error';
+        const stack = typeof payload.stack === 'string' ? payload.stack.trim() : '';
+        const source = typeof payload.source === 'string' ? payload.source.trim() : '';
+
+        console.error(`[UniStudyRenderer][Fatal][${phase}] ${message}`);
+        if (source) {
+            console.error(`[UniStudyRenderer][Fatal][source] ${source}`);
+        }
+        if (stack) {
+            console.error(stack);
+        }
+
+        return ok();
+    });
+
     windowHandlersRegistered = true;
 }
 

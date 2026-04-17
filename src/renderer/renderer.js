@@ -851,11 +851,51 @@ function bindShellEvents() {
     el.closeBtn?.addEventListener('click', () => chatAPI.closeWindow());
 }
 
+function reportRendererFatalError(payload = {}) {
+    const reporter = window.chatAPI?.reportRendererFatalError || window.electronAPI?.reportRendererFatalError;
+    if (typeof reporter !== 'function') {
+        return;
+    }
+
+    Promise.resolve(reporter(payload)).catch((error) => {
+        console.error('[UniStudyRenderer] failed to report fatal error:', error);
+    });
+}
+
+function installRendererFatalErrorReporting() {
+    window.addEventListener('error', (event) => {
+        const error = event.error;
+        reportRendererFatalError({
+            phase: 'window-error',
+            message: error?.message || event.message || 'Unknown window error',
+            stack: error?.stack || '',
+            source: [event.filename, event.lineno, event.colno].filter(Boolean).join(':'),
+        });
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        reportRendererFatalError({
+            phase: 'unhandledrejection',
+            message: reason?.message || String(reason || 'Unhandled promise rejection'),
+            stack: reason?.stack || '',
+            source: 'window.unhandledrejection',
+        });
+    });
+}
+
 setAppBootLoading(true);
+installRendererFatalErrorReporting();
 
 bootstrap()
     .catch((error) => {
         console.error('[UniStudyRenderer] bootstrap failed:', error);
+        reportRendererFatalError({
+            phase: 'bootstrap',
+            message: error?.message || 'Renderer bootstrap failed',
+            stack: error?.stack || '',
+            source: 'bootstrap()',
+        });
         ui?.showToastNotification?.(error.message || 'Bootstrap failed', 'error', 5000);
     })
     .finally(() => {

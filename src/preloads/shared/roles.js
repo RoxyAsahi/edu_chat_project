@@ -29,6 +29,7 @@ const SHELL_KEYS = [
 ];
 
 const SESSION_KEYS = [
+    'reportRendererFatalError',
     'getAgents',
     'getAgentConfig',
     'saveAgentConfig',
