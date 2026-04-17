@@ -658,7 +658,7 @@ function createNotesController(deps = {}) {
         if (options.trigger instanceof HTMLElementCtor) {
             manualNotesLibraryTrigger = options.trigger;
         }
-        if (!el.manualNotesLibraryPage) {
+        if (!el.manualNotesLibraryPage && !el.manualNotesLibraryModal) {
             return;
         }
 
@@ -670,6 +670,8 @@ function createNotesController(deps = {}) {
         notesDomApi.renderManualNotesLibrary();
         patchLayout({ workspaceViewMode: 'manual-notes' });
         showManualNotesLibraryPage();
+        el.manualNotesLibraryModal?.classList.remove('hidden');
+        el.manualNotesLibraryModal?.setAttribute('aria-hidden', 'false');
         documentObj.body?.classList.add('manual-notes-library-open');
         el.manualNotesLibraryFilterAllBtn?.focus();
 
@@ -682,6 +684,8 @@ function createNotesController(deps = {}) {
         state.manualNotesLibraryOpen = false;
         patchLayout({ workspaceViewMode: state.currentSelectedItem?.id ? 'subject' : 'overview' });
         syncWorkspaceView();
+        el.manualNotesLibraryModal?.classList.add('hidden');
+        el.manualNotesLibraryModal?.setAttribute('aria-hidden', 'true');
         documentObj.body?.classList.remove('manual-notes-library-open');
         if (
             options.restoreFocus !== false
@@ -795,6 +799,9 @@ function createNotesController(deps = {}) {
         });
         el.manualNotesLibraryFilterSelectedBtn?.addEventListener('click', () => {
             setManualNotesLibraryFilter('selected');
+        });
+        el.manualNotesLibraryCloseBtn?.addEventListener('click', () => {
+            closeManualNotesLibrary();
         });
         el.saveNoteBtn?.addEventListener('click', () => {
             void notesOperationsApi.saveActiveNote();
