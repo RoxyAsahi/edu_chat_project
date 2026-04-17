@@ -31,8 +31,14 @@ import {
 const chatAPI = window.chatAPI || window.electronAPI;
 const ui = window.uiHelperFunctions;
 const store = createAppStore(createInitialAppState());
+let markedInstance;
 
 const el = collectRootElements(document);
+const initializeMarked = createMarkedInitializer(window);
+const renderMarkdownFragment = createMarkdownFragmentRenderer({
+    renderMarkdownToSafeHtml,
+    getMarkedInstance: () => markedInstance,
+});
 let sourceController = null;
 let workspaceController = null;
 let readerController = null;
@@ -420,12 +426,6 @@ const { bootstrap } = createAppBootstrap({
     },
 });
 
-let markedInstance;
-const initializeMarked = createMarkedInitializer(window);
-const renderMarkdownFragment = createMarkdownFragmentRenderer({
-    renderMarkdownToSafeHtml,
-    getMarkedInstance: () => markedInstance,
-});
 const DEFAULT_SEND_BUTTON_HTML = el.sendMessageBtn?.innerHTML || '';
 const INTERRUPT_SEND_BUTTON_HTML = `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="none" aria-hidden="true">
