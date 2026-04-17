@@ -21,6 +21,12 @@ import { createTopicTitleController } from '../modules/renderer/app/topicTitles/
 import { createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
 import { buildSubjectOverviewMarkup } from '../modules/renderer/app/workspace/workspaceOverview.js';
 import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime } from '../modules/renderer/app/bootstrap.js';
+import {
+    createMarkdownFragmentRenderer,
+    createMarkedInitializer,
+    extractPromptTextFromLegacyConfig,
+    normalizeTopic,
+} from '../modules/renderer/app/runtime/rendererRuntimeHelpers.js';
 
 const chatAPI = window.chatAPI || window.electronAPI;
 const ui = window.uiHelperFunctions;
@@ -415,6 +421,11 @@ const { bootstrap } = createAppBootstrap({
 });
 
 let markedInstance;
+const initializeMarked = createMarkedInitializer(window);
+const renderMarkdownFragment = createMarkdownFragmentRenderer({
+    renderMarkdownToSafeHtml,
+    getMarkedInstance: () => markedInstance,
+});
 const DEFAULT_SEND_BUTTON_HTML = el.sendMessageBtn?.innerHTML || '';
 const INTERRUPT_SEND_BUTTON_HTML = `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="none" aria-hidden="true">
@@ -558,57 +569,8 @@ function makeId(prefix) {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function escapeHtml(text) {
-    return String(text || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-function renderMarkdownFragment(text) {
-    const markdown = String(text || '').trim();
-    if (!markdown) {
-        return '';
-    }
-
-    return renderMarkdownToSafeHtml(
-        markdown,
-        markedInstance || {
-            parse(value) {
-                return `<p>${escapeHtml(value)}</p>`;
-            },
-        },
-    );
-}
-
 function initMarked() {
-    if (window.marked && typeof window.marked.Marked === 'function') {
-        markedInstance = new window.marked.Marked({
-            gfm: true,
-            tables: true,
-            breaks: true,
-            pedantic: false,
-            sanitize: false,
-            smartLists: true,
-            smartypants: false,
-            highlight(code, lang) {
-                if (window.hljs) {
-                    const language = window.hljs.getLanguage(lang) ? lang : 'plaintext';
-                return window.hljs.highlight(code, { language }).value;
-            }
-            return code;
-        },
-        });
-        return markedInstance;
-    }
-
-    markedInstance = {
-        parse(text) {
-            return `<p>${String(text || '').replace(/\n/g, '<br>')}</p>`;
-        },
-    };
+    markedInstance = initializeMarked();
     return markedInstance;
 }
 
@@ -689,50 +651,6 @@ function setLeftSidebarMode(mode) {
     if (nextMode === 'source-list') {
         restoreSourceListScrollPosition();
     }
-}
-
-function normalizeTopic(topic = {}) {
-    return {
-        ...topic,
-        knowledgeBaseId: topic.knowledgeBaseId || null,
-    };
-}
-
-function extractPromptTextFromLegacyConfig(config = {}) {
-    if (typeof config.originalSystemPrompt === 'string' && config.originalSystemPrompt.trim()) {
-        return config.originalSystemPrompt;
-    }
-
-    if (typeof config.systemPrompt === 'string' && config.systemPrompt.trim()) {
-        return config.systemPrompt;
-    }
-
-    if (config.promptMode === 'modular') {
-        const advancedPrompt = config.advancedSystemPrompt;
-        if (typeof advancedPrompt === 'string' && advancedPrompt.trim()) {
-            return advancedPrompt;
-        }
-        if (advancedPrompt && typeof advancedPrompt === 'object' && Array.isArray(advancedPrompt.blocks)) {
-            return advancedPrompt.blocks
-                .filter((block) => block && block.disabled !== true)
-                .map((block) => {
-                    if (block.type === 'newline') {
-                        return '\n';
-                    }
-                    if (Array.isArray(block.variants) && block.variants.length > 0) {
-                        return block.variants[block.selectedVariant || 0] || block.content || '';
-                    }
-                    return block.content || '';
-                })
-                .join('');
-        }
-    }
-
-    if (config.promptMode === 'preset' && typeof config.presetSystemPrompt === 'string') {
-        return config.presetSystemPrompt;
-    }
-
-    return '';
 }
 
 async function ensurePromptModule() {

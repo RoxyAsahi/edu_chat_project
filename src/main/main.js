@@ -96,14 +96,29 @@ const { PRELOAD_ROLES, resolveProjectPreload } = require('../modules/main/servic
 
 const SRC_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(SRC_ROOT, '..');
-const DATA_ROOT_PATHS = resolveDataRootPaths({ app, env: process.env, cwd: REPO_ROOT });
-const DATA_ROOT = DATA_ROOT_PATHS.dataRoot;
-const AGENT_DIR = DATA_ROOT_PATHS.agentsDir;
-const USER_DATA_DIR = DATA_ROOT_PATHS.userDataDir;
-const SETTINGS_FILE = DATA_ROOT_PATHS.settingsFile;
-const USER_AVATAR_FILE = DATA_ROOT_PATHS.userAvatarFile;
-const AVATAR_IMAGE_DIR = DATA_ROOT_PATHS.avatarImageDir;
-mainProcessLogDir = path.join(DATA_ROOT, '.tmp');
+let DATA_ROOT_PATHS = null;
+let DATA_ROOT = null;
+let AGENT_DIR = null;
+let USER_DATA_DIR = null;
+let SETTINGS_FILE = null;
+let USER_AVATAR_FILE = null;
+let AVATAR_IMAGE_DIR = null;
+
+function ensureDataRootPaths() {
+    if (DATA_ROOT_PATHS) {
+        return DATA_ROOT_PATHS;
+    }
+
+    DATA_ROOT_PATHS = resolveDataRootPaths({ app, env: process.env, cwd: REPO_ROOT });
+    DATA_ROOT = DATA_ROOT_PATHS.dataRoot;
+    AGENT_DIR = DATA_ROOT_PATHS.agentsDir;
+    USER_DATA_DIR = DATA_ROOT_PATHS.userDataDir;
+    SETTINGS_FILE = DATA_ROOT_PATHS.settingsFile;
+    USER_AVATAR_FILE = DATA_ROOT_PATHS.userAvatarFile;
+    AVATAR_IMAGE_DIR = DATA_ROOT_PATHS.avatarImageDir;
+    mainProcessLogDir = path.join(DATA_ROOT, '.tmp');
+    return DATA_ROOT_PATHS;
+}
 
 let mainWindow = null;
 const openChildWindows = [];
@@ -174,6 +189,7 @@ const fileWatcher = {
 };
 
 async function bootstrapIndependentDataRoot() {
+    ensureDataRootPaths();
     await fs.ensureDir(DATA_ROOT);
     console.log(`[UniStudyBootstrap] Data root: ${DATA_ROOT}`);
     if (DATA_ROOT_PATHS.source === 'env-override') {
@@ -401,6 +417,7 @@ async function initializeCoreServices() {
         return;
     }
 
+    ensureDataRootPaths();
     await bootstrapIndependentDataRoot();
     await fs.ensureDir(AGENT_DIR);
     await fs.ensureDir(USER_DATA_DIR);
@@ -435,6 +452,7 @@ async function registerDomainIpc() {
         return;
     }
 
+    ensureDataRootPaths();
     await emoticonHandlers.initialize({
         SETTINGS_FILE,
         DATA_ROOT,
@@ -522,6 +540,7 @@ function startDeferredServices() {
         return deferredServicesPromise;
     }
 
+    ensureDataRootPaths();
     deferredServicesPromise = (async () => {
         try {
             await knowledgeBase.initializeKnowledgeBase({
