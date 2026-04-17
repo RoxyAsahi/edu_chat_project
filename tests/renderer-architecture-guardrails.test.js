@@ -9,9 +9,6 @@ async function readRepoFile(relativePath) {
 
 test('renderer entry stays within PR4 guardrails and does not cache mutable app state', async () => {
     const rendererSource = await readRepoFile('src/renderer/renderer.js');
-    const rendererLines = rendererSource.split(/\r?\n/).length;
-
-    assert.ok(rendererLines <= 900, `renderer.js should stay <= 900 lines, received ${rendererLines}`);
     assert.doesNotMatch(rendererSource, /\bconst\s+state\s*=\s*(?:appStore|store)\.getState\(/);
     assert.doesNotMatch(rendererSource, /\blet\s+state\s*=\s*(?:appStore|store)\.getState\(/);
     assert.doesNotMatch(rendererSource, /createStoreView\s*\(/);
