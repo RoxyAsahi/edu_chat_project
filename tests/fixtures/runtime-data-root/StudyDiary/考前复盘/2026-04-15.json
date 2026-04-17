@@ -1,0 +1,51 @@
+{
+  "id": "study_diary_考前复盘_2026-04-15",
+  "notebookId": "考前复盘",
+  "notebookName": "考前复盘",
+  "dateKey": "2026-04-15",
+  "createdAt": 1776263400000,
+  "updatedAt": 1776263400000,
+  "lastEntryAt": 1776263400000,
+  "entryIds": [
+    "study_log_1776456349945_3cqy2y"
+  ],
+  "entryRefs": [
+    {
+      "agentId": "contest_demo_growth",
+      "topicId": "contest_demo_growth_topic",
+      "entryId": "study_log_1776456349945_3cqy2y"
+    }
+  ],
+  "entryCount": 1,
+  "recallCount": 0,
+  "lastRecalledAt": 0,
+  "tags": [
+    "考前心态",
+    "复盘闭环"
+  ],
+  "topicIds": [
+    "contest_demo_growth_topic"
+  ],
+  "topics": {
+    "contest_demo_growth_topic": {
+      "topicId": "contest_demo_growth_topic",
+      "topicName": "🌙 考前一周复盘",
+      "entryIds": [
+        "study_log_1776456349945_3cqy2y"
+      ],
+      "count": 1
+    }
+  },
+  "agentIds": [
+    "contest_demo_growth"
+  ],
+  "agentNames": [
+    "展示案例｜学习成长"
+  ],
+  "sourceMessageIds": [],
+  "maidSignatures": [
+    "Reflection Coach"
+  ],
+  "isPublicNotebook": false,
+  "contentMarkdown": "# DailyNote 2026-04-15\n\n> 日记本：[考前复盘]\n\n## 🌙 考前一周复盘\n\n#### 22:30:00 · Reflection Coach\n[22:30] 临考前最后一次对清单进行闭环检查，发现大部分黄色区域已经变绿，不再去纠结那些根本没思路的难题了。\nTag: 考前心态, 复盘闭环\n\n\nMaid: [考前复盘]Reflection Coach\n\n\nTags: #考前心态 #复盘闭环"
+}

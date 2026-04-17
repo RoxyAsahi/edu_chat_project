@@ -1,0 +1,463 @@
+[
+  {
+    "id": "contest_demo_english_note_message",
+    "agentId": "contest_demo_english",
+    "topicId": "contest_demo_english_topic",
+    "title": "AI 回答摘录｜responsibility 和 participation 的关系",
+    "contentMarkdown": "### 核心逻辑：因果链条分析\n- **定位句**：*“Because every student had a clear responsibility, attendance... became noticeably better.”*\n- **因果逻辑**：\n  - **因 (Cause)**：明确的责任制（Clear responsibility）。\n  - **果 (Effect)**：参与度与出勤率的提升（Better attendance/participation）。\n- **主旨关联**：文章核心并非“园艺技术”，而是“社区参与感如何改变人”。责任感是促成这种改变的根本动力。\n- **干扰项辨析**：警惕“以偏概全”的选项（如：强调收获蔬菜是主要目的），真正的价值在于学生心态的转变。",
+    "sourceMessageIds": [
+      "contest_demo_english_assistant_1"
+    ],
+    "sourceDocumentRefs": [
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_passage",
+        "chunkId": "contest_demo_english_doc_passage_preview",
+        "documentName": "Community Garden Reading Lab.docx",
+        "chunkIndex": 0,
+        "contentType": "docx-text",
+        "sectionTitle": "Community Garden Reading Lab",
+        "pageNumber": null,
+        "paragraphIndex": 1,
+        "snippet": "At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project would only belong to the scie...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_vocab",
+        "chunkId": "contest_demo_english_doc_vocab_preview",
+        "documentName": "Community Garden Vocabulary.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ],
+    "kind": "message-note",
+    "createdAt": 1776216930000,
+    "updatedAt": 1776216930000
+  },
+  {
+    "id": "contest_demo_english_note_strategy",
+    "agentId": "contest_demo_english",
+    "topicId": "contest_demo_english_topic",
+    "title": "阅读理解定位三问",
+    "contentMarkdown": "### 阅读策略：抓因果，定主旨\n1. **识别逻辑枢纽**：在文中看到 `Because`, `Since`, `As a result` 等词时，其引导的因果链条往往是解开主旨题的关键。\n2. **区分“手段”与“目的”**：细节（如种菜、记录）是手段，而作者强调的价值（如责任感、公共空间改善）才是文章的最终目的。\n3. **排除干扰项**：如果选项只描述了具体的物质成果（如 Harvest），而忽略了人的行为转变，通常为局部细节干扰项。",
+    "sourceMessageIds": [],
+    "sourceDocumentRefs": [
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_passage",
+        "chunkId": "contest_demo_english_doc_passage_preview",
+        "documentName": "Community Garden Reading Lab.docx",
+        "chunkIndex": 0,
+        "contentType": "docx-text",
+        "sectionTitle": "Community Garden Reading Lab",
+        "pageNumber": null,
+        "paragraphIndex": 1,
+        "snippet": "At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project would only belong to the scie...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_vocab",
+        "chunkId": "contest_demo_english_doc_vocab_preview",
+        "documentName": "Community Garden Vocabulary.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ],
+    "kind": "note",
+    "createdAt": 1776217080000,
+    "updatedAt": 1776217080000
+  },
+  {
+    "id": "contest_demo_english_note_quiz",
+    "agentId": "contest_demo_english",
+    "topicId": "contest_demo_english_topic",
+    "title": "社区花园阅读核心词汇组",
+    "contentMarkdown": "# 社区花园阅读核心词汇组\n\n\n\n## 卡片 1\n- 正面：community\n- 背面：社区；共同体（常出现在学校或邻里话题中）\n\n## 卡片 2\n- 正面：participation\n- 背面：参与；参加（常用于考查因果关系的题目）\n\n## 卡片 3\n- 正面：responsibility\n- 背面：责任；职责（解释学生变得积极的原因）\n\n## 卡片 4\n- 正面：observe\n- 背面：观察；监测（常与科学项目或记录细节相关）\n\n## 卡片 5\n- 正面：harvest\n- 背面：收获；收割（象征长期努力后的成果）\n\n## 卡片 6\n- 正面：as a result\n- 背面：结果是；因此（引导结果的重要信号词）\n\n## 卡片 7\n- 正面：take turns\n- 背面：轮流；依次（体现团队合作与流程）\n\n## 卡片 8\n- 正面：in charge of\n- 背面：负责；掌管（常用于角色分配类问题）",
+    "sourceMessageIds": [
+      "contest_demo_english_assistant_1",
+      "contest_demo_english_assistant_2"
+    ],
+    "sourceDocumentRefs": [
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_passage",
+        "chunkId": "contest_demo_english_doc_passage_preview",
+        "documentName": "Community Garden Reading Lab.docx",
+        "chunkIndex": 0,
+        "contentType": "docx-text",
+        "sectionTitle": "Community Garden Reading Lab",
+        "pageNumber": null,
+        "paragraphIndex": 1,
+        "snippet": "At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project would only belong to the scie...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_english_kb",
+        "documentId": "contest_demo_english_doc_vocab",
+        "chunkId": "contest_demo_english_doc_vocab_preview",
+        "documentName": "Community Garden Vocabulary.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ],
+    "kind": "flashcards",
+    "createdAt": 1776217140000,
+    "updatedAt": 1776217140000,
+    "flashcardDeck": {
+      "title": "社区花园阅读核心词汇组",
+      "cards": [
+        {
+          "id": "flashcard_1",
+          "front": "community",
+          "back": "社区；共同体（常出现在学校或邻里话题中）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        },
+        {
+          "id": "flashcard_2",
+          "front": "participation",
+          "back": "参与；参加（常用于考查因果关系的题目）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        },
+        {
+          "id": "flashcard_3",
+          "front": "responsibility",
+          "back": "责任；职责（解释学生变得积极的原因）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        },
+        {
+          "id": "flashcard_4",
+          "front": "observe",
+          "back": "观察；监测（常与科学项目或记录细节相关）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        },
+        {
+          "id": "flashcard_5",
+          "front": "harvest",
+          "back": "收获；收割（象征长期努力后的成果）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        },
+        {
+          "id": "flashcard_6",
+          "front": "as a result",
+          "back": "结果是；因此（引导结果的重要信号词）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        },
+        {
+          "id": "flashcard_7",
+          "front": "take turns",
+          "back": "轮流；依次（体现团队合作与流程）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        },
+        {
+          "id": "flashcard_8",
+          "front": "in charge of",
+          "back": "负责；掌管（常用于角色分配类问题）",
+          "sourceDocumentRefs": [
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_passage",
+              "chunkId": "contest_demo_english_doc_passage_chunk_01",
+              "documentName": "Community Garden Reading Lab.docx",
+              "chunkIndex": 0,
+              "contentType": "docx-text",
+              "sectionTitle": "Community Garden Reading Lab",
+              "pageNumber": 0,
+              "paragraphIndex": 1,
+              "snippet": "Community Garden Reading Lab At Harbor City Middle School, a patch of empty land beside the library was turned into a community garden. At first, many students thought the project...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            },
+            {
+              "kbId": "contest_demo_english_kb",
+              "documentId": "contest_demo_english_doc_vocab",
+              "chunkId": "contest_demo_english_doc_vocab_chunk_01",
+              "documentName": "Community Garden Vocabulary.txt",
+              "chunkIndex": 0,
+              "contentType": "plain",
+              "sectionTitle": null,
+              "pageNumber": null,
+              "paragraphIndex": null,
+              "snippet": "Community Garden Reading Lab Vocabulary 1. community - meaning: a group of people living or working together - exam hint: often appears in topics about school, neighborhood, or ser...",
+              "vectorScore": 0.912,
+              "score": 0.912
+            }
+          ]
+        }
+      ]
+    },
+    "flashcardProgress": {
+      "currentIndex": 0,
+      "flipped": false,
+      "knownCount": 0,
+      "unknownCount": 0,
+      "cardStates": [
+        {
+          "cardId": "flashcard_1",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "flashcard_2",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "flashcard_3",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "flashcard_4",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "flashcard_5",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "flashcard_6",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "flashcard_7",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "flashcard_8",
+          "result": null,
+          "updatedAt": 0
+        }
+      ]
+    }
+  }
+]

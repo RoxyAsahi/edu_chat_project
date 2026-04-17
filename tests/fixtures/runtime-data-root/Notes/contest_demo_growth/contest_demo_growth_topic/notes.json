@@ -1,0 +1,28 @@
+[
+  {
+    "id": "contest_demo_growth_note_reflection",
+    "agentId": "contest_demo_growth",
+    "topicId": "contest_demo_growth_topic",
+    "title": "考前一周复盘触发器",
+    "contentMarkdown": "# 考前状态：我今天真的“推进”了吗？\n\n- [ ] **颜色分明**：我今天攻克的是“黄色区域”（有增长空间）还是在“红色区域”（无效死磕）？\n- [ ] **颗粒度检查**：我的任务是“学数学”这种模糊目标，还是“掌握弦长公式”这种明确产出？\n- [ ] **情绪止损**：如果遇到卡壳，我是否在 15 分钟内果断切换了策略？\n- [ ] **闭环预演**：临睡前，我能闭眼复述出今天掌握的那一个“套路”吗？",
+    "sourceMessageIds": [],
+    "sourceDocumentRefs": [],
+    "kind": "note",
+    "createdAt": 1776218760000,
+    "updatedAt": 1776218760000
+  },
+  {
+    "id": "contest_demo_growth_note_message",
+    "agentId": "contest_demo_growth",
+    "topicId": "contest_demo_growth_topic",
+    "title": "AI 回答摘录｜把考前焦虑拆成可执行任务",
+    "contentMarkdown": "# 考前减压：把焦虑拆解为确定性任务\n\n### 1. 三色复盘诊断\n*   **绿色（稳拿）**：保持手感，避免粗心。\n*   **黄色（纠结）**：**核心战场**。能做但易错，是提分最快的区域。\n*   **红色（压轴）**：学会放弃。死磕红色是导致“学了很多但没推进”的元凶。\n\n### 2. 压轴题“止损”策略\n*   **分步得分**：拿稳第一问，看清旧知识的复杂组合。\n*   **时间红线**：考试时 15 分钟没思路立刻跳过，保住前面的 120 分比死磕最后 10 分更有成就感。\n\n### 3. 产出导向思维\n*   放弃“今晚学 3 小时”的虚假勤奋。\n*   细化为“解决 3 组导数第一问”的具体动作。考前一周的意义是稳定发挥，而非突击成天才。",
+    "sourceMessageIds": [
+      "contest_demo_growth_assistant_1"
+    ],
+    "sourceDocumentRefs": [],
+    "kind": "message-note",
+    "createdAt": 1776218610000,
+    "updatedAt": 1776218610000
+  }
+]

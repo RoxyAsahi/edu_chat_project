@@ -1,0 +1,127 @@
+[
+  {
+    "id": "contest_demo_math_assistant_intro",
+    "role": "assistant",
+    "content": "# 展示建议卡\n\n- 先点左侧 Source 打开“二次函数压轴突破图”。\n- 再回到聊天区追问“为什么先配方再谈范围”。\n- 最后去右侧 Studio，用已有笔记继续生成选择题。\n\n这个案例想展示三件事：\n\n1. 资料不是附件堆积，而是可以直接进入阅读区和来源指南。\n2. AI 的解释会带着 KB 引用，方便回到原文定位。\n3. 有价值的回答能沉淀成 Notes，再继续生成训练内容。",
+    "timestamp": 1776214980000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": [],
+    "name": "展示案例｜数学",
+    "agentId": "contest_demo_math",
+    "avatarUrl": "assets/default_avatar.png",
+    "isThinking": false,
+    "topicId": "contest_demo_math_topic",
+    "isGroupMessage": false,
+    "finishReason": "completed",
+    "kbContextRefs": []
+  },
+  {
+    "id": "contest_demo_math_user_1",
+    "role": "user",
+    "content": "这道压轴题为什么你建议先配方，再去讨论 a 的范围？",
+    "timestamp": 1776215040000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": []
+  },
+  {
+    "id": "contest_demo_math_assistant_1",
+    "role": "assistant",
+    "content": "你好！这是一个非常关键的策略问题。很多同学在做压轴题时，习惯看到解析式就直接去算判别式 $\\Delta$ 或者代入点坐标，但这样往往会陷入复杂的代数泥潭，甚至漏掉关键分类。\n\n我建议**先配方、再讨论 $a$**，核心逻辑在于：**二次函数的“灵魂”在于顶点，而“骨架”在于开口。**\n\n以下是分步拆解，帮你理清为什么要这么做：\n\n### 1. 先看图像“骨架”，再看“位置”\n二次函数有三个核心骨架量：开口方向（$a$）、对称轴（$x = -b/2a$）和顶点坐标。\n*   **直接看标准式：** 你只能一眼看到开口和与 $y$ 轴的交点，信息是散乱的。\n*   **配方成顶点式 $y = a(x-h)^2 + k$：** 你一眼就能抓到**最值点在哪里**。压轴题往往在考“这个抛物线的顶点和某条直线、某个区间之间是什么关系”。\n\n### 2. 为什么要“先配方”？（提炼步骤）\n在处理参数范围题时，稳定的解题顺序应该是：\n1.  **变形：** 将 $y = ax^2 + bx + c$ 转化为 $y = a(x-h)^2 + k$。\n2.  **定性：** 确定对称轴 $x=h$ 是在变动还是固定。\n3.  **画图：** 根据 $a$ 的正负画出开口向上或向下的草图。\n4.  **列式：** 观察顶点是否落在题目要求的区间内。\n\n**理由：** 很多压轴题问的是“区间内恒成立”或“区间内有最值”。如果你只检查区间的两个端点，而忽略了顶点是否在区间内部，就会丢掉最核心的分类讨论。\n\n### 3. 为什么“后讨论 $a$”？\n$a$ 决定了开口方向，也就是决定了函数是“盆地”还是“山峰”。\n*   如果你先讨论 $a$，你手里只有两个方向，但不知道函数具体在哪里转弯。\n*   如果你先配方，你已经知道了“转弯点”的坐标。此时再根据 $a > 0$ 或 $a < 0$ 展开讨论，你会发现不等式的方向会非常清晰，不容易出错。\n\n---\n\n### ⚠️ 易错点提醒\n在实际操作中，请务必警惕这两个“坑”：\n1.  **配方失误：** 很多同学在提取系数 $a$ 时，经常忘记把 $a$ 乘回到常数项上，导致顶点纵坐标算错。\n2.  **判别式依赖症：** 看到“交点”就只想 $\\Delta > 0$。其实如果已知两个根，利用**“对称轴是两根中点”**这个性质（交点式 $y=a(x-x_1)(x-x_2)$）往往比判别式快得多。\n\n### 💡 总结：稳定做法\n**先找顶点定位置，再看开口定趋势。** 只有先把函数写成顶点式，你才能真正“看”到图像在坐标系里是如何滑动的。\n\n**接下来可以怎么练：**\n你可以找两道“动轴定区间”（对称轴含参数，区间固定）的题目，尝试**不列判别式**，只通过**顶点式+画草图**的方法，看看是不是逻辑变简单了？",
+    "timestamp": 1776215100000,
+    "attachments": [],
+    "favorited": true,
+    "favoriteAt": 1776215100000,
+    "noteRefs": [
+      "contest_demo_math_note_message"
+    ],
+    "selectionContextRefs": [],
+    "name": "展示案例｜数学",
+    "agentId": "contest_demo_math",
+    "avatarUrl": "assets/default_avatar.png",
+    "isThinking": false,
+    "topicId": "contest_demo_math_topic",
+    "isGroupMessage": false,
+    "finishReason": "completed",
+    "kbContextRefs": [
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_blueprint",
+        "chunkId": "contest_demo_math_doc_blueprint_preview",
+        "documentName": "二次函数压轴突破图.md",
+        "chunkIndex": 0,
+        "contentType": "markdown",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "# 二次函数压轴突破图 ## 先抓住函数骨架 二次函数题目的第一步，不是立刻代数运算，而是先确认三个骨架量： - 开口方向由 `a` 的正负决定。 - 对称轴由 `x = -b / 2a` 决定。 - 顶点坐标由对称轴和函数值共同确定。 只要骨架判断清楚，后续的最值、交点、范围题都会更稳定。 ## 三种常用表达式 ### 标准式 `y = ax^2 + bx...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      },
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_mistakes",
+        "chunkId": "contest_demo_math_doc_mistakes_preview",
+        "documentName": "二次函数常见失分点.txt",
+        "chunkIndex": 0,
+        "contentType": "plain",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "二次函数常见失分点清单 1. 求对称轴时把 x = -b/2a 写成了 -b/2 + a。 2. 配方时忘记把提出去的系数 a 乘回去。 3. 已经转成顶点式，却还在用大量代点替代图像分析。 4. 题目问“在区间内恒成立”，只检查端点，没有检查顶点是否落在区间内部。 5. 把“有两个交点”和“有两个不同实数根”混用，却没有检查判别式大于 0。 6. 已知两个...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ]
+  },
+  {
+    "id": "contest_demo_math_user_2",
+    "role": "user",
+    "content": "如果顶点刚好落在区间里面，我应该先看顶点还是先看端点？",
+    "timestamp": 1776215160000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": []
+  },
+  {
+    "id": "contest_demo_math_assistant_2",
+    "role": "assistant",
+    "content": "这是一个非常棒的问题，直接触及了二次函数区间最值问题的“灵魂”。\n\n我的建议非常明确：**如果顶点落在区间内部，必须优先看顶点。**\n\n在压轴题的逻辑里，顶点是“全局最值”，而端点只是“局部边界”。当顶点进入区间，它就成了决定胜负的关键点。我们可以通过以下三个维度来深度理解：\n\n### 1. 图像语言：谁是“天花板”或“地板”？\n想象一下抛物线的形状：\n*   **开口向上 ($a > 0$)：** 顶点是整个图像的“最低谷”。如果这个谷底落在区间 $[m, n]$ 内部，那么这个区间的**最小值**一定就是顶点的纵坐标 $k$。此时，无论端点 $f(m)$ 或 $f(n)$ 有多大，都无法改变“最小值由顶点决定”的事实。\n*   **开口向下 ($a < 0$)：** 顶点是“最高峰”。如果峰顶在区间内，那么区间的**最大值**就是顶点的纵坐标 $k$。\n\n### 2. 提炼步骤：三步走策略\n当你在草图上发现对称轴 $x = h$ 满足 $m \\le h \\le n$ 时，请按这个顺序思考：\n\n1.  **定最值：** \n    *   若求最小值且 $a>0$，直接看顶点 $k$。\n    *   若求最大值且 $a<0$，直接看顶点 $k$。\n2.  **比远近：** \n    *   二次函数具有对称性。**离对称轴越远的端点，函数值偏离顶点越远。**\n    *   比如 $a>0$ 时，想找区间内的最大值？看 $m$ 和 $n$ 谁离对称轴 $h$ 更远，远的那个对应的 $f(x)$ 就是最大值。\n3.  **列不等式：** \n    *   如果题目要求“在区间内 $f(x) > 0$”且 $a>0$，你只需要列出 **顶点纵坐标 $k > 0$** 即可，根本不需要管端点。因为只要最矮的地方都大于 0，其他地方肯定都大于 0。\n\n### 3. 易错点提醒（避坑指南）\n很多同学在这里丢分，是因为掉进了这两个陷阱：\n*   **“端点万能论”：** 习惯性地只把区间的左端点 $m$ 和右端点 $n$ 代入函数。如果顶点在区间内，最小值可能在顶点处取得，只算端点会漏掉最关键的限制条件。\n*   **忽略开口方向：** 没看清 $a$ 的正负就去判断顶点是最大还是最小。记住：**先看 $a$ 定盆脊，再看顶点定极值。**\n\n---\n\n### 稳定做法总结\n**“顶点在内看顶点，顶点在外看端点。”**\n*   **在内：** 顶点决定了一个极值（最值），另一个极值由离对称轴较远的端点决定。\n*   **在外：** 函数在区间内是单调的，最值一定在两个端点处取得。\n\n**接下来可以怎么练：**\n找一道**“动区间”**的题（例如函数固定，但区间是 $[t, t+1]$）。尝试让这个区间从左向右“滑过”顶点，观察并记录：当顶点进入区间的那一刻，你的不等式列法发生了什么变化？这种“滑动”的动态思维是破解压轴题的高阶武器。",
+    "timestamp": 1776215220000,
+    "attachments": [],
+    "favorited": false,
+    "favoriteAt": null,
+    "noteRefs": [],
+    "selectionContextRefs": [],
+    "name": "展示案例｜数学",
+    "agentId": "contest_demo_math",
+    "avatarUrl": "assets/default_avatar.png",
+    "isThinking": false,
+    "topicId": "contest_demo_math_topic",
+    "isGroupMessage": false,
+    "finishReason": "completed",
+    "kbContextRefs": [
+      {
+        "kbId": "contest_demo_math_kb",
+        "documentId": "contest_demo_math_doc_blueprint",
+        "chunkId": "contest_demo_math_doc_blueprint_preview",
+        "documentName": "二次函数压轴突破图.md",
+        "chunkIndex": 0,
+        "contentType": "markdown",
+        "sectionTitle": null,
+        "pageNumber": null,
+        "paragraphIndex": null,
+        "snippet": "# 二次函数压轴突破图 ## 先抓住函数骨架 二次函数题目的第一步，不是立刻代数运算，而是先确认三个骨架量： - 开口方向由 `a` 的正负决定。 - 对称轴由 `x = -b / 2a` 决定。 - 顶点坐标由对称轴和函数值共同确定。 只要骨架判断清楚，后续的最值、交点、范围题都会更稳定。 ## 三种常用表达式 ### 标准式 `y = ax^2 + bx...",
+        "vectorScore": 0.912,
+        "score": 0.912
+      }
+    ]
+  }
+]
