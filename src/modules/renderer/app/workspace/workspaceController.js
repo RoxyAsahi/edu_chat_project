@@ -140,15 +140,127 @@ function createWorkspaceController(deps = {}) {
     });
 
     let agentOverviewStats = {};
+    let overviewLearningMetrics = {
+        score: 700,
+        streakDays: 0,
+        activeDaysLast7: 0,
+        totalLearningDays: 0,
+    };
     let overviewClockTimerId = null;
 
-    function buildOverviewStats() {
-        const statsEntries = Object.values(agentOverviewStats || {});
+    function normalizeDateToDayStart(value) {
+        const date = new Date(Number(value || Date.now()));
+        date.setHours(0, 0, 0, 0);
+        return date.getTime();
+    }
+
+    function parseDateKeyToTimestamp(dateKey = '') {
+        const normalized = String(dateKey || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+            return null;
+        }
+
+        const parsed = new Date(`${normalized}T00:00:00`).getTime();
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function computeStreakDays(dayTimestamps = []) {
+        if (!Array.isArray(dayTimestamps) || dayTimestamps.length === 0) {
+            return 0;
+        }
+
+        const daySet = new Set(dayTimestamps.map((value) => normalizeDateToDayStart(value)));
+        const oneDay = 24 * 60 * 60 * 1000;
+        let cursor = normalizeDateToDayStart(Date.now());
+        let streak = 0;
+
+        while (daySet.has(cursor)) {
+            streak += 1;
+            cursor -= oneDay;
+        }
+
+        return streak;
+    }
+
+    function computeLearningMetricsFromDays(items = []) {
+        const dayTimestamps = (Array.isArray(items) ? items : [])
+            .map((item) => parseDateKeyToTimestamp(item?.dateKey))
+            .filter((value) => Number.isFinite(value));
+        const uniqueDaySet = new Set(dayTimestamps.map((value) => normalizeDateToDayStart(value)));
+        const totalLearningDays = uniqueDaySet.size;
+        const streakDays = computeStreakDays([...uniqueDaySet]);
+
+        const sevenDaysAgo = normalizeDateToDayStart(Date.now()) - (6 * 24 * 60 * 60 * 1000);
+        const activeDaysLast7 = [...uniqueDaySet].filter((value) => value >= sevenDaysAgo).length;
+
+        const score = Math.min(
+            980,
+            600
+                + Math.min(streakDays * 18, 180)
+                + Math.min(activeDaysLast7 * 20, 140)
+                + Math.min(totalLearningDays * 2, 60),
+        );
+
         return {
-            subjectCount: Array.isArray(state.agents) ? state.agents.length : 0,
-            topicCount: statsEntries.reduce((sum, stats) => sum + Number(stats?.topicCount || 0), 0),
-            pendingCount: statsEntries.reduce((sum, stats) => sum + Number(stats?.unreadCount || 0), 0),
+            score,
+            streakDays,
+            activeDaysLast7,
+            totalLearningDays,
         };
+    }
+
+    function buildFallbackLearningMetrics() {
+        const stats = Object.values(agentOverviewStats || {});
+        const totalTopics = stats.reduce((sum, item) => sum + Number(item?.topicCount || 0), 0);
+        const totalUnread = stats.reduce((sum, item) => sum + Number(item?.unreadCount || 0), 0);
+        const estimatedActiveDays = Math.min(30, Math.max(0, totalTopics));
+        const estimatedActiveLast7 = Math.min(7, Math.ceil(totalUnread / 2) || Math.min(7, totalTopics));
+        const estimatedStreak = Math.min(21, Math.max(0, Math.floor(totalTopics / 2)));
+
+        const score = Math.min(
+            900,
+            620
+                + Math.min(estimatedStreak * 12, 120)
+                + Math.min(estimatedActiveLast7 * 18, 126)
+                + Math.min(estimatedActiveDays * 2, 54),
+        );
+
+        return {
+            score,
+            streakDays: estimatedStreak,
+            activeDaysLast7: estimatedActiveLast7,
+            totalLearningDays: estimatedActiveDays,
+        };
+    }
+
+    async function refreshOverviewLearningMetrics() {
+        if (typeof chatAPI.listStudyLogDays !== 'function') {
+            overviewLearningMetrics = buildFallbackLearningMetrics();
+            return overviewLearningMetrics;
+        }
+
+        try {
+            const result = await chatAPI.listStudyLogDays({
+                scope: 'global',
+                agentId: '',
+                topicId: '',
+                query: '',
+                dateKey: '',
+                notebookId: '',
+                notebookName: '',
+                limit: 365,
+            });
+
+            if (result?.success && Array.isArray(result.items) && result.items.length > 0) {
+                overviewLearningMetrics = computeLearningMetricsFromDays(result.items);
+                return overviewLearningMetrics;
+            }
+        } catch (_error) {
+            // Fallback is handled below.
+        }
+
+        overviewLearningMetrics = buildFallbackLearningMetrics();
+        return overviewLearningMetrics;
     }
 
     function clearOverviewClockTimer() {
@@ -198,6 +310,69 @@ function createWorkspaceController(deps = {}) {
 
     function getCurrentAgentDisplayName() {
         return state.currentSelectedItem.name || '未选择学科';
+    }
+
+    function hasCurrentAgentSelected() {
+        return Boolean(state.currentSelectedItem?.id);
+    }
+
+    function focusOverviewHighlights() {
+        const featureMatrix = el.subjectOverviewGrid?.querySelector('#overviewHomeFeatureMatrix');
+        if (!featureMatrix) {
+            return;
+        }
+        featureMatrix.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+        });
+    }
+
+    function showManualNotesLibrary() {
+        state.workspaceViewMode = 'manual-notes';
+        syncWorkspaceView();
+    }
+
+    function openDiaryWall() {
+        el.openDiaryWallBtn?.click();
+    }
+
+    function continueLearningFromHome() {
+        if (!hasCurrentAgentSelected()) {
+            void createAgent();
+            return;
+        }
+        showSubjectWorkspace();
+    }
+
+    function handleHomeAction(action, payload = {}) {
+        switch (action) {
+        case 'create-agent':
+            void createAgent();
+            break;
+        case 'open-agent': {
+            const agentId = String(payload.agentId || '').trim();
+            if (!agentId) {
+                break;
+            }
+            void selectAgent(agentId);
+            break;
+        }
+        case 'view-highlights':
+            focusOverviewHighlights();
+            break;
+        case 'open-subject':
+        case 'continue-learning':
+            continueLearningFromHome();
+            break;
+        case 'open-notes':
+            showManualNotesLibrary();
+            break;
+        case 'open-diary':
+            openDiaryWall();
+            break;
+        default:
+            break;
+        }
     }
 
     function closeTopicActionMenu() {
@@ -393,7 +568,9 @@ function createWorkspaceController(deps = {}) {
             agents: state.agents,
             statsByAgent: agentOverviewStats,
             selectedAgentId: state.currentSelectedItem.id,
-            overviewStats: buildOverviewStats(),
+            selectedAgentName: getCurrentAgentDisplayName(),
+            currentTopicName: getCurrentTopicDisplayName(),
+            learningMetrics: overviewLearningMetrics,
         });
 
         if (el.subjectOverviewHeadline) {
@@ -403,11 +580,7 @@ function createWorkspaceController(deps = {}) {
             el.subjectOverviewSummary.textContent = markup.summary;
         }
 
-        el.subjectOverviewGrid.innerHTML = `${markup.clockMarkup || ''}${markup.statsRowMarkup || ''}${markup.gridMarkup || ''}`;
-        const overviewClockPanel = el.subjectOverviewGrid.querySelector('.overview-clock-panel');
-        if (overviewClockPanel && el.workspaceOverviewIslandRow) {
-            overviewClockPanel.insertAdjacentElement('afterend', el.workspaceOverviewIslandRow);
-        }
+        el.subjectOverviewGrid.innerHTML = `${markup.heroMarkup || ''}${markup.clockMarkup || ''}${markup.statsRowMarkup || ''}${markup.gridMarkup || ''}`;
         el.subjectOverviewGrid.querySelectorAll('[data-subject-card]').forEach((button) => {
             button.addEventListener('click', () => {
                 const { agentId } = button.dataset;
@@ -432,6 +605,17 @@ function createWorkspaceController(deps = {}) {
         const createCard = el.subjectOverviewGrid.querySelector('#subjectOverviewCreateCard');
         createCard?.addEventListener('click', () => {
             void createAgent();
+        });
+
+        el.subjectOverviewGrid.querySelectorAll('[data-home-action]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                const { homeAction } = button.dataset;
+                if (!homeAction) {
+                    return;
+                }
+                handleHomeAction(homeAction, button.dataset);
+            });
         });
 
         ensureOverviewClockTimer();
@@ -501,6 +685,7 @@ function createWorkspaceController(deps = {}) {
         state.agents = Array.isArray(agents) ? agents : [];
         const unreadResult = await chatAPI.getUnreadTopicCounts().catch(() => ({ counts: {} }));
         await refreshAgentOverviewStats(unreadResult?.counts || {});
+        await refreshOverviewLearningMetrics();
         renderAgentList(unreadResult?.counts || {});
         renderSubjectOverview();
         return state.agents;

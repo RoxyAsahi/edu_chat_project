@@ -7,231 +7,195 @@ function escapeHtml(text) {
         .replace(/'/g, '&#39;');
 }
 
-function getAgentAccent(agentId = '') {
-    const colors = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#673ab7', '#e91e63'];
-    let charCode = 0;
-    const id = String(agentId || '');
-    for (let index = 0; index < id.length; index += 1) {
-        charCode += id.charCodeAt(index);
-    }
-    return colors[charCode % colors.length];
-}
+function buildRecentItems({ agents = [], statsByAgent = {}, selectedAgentId = null } = {}) {
+    const items = [];
+    const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) || null;
+    const selectedStats = selectedAgent ? (statsByAgent[selectedAgent.id] || {}) : null;
 
-function buildClockMarkup() {
-    return `
-        <section class="overview-clock-panel" aria-label="当前时间">
-            <div class="overview-clock-panel__face">
-                <span class="overview-clock-panel__label">当前时间</span>
-                <strong id="overviewClockTime" class="overview-clock-panel__time">00:00</strong>
-                <span id="overviewClockDate" class="overview-clock-panel__date">4月17日 星期四</span>
-            </div>
-        </section>
-    `;
-}
-
-function buildStatsRowMarkup(stats = {}) {
-    const subjects = Number(stats.subjectCount || 0);
-    const topics = Number(stats.topicCount || 0);
-    const pending = Number(stats.pendingCount || 0);
-
-    return `
-        <section class="overview-stats-row" aria-label="首页概览摘要">
-            <article class="overview-stat-card">
-                <span class="overview-stat-card__label">学科</span>
-                <strong>${subjects}</strong>
-            </article>
-            <article class="overview-stat-card overview-stat-card--warm">
-                <span class="overview-stat-card__label">话题</span>
-                <strong>${topics}</strong>
-            </article>
-            <article class="overview-stat-card overview-stat-card--accent">
-                <span class="overview-stat-card__label">待处理</span>
-                <strong>${pending}</strong>
-            </article>
-        </section>
-    `;
-}
-
-function buildHeroSummaryCard(headline, summary) {
-    return `
-        <article class="overview-hero-card overview-hero-card--summary">
-            <span class="overview-hero-card__eyebrow">Overview</span>
-            <strong class="overview-hero-card__title">${escapeHtml(headline)}</strong>
-            <p class="overview-hero-card__summary">${escapeHtml(summary)}</p>
-        </article>
-    `;
-}
-
-function buildFocusedAgentCard(agent, stats) {
-    if (!agent) {
-        return `
-            <article class="overview-hero-card overview-hero-card--current">
-                <span class="overview-hero-card__eyebrow">当前学科</span>
-                <strong class="overview-hero-card__title">还没有学科</strong>
-                <p class="overview-hero-card__summary">先创建一个学习方向，首页就会在这里显示你的当前学科概览。</p>
-            </article>
-        `;
+    if (selectedAgent) {
+        items.push({
+            title: selectedStats?.lastTopicName
+                ? `继续：${selectedStats.lastTopicName}`
+                : `进入：${selectedAgent.name || selectedAgent.id}`,
+            meta: `${selectedAgent.name || selectedAgent.id} · 当前学习空间`,
+            accent: 'primary',
+        });
     }
 
-    const topicCount = Number(stats?.topicCount || 0);
-    const unreadCount = Number(stats?.unreadCount || 0);
-    const lastTopicName = stats?.lastTopicName || '尚未创建话题';
-    const accent = getAgentAccent(agent.id);
-    const statusText = unreadCount > 0
-        ? `当前有 ${unreadCount} 个待处理话题`
-        : '当前学科已经做好学习准备';
+    const unreadAgent = agents
+        .map((agent) => ({
+            agent,
+            stats: statsByAgent[agent.id] || {},
+        }))
+        .filter((item) => item.agent.id !== selectedAgentId && Number(item.stats.unreadCount || 0) > 0)
+        .sort((left, right) => Number(right.stats.unreadCount || 0) - Number(left.stats.unreadCount || 0))[0];
 
-    return `
-        <article class="overview-hero-card overview-hero-card--current subject-overview-card is-active" data-subject-card data-agent-id="${escapeHtml(agent.id)}">
-            <div class="overview-hero-card__topline">
-                <span class="overview-hero-card__pill" style="--overview-pill-accent: ${accent};">当前</span>
-                <button
-                    type="button"
-                    class="subject-overview-card__delete"
-                    data-delete-subject-card
-                    data-agent-id="${escapeHtml(agent.id)}"
-                    data-agent-name="${escapeHtml(agent.name || agent.id)}"
-                    aria-label="删除"
-                    title="删除学科"
-                >
-                    <span class="material-symbols-outlined">more_vert</span>
-                </button>
-            </div>
-            <span class="overview-hero-card__eyebrow">当前学科</span>
-            <strong class="overview-hero-card__title">${escapeHtml(agent.name || agent.id)}</strong>
-            <p class="overview-hero-card__summary">${escapeHtml(statusText)}</p>
-            <div class="overview-hero-card__stats">
-                <span class="overview-hero-card__stat">
-                    <span class="overview-hero-card__stat-label">当前学科</span>
-                    <strong>${escapeHtml(agent.name || agent.id)}</strong>
-                </span>
-                <span class="overview-hero-card__stat">
-                    <span class="overview-hero-card__stat-label">话题</span>
-                    <strong>${topicCount}</strong>
-                </span>
-                <span class="overview-hero-card__stat">
-                    <span class="overview-hero-card__stat-label">待处理</span>
-                    <strong>${unreadCount}</strong>
-                </span>
-            </div>
-            <div class="overview-hero-card__footer">
-                <span>最近话题：${escapeHtml(lastTopicName)}</span>
-                <span class="material-symbols-outlined" aria-hidden="true">arrow_outward</span>
-            </div>
-        </article>
-    `;
+    if (unreadAgent) {
+        items.push({
+            title: `待处理：${unreadAgent.agent.name || unreadAgent.agent.id}`,
+            meta: `${unreadAgent.stats.unreadCount || 0} 项内容等待整理`,
+            accent: 'success',
+        });
+    }
+
+    const topicAgent = agents
+        .map((agent) => ({
+            agent,
+            stats: statsByAgent[agent.id] || {},
+        }))
+        .filter((item) => item.stats.lastTopicName && item.agent.id !== selectedAgentId)
+        .sort((left, right) => Number(right.stats.topicCount || 0) - Number(left.stats.topicCount || 0))[0];
+
+    if (topicAgent) {
+        items.push({
+            title: `归档：${topicAgent.stats.lastTopicName}`,
+            meta: `${topicAgent.agent.name || topicAgent.agent.id} · 已整理 ${topicAgent.stats.topicCount || 0} 个话题`,
+            accent: 'muted',
+        });
+    }
+
+    if (items.length === 0) {
+        return [
+            {
+                title: '创建第一个学科',
+                meta: '从一个学习入口开始，把资料、对话和笔记组织起来',
+                accent: 'primary',
+            },
+            {
+                title: '沉淀你的学习过程',
+                meta: '后续这里会自动汇总最近的话题、笔记和成长记录',
+                accent: 'success',
+            },
+            {
+                title: '继续完成当天任务',
+                meta: '通过首页快速回到当前学习空间',
+                accent: 'muted',
+            },
+        ];
+    }
+
+    return items.slice(0, 3);
 }
 
-function buildCreateCardMarkup() {
+function buildFeatureCard({ title, description, accent, action, icon } = {}) {
     return `
-        <button type="button" class="overview-hero-card overview-hero-card--create subject-overview-create-card" id="subjectOverviewCreateCard">
-            <div class="subject-overview-create-card__inner">
-                <span class="subject-overview-create-card__icon material-symbols-outlined">add</span>
-                <span class="overview-hero-card__eyebrow">New Subject</span>
-                <strong class="overview-hero-card__title">新建学科</strong>
-                <p class="overview-hero-card__summary">为新的学习方向创建一个独立工作台。</p>
-            </div>
+        <button type="button" class="overview-dashboard-card overview-dashboard-card--${escapeHtml(accent)}" data-home-action="${escapeHtml(action)}">
+            <span class="overview-dashboard-card__icon">${icon}</span>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(description)}</p>
         </button>
     `;
 }
 
-function buildAgentWallCard(agent, stats, isActive) {
-    const topicCount = Number(stats?.topicCount || 0);
-    const unreadCount = Number(stats?.unreadCount || 0);
-    const lastTopicName = stats?.lastTopicName || '尚未创建话题';
-    const accent = getAgentAccent(agent.id);
+function buildSubjectOverviewMarkup({
+    agents = [],
+    statsByAgent = {},
+    selectedAgentId = null,
+    selectedAgentName = '',
+    currentTopicName = '',
+    learningMetrics = {},
+} = {}) {
+    const hasAgents = agents.length > 0;
+    const totalTopics = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.topicCount || 0), 0);
+    const totalUnread = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.unreadCount || 0), 0);
+    const currentAgentLabel = selectedAgentName || '还没有创建学科';
+    const currentTopicLabel = currentTopicName || '还没有选中话题';
+    const recentItems = buildRecentItems({ agents, statsByAgent, selectedAgentId });
+    const streakDays = Math.max(0, Number(learningMetrics?.streakDays || 0));
+    const activeDaysLast7 = Math.max(0, Number(learningMetrics?.activeDaysLast7 || 0));
+    const totalLearningDays = Math.max(0, Number(learningMetrics?.totalLearningDays || 0));
+    const learningScore = Math.max(0, Number(learningMetrics?.score || 700));
 
-    return `
-        <article class="subject-overview-card ${isActive ? 'is-active subject-overview-card--active' : ''}" data-subject-card data-agent-id="${escapeHtml(agent.id)}">
-            <div class="subject-overview-card__topline">
-                <span class="subject-overview-card__icon" style="color: ${accent};">
-                    <span class="material-symbols-outlined">book_2</span>
-                </span>
-                <button
-                    type="button"
-                    class="subject-overview-card__delete"
-                    data-delete-subject-card
-                    data-agent-id="${escapeHtml(agent.id)}"
-                    data-agent-name="${escapeHtml(agent.name || agent.id)}"
-                    aria-label="删除"
-                    title="删除学科"
-                >
-                    <span class="material-symbols-outlined">more_vert</span>
-                </button>
-            </div>
-            <div class="subject-overview-card__body">
-                <span class="subject-overview-card__eyebrow">学科</span>
-                <strong>${escapeHtml(agent.name || agent.id)}</strong>
-                <p>${unreadCount > 0 ? `还有 ${unreadCount} 项待处理内容。` : '可以继续进入当前学习工作台。'}</p>
-            </div>
-            <div class="subject-overview-card__meta">
-                <span class="subject-overview-card__chip">${topicCount} 个话题</span>
-                <span class="subject-overview-card__chip">${unreadCount} 项待处理</span>
-                ${isActive ? '<span class="subject-overview-card__badge">当前</span>' : ''}
-            </div>
-            <div class="subject-overview-card__footer">
-                <span class="subject-overview-card__footer-label">最近话题：${escapeHtml(lastTopicName)}</span>
-                <span class="material-symbols-outlined" aria-hidden="true">arrow_outward</span>
-            </div>
+    const featureMarkup = [
+        buildFeatureCard({
+            title: '学科辅导',
+            description: '启发对话 · 深度解析',
+            accent: 'primary',
+            action: 'open-subject',
+            icon: '💬',
+        }),
+        buildFeatureCard({
+            title: '知识沉淀',
+            description: '自动整理 · 资料索引',
+            accent: 'success',
+            action: 'open-notes',
+            icon: '📘',
+        }),
+        buildFeatureCard({
+            title: '训练转化',
+            description: '变式练习 · 记忆闪卡',
+            accent: 'warm',
+            action: 'continue-learning',
+            icon: '✅',
+        }),
+        buildFeatureCard({
+            title: '成长复盘',
+            description: 'DailyNote · 进步轨迹',
+            accent: 'rose',
+            action: 'open-diary',
+            icon: '📊',
+        }),
+    ].join('');
+
+    const recentMarkup = recentItems.map((item) => `
+        <article class="overview-dashboard-activity overview-dashboard-activity--${escapeHtml(item.accent)}">
+            <strong>${escapeHtml(item.title)}</strong>
+            <p>${escapeHtml(item.meta)}</p>
         </article>
-    `;
-}
-
-function buildSubjectOverviewMarkup({ agents = [], statsByAgent = {}, selectedAgentId = null, overviewStats = null } = {}) {
-    const hasAgents = Array.isArray(agents) && agents.length > 0;
-    const headline = hasAgents ? '学科总视图' : '创建你的第一个学科';
-    const summary = hasAgents
-        ? '继续管理你的学习，或从下方切换到其他学科。'
-        : '先创建一个学科入口，UniStudy 会在这里为你组织学习工作台。';
-
-    const normalizedOverviewStats = overviewStats && typeof overviewStats === 'object'
-        ? overviewStats
-        : {
-            subjectCount: agents.length,
-            topicCount: agents.reduce((sum, agent) => sum + Number(statsByAgent?.[agent.id]?.topicCount || 0), 0),
-            pendingCount: agents.reduce((sum, agent) => sum + Number(statsByAgent?.[agent.id]?.unreadCount || 0), 0),
-        };
-
-    const focusedAgent = agents.find((agent) => agent.id === selectedAgentId) || agents[0] || null;
-    const focusedStats = focusedAgent ? (statsByAgent[focusedAgent.id] || {}) : {};
-
-    const wallAgents = hasAgents
-        ? agents.filter((agent) => agent?.id !== focusedAgent?.id)
-        : [];
-
-    const wallMarkup = hasAgents
-        ? (
-            wallAgents.length > 0
-                ? wallAgents.map((agent) => buildAgentWallCard(agent, statsByAgent[agent.id] || {}, false)).join('')
-                : `
-                    <article class="subject-overview-empty">
-                        <span class="subject-overview-empty__eyebrow">All set</span>
-                        <strong>当前没有其他学科</strong>
-                        <p>上方已经展示了当前学科；创建新的学科后，会在这里显示更多学习工作台。</p>
-                    </article>
-                `
-        )
-        : `
-            <article class="subject-overview-empty">
-                <span class="subject-overview-empty__eyebrow">Ready to start</span>
-                <strong>还没有学科卡片</strong>
-                <p>点击右侧的新建学科卡，创建第一个学习工作台。</p>
-            </article>
-        `;
+    `).join('');
 
     return {
-        headline,
-        summary,
-        clockMarkup: buildClockMarkup(),
-        statsRowMarkup: buildStatsRowMarkup(normalizedOverviewStats),
+        headline: '学习首页',
+        summary: '把首页变成一个能直接继续学习的入口，而不是只做概览。',
+        heroMarkup: '',
         gridMarkup: `
-            <section class="overview-hero-grid" aria-label="首页重点卡片">
-                ${buildHeroSummaryCard(headline, summary)}
-                ${buildFocusedAgentCard(focusedAgent, focusedStats)}
-                ${buildCreateCardMarkup()}
-            </section>
-            <section class="overview-subject-wall" aria-label="全部学科卡片">
-                ${wallMarkup}
+            <section class="overview-dashboard" aria-label="首页工作台">
+                <header class="overview-dashboard__header">
+                    <div class="overview-dashboard__welcome">
+                        <h2>你好，同学 👋</h2>
+                        <p>${streakDays > 0
+                            ? `今天是你连续学习的第 ${escapeHtml(streakDays)} 天，近 7 天活跃 ${escapeHtml(activeDaysLast7)} 天。`
+                            : (hasAgents
+                                ? `当前学科：${escapeHtml(currentAgentLabel)} · 当前话题：${escapeHtml(currentTopicLabel)}`
+                                : '先创建一个学科入口，然后开始你的第一条学习链路。')}</p>
+                    </div>
+                    <div class="overview-dashboard__score">
+                        <span>学习力指数</span>
+                        <strong>${escapeHtml(learningScore)}</strong>
+                    </div>
+                </header>
+
+                <section class="overview-dashboard__body">
+                    <div class="overview-dashboard__features">
+                        ${featureMarkup}
+                    </div>
+
+                    <aside class="overview-dashboard__activity-card">
+                        <div class="overview-dashboard__activity-title">
+                            <span class="overview-dashboard__activity-dot"></span>
+                            <strong>最近成长动态</strong>
+                        </div>
+                        <div class="overview-dashboard__activity-list">
+                            ${recentMarkup}
+                        </div>
+                        <button type="button" class="ghost-button overview-dashboard__activity-button" data-home-action="open-diary">
+                            查看全部记录 →
+                        </button>
+                    </aside>
+                </section>
+
+                <footer class="overview-dashboard__footer">
+                    <div class="overview-dashboard__footer-copy">
+                        <span class="overview-dashboard__footer-icon">📖</span>
+                        <strong>${hasAgents ? `正在阅读：${escapeHtml(currentAgentLabel)}` : '从创建学科开始你的学习工作台'}</strong>
+                        <p>${hasAgents
+                            ? `学习天数 ${escapeHtml(totalLearningDays)} 天 · 共 ${totalTopics} 个话题 · ${totalUnread} 项待处理`
+                            : '创建后即可开始整理资料、笔记和训练内容。'}</p>
+                    </div>
+                    <button type="button" class="accent-button overview-dashboard__footer-button" data-home-action="${hasAgents ? 'continue-learning' : 'create-agent'}">
+                        ${hasAgents ? '继续学习' : '立即开始'}
+                    </button>
+                </footer>
             </section>
         `,
     };

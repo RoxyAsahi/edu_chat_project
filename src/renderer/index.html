@@ -532,6 +532,12 @@
             <button id="analysisEditMarkdownBtn" class="ghost-button icon-text-btn hidden" type="button">
               <span class="material-symbols-outlined">edit_document</span> 编辑 Markdown
             </button>
+            <button id="noteViewPreviewBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">preview</span> 查看预览
+            </button>
+            <button id="noteEditMarkdownBtn" class="ghost-button icon-text-btn hidden" type="button">
+              <span class="material-symbols-outlined">edit_document</span> 编辑文档
+            </button>
             <button id="quizViewPracticeBtn" class="ghost-button icon-text-btn hidden" type="button">
               <span class="material-symbols-outlined">school</span> 返回练习
             </button>
@@ -560,6 +566,17 @@
             </div>
             <article id="analysisPreviewContent" class="analysis-preview__content"></article>
             <div id="analysisPreviewMeta" class="settings-caption analysis-preview__meta">当前没有可预览的报告。</div>
+          </section>
+
+          <section id="noteMarkdownPreviewCard" class="settings-card analysis-preview-card hidden">
+            <div class="analysis-preview__header">
+              <div class="analysis-preview__title-block">
+                <p class="eyebrow">笔记预览</p>
+                <h3 id="noteMarkdownPreviewTitle">Markdown 渲染预览</h3>
+              </div>
+            </div>
+            <article id="noteMarkdownPreviewContent" class="analysis-preview__content"></article>
+            <div id="noteMarkdownPreviewMeta" class="settings-caption analysis-preview__meta">当前没有可预览的内容。</div>
           </section>
 
           <section id="noteEditorCard" class="settings-card note-detail-editor">
