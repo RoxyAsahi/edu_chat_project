@@ -147,6 +147,8 @@ function createWorkspaceController(deps = {}) {
         totalLearningDays: 0,
     };
     let overviewClockTimerId = null;
+    let overviewSubjectRevealObserver = null;
+    let overviewSubjectRevealResetTimerId = null;
 
     function normalizeDateToDayStart(value) {
         const date = new Date(Number(value || Date.now()));
@@ -269,6 +271,63 @@ function createWorkspaceController(deps = {}) {
         }
         clearIntervalFn(overviewClockTimerId);
         overviewClockTimerId = null;
+    }
+
+    function disconnectOverviewSubjectRevealObserver() {
+        if (overviewSubjectRevealObserver?.disconnect) {
+            overviewSubjectRevealObserver.disconnect();
+        }
+        overviewSubjectRevealObserver = null;
+        if (overviewSubjectRevealResetTimerId != null) {
+            windowObj.clearTimeout(overviewSubjectRevealResetTimerId);
+            overviewSubjectRevealResetTimerId = null;
+        }
+    }
+
+    function bindOverviewSubjectReveal() {
+        disconnectOverviewSubjectRevealObserver();
+        const subjectSection = el.subjectOverviewGrid?.querySelector('.overview-subject-section--pending');
+        if (!subjectSection) {
+            return;
+        }
+        const restartEnterAnimation = () => {
+            subjectSection.classList.remove('is-leaving');
+            subjectSection.classList.remove('is-visible');
+            void subjectSection.offsetWidth;
+            subjectSection.classList.add('is-visible');
+        };
+        if (typeof windowObj.IntersectionObserver !== 'function') {
+            restartEnterAnimation();
+            return;
+        }
+        overviewSubjectRevealObserver = new windowObj.IntersectionObserver((entries) => {
+            const entry = entries[0];
+            if (!entry) {
+                return;
+            }
+            if (entry.isIntersecting) {
+                if (overviewSubjectRevealResetTimerId != null) {
+                    windowObj.clearTimeout(overviewSubjectRevealResetTimerId);
+                    overviewSubjectRevealResetTimerId = null;
+                }
+                restartEnterAnimation();
+                return;
+            }
+            if (!subjectSection.classList.contains('is-visible')) {
+                return;
+            }
+            subjectSection.classList.remove('is-visible');
+            subjectSection.classList.add('is-leaving');
+            overviewSubjectRevealResetTimerId = windowObj.setTimeout(() => {
+                subjectSection.classList.remove('is-leaving');
+                overviewSubjectRevealResetTimerId = null;
+            }, 460);
+        }, {
+            root: el.workspaceOverviewPage || null,
+            threshold: 0.08,
+            rootMargin: '0px 0px -6% 0px',
+        });
+        overviewSubjectRevealObserver.observe(subjectSection);
     }
 
     function syncOverviewClockText() {
@@ -618,6 +677,7 @@ function createWorkspaceController(deps = {}) {
             });
         });
 
+        bindOverviewSubjectReveal();
         ensureOverviewClockTimer();
     }
 

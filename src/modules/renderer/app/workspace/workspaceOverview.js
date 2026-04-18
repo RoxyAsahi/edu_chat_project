@@ -89,6 +89,45 @@ function buildFeatureCard({ title, description, accent, action, icon } = {}) {
     `;
 }
 
+function buildSubjectWallCard({ agent, stats = {}, isCurrent = false } = {}) {
+    const agentId = agent?.id || '';
+    const agentName = agent?.name || agentId || '未命名学科';
+    const topicCount = Math.max(0, Number(stats?.topicCount || 0));
+    const unreadCount = Math.max(0, Number(stats?.unreadCount || 0));
+    const lastTopicName = stats?.lastTopicName || '从一个新话题开始今天的学习';
+    const summaryText = unreadCount > 0
+        ? `${unreadCount} 项内容待整理`
+        : (topicCount > 0 ? `已累计 ${topicCount} 个学习话题` : '准备好开始第一条学习链路');
+
+    return `
+        <button
+            type="button"
+            class="subject-overview-card${isCurrent ? ' subject-overview-card--current' : ''}"
+            data-subject-card
+            data-agent-id="${escapeHtml(agentId)}"
+        >
+            <div class="subject-overview-card__topline">
+                <span class="subject-overview-card__badge">${isCurrent ? '当前学科' : '学习空间'}</span>
+                <span class="subject-overview-card__metric">${topicCount} 话题</span>
+            </div>
+            <div class="subject-overview-card__body">
+                <strong>${escapeHtml(agentName)}</strong>
+                <p>${escapeHtml(lastTopicName)}</p>
+            </div>
+            <div class="subject-overview-card__meta" aria-hidden="true">
+                <span>
+                    <span class="material-symbols-outlined">schedule</span>
+                    ${escapeHtml(summaryText)}
+                </span>
+                <span>
+                    <span class="material-symbols-outlined">arrow_outward</span>
+                    进入学习
+                </span>
+            </div>
+        </button>
+    `;
+}
+
 function buildSubjectOverviewMarkup({
     agents = [],
     statsByAgent = {},
@@ -145,6 +184,51 @@ function buildSubjectOverviewMarkup({
         </article>
     `).join('');
 
+    const subjectCardsMarkup = agents.map((agent) => buildSubjectWallCard({
+        agent,
+        stats: statsByAgent[agent.id] || {},
+        isCurrent: agent.id === selectedAgentId,
+    })).join('');
+
+    const subjectWallMarkup = hasAgents
+        ? `
+            <section class="overview-subject-section overview-subject-section--pending" aria-label="学科入口">
+                <div class="overview-subject-section__header">
+                    <div>
+                        <p class="overview-subject-section__eyebrow">Subjects</p>
+                        <h3>继续你的学科工作台</h3>
+                    </div>
+                    <button
+                        id="subjectOverviewCreateCard"
+                        type="button"
+                        class="subject-overview-create-pill"
+                    >
+                        <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                        <span>新建学科</span>
+                    </button>
+                </div>
+                <div class="overview-subject-wall">
+                    ${subjectCardsMarkup}
+                </div>
+            </section>
+        `
+        : `
+            <section class="overview-subject-section overview-subject-section--pending" aria-label="学科入口">
+                <div class="overview-subject-section__header">
+                    <div>
+                        <p class="overview-subject-section__eyebrow">Subjects</p>
+                        <h3>从第一个学科开始</h3>
+                    </div>
+                </div>
+                <button id="subjectOverviewCreateCard" type="button" class="subject-overview-empty">
+                    <span class="subject-overview-empty__icon material-symbols-outlined" aria-hidden="true">school</span>
+                    <span class="subject-overview-empty__eyebrow">Ready</span>
+                    <strong>创建你的第一个学科工作台</strong>
+                    <p>把资料、对话、笔记和复盘收进同一个学习入口，后面首页就会自动帮你继续追踪。</p>
+                </button>
+            </section>
+        `;
+
     return {
         headline: '学习首页',
         summary: '把首页变成一个能直接继续学习的入口，而不是只做概览。',
@@ -198,6 +282,7 @@ function buildSubjectOverviewMarkup({
                     </button>
                 </footer>
             </section>
+            ${subjectWallMarkup}
         `,
     };
 }
