@@ -21,6 +21,16 @@ if not exist package.json (
   exit /b 1
 )
 
+if not defined npm_config_registry set "npm_config_registry=https://registry.npmmirror.com"
+if not defined ELECTRON_MIRROR set "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/"
+if not defined ELECTRON_BUILDER_BINARIES_MIRROR set "ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/"
+if not defined npm_config_disturl set "npm_config_disturl=https://npmmirror.com/mirrors/node/"
+
+echo [UniStudy] npm registry: %npm_config_registry%
+echo [UniStudy] Electron mirror: %ELECTRON_MIRROR%
+echo [UniStudy] Electron Builder binaries mirror: %ELECTRON_BUILDER_BINARIES_MIRROR%
+echo [UniStudy] Node disturl mirror: %npm_config_disturl%
+
 set "NEEDS_INSTALL="
 if not exist node_modules (
   set "NEEDS_INSTALL=1"
