@@ -265,6 +265,17 @@ function createNotesController(deps = {}) {
         }
 
         target.innerHTML = renderMarkdownFragment(markdown);
+        if (typeof windowObj.renderMathInElement === 'function') {
+            windowObj.renderMathInElement(target, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '\\[', right: '\\]', display: true },
+                    { left: '$', right: '$', display: false },
+                    { left: '\\(', right: '\\)', display: false },
+                ],
+                throwOnError: false,
+            });
+        }
     }
 
     function buildAnalysisPreviewMeta(note = null) {
@@ -292,9 +303,51 @@ function createNotesController(deps = {}) {
             el.analysisPreviewContent.innerHTML = markdown.trim()
                 ? renderMarkdownFragment(markdown)
                 : '<p>当前报告暂无内容。</p>';
+            if (markdown.trim() && typeof windowObj.renderMathInElement === 'function') {
+                windowObj.renderMathInElement(el.analysisPreviewContent, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\(', right: '\\)', display: false },
+                    ],
+                    throwOnError: false,
+                });
+            }
         }
         if (el.analysisPreviewMeta) {
             el.analysisPreviewMeta.textContent = buildAnalysisPreviewMeta(normalized);
+        }
+    }
+
+    function renderNoteMarkdownPreview(note = getCurrentDetailNote()) {
+        const normalized = note ? normalizeNote(note) : null;
+        const draftTitle = String(el.noteTitleInput?.value || '').trim();
+        const draftMarkdown = String(el.noteContentInput?.value || '');
+        const title = draftTitle || normalized?.title || 'Markdown 渲染预览';
+        const markdown = draftMarkdown || normalized?.contentMarkdown || '';
+
+        if (el.noteMarkdownPreviewTitle) {
+            el.noteMarkdownPreviewTitle.textContent = title;
+        }
+        if (el.noteMarkdownPreviewContent) {
+            el.noteMarkdownPreviewContent.innerHTML = markdown.trim()
+                ? renderMarkdownFragment(markdown)
+                : '<p>当前笔记暂无内容。</p>';
+            if (markdown.trim() && typeof windowObj.renderMathInElement === 'function') {
+                windowObj.renderMathInElement(el.noteMarkdownPreviewContent, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\(', right: '\\)', display: false },
+                    ],
+                    throwOnError: false,
+                });
+            }
+        }
+        if (el.noteMarkdownPreviewMeta) {
+            el.noteMarkdownPreviewMeta.textContent = buildAnalysisPreviewMeta(normalized);
         }
     }
 
@@ -468,6 +521,8 @@ function createNotesController(deps = {}) {
             }
         } else if (state.noteDetailKind === 'analysis') {
             state.noteDetailMode = mode === 'view' ? 'view' : 'edit';
+        } else if (state.noteDetailKind === 'note') {
+            state.noteDetailMode = mode === 'view' ? 'view' : 'edit';
         } else {
             state.noteDetailMode = 'edit';
         }
@@ -478,6 +533,9 @@ function createNotesController(deps = {}) {
         }
         if (state.noteDetailKind === 'analysis' && state.noteDetailMode === 'view') {
             renderAnalysisPreview(note);
+        }
+        if (state.noteDetailKind === 'note' && state.noteDetailMode === 'view') {
+            renderNoteMarkdownPreview(note);
         }
     }
 
@@ -532,7 +590,11 @@ function createNotesController(deps = {}) {
         state.noteDetailKind = requestedKind;
         state.noteDetailMode = requestedKind === 'quiz' && hasStructuredQuiz(normalized)
             ? 'practice'
-            : (requestedKind === 'analysis' && normalized?.id ? 'view' : 'edit');
+            : (
+                requestedKind === 'analysis' && normalized?.id
+                    ? 'view'
+                    : (requestedKind === 'note' && normalized?.id ? 'view' : 'edit')
+            );
         resetQuizPracticeState(normalized?.id || null);
         el.noteDetailModal?.classList.remove('hidden');
         el.noteDetailModal?.classList.add('note-detail-modal--open');
@@ -567,6 +629,9 @@ function createNotesController(deps = {}) {
             }
             if (requestedKind === 'analysis') {
                 renderAnalysisPreview(normalized);
+            }
+            if (requestedKind === 'note' && state.noteDetailMode === 'view') {
+                renderNoteMarkdownPreview(normalized);
             }
             if (requestedKind === 'quiz') {
                 renderQuizPractice(normalized);
@@ -810,6 +875,12 @@ function createNotesController(deps = {}) {
             setNoteDetailMode('edit');
         });
         el.analysisViewReportBtn?.addEventListener('click', () => {
+            setNoteDetailMode('view');
+        });
+        el.noteEditMarkdownBtn?.addEventListener('click', () => {
+            setNoteDetailMode('edit');
+        });
+        el.noteViewPreviewBtn?.addEventListener('click', () => {
             setNoteDetailMode('view');
         });
         el.quizEditSourceBtn?.addEventListener('click', () => {
