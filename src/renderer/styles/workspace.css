@@ -219,6 +219,32 @@
   padding-bottom: 8px;
 }
 
+@keyframes overviewFadeLift {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes overviewGlowIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    box-shadow: 0 0 0 rgba(148, 163, 184, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    box-shadow: 0 18px 44px rgba(148, 163, 184, 0.12);
+  }
+}
+
 .overview-dashboard {
   display: flex;
   flex-direction: column;
@@ -228,6 +254,7 @@
   background: #f4f7fb;
   border: 1px solid #ffffff;
   box-shadow: 0 18px 44px rgba(148, 163, 184, 0.12);
+  animation: overviewGlowIn 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .overview-dashboard__header {
@@ -235,6 +262,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
+  animation: overviewFadeLift 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 70ms;
 }
 
 .overview-dashboard__welcome h2 {
@@ -258,6 +287,8 @@
 .overview-dashboard__score {
   min-width: 136px;
   text-align: right;
+  animation: overviewFadeLift 540ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 120ms;
 }
 
 .overview-dashboard__score span {
@@ -282,6 +313,8 @@
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
   gap: 18px;
   align-items: stretch;
+  animation: overviewFadeLift 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 120ms;
 }
 
 .overview-dashboard__features {
@@ -310,7 +343,26 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
+  opacity: 0;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  animation: overviewFadeLift 540ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform, opacity;
+}
+
+.overview-dashboard__features > .overview-dashboard-card:nth-child(1) {
+  animation-delay: 150ms;
+}
+
+.overview-dashboard__features > .overview-dashboard-card:nth-child(2) {
+  animation-delay: 210ms;
+}
+
+.overview-dashboard__features > .overview-dashboard-card:nth-child(3) {
+  animation-delay: 270ms;
+}
+
+.overview-dashboard__features > .overview-dashboard-card:nth-child(4) {
+  animation-delay: 330ms;
 }
 
 .overview-dashboard-card:hover,
@@ -326,7 +378,13 @@
   align-items: center;
   justify-content: center;
   border-radius: 16px;
-  font-size: 24px;
+  color: #42526b;
+}
+
+.overview-dashboard-card__icon .material-symbols-outlined {
+  font-size: 28px;
+  line-height: 1;
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
 }
 
 .overview-dashboard-card strong,
@@ -378,6 +436,9 @@
   padding: 24px;
   display: flex;
   flex-direction: column;
+  opacity: 0;
+  animation: overviewFadeLift 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 240ms;
 }
 
 .overview-dashboard__activity-title {
@@ -442,6 +503,23 @@
   padding: 18px 22px;
   background: #eef0ff;
   border-color: #e5e9fb;
+  opacity: 0;
+  animation: overviewFadeLift 580ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-dashboard,
+  .overview-dashboard__header,
+  .overview-dashboard__score,
+  .overview-dashboard__body,
+  .overview-dashboard-card,
+  .overview-dashboard__activity-card,
+  .overview-dashboard__footer {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .overview-dashboard__footer-copy {
@@ -452,7 +530,11 @@
 }
 
 .overview-dashboard__footer-icon {
-  font-size: 20px;
+  flex: 0 0 auto;
+  font-size: 22px;
+  line-height: 1;
+  color: #4d55d7;
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
 }
 
 .overview-dashboard__footer-copy strong {

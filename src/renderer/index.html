@@ -75,32 +75,7 @@
     <div class="workspace-pages">
       <section id="workspaceOverviewPage" class="workspace-overview-page">
         <div class="workspace-overview-page__inner">
-          <header class="workspace-overview-page__header">
-            <div class="workspace-overview-page__header-main">
-              <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
-              <h1 id="subjectOverviewHeadline">学科总视图</h1>
-              <p id="subjectOverviewSummary" class="workspace-overview-page__summary">把不同学科整理成独立工作台，在这里快速切换学习上下文。</p>
-              <div class="workspace-overview-page__highlights" aria-label="工作台亮点">
-                <span class="workspace-overview-page__highlight-chip">
-                  <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
-                  学科仪表盘
-                </span>
-                <span class="workspace-overview-page__highlight-chip">
-                  <span class="material-symbols-outlined" aria-hidden="true">chat</span>
-                  对话学习
-                </span>
-                <span class="workspace-overview-page__highlight-chip">
-                  <span class="material-symbols-outlined" aria-hidden="true">library_books</span>
-                  来源阅读
-                </span>
-              </div>
-            </div>
-            <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button">
-              <span class="material-symbols-outlined">add</span> 新建学科
-            </button>
-          </header>
-
-          <section class="workspace-overview-page__island-row" aria-label="首页专注计时">
+          <section class="workspace-overview-page__island-row hidden" aria-label="首页专注计时" aria-hidden="true">
             <div id="dynamicIsland" class="dynamic-island dynamic-island--overview">
               <div class="dynamic-island__bar">
                 <button
@@ -136,6 +111,18 @@
           </section>
 
           <section id="subjectOverviewGrid" class="subject-overview-grid" aria-label="学科总览"></section>
+          <div class="hidden" aria-hidden="true">
+            <header class="workspace-overview-page__header">
+              <div class="workspace-overview-page__header-main">
+                <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
+                <h1 id="subjectOverviewHeadline">学习首页</h1>
+                <p id="subjectOverviewSummary" class="workspace-overview-page__summary">从这里切换学科、继续对话学习，并查看来源阅读与学习成果。</p>
+              </div>
+              <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button" tabindex="-1">
+                <span class="material-symbols-outlined">add</span> 新建学科
+              </button>
+            </header>
+          </div>
         </div>
       </section>
 

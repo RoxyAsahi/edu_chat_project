@@ -80,7 +80,9 @@ function buildRecentItems({ agents = [], statsByAgent = {}, selectedAgentId = nu
 function buildFeatureCard({ title, description, accent, action, icon } = {}) {
     return `
         <button type="button" class="overview-dashboard-card overview-dashboard-card--${escapeHtml(accent)}" data-home-action="${escapeHtml(action)}">
-            <span class="overview-dashboard-card__icon">${icon}</span>
+            <span class="overview-dashboard-card__icon">
+                <span class="material-symbols-outlined" aria-hidden="true">${escapeHtml(icon)}</span>
+            </span>
             <strong>${escapeHtml(title)}</strong>
             <p>${escapeHtml(description)}</p>
         </button>
@@ -104,7 +106,6 @@ function buildSubjectOverviewMarkup({
     const streakDays = Math.max(0, Number(learningMetrics?.streakDays || 0));
     const activeDaysLast7 = Math.max(0, Number(learningMetrics?.activeDaysLast7 || 0));
     const totalLearningDays = Math.max(0, Number(learningMetrics?.totalLearningDays || 0));
-    const learningScore = Math.max(0, Number(learningMetrics?.score || 700));
 
     const featureMarkup = [
         buildFeatureCard({
@@ -112,28 +113,28 @@ function buildSubjectOverviewMarkup({
             description: '启发对话 · 深度解析',
             accent: 'primary',
             action: 'open-subject',
-            icon: '💬',
+            icon: 'forum',
         }),
         buildFeatureCard({
             title: '知识沉淀',
             description: '自动整理 · 资料索引',
             accent: 'success',
             action: 'open-notes',
-            icon: '📘',
+            icon: 'library_books',
         }),
         buildFeatureCard({
             title: '训练转化',
             description: '变式练习 · 记忆闪卡',
             accent: 'warm',
             action: 'continue-learning',
-            icon: '✅',
+            icon: 'task_alt',
         }),
         buildFeatureCard({
             title: '成长复盘',
             description: 'DailyNote · 进步轨迹',
             accent: 'rose',
             action: 'open-diary',
-            icon: '📊',
+            icon: 'auto_stories',
         }),
     ].join('');
 
@@ -160,8 +161,8 @@ function buildSubjectOverviewMarkup({
                                 : '先创建一个学科入口，然后开始你的第一条学习链路。')}</p>
                     </div>
                     <div class="overview-dashboard__score">
-                        <span>学习力指数</span>
-                        <strong>${escapeHtml(learningScore)}</strong>
+                        <span>陪伴学习</span>
+                        <strong>${escapeHtml(totalLearningDays)}天</strong>
                     </div>
                 </header>
 
@@ -186,7 +187,7 @@ function buildSubjectOverviewMarkup({
 
                 <footer class="overview-dashboard__footer">
                     <div class="overview-dashboard__footer-copy">
-                        <span class="overview-dashboard__footer-icon">📖</span>
+                        <span class="overview-dashboard__footer-icon material-symbols-outlined" aria-hidden="true">menu_book</span>
                         <strong>${hasAgents ? `正在阅读：${escapeHtml(currentAgentLabel)}` : '从创建学科开始你的学习工作台'}</strong>
                         <p>${hasAgents
                             ? `学习天数 ${escapeHtml(totalLearningDays)} 天 · 共 ${totalTopics} 个话题 · ${totalUnread} 项待处理`
