@@ -122,6 +122,19 @@
 }
 
 @media (max-width: 900px) {
+  .overview-subject-wall {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .subject-overview-card {
+    grid-column: span 3;
+  }
+
+  .subject-overview-card__meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .notes-studio__hero,
   .notes-studio__footer {
     padding-left: 16px;
@@ -181,6 +194,20 @@
 }
 
 @media (max-width: 620px) {
+  .overview-subject-section__header {
+    align-items: stretch;
+  }
+
+  .overview-subject-wall {
+    grid-template-columns: 1fr;
+  }
+
+  .subject-overview-card,
+  .subject-overview-empty {
+    grid-column: auto;
+    min-height: 0;
+  }
+
   .notes-stream__hero {
     grid-template-columns: 1fr;
     align-items: stretch;
