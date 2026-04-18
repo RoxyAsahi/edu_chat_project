@@ -112,16 +112,20 @@ function createNotesDom(deps = {}) {
         const flashcards = kind === 'flashcards';
         const structuredQuiz = kind === 'quiz' && hasStructuredQuiz(note);
         const analysisPreviewMode = kind === 'analysis' && state.noteDetailMode === 'view';
+        const notePreviewMode = kind === 'note' && state.noteDetailMode === 'view';
         if (kind === 'quiz' && !structuredQuiz) {
             state.noteDetailMode = 'edit';
         }
         const practiceMode = kind === 'quiz' && structuredQuiz && state.noteDetailMode === 'practice';
-        const editable = !flashcards && !analysisPreviewMode && (!structuredQuiz || state.noteDetailMode === 'edit');
+        const editable = !flashcards
+            && !analysisPreviewMode
+            && !notePreviewMode
+            && (!structuredQuiz || state.noteDetailMode === 'edit');
         const noteTitle = flashcards
             ? (note?.flashcardDeck?.title || note?.title || '闪卡练习')
             : structuredQuiz
                 ? (note?.quizSet?.title || note?.title || '选择题练习')
-            : (note?.title || '新建笔记');
+                : (note?.title || '新建笔记');
         const subtitle = note
             ? buildNoteDetailSubtitle(note, meta.subtitle)
             : (state.currentTopicId
@@ -140,11 +144,14 @@ function createNotesDom(deps = {}) {
         el.saveNoteBtn?.classList.toggle('hidden', !editable);
         el.analysisEditMarkdownBtn?.classList.toggle('hidden', !(kind === 'analysis' && analysisPreviewMode));
         el.analysisViewReportBtn?.classList.toggle('hidden', !(kind === 'analysis' && !analysisPreviewMode && Boolean(note?.id)));
+        el.noteEditMarkdownBtn?.classList.toggle('hidden', !(kind === 'note' && notePreviewMode));
+        el.noteViewPreviewBtn?.classList.toggle('hidden', !(kind === 'note' && !notePreviewMode));
         el.quizEditSourceBtn?.classList.toggle('hidden', !(kind === 'quiz' && structuredQuiz && practiceMode));
         el.quizViewPracticeBtn?.classList.toggle('hidden', !(kind === 'quiz' && structuredQuiz && !practiceMode));
         el.deleteNoteBtn?.classList.toggle('hidden', !note?.id);
         el.analysisPreviewCard?.classList.toggle('hidden', !analysisPreviewMode);
-        el.noteEditorCard?.classList.toggle('hidden', flashcards || practiceMode || analysisPreviewMode);
+        el.noteMarkdownPreviewCard?.classList.toggle('hidden', !notePreviewMode);
+        el.noteEditorCard?.classList.toggle('hidden', flashcards || practiceMode || analysisPreviewMode || notePreviewMode);
         el.quizPracticeCard?.classList.toggle('hidden', !practiceMode);
         el.flashcardsPracticeCard?.classList.toggle('hidden', !flashcards);
     }
