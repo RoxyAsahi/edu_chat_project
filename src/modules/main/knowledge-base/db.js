@@ -53,6 +53,8 @@ async function initializeDatabase(rootDir) {
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             processed_at INTEGER,
+            extracted_text TEXT,
+            extracted_content_type TEXT,
             FOREIGN KEY (kb_id) REFERENCES knowledge_base(id)
         )`,
         `CREATE TABLE IF NOT EXISTS kb_chunk (
@@ -85,6 +87,8 @@ async function initializeDatabase(rootDir) {
     await ensureColumn('kb_document', 'guide_markdown', 'TEXT');
     await ensureColumn('kb_document', 'guide_generated_at', 'INTEGER');
     await ensureColumn('kb_document', 'guide_error', 'TEXT');
+    await ensureColumn('kb_document', 'extracted_text', 'TEXT');
+    await ensureColumn('kb_document', 'extracted_content_type', 'TEXT');
 
     await ensureColumn('kb_chunk', 'content_type', 'TEXT');
     await ensureColumn('kb_chunk', 'char_length', 'INTEGER DEFAULT 0');

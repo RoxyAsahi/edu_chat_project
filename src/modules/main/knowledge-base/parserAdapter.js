@@ -4,7 +4,9 @@ const mammoth = require('mammoth');
 const fileManager = require('../fileManager');
 const {
     KB_UNSUPPORTED_OCR_ERROR,
+    KB_IMAGE_TRANSCRIPTION_PENDING_ERROR,
     SUPPORTED_MIME_TYPES,
+    SUPPORTED_IMAGE_MIME_TYPES,
     SUPPORTED_TEXT_MIME_PREFIX,
 } = require('./constants');
 const { htmlToSections } = require('./chunking');
@@ -40,13 +42,30 @@ function inferMimeType(document) {
             return 'application/pdf';
         case '.docx':
             return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        case '.png':
+            return 'image/png';
+        case '.jpg':
+        case '.jpeg':
+            return 'image/jpeg';
+        case '.webp':
+            return 'image/webp';
+        case '.gif':
+            return 'image/gif';
+        case '.bmp':
+            return 'image/bmp';
         default:
             return mimeType || 'application/octet-stream';
     }
 }
 
 function isSupportedMimeType(mimeType) {
-    return mimeType.startsWith(SUPPORTED_TEXT_MIME_PREFIX) || SUPPORTED_MIME_TYPES.has(mimeType);
+    return mimeType.startsWith(SUPPORTED_TEXT_MIME_PREFIX)
+        || SUPPORTED_MIME_TYPES.has(mimeType)
+        || SUPPORTED_IMAGE_MIME_TYPES.has(mimeType);
+}
+
+function isImageMimeType(mimeType = '') {
+    return SUPPORTED_IMAGE_MIME_TYPES.has(String(mimeType || '').trim().toLowerCase());
 }
 
 function resolveDocumentContentType(mimeType) {
@@ -64,6 +83,10 @@ function resolveDocumentContentType(mimeType) {
 
     if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         return 'docx-text';
+    }
+
+    if (isImageMimeType(mimeType)) {
+        return 'markdown';
     }
 
     return 'plain';
@@ -210,6 +233,20 @@ async function parseKnowledgeBaseDocument(document) {
         throw new Error(KB_UNSUPPORTED_OCR_ERROR);
     }
 
+    if (isImageMimeType(mimeType)) {
+        const extractedText = String(document?.extractedText || '').trim();
+        if (!extractedText) {
+            throw new Error(KB_IMAGE_TRANSCRIPTION_PENDING_ERROR);
+        }
+
+        return {
+            mimeType,
+            contentType: document?.extractedContentType || document?.contentType || 'markdown',
+            text: extractedText,
+            structure: null,
+        };
+    }
+
     const contentType = resolveDocumentContentType(mimeType);
     let parsed = null;
 
@@ -243,6 +280,8 @@ async function parseKnowledgeBaseDocument(document) {
 }
 
 module.exports = {
+    inferMimeType,
+    isImageMimeType,
     parseKnowledgeBaseDocument,
     resolveDocumentContentType,
 };

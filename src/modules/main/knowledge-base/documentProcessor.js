@@ -7,9 +7,14 @@ function createDocumentProcessor(deps = {}) {
     const runtime = deps.runtime;
     const repository = deps.repository;
     const parseKnowledgeBaseDocument = deps.parseKnowledgeBaseDocument;
+    const transcribeImageDocument = deps.transcribeImageDocument || (async () => {
+        throw new Error('当前 KB 无法处理该来源文件');
+    });
+    const inferMimeType = deps.inferMimeType || ((document) => document?.mimeType || '');
     const chunkText = deps.chunkText;
     const requestEmbeddings = deps.requestEmbeddings;
     const KB_UNSUPPORTED_OCR_ERROR = deps.KB_UNSUPPORTED_OCR_ERROR;
+    const isImageMimeType = deps.isImageMimeType || (() => false);
 
     async function processDocument(documentId) {
         const document = await repository.getDocumentById(documentId);
@@ -37,12 +42,30 @@ function createDocumentProcessor(deps = {}) {
         });
 
         try {
+            const resolvedMimeType = inferMimeType(document);
+            const parsed = isImageMimeType(resolvedMimeType)
+                ? await transcribeImageDocument({
+                    ...document,
+                    mimeType: resolvedMimeType,
+                })
+                : await parseKnowledgeBaseDocument(document);
             const {
                 text,
                 mimeType,
                 contentType,
                 structure,
-            } = await parseKnowledgeBaseDocument(document);
+            } = parsed;
+
+            if (isImageMimeType(mimeType) || isImageMimeType(resolvedMimeType)) {
+                await repository.updateDocumentDerivedContent(documentId, {
+                    extractedText: text,
+                    extractedContentType: contentType || 'markdown',
+                });
+                await repository.updateDocumentState(documentId, {
+                    contentType: contentType || 'markdown',
+                });
+            }
+
             const chunks = chunkText(text, { contentType, structure });
             if (chunks.length === 0) {
                 throw new Error(KB_UNSUPPORTED_OCR_ERROR);

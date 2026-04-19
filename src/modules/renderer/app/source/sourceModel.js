@@ -49,9 +49,14 @@ function getKnowledgeBaseDocumentVisual(documentItem = {}) {
     const name = String(documentItem.name || '').toLowerCase();
     const contentType = String(documentItem.contentType || '').toLowerCase();
     const mimeType = String(documentItem.mimeType || '').toLowerCase();
+    const status = String(documentItem.status || '').toLowerCase();
+
+    if (status === 'pending' || status === 'processing') {
+        return { icon: 'progress_activity', tone: 'loading', spinning: true };
+    }
 
     if (contentType === 'pdf-text' || mimeType === 'application/pdf' || name.endsWith('.pdf')) {
-        return { icon: 'picture_as_pdf', tone: 'pdf' };
+        return { icon: 'picture_as_pdf', tone: 'pdf', spinning: false };
     }
 
     if (
@@ -60,11 +65,11 @@ function getKnowledgeBaseDocumentVisual(documentItem = {}) {
         || name.endsWith('.docx')
         || name.endsWith('.doc')
     ) {
-        return { icon: 'description', tone: 'doc' };
+        return { icon: 'description', tone: 'doc', spinning: false };
     }
 
     if (contentType === 'markdown' || name.endsWith('.md')) {
-        return { icon: 'article', tone: 'text' };
+        return { icon: 'article', tone: 'text', spinning: false };
     }
 
     if (
@@ -75,10 +80,14 @@ function getKnowledgeBaseDocumentVisual(documentItem = {}) {
         || name.endsWith('.html')
         || name.endsWith('.htm')
     ) {
-        return { icon: 'article', tone: 'text' };
+        return { icon: 'article', tone: 'text', spinning: false };
     }
 
-    return { icon: 'draft', tone: 'neutral' };
+    if (mimeType.startsWith('image/')) {
+        return { icon: 'image', tone: 'text', spinning: false };
+    }
+
+    return { icon: 'draft', tone: 'neutral', spinning: false };
 }
 
 function canReuseSelectedKnowledgeBaseDocuments({

@@ -161,9 +161,11 @@ function createSourceDom(deps = {}) {
         const readable = isReaderSupportedDocument(documentItem) && documentItem.status === 'done';
         const visual = getKnowledgeBaseDocumentVisual(documentItem);
         const menuOpen = state.activeSourceFileMenu?.documentId === documentItem.id;
+        const processing = visual.spinning === true;
         row.classList.toggle('kb-document-row--clickable', readable);
         row.classList.toggle('kb-document-row--active', isReaderDocumentActive(documentItem.id));
         row.classList.toggle('kb-document-row--menu-open', menuOpen);
+        row.classList.toggle('kb-document-row--processing', processing);
 
         row.innerHTML = `
             <div class="kb-document-row__leading">
@@ -174,7 +176,7 @@ function createSourceDom(deps = {}) {
                     title="更多操作"
                     aria-label="更多操作"
                 >
-                    <span class="material-symbols-outlined kb-document-row__file-icon kb-document-row__file-icon--${escapeHtml(visual.tone)}">${escapeHtml(visual.icon)}</span>
+                    <span class="material-symbols-outlined kb-document-row__file-icon kb-document-row__file-icon--${escapeHtml(visual.tone)} ${processing ? 'kb-document-row__file-icon--spinning' : ''}">${escapeHtml(visual.icon)}</span>
                     <span class="material-symbols-outlined kb-document-row__menu-icon">more_vert</span>
                 </button>
             </div>

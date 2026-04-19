@@ -270,7 +270,15 @@ test('document visual and status helpers preserve current source presentation ru
             name: 'chapter-1.pdf',
             mimeType: 'application/pdf',
         }),
-        { icon: 'picture_as_pdf', tone: 'pdf' }
+        { icon: 'picture_as_pdf', tone: 'pdf', spinning: false }
+    );
+    assert.deepEqual(
+        getKnowledgeBaseDocumentVisual({
+            name: '道法海报.png',
+            mimeType: 'image/png',
+            status: 'processing',
+        }),
+        { icon: 'progress_activity', tone: 'loading', spinning: true }
     );
 });
 

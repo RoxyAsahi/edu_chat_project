@@ -1,4 +1,5 @@
-const KB_UNSUPPORTED_OCR_ERROR = '当前 KB 首版不支持 OCR/图片型文档入库';
+const KB_UNSUPPORTED_OCR_ERROR = '当前 KB 无法处理该来源文件';
+const KB_IMAGE_TRANSCRIPTION_PENDING_ERROR = '当前图片来源尚未完成转录，请稍后再试';
 const DEFAULT_KB_EMBEDDING_MODEL = 'BAAI/bge-m3';
 const DEFAULT_KB_RERANK_MODEL = 'BAAI/bge-reranker-v2-m3';
 const DEFAULT_KB_TOP_K = 6;
@@ -18,9 +19,17 @@ const SUPPORTED_MIME_TYPES = new Set([
     'text/html',
     'text/css',
 ]);
+const SUPPORTED_IMAGE_MIME_TYPES = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/gif',
+    'image/bmp',
+]);
 
 module.exports = {
     KB_UNSUPPORTED_OCR_ERROR,
+    KB_IMAGE_TRANSCRIPTION_PENDING_ERROR,
     DEFAULT_KB_EMBEDDING_MODEL,
     DEFAULT_KB_RERANK_MODEL,
     DEFAULT_KB_TOP_K,
@@ -30,4 +39,5 @@ module.exports = {
     DEFAULT_CHUNK_OVERLAP,
     SUPPORTED_TEXT_MIME_PREFIX,
     SUPPORTED_MIME_TYPES,
+    SUPPORTED_IMAGE_MIME_TYPES,
 };

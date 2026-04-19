@@ -1967,6 +1967,28 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   color: var(--muted);
 }
 
+.kb-document-row__file-icon--loading {
+  color: var(--accent-strong);
+}
+
+.kb-document-row__file-icon--spinning {
+  animation: kbDocumentRowSpin 1.05s linear infinite;
+  transform-origin: center;
+}
+
+.kb-document-row--processing:hover .kb-document-row__file-icon,
+.kb-document-row--processing.kb-document-row--menu-open .kb-document-row__file-icon,
+.kb-document-row--processing .kb-document-row__menu-btn:focus-visible .kb-document-row__file-icon {
+  opacity: 1;
+}
+
+.kb-document-row--processing:hover .kb-document-row__menu-icon,
+.kb-document-row--processing.kb-document-row--menu-open .kb-document-row__menu-icon,
+.kb-document-row--processing .kb-document-row__menu-btn:focus-visible .kb-document-row__menu-icon {
+  opacity: 0;
+  transform: scale(0.84);
+}
+
 .kb-document-row__body {
   display: flex;
   align-items: center;
@@ -2004,6 +2026,16 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   background: color-mix(in srgb, var(--accent-soft) 48%, var(--panel) 52%);
   border-color: color-mix(in srgb, var(--accent) 22%, var(--line) 78%);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-soft) 64%, transparent);
+}
+
+@keyframes kbDocumentRowSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .workspace-sidebar {
