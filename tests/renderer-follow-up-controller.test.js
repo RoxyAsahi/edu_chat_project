@@ -542,6 +542,7 @@ test('composerController adds selected emoticons into the shared attachment prev
     assert.equal(store.getState().composer.pendingAttachments[0].type, 'image/jpeg');
     assert.equal(store.getState().composer.pendingAttachments[0].src, 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg');
     assert.equal(store.getState().composer.pendingAttachments[0].internalPath, 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg');
+    assert.equal(store.getState().composer.pendingAttachments[0].attachmentKind, 'emoticon');
     assert.equal(store.getState().composer.pendingAttachments[0].renderPath, '/通用表情包/不要优化我.jpg');
     assert.equal(previewCalls.length, 1);
     assert.deepEqual(previewCalls[0], [{
@@ -551,4 +552,133 @@ test('composerController adds selected emoticons into the shared attachment prev
         internalPath: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
         renderPath: '/通用表情包/不要优化我.jpg',
     }]);
+});
+
+test('composerController serializes emoticon attachments back into pseudo-path img tags for upstream messages', async (t) => {
+    const { createComposerController } = await loadComposerControllerModule();
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatInputCard"></div>
+          <textarea id="messageInput"></textarea>
+          <button id="sendMessageBtn" type="button">send</button>
+          <button id="attachFileBtn" type="button">attach</button>
+          <button id="emoticonTriggerBtn" type="button">emoji</button>
+          <button id="composerQuickNewTopicBtn" type="button">topic</button>
+          <div id="attachmentPreviewArea"></div>
+          <div id="selectionContextPreview"></div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const state = {
+        session: {
+            currentSelectedItem: {
+                id: 'agent-1',
+                name: 'Agent One',
+                avatarUrl: '',
+                config: {},
+            },
+            currentTopicId: 'topic-1',
+            currentChatHistory: [],
+        },
+        settings: {
+            settings: {},
+        },
+        composer: {
+            pendingAttachments: [],
+            pendingSelectionContextRefs: [],
+            activeRequestId: null,
+        },
+    };
+    const store = createStore(state);
+    let base64Reads = 0;
+
+    const controller = createComposerController({
+        store,
+        el: {
+            chatInputCard: dom.window.document.getElementById('chatInputCard'),
+            messageInput: dom.window.document.getElementById('messageInput'),
+            sendMessageBtn: dom.window.document.getElementById('sendMessageBtn'),
+            attachFileBtn: dom.window.document.getElementById('attachFileBtn'),
+            emoticonTriggerBtn: dom.window.document.getElementById('emoticonTriggerBtn'),
+            composerQuickNewTopicBtn: dom.window.document.getElementById('composerQuickNewTopicBtn'),
+            attachmentPreviewArea: dom.window.document.getElementById('attachmentPreviewArea'),
+            selectionContextPreview: dom.window.document.getElementById('selectionContextPreview'),
+        },
+        chatAPI: {
+            async getActiveSystemPrompt() {
+                return { success: false, systemPrompt: '' };
+            },
+            async getFileAsBase64() {
+                base64Reads += 1;
+                return { success: true, base64Frames: ['abc'] };
+            },
+        },
+        ui: {
+            updateAttachmentPreview() {},
+            showToastNotification() {},
+            autoResizeTextarea() {},
+        },
+        windowObj: dom.window,
+        documentObj: dom.window.document,
+        interruptRequest: async () => ({ success: true }),
+        messageRendererApi: {
+            async renderMessage() {},
+            startStreamingMessage() {},
+            async finalizeStreamedMessage() {},
+        },
+        createId: (() => {
+            let count = 0;
+            return (prefix) => `${prefix}_${++count}`;
+        })(),
+        getCurrentTopic: () => ({
+            id: 'topic-1',
+            name: 'Topic One',
+            knowledgeBaseId: '',
+        }),
+        loadTopics: async () => {},
+        loadAgents: async () => {},
+        buildTopicContext: () => ({
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+        }),
+        persistHistory: async () => {},
+        resolveLivePrompt: async () => '',
+        autoResizeTextarea: () => {},
+        decorateChatMessages: () => {},
+        generateFollowUpsForAssistantMessage: async () => [],
+        updateCurrentChatHistory: (updater) => {
+            state.session.currentChatHistory = updater(state.session.currentChatHistory);
+            return state.session.currentChatHistory;
+        },
+        getCurrentSelectedItem: () => state.session.currentSelectedItem,
+        getCurrentTopicId: () => state.session.currentTopicId,
+        getCurrentChatHistory: () => state.session.currentChatHistory,
+        getGlobalSettings: () => state.settings.settings,
+    });
+
+    const messages = await controller.buildApiMessages({
+        historyOverride: [{
+            id: 'user-1',
+            role: 'user',
+            content: '',
+            attachments: [{
+                name: '不要优化我.jpg',
+                type: 'image/jpeg',
+                src: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
+                internalPath: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
+                renderPath: '/通用表情包/不要优化我.jpg',
+                attachmentKind: 'emoticon',
+                emoticonId: 'bundled:通用表情包:不要优化我.jpg',
+                emoticonCategory: '通用表情包',
+                source: 'bundled',
+            }],
+        }],
+    });
+
+    assert.deepEqual(messages, [{
+        role: 'user',
+        content: '<img src="/通用表情包/不要优化我.jpg" width="80">',
+    }]);
+    assert.equal(base64Reads, 0);
 });
