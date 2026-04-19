@@ -717,8 +717,6 @@
   .subject-overview-empty strong,
   .subject-overview-empty p,
   .workspace-card__title,
-  #readerDocumentTitle,
-  #readerDocumentMeta,
   #readerSelectionSummary,
   #currentChatTopicName,
   #currentChatAgentName,
@@ -757,7 +755,6 @@
   .side-panel-tab,
   .logs-studio__action,
   .workspace-card__cta,
-  .workspace-reader-tab,
   .logs-jump-btn,
   .flashcards-practice__pill,
   .flashcards-practice__stat,
@@ -777,7 +774,6 @@
   .settings-inline-actions,
   .panel__actions,
   .chat-stage__header-actions,
-  .workspace-reader-panel__header-actions,
   .logs-studio__actions {
     flex-wrap: nowrap;
     overflow: hidden;
@@ -822,7 +818,6 @@
   #logsStateSummary,
   #currentChatAgentName,
   #currentTopicKnowledgeBaseStatus,
-  #readerDocumentMeta,
   #noteDetailSubtitle,
   #analysisPreviewMeta,
   #flashcardsDeckMeta,
@@ -831,7 +826,6 @@
   #diaryWallSubtitle,
   .settings-subsection__header .settings-caption,
   .kb-debug-panel__header .settings-caption,
-  .workspace-reader-panel__header .settings-caption,
   .logs-column__header .settings-caption,
   .topic-files__hint {
     display: none;
@@ -882,7 +876,6 @@
   }
 
   .workspace-card__header .workspace-card__cta,
-  .workspace-reader-panel__header-actions .icon-text-btn,
   .logs-studio__actions .icon-text-btn,
   .diary-wall-actions .icon-text-btn,
   .note-detail-modal__actions .icon-text-btn,
@@ -898,7 +891,6 @@
   }
 
   .workspace-card__header .workspace-card__cta .material-symbols-outlined,
-  .workspace-reader-panel__header-actions .icon-text-btn .material-symbols-outlined,
   .logs-studio__actions .icon-text-btn .material-symbols-outlined,
   .diary-wall-actions .icon-text-btn .material-symbols-outlined,
   .note-detail-modal__actions .icon-text-btn .material-symbols-outlined,
@@ -915,6 +907,16 @@
 }
 
 @media (max-width: 700px) {
+
+  .workspace-reader-panel__badges {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .workspace-reader-panel__badges .reader-badge:nth-child(n + 3) {
+    display: none;
+  }
+
   .titlebar__tabs {
     gap: 8px;
   }
@@ -967,5 +969,39 @@
   .manual-notes-library-page__filter {
     min-height: 36px;
     padding: 0 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .workspace-reader-panel {
+    padding: 14px 14px 16px;
+  }
+
+  .workspace-reader-panel__header {
+    align-items: flex-start;
+  }
+
+  .workspace-reader-panel__header-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .workspace-reader-panel__header-actions .icon-btn {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+  }
+
+  #readerDocumentTitle {
+    font-size: 16px;
+    line-height: 1.28;
+  }
+
+  .workspace-reader-tab {
+    padding: 10px 8px;
+  }
+
+  .workspace-reader-panel__badges .reader-badge:nth-child(n + 2) {
+    display: none;
   }
 }

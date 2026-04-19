@@ -16,6 +16,46 @@ function escapeHtml(text) {
         .replace(/'/g, '&#39;');
 }
 
+function isMarkdownReaderDocument(reader = {}) {
+    const name = String(reader.documentName || '').toLowerCase();
+    const contentType = String(reader.contentType || '').toLowerCase();
+    return name.endsWith('.md')
+        || name.endsWith('.markdown')
+        || contentType.includes('markdown')
+        || contentType === 'text/markdown';
+}
+
+function renderReaderMarkdown(markdown, renderMarkdownToSafeHtml, getMarkedInstance) {
+    return renderMarkdownToSafeHtml(
+        markdown,
+        getMarkedInstance() || {
+            parse(value) {
+                return `<pre>${escapeHtml(value)}</pre>`;
+            },
+        },
+    );
+}
+
+function enhanceReaderRenderedContent(container, windowObj) {
+    if (!container || !windowObj?.renderMathInElement) {
+        return;
+    }
+
+    try {
+        windowObj.renderMathInElement(container, {
+            delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '$', right: '$', display: false },
+                { left: '\\(', right: '\\)', display: false },
+                { left: '\\[', right: '\\]', display: true },
+            ],
+            throwOnError: false,
+        });
+    } catch (error) {
+        console.error('Reader math rendering error:', error);
+    }
+}
+
 function createReaderController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -170,7 +210,7 @@ function createReaderController(deps = {}) {
             el.readerGuideStatusBadge.textContent = guideStatusLabels[reader.guideStatus] || reader.guideStatus || '指南未生成';
         }
         if (el.readerSelectionBar) {
-            el.readerSelectionBar.classList.toggle('hidden', state.leftReaderActiveTab !== 'content' || !reader.pendingSelection);
+            el.readerSelectionBar.classList.add('hidden');
         }
         if (el.readerSelectionSummary) {
             el.readerSelectionSummary.textContent = reader.pendingSelection
@@ -197,6 +237,7 @@ function createReaderController(deps = {}) {
 
         if (!reader.documentId) {
             el.readerGuideContent.innerHTML = `
+                <div class="reader-guide-content__title">来源指南</div>
                 <div class="empty-list-state">
                     <strong>来源指南会显示在这里</strong>
                     <span>从左侧“学习来源”打开资料后，系统会先生成一份学习导向的阅读指南。</span>
@@ -204,6 +245,7 @@ function createReaderController(deps = {}) {
             `;
         } else if (reader.guideStatus === 'processing' || reader.guideStatus === 'pending') {
             el.readerGuideContent.innerHTML = `
+                <div class="reader-guide-content__title">来源指南</div>
                 <div class="reader-guide-skeleton">
                     <div class="reader-guide-skeleton__pill"></div>
                     <div class="reader-guide-skeleton__line"></div>
@@ -214,27 +256,24 @@ function createReaderController(deps = {}) {
             `;
         } else if (reader.guideStatus === 'failed') {
             el.readerGuideContent.innerHTML = `
+                <div class="reader-guide-content__title">来源指南</div>
                 <div class="empty-list-state reader-guide-empty">
                     <strong>来源指南生成失败</strong>
                     <span>${escapeHtml(reader.guideError || '暂时无法生成来源指南。')}</span>
                 </div>
             `;
         } else if (reader.guideMarkdown) {
-            const sanitized = renderMarkdownToSafeHtml(
-                reader.guideMarkdown,
-                getMarkedInstance() || {
-                    parse(value) {
-                        return `<pre>${escapeHtml(value)}</pre>`;
-                    },
-                },
-            );
+            const sanitized = renderReaderMarkdown(reader.guideMarkdown, renderMarkdownToSafeHtml, getMarkedInstance);
             el.readerGuideContent.innerHTML = `
+                <div class="reader-guide-content__title">来源指南</div>
                 <article class="reader-guide-card">
                     ${sanitized}
                 </article>
             `;
+            enhanceReaderRenderedContent(el.readerGuideContent, windowObj);
         } else {
             el.readerGuideContent.innerHTML = `
+                <div class="reader-guide-content__title">来源指南</div>
                 <div class="empty-list-state reader-guide-empty">
                     <strong>来源指南尚未生成</strong>
                     <span>系统会在你首次打开资料时异步生成一份学习指南；你也可以手动刷新重新生成。</span>
@@ -272,6 +311,24 @@ function createReaderController(deps = {}) {
         }
 
         const paragraphs = Array.isArray(reader.view.paragraphs) ? reader.view.paragraphs : [];
+        const treatAsMarkdown = isMarkdownReaderDocument(reader);
+
+        if (treatAsMarkdown) {
+            const markdownSource = paragraphs
+                .map((paragraph) => String(paragraph.text || ''))
+                .join('\n\n')
+                .trim();
+            const renderedMarkdown = renderReaderMarkdown(markdownSource, renderMarkdownToSafeHtml, getMarkedInstance);
+            el.readerContent.className = 'reader-content reader-content--markdown';
+            el.readerContent.innerHTML = `
+                <article class="reader-markdown-doc">
+                    ${renderedMarkdown}
+                </article>
+            `;
+            enhanceReaderRenderedContent(el.readerContent, windowObj);
+            return;
+        }
+
         const grouped = [];
         let currentGroup = null;
         paragraphs.forEach((paragraph) => {

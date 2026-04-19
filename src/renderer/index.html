@@ -224,62 +224,69 @@
         </section>
 
         <section id="workspaceReaderPanel" class="panel workspace-reader-panel hidden" aria-live="polite">
-          <div class="workspace-reader-panel__header">
-            <div class="workspace-reader-panel__header-main">
-              <button id="workspaceReaderBackBtn" class="ghost-button icon-text-btn workspace-reader-panel__back" type="button">
-                <span class="material-symbols-outlined">arrow_back</span> 返回学习来源
-              </button>
-              <div>
-                <p class="eyebrow">来源阅读</p>
-                <h2 id="readerDocumentTitle">选择一份资料开始阅读</h2>
-                <p id="readerDocumentMeta" class="settings-caption">打开资料后，系统会异步生成来源指南；你也可以随时切到原文进行阅读和选段注入。</p>
-              </div>
+          <div class="workspace-card__header workspace-reader-panel__header">
+            <div class="workspace-card__titleblock">
+              <p class="workspace-card__title">来源</p>
             </div>
-            <div class="workspace-reader-panel__header-actions">
-              <button id="refreshReaderGuideBtn" class="ghost-button icon-text-btn" type="button">
-                <span class="material-symbols-outlined">refresh</span> 刷新指南
-              </button>
-              <button id="readerPrevBtn" class="ghost-button icon-btn" type="button" title="上一页 / 上一段"><span class="material-symbols-outlined">navigate_before</span></button>
-              <button id="readerNextBtn" class="ghost-button icon-btn" type="button" title="下一页 / 下一段"><span class="material-symbols-outlined">navigate_next</span></button>
-            </div>
+            <button id="workspaceReaderBackBtn" class="ghost-button icon-btn workspace-reader-panel__close" type="button" aria-label="关闭来源视图">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
 
-          <div class="reader-toolbar workspace-reader-panel__badges">
-            <div id="readerLocationBadge" class="reader-badge">未打开文档</div>
-            <div id="readerIndexStatusBadge" class="reader-badge">尚未入库</div>
-            <div id="readerProcessingStatusBadge" class="reader-badge">等待中</div>
-            <div id="readerGuideStatusBadge" class="reader-badge">指南未生成</div>
-          </div>
+          <div class="workspace-reader-panel__body">
+            <div class="workspace-reader-panel__title-block">
+              <h2 id="readerDocumentTitle">选择一份资料开始阅读</h2>
+              <p id="readerDocumentMeta" class="settings-caption hidden">打开资料后，系统会异步生成来源指南；你也可以随时切到原文进行阅读和选段注入。</p>
+            </div>
 
-          <div class="workspace-reader-tabs">
-            <button id="leftReaderGuideTabBtn" class="workspace-reader-tab workspace-reader-tab--active" type="button">来源指南</button>
-            <button id="leftReaderContentTabBtn" class="workspace-reader-tab" type="button">原文</button>
-          </div>
-
-          <div id="readerGuidePane" class="workspace-reader-pane workspace-reader-pane--active">
-            <div id="readerGuideContent" class="reader-guide-content">
-              <div class="empty-list-state">
-                <strong>来源指南会显示在这里</strong>
-                <span>从“学习来源”中打开任意 PDF、DOCX 或文本资料后，系统会先生成一份学习导向的阅读指南。</span>
+            <div class="workspace-reader-panel__compat hidden" aria-hidden="true">
+              <div class="workspace-reader-panel__header-actions">
+                <button id="refreshReaderGuideBtn" class="ghost-button icon-text-btn" type="button">
+                  <span class="material-symbols-outlined">refresh</span> 刷新指南
+                </button>
+                <button id="readerPrevBtn" class="ghost-button icon-btn" type="button" title="上一页 / 上一段"><span class="material-symbols-outlined">navigate_before</span></button>
+                <button id="readerNextBtn" class="ghost-button icon-btn" type="button" title="下一页 / 下一段"><span class="material-symbols-outlined">navigate_next</span></button>
+              </div>
+              <div class="reader-toolbar workspace-reader-panel__badges">
+                <div id="readerLocationBadge" class="reader-badge">未打开文档</div>
+                <div id="readerIndexStatusBadge" class="reader-badge">尚未入库</div>
+                <div id="readerProcessingStatusBadge" class="reader-badge">等待中</div>
+                <div id="readerGuideStatusBadge" class="reader-badge">指南未生成</div>
+              </div>
+              <div class="workspace-reader-tabs">
+                <button id="leftReaderGuideTabBtn" class="workspace-reader-tab workspace-reader-tab--active" type="button">来源指南</button>
+                <button id="leftReaderContentTabBtn" class="workspace-reader-tab" type="button">原文</button>
+              </div>
+              <div id="readerSelectionBar" class="reader-selection-bar hidden">
+                <div>
+                  <strong>已选中片段</strong>
+                  <p id="readerSelectionSummary" class="settings-caption">当前没有选中内容。</p>
+                </div>
+                <div class="panel__actions">
+                  <button id="clearReaderSelectionBtn" class="ghost-button icon-text-btn" type="button"><span class="material-symbols-outlined">close</span> 清空</button>
+                  <button id="injectReaderSelectionBtn" class="accent-button icon-text-btn" type="button"><span class="material-symbols-outlined">arrow_circle_up</span> 注入当前对话</button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div id="readerContentPane" class="workspace-reader-pane hidden">
-            <div id="readerSelectionBar" class="reader-selection-bar hidden">
-              <div>
-                <strong>已选中片段</strong>
-                <p id="readerSelectionSummary" class="settings-caption">当前没有选中内容。</p>
-              </div>
-              <div class="panel__actions">
-                <button id="clearReaderSelectionBtn" class="ghost-button icon-text-btn" type="button"><span class="material-symbols-outlined">close</span> 清空</button>
-                <button id="injectReaderSelectionBtn" class="accent-button icon-text-btn" type="button"><span class="material-symbols-outlined">arrow_circle_up</span> 注入当前对话</button>
+            <div id="readerGuidePane" class="workspace-reader-pane workspace-reader-pane--stacked">
+              <div class="reader-guide-shell">
+                <div id="readerGuideContent" class="reader-guide-content">
+                  <div class="reader-guide-content__title">来源指南</div>
+                  <div class="empty-list-state">
+                    <strong>来源指南会显示在这里</strong>
+                    <span>从“学习来源”中打开任意 PDF、DOCX 或文本资料后，系统会先生成一份学习导向的阅读指南。</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div id="readerContent" class="reader-content">
-              <div class="empty-list-state">
-                <strong>原文阅读区已就绪</strong>
-                <span>你可以在这里查看 PDF 页级内容、DOCX 段落结构，并把选中的片段直接注入当前对话。</span>
+
+            <div id="readerContentPane" class="workspace-reader-pane workspace-reader-pane--stacked">
+              <div id="readerContent" class="reader-content reader-content--plain">
+                <div class="empty-list-state">
+                  <strong>原文阅读区已就绪</strong>
+                  <span>你可以在这里查看 PDF 页级内容、DOCX 段落结构，并把选中的片段直接注入当前对话。</span>
+                </div>
               </div>
             </div>
           </div>

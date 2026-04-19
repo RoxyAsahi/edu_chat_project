@@ -626,11 +626,11 @@ function setLeftReaderTab(tab) {
 
     el.leftReaderGuideTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'guide');
     el.leftReaderContentTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'content');
-    el.readerGuidePane?.classList.toggle('hidden', nextTab !== 'guide');
-    el.readerGuidePane?.classList.toggle('workspace-reader-pane--active', nextTab === 'guide');
-    el.readerContentPane?.classList.toggle('hidden', nextTab !== 'content');
-    el.readerContentPane?.classList.toggle('workspace-reader-pane--active', nextTab === 'content');
-    el.readerSelectionBar?.classList.toggle('hidden', nextTab !== 'content' || !hasPendingSelection);
+    el.readerGuidePane?.classList.remove('hidden');
+    el.readerGuidePane?.classList.add('workspace-reader-pane--active');
+    el.readerContentPane?.classList.remove('hidden');
+    el.readerContentPane?.classList.add('workspace-reader-pane--active');
+    el.readerSelectionBar?.classList.add('hidden');
 }
 
 function setLeftSidebarMode(mode) {
