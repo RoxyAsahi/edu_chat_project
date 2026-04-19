@@ -98,7 +98,7 @@ function buildHeaderHighlight({ icon, label } = {}) {
     `;
 }
 
-function buildSubjectWallCard({ agent, stats = {}, isCurrent = false } = {}) {
+function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'violet' } = {}) {
     const agentId = agent?.id || '';
     const agentName = agent?.name || agentId || '未命名学科';
     const topicCount = Math.max(0, Number(stats?.topicCount || 0));
@@ -111,7 +111,7 @@ function buildSubjectWallCard({ agent, stats = {}, isCurrent = false } = {}) {
     return `
         <button
             type="button"
-            class="subject-overview-card${isCurrent ? ' subject-overview-card--current' : ''}"
+            class="subject-overview-card subject-overview-card--${escapeHtml(tone)}${isCurrent ? ' subject-overview-card--current' : ''}"
             data-subject-card
             data-agent-id="${escapeHtml(agentId)}"
         >
@@ -145,6 +145,7 @@ function buildSubjectOverviewMarkup({
     currentTopicName = '',
     learningMetrics = {},
 } = {}) {
+    const subjectTones = ['violet', 'green', 'warm', 'rose', 'slate'];
     const hasAgents = agents.length > 0;
     const totalTopics = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.topicCount || 0), 0);
     const totalUnread = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.unreadCount || 0), 0);
@@ -194,10 +195,11 @@ function buildSubjectOverviewMarkup({
         </article>
     `).join('');
 
-    const subjectCardsMarkup = agents.map((agent) => buildSubjectWallCard({
+    const subjectCardsMarkup = agents.map((agent, index) => buildSubjectWallCard({
         agent,
         stats: statsByAgent[agent.id] || {},
         isCurrent: agent.id === selectedAgentId,
+        tone: subjectTones[index % subjectTones.length],
     })).join('');
 
     const subjectWallMarkup = hasAgents
