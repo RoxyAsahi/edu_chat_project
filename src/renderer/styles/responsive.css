@@ -262,7 +262,8 @@
   .overview-dashboard__body,
   .overview-dashboard__features,
   .overview-stats-row,
-  .overview-subject-wall {
+  .overview-subject-wall,
+  .overview-subject-section__body {
     grid-template-columns: 1fr;
   }
 
@@ -270,6 +271,15 @@
   .overview-dashboard__footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .overview-subject-section__cta {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .overview-subject-section__summary {
+    width: 100%;
   }
 
   .overview-dashboard {
@@ -548,6 +558,10 @@
 
   .overview-dashboard__footer {
     padding: 16px;
+  }
+
+  .workspace-overview-page__highlights {
+    width: 100%;
   }
 
   .overview-dashboard__footer-copy {

@@ -89,7 +89,16 @@ function buildFeatureCard({ title, description, accent, action, icon } = {}) {
     `;
 }
 
-function buildSubjectWallCard({ agent, stats = {}, isCurrent = false } = {}) {
+function buildHeaderHighlight({ icon, label } = {}) {
+    return `
+        <button type="button" class="workspace-overview-page__highlight-chip" data-home-action="${escapeHtml(icon === 'grid_view' ? 'view-highlights' : icon === 'forum' ? 'open-subject' : 'open-notes')}">
+            <span class="material-symbols-outlined" aria-hidden="true">${escapeHtml(icon)}</span>
+            <span>${escapeHtml(label)}</span>
+        </button>
+    `;
+}
+
+function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'violet' } = {}) {
     const agentId = agent?.id || '';
     const agentName = agent?.name || agentId || '未命名学科';
     const topicCount = Math.max(0, Number(stats?.topicCount || 0));
@@ -102,7 +111,7 @@ function buildSubjectWallCard({ agent, stats = {}, isCurrent = false } = {}) {
     return `
         <button
             type="button"
-            class="subject-overview-card${isCurrent ? ' subject-overview-card--current' : ''}"
+            class="subject-overview-card subject-overview-card--${escapeHtml(tone)}${isCurrent ? ' subject-overview-card--current' : ''}"
             data-subject-card
             data-agent-id="${escapeHtml(agentId)}"
         >
@@ -136,6 +145,7 @@ function buildSubjectOverviewMarkup({
     currentTopicName = '',
     learningMetrics = {},
 } = {}) {
+    const subjectTones = ['violet', 'green', 'warm', 'rose', 'slate'];
     const hasAgents = agents.length > 0;
     const totalTopics = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.topicCount || 0), 0);
     const totalUnread = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.unreadCount || 0), 0);
@@ -145,6 +155,7 @@ function buildSubjectOverviewMarkup({
     const streakDays = Math.max(0, Number(learningMetrics?.streakDays || 0));
     const activeDaysLast7 = Math.max(0, Number(learningMetrics?.activeDaysLast7 || 0));
     const totalLearningDays = Math.max(0, Number(learningMetrics?.totalLearningDays || 0));
+    const score = Math.max(0, Number(learningMetrics?.score || 0));
 
     const featureMarkup = [
         buildFeatureCard({
@@ -184,10 +195,11 @@ function buildSubjectOverviewMarkup({
         </article>
     `).join('');
 
-    const subjectCardsMarkup = agents.map((agent) => buildSubjectWallCard({
+    const subjectCardsMarkup = agents.map((agent, index) => buildSubjectWallCard({
         agent,
         stats: statsByAgent[agent.id] || {},
         isCurrent: agent.id === selectedAgentId,
+        tone: subjectTones[index % subjectTones.length],
     })).join('');
 
     const subjectWallMarkup = hasAgents
@@ -195,20 +207,33 @@ function buildSubjectOverviewMarkup({
             <section class="overview-subject-section overview-subject-section--pending" aria-label="学科入口">
                 <div class="overview-subject-section__header">
                     <div>
-                        <p class="overview-subject-section__eyebrow">Subjects</p>
-                        <h3>继续你的学科工作台</h3>
+                        <p class="overview-subject-section__eyebrow">All Subjects</p>
+                        <h3>全部学科</h3>
+                        <p class="overview-subject-section__caption">点击任意卡片即可进入对应学科</p>
                     </div>
-                    <button
-                        id="subjectOverviewCreateCard"
-                        type="button"
-                        class="subject-overview-create-pill"
-                    >
-                        <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                        <span>新建学科</span>
-                    </button>
+                    <div class="overview-subject-section__summary">
+                        <span>学习天数 ${escapeHtml(totalLearningDays)} 天</span>
+                        <span>共 ${escapeHtml(totalTopics)} 个话题</span>
+                        <span>${escapeHtml(totalUnread)} 项待处理</span>
+                    </div>
                 </div>
-                <div class="overview-subject-wall">
+                <div class="overview-subject-section__body">
+                    <div class="overview-subject-wall">
                     ${subjectCardsMarkup}
+                    </div>
+                    <div class="overview-subject-section__cta">
+                        <button
+                            id="subjectOverviewCreateCard"
+                            type="button"
+                            class="subject-overview-create-pill subject-overview-create-pill--inline"
+                        >
+                            <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                            <span>新建学科</span>
+                        </button>
+                        <button type="button" class="accent-button overview-dashboard__footer-button" data-home-action="continue-learning">
+                            继续学习
+                        </button>
+                    </div>
                 </div>
             </section>
         `
@@ -216,8 +241,9 @@ function buildSubjectOverviewMarkup({
             <section class="overview-subject-section overview-subject-section--pending" aria-label="学科入口">
                 <div class="overview-subject-section__header">
                     <div>
-                        <p class="overview-subject-section__eyebrow">Subjects</p>
-                        <h3>从第一个学科开始</h3>
+                        <p class="overview-subject-section__eyebrow">All Subjects</p>
+                        <h3>全部学科</h3>
+                        <p class="overview-subject-section__caption">先创建第一个学科入口，首页就会开始聚合你的学习记录。</p>
                     </div>
                 </div>
                 <button id="subjectOverviewCreateCard" type="button" class="subject-overview-empty">
@@ -232,6 +258,11 @@ function buildSubjectOverviewMarkup({
     return {
         headline: '学习首页',
         summary: '把首页变成一个能直接继续学习的入口，而不是只做概览。',
+        highlightsMarkup: [
+            buildHeaderHighlight({ icon: 'grid_view', label: '学科仪表盘' }),
+            buildHeaderHighlight({ icon: 'forum', label: '对话学习' }),
+            buildHeaderHighlight({ icon: 'library_books', label: '来源阅读' }),
+        ].join(''),
         heroMarkup: '',
         gridMarkup: `
             <section class="overview-dashboard" aria-label="首页工作台">
@@ -245,8 +276,8 @@ function buildSubjectOverviewMarkup({
                                 : '先创建一个学科入口，然后开始你的第一条学习链路。')}</p>
                     </div>
                     <div class="overview-dashboard__score">
-                        <span>陪伴学习</span>
-                        <strong>${escapeHtml(totalLearningDays)}天</strong>
+                        <span>学习力指数</span>
+                        <strong>${escapeHtml(score)}</strong>
                     </div>
                 </header>
 
@@ -272,12 +303,12 @@ function buildSubjectOverviewMarkup({
                 <footer class="overview-dashboard__footer">
                     <div class="overview-dashboard__footer-copy">
                         <span class="overview-dashboard__footer-icon material-symbols-outlined" aria-hidden="true">menu_book</span>
-                        <strong>${hasAgents ? `正在阅读：${escapeHtml(currentAgentLabel)}` : '从创建学科开始你的学习工作台'}</strong>
+                        <strong>${hasAgents ? '全部学科' : '从创建学科开始你的学习工作台'}</strong>
                         <p>${hasAgents
-                            ? `学习天数 ${escapeHtml(totalLearningDays)} 天 · 共 ${totalTopics} 个话题 · ${totalUnread} 项待处理`
+                            ? `点击下方卡片即可进入对应学科`
                             : '创建后即可开始整理资料、笔记和训练内容。'}</p>
                     </div>
-                    <button type="button" class="accent-button overview-dashboard__footer-button" data-home-action="${hasAgents ? 'continue-learning' : 'create-agent'}">
+                    <button type="button" class="accent-button overview-dashboard__footer-button" data-home-action="${hasAgents ? 'view-highlights' : 'create-agent'}">
                         ${hasAgents ? '继续学习' : '立即开始'}
                     </button>
                 </footer>

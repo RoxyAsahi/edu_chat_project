@@ -19,6 +19,21 @@ function formatTimestamp(value) {
     }
 }
 
+function formatTimeOnly(value) {
+    if (!value) {
+        return '未记录时间';
+    }
+
+    try {
+        return new Date(Number(value)).toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    } catch (_error) {
+        return '未记录时间';
+    }
+}
+
 function escapeSelectorValue(value) {
     if (typeof window !== 'undefined' && window.CSS && typeof window.CSS.escape === 'function') {
         return window.CSS.escape(String(value));
@@ -147,6 +162,15 @@ function buildCardTitle(card = {}) {
     return 'DailyNote';
 }
 
+function buildCardSelectionKey(card = {}) {
+    const diaryId = String(card.diaryId || '').trim();
+    const notebookId = String(card.notebookId || '').trim();
+    const dateKey = String(card.dateKey || '').trim();
+    const updatedAt = String(card.updatedAt || '').trim();
+    const topicName = getCardTopicNames(card)[0] || '';
+    return [diaryId, notebookId, dateKey, updatedAt, topicName].join('::');
+}
+
 function groupCardsByAgent(cards = []) {
     const groups = new Map();
 
@@ -184,10 +208,23 @@ function createDiaryWallController(deps = {}) {
         scope: 'global',
         cards: [],
         activeAgentFilter: 'all',
-        selectedDiaryId: '',
+        selectedCardKey: '',
         detail: null,
         detailExpanded: false,
+        noteModalOpen: false,
     };
+
+    function openNoteModal() {
+        state.noteModalOpen = true;
+        el.diaryWallNoteModal?.classList.remove('hidden');
+        el.diaryWallNoteModal?.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeNoteModal() {
+        state.noteModalOpen = false;
+        el.diaryWallNoteModal?.classList.add('hidden');
+        el.diaryWallNoteModal?.setAttribute('aria-hidden', 'true');
+    }
 
     function getAgentTabs(cards = state.cards) {
         const groups = groupCardsByAgent(cards);
@@ -215,8 +252,8 @@ function createDiaryWallController(deps = {}) {
 
     function syncSelectedDiary() {
         const visibleCards = getVisibleCards();
-        if (!state.selectedDiaryId || !visibleCards.some((item) => item.diaryId === state.selectedDiaryId)) {
-            state.selectedDiaryId = visibleCards[0]?.diaryId || '';
+        if (!state.selectedCardKey || !visibleCards.some((item) => buildCardSelectionKey(item) === state.selectedCardKey)) {
+            state.selectedCardKey = visibleCards[0] ? buildCardSelectionKey(visibleCards[0]) : '';
         }
     }
 
@@ -346,24 +383,25 @@ function createDiaryWallController(deps = {}) {
             <section class="diary-wall-group" data-diary-wall-group="${escapeHtml(group.label)}">
               <div class="diary-wall-group__header">
                 <strong>${escapeHtml(group.label)}</strong>
-                <span>${escapeHtml(`${group.items.length} 张日记卡`)}</span>
+                <span>${escapeHtml(`${group.items.length} 张日记`)}</span>
               </div>
               <div class="diary-wall-group__grid">
                 ${group.items.map((card) => `
-                    <button type="button" class="diary-wall-card ${card.diaryId === state.selectedDiaryId ? 'diary-wall-card--active' : ''}" data-diary-wall-card="${escapeHtml(card.diaryId)}">
-                      <div class="diary-wall-card__meta">
-                        <span>${escapeHtml(card.dateKey)}</span>
-                        <span>[${escapeHtml(card.notebookName || '默认')}]</span>
+                    <button type="button" class="diary-wall-card ${buildCardSelectionKey(card) === state.selectedCardKey ? 'diary-wall-card--active' : ''}" data-diary-wall-card="${escapeHtml(buildCardSelectionKey(card))}">
+                      <div class="diary-wall-card__meta diary-wall-card__meta--top">
+                        <span>${escapeHtml(card.dateKey || '未记录日期')}</span>
+                        <span>[${escapeHtml(group.label || '未归类')}]</span>
                       </div>
-                      <h3>${escapeHtml(buildCardTitle(card))}</h3>
+                      <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
+                      <div class="diary-wall-card__topic">日记本：${escapeHtml(card.notebookName || '默认')}</div>
+                      <div class="diary-wall-card__source">来源对话：${escapeHtml(getCardTopicNames(card)[0] || '未记录')}</div>
                       <div class="diary-wall-card__summary diary-wall-markdown-preview">${renderMarkdownFragment(
                           buildMarkdownPreview(card.previewMarkdown || card.contentMarkdown || '', 280).markdown || '查看这张日记卡的聚合摘要。'
                       )}</div>
                       <div class="diary-wall-card__stats">${escapeHtml([
-                          getCardAgentNames(card).join(' / '),
+                          `${formatTimeOnly(card.updatedAt)} · ${group.label || '未归类'}`,
                           `${Number(card.entryCount || 0)} 条`,
                           `召回 ${Number(card.recallCount || 0)} 次`,
-                          card.maidSignatures?.length ? card.maidSignatures.slice(0, 2).join(' / ') : '',
                       ].filter(Boolean).join(' · '))}</div>
                       <div class="diary-wall-card__tags">${(card.tags || []).slice(0, 6).map((tag) => `<span class="diary-wall-chip">#${escapeHtml(tag)}</span>`).join('')}</div>
                     </button>
@@ -373,18 +411,49 @@ function createDiaryWallController(deps = {}) {
         `).join('');
     }
 
-    function renderDetail() {
-        if (!el.diaryWallDetail) {
+    function bindDetailActions(container) {
+        if (!container) {
             return;
         }
 
+        container.querySelectorAll('[data-diary-wall-tag]').forEach((button) => {
+            button.addEventListener('click', () => {
+                if (el.diaryWallTagInput) {
+                    el.diaryWallTagInput.value = button.getAttribute('data-diary-wall-tag') || '';
+                }
+                closeNoteModal();
+                void refresh();
+            });
+        });
+        container.querySelectorAll('[data-diary-wall-jump]').forEach((button) => {
+            button.addEventListener('click', () => {
+                closeNoteModal();
+                void jumpToMessage(
+                    button.getAttribute('data-diary-wall-jump') || '',
+                    button.getAttribute('data-diary-wall-topic') || ''
+                );
+            });
+        });
+        container.querySelector('[data-diary-wall-toggle-preview]')?.addEventListener('click', () => {
+            state.detailExpanded = !state.detailExpanded;
+            renderDetail();
+        });
+    }
+
+    function renderDetail() {
+        const emptyMarkup = `
+            <div class="empty-list-state">
+              <strong>选择一张日记卡</strong>
+              <span>点击中间卡片后，会弹窗展示完整聚合日记、来源条目和原始 DailyNote 请求。</span>
+            </div>
+        `;
         if (!state.detail) {
-            el.diaryWallDetail.innerHTML = `
-                <div class="empty-list-state">
-                  <strong>选择一张日记卡</strong>
-                  <span>右侧会展示完整聚合日记、来源条目和原始 DailyNote 请求。</span>
-                </div>
-            `;
+            if (el.diaryWallDetail) {
+                el.diaryWallDetail.innerHTML = emptyMarkup;
+            }
+            if (el.diaryWallNoteContent) {
+                el.diaryWallNoteContent.innerHTML = emptyMarkup;
+            }
             return;
         }
 
@@ -419,7 +488,7 @@ function createDiaryWallController(deps = {}) {
             `).join('')
             : '<div class="empty-list-state"><strong>这张日记卡还没有逐条条目</strong><span>通常这表示它还没被写入或筛选条件过严。</span></div>';
 
-        el.diaryWallDetail.innerHTML = `
+        const detailMarkup = `
             <div class="diary-wall-detail__header">
               <div>
                 <p class="eyebrow">${escapeHtml(item.dateKey || '未记录日期')}</p>
@@ -449,36 +518,24 @@ function createDiaryWallController(deps = {}) {
             </div>
         `;
 
-        el.diaryWallDetail.querySelectorAll('[data-diary-wall-tag]').forEach((button) => {
-            button.addEventListener('click', () => {
-                if (el.diaryWallTagInput) {
-                    el.diaryWallTagInput.value = button.getAttribute('data-diary-wall-tag') || '';
-                }
-                void refresh();
-            });
-        });
-        el.diaryWallDetail.querySelectorAll('[data-diary-wall-jump]').forEach((button) => {
-            button.addEventListener('click', () => {
-                void jumpToMessage(
-                    button.getAttribute('data-diary-wall-jump') || '',
-                    button.getAttribute('data-diary-wall-topic') || ''
-                );
-            });
-        });
-        el.diaryWallDetail.querySelector('[data-diary-wall-toggle-preview]')?.addEventListener('click', () => {
-            state.detailExpanded = !state.detailExpanded;
-            renderDetail();
-        });
+        if (el.diaryWallDetail) {
+            el.diaryWallDetail.innerHTML = detailMarkup;
+            bindDetailActions(el.diaryWallDetail);
+        }
+        if (el.diaryWallNoteContent) {
+            el.diaryWallNoteContent.innerHTML = detailMarkup;
+            bindDetailActions(el.diaryWallNoteContent);
+        }
     }
 
     async function loadDetail() {
-        if (!state.selectedDiaryId || typeof chatAPI.getStudyDiaryWallDetail !== 'function') {
+        if (!state.selectedCardKey || typeof chatAPI.getStudyDiaryWallDetail !== 'function') {
             state.detail = null;
             renderDetail();
             return;
         }
 
-        const selectedCard = getVisibleCards().find((card) => card.diaryId === state.selectedDiaryId) || null;
+        const selectedCard = getVisibleCards().find((card) => buildCardSelectionKey(card) === state.selectedCardKey) || null;
         if (!selectedCard) {
             state.detail = null;
             renderDetail();
@@ -533,7 +590,7 @@ function createDiaryWallController(deps = {}) {
         if (!result?.success) {
             ui.showToastNotification(`加载日记墙失败：${result?.error || '未知错误'}`, 'error');
             state.cards = [];
-            state.selectedDiaryId = '';
+            state.selectedCardKey = '';
             state.detail = null;
             renderSummary();
             renderCards();
@@ -567,6 +624,7 @@ function createDiaryWallController(deps = {}) {
 
     function close() {
         state.open = false;
+        closeNoteModal();
         el.diaryWallModal?.classList.add('hidden');
         el.diaryWallModal?.setAttribute('aria-hidden', 'true');
         documentObj.body.classList.remove('diary-wall-open');
@@ -606,7 +664,7 @@ function createDiaryWallController(deps = {}) {
         el.diaryWallModalBackdrop?.addEventListener('click', close);
         el.diaryWallScopeSelect?.addEventListener('change', () => {
             state.scope = el.diaryWallScopeSelect.value || 'global';
-            state.selectedDiaryId = '';
+            state.selectedCardKey = '';
             void refresh();
         });
         el.diaryWallRefreshBtn?.addEventListener('click', () => {
@@ -638,12 +696,22 @@ function createDiaryWallController(deps = {}) {
             if (!target) {
                 return;
             }
-            state.selectedDiaryId = target.getAttribute('data-diary-wall-card') || '';
+            state.selectedCardKey = target.getAttribute('data-diary-wall-card') || '';
             state.detailExpanded = false;
             renderCards();
-            void loadDetail();
+            void loadDetail().then(() => {
+                if (state.detail) {
+                    openNoteModal();
+                }
+            });
         });
+        el.diaryWallNoteCloseBtn?.addEventListener('click', closeNoteModal);
+        el.diaryWallNoteModalBackdrop?.addEventListener('click', closeNoteModal);
         documentObj.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && state.noteModalOpen) {
+                closeNoteModal();
+                return;
+            }
             if (event.key === 'Escape' && state.open) {
                 close();
             }
