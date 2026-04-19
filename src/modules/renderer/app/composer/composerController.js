@@ -29,6 +29,27 @@ function inferImageMimeTypeFromName(fileName = '') {
     return 'image/png';
 }
 
+function isEmoticonAttachment(attachment = {}) {
+    const renderPath = typeof attachment?.renderPath === 'string' ? attachment.renderPath.trim() : '';
+    if (!renderPath) {
+        return false;
+    }
+
+    return attachment?.attachmentKind === 'emoticon'
+        || Boolean(attachment?.emoticonId)
+        || Boolean(attachment?.emoticonCategory)
+        || attachment?.source === 'bundled';
+}
+
+function buildEmoticonMarkup(renderPath = '', width = 80) {
+    const normalizedPath = String(renderPath || '').trim();
+    if (!normalizedPath) {
+        return '';
+    }
+
+    return `<img src="${normalizedPath}" width="${width}">`;
+}
+
 function createComposerController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -201,6 +222,7 @@ function createComposerController(deps = {}) {
             type: inferImageMimeTypeFromName(fileName),
             src: previewSrc,
             internalPath: previewSrc.startsWith('file://') ? previewSrc : '',
+            attachmentKind: 'emoticon',
             renderPath: typeof emoticon?.renderPath === 'string' ? emoticon.renderPath : '',
             emoticonId: typeof emoticon?.id === 'string' ? emoticon.id : '',
             emoticonCategory: typeof emoticon?.category === 'string' ? emoticon.category : '',
@@ -368,6 +390,14 @@ function createComposerController(deps = {}) {
             }
 
             for (const attachment of normalizeAttachmentList(message.attachments)) {
+                if (isEmoticonAttachment(attachment)) {
+                    const emoticonMarkup = buildEmoticonMarkup(attachment.renderPath, 80);
+                    if (emoticonMarkup) {
+                        parts.push({ type: 'text', text: emoticonMarkup });
+                        continue;
+                    }
+                }
+
                 if (attachment.type?.startsWith('image/')) {
                     const fileResult = await chatAPI.getFileAsBase64(attachment.internalPath || attachment.src).catch(() => null);
                     const base64Frames = Array.isArray(fileResult?.base64Frames) ? fileResult.base64Frames : [];
