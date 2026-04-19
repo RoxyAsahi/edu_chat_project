@@ -376,11 +376,11 @@ function createWorkspaceController(deps = {}) {
     }
 
     function focusOverviewHighlights() {
-        const featureMatrix = el.subjectOverviewGrid?.querySelector('#overviewHomeFeatureMatrix');
-        if (!featureMatrix) {
+        const targetSection = el.subjectOverviewGrid?.querySelector('.overview-subject-section');
+        if (!targetSection) {
             return;
         }
-        featureMatrix.scrollIntoView({
+        targetSection.scrollIntoView({
             behavior: 'smooth',
             block: 'start',
         });
@@ -638,8 +638,21 @@ function createWorkspaceController(deps = {}) {
         if (el.subjectOverviewSummary) {
             el.subjectOverviewSummary.textContent = markup.summary;
         }
+        if (el.workspaceOverviewHighlights) {
+            el.workspaceOverviewHighlights.innerHTML = markup.highlightsMarkup || '';
+        }
 
         el.subjectOverviewGrid.innerHTML = `${markup.heroMarkup || ''}${markup.clockMarkup || ''}${markup.statsRowMarkup || ''}${markup.gridMarkup || ''}`;
+        el.workspaceOverviewHighlights?.querySelectorAll('[data-home-action]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                const { homeAction } = button.dataset;
+                if (!homeAction) {
+                    return;
+                }
+                handleHomeAction(homeAction, button.dataset);
+            });
+        });
         el.subjectOverviewGrid.querySelectorAll('[data-subject-card]').forEach((button) => {
             button.addEventListener('click', () => {
                 const { agentId } = button.dataset;

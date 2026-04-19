@@ -75,7 +75,19 @@
     <div class="workspace-pages">
       <section id="workspaceOverviewPage" class="workspace-overview-page">
         <div class="workspace-overview-page__inner">
-          <section class="workspace-overview-page__island-row hidden" aria-label="首页专注计时" aria-hidden="true">
+          <header class="workspace-overview-page__header">
+            <div class="workspace-overview-page__header-main">
+              <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
+              <h1 id="subjectOverviewHeadline">学习首页</h1>
+              <p id="subjectOverviewSummary" class="workspace-overview-page__summary">从这里继续学习、进入对话，并查看所有学科入口。</p>
+              <div id="workspaceOverviewHighlights" class="workspace-overview-page__highlights" aria-label="首页快捷入口"></div>
+            </div>
+            <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button">
+              <span class="material-symbols-outlined">add</span> 新建学科
+            </button>
+          </header>
+
+          <section class="workspace-overview-page__island-row" aria-label="首页专注计时">
             <div id="dynamicIsland" class="dynamic-island dynamic-island--overview">
               <div class="dynamic-island__bar">
                 <button
@@ -111,18 +123,6 @@
           </section>
 
           <section id="subjectOverviewGrid" class="subject-overview-grid" aria-label="学科总览"></section>
-          <div class="hidden" aria-hidden="true">
-            <header class="workspace-overview-page__header">
-              <div class="workspace-overview-page__header-main">
-                <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
-                <h1 id="subjectOverviewHeadline">学习首页</h1>
-                <p id="subjectOverviewSummary" class="workspace-overview-page__summary">从这里切换学科、继续对话学习，并查看来源阅读与学习成果。</p>
-              </div>
-              <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button" tabindex="-1">
-                <span class="material-symbols-outlined">add</span> 新建学科
-              </button>
-            </header>
-          </div>
         </div>
       </section>
 
@@ -1269,6 +1269,18 @@
             </div>
           </div>
         </aside>
+      </div>
+      <div id="diaryWallNoteModal" class="diary-wall-note-modal hidden" aria-hidden="true">
+        <div id="diaryWallNoteModalBackdrop" class="diary-wall-note-modal__backdrop"></div>
+        <section class="diary-wall-note-modal__dialog" role="dialog" aria-modal="true" aria-label="笔记详情">
+          <header class="diary-wall-note-modal__header">
+            <strong>笔记详情</strong>
+            <button id="diaryWallNoteCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭笔记详情">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </header>
+          <div id="diaryWallNoteContent" class="diary-wall-note-modal__content"></div>
+        </section>
       </div>
     </div>
   </div>
