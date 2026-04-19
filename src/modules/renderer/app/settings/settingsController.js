@@ -39,6 +39,15 @@ const DEFAULT_RENDERING_PROMPT = [
     'Prefer normal Markdown for standard prose.',
     'Do not echo unresolved template variables in the final answer.',
 ].join(' ');
+const DEFAULT_EMOTICON_PROMPT = [
+    'This client supports local emoticon packs rendered from pseudo paths.',
+    'Available emoticon packs:',
+    '{{EmoticonPackSummary}}',
+    'Primary generic pack path: {{GeneralEmoticonPath}}',
+    'Generic pack files: {{GeneralEmoticonList}}',
+    'When you want to use an emoticon, output HTML like <img src="{{GeneralEmoticonPath}}/文件名" width="120">.',
+    'Only use filenames from the provided lists, keep width between 60 and 180, and do not invent missing files.',
+].join('\n');
 const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
     'Keep answers readable and compact when rich layout is unnecessary.',
     'Only switch to more structured rendering when it clearly helps comprehension.',
@@ -77,7 +86,9 @@ const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
     topicTitleDefaultModel: '话题命名默认模型',
     topicTitlePromptTemplate: '话题命名提示词模板',
     enableRenderingPrompt: '结构化渲染提示',
+    enableEmoticonPrompt: '表情包提示',
     enableAdaptiveBubbleTip: '简洁气泡补充',
+    emoticonPrompt: '表情包提示模板',
     'studyLogPolicy.enableDailyNotePromptVariables': '内建 DailyNote 变量',
     'studyLogPolicy.autoInjectDailyNoteProtocol': '自动注入 DailyNote 协议',
 });
@@ -2300,6 +2311,7 @@ function createSettingsController(deps = {}) {
 
     function syncPromptInjectionState() {
         syncPromptTextareaState(el.renderingPromptInput, el.enableRenderingPromptInput?.checked !== false);
+        syncPromptTextareaState(el.emoticonPromptInput, el.enableEmoticonPromptInput?.checked !== false);
         syncPromptTextareaState(el.adaptiveBubbleTipInput, el.enableAdaptiveBubbleTipInput?.checked !== false);
         syncPromptTextareaState(el.topicTitlePromptTemplateInput, el.enableTopicTitleGenerationInput?.checked !== false);
         syncPromptTextareaState(el.agentBubbleThemePrompt, el.enableAgentBubbleTheme?.checked === true);
@@ -2393,6 +2405,11 @@ function createSettingsController(deps = {}) {
                 description: '控制 {{VarDivRender}} / {{VarRendering}} 是否进入当前智能体提示词。',
             },
             {
+                key: 'emoticonPrompt',
+                title: '表情包提示',
+                description: '启用后会自动把内置表情包说明追加到当前智能体提示词；若主 prompt 已显式引用 {{VarEmoticonPrompt}} / {{VarEmojiPrompt}}，则会跳过重复追加。',
+            },
+            {
                 key: 'adaptiveBubbleTip',
                 title: '简洁气泡补充',
                 description: '控制 {{VarAdaptiveBubbleTip}} 是否进入当前智能体提示词。',
@@ -2444,6 +2461,28 @@ function createSettingsController(deps = {}) {
                     status = '额外追加已关闭';
                     reason = '最终 prompt 不会再附带单独的气泡主题补充。';
                 }
+            } else if (item.key === 'emoticonPrompt') {
+                if (segment.enabled) {
+                    if (segment.available === false) {
+                        status = '已启用，但当前没有可用表情包';
+                        reason = '主进程暂时没有扫描到内置表情包，因此这一段会解析为空。';
+                    } else if (segment.appended) {
+                        status = '发送前会自动补上';
+                        reason = '当前 agent prompt 没有自带表情包变量，所以系统会自动把这段说明追加到最终 system prompt。';
+                    } else if (segment.skippedBecausePromptAlreadyContainsVariable || segment.referencedInBasePrompt) {
+                        status = '已启用，但不会重复追加';
+                        reason = '当前 agent prompt 已经自带表情包变量，所以这里会主动跳过，避免重复注入。';
+                    } else if (segment.skippedBecausePromptAlreadyContainsSameContent) {
+                        status = '已启用，但不会重复追加';
+                        reason = '当前 agent prompt 已经包含同样的表情包说明，所以这里会主动跳过，避免重复注入。';
+                    } else {
+                        status = '已启用，当前无需追加';
+                        reason = '表情包说明已准备好；如果当前 prompt 没有显式自带说明，发送前会自动补上。';
+                    }
+                } else {
+                    status = '表情包提示已关闭';
+                    reason = '自动追加会关闭，而且即使 prompt 里写了对应变量，也会被解析为空。';
+                }
             } else {
                 if (segment.enabled) {
                     status = segment.referencedInBasePrompt ? '会进入当前 prompt' : '已启用，但当前未被引用';
@@ -2492,9 +2531,24 @@ function createSettingsController(deps = {}) {
             `基础 prompt：${preview?.hasBasePrompt ? '已找到' : '未找到'}`,
         ];
         const notes = [];
+        const emoticonPrompt = preview?.segments?.emoticonPrompt || {};
         const dailyNoteVariable = preview?.segments?.dailyNoteVariable || {};
         const dailyNoteAutoInject = preview?.segments?.dailyNoteAutoInject || {};
         const bubbleTheme = preview?.segments?.bubbleTheme || {};
+
+        if (emoticonPrompt.enabled && emoticonPrompt.available === false) {
+            notes.push('表情包提示已启用，但当前没有扫描到可用的内置表情包。');
+        } else if (emoticonPrompt.appended) {
+            notes.push('当前 agent prompt 没自带表情包说明，因此发送前会自动补上一段伪路径和文件名列表。');
+        } else if (emoticonPrompt.enabled && (emoticonPrompt.skippedBecausePromptAlreadyContainsVariable || emoticonPrompt.referencedInBasePrompt)) {
+            notes.push('当前 agent prompt 已经自带表情包变量，所以系统不会重复追加。');
+        } else if (emoticonPrompt.enabled && emoticonPrompt.skippedBecausePromptAlreadyContainsSameContent) {
+            notes.push('当前 agent prompt 已经包含同样的表情包说明，所以系统不会重复追加。');
+        } else if (!emoticonPrompt.enabled) {
+            notes.push('表情包提示当前关闭，{{VarEmoticonPrompt}} / {{VarEmojiPrompt}} 会解析为空。');
+        } else {
+            notes.push('表情包提示已准备好；如果当前 prompt 没有显式自带说明，发送前会自动补上。');
+        }
 
         if (dailyNoteVariable.enabled && dailyNoteVariable.referencedInBasePrompt) {
             notes.push('当前 agent prompt 自己引用了 DailyNote 协议变量，所以发送时会直接展开。');
@@ -2536,8 +2590,10 @@ function createSettingsController(deps = {}) {
         return {
             userName: el.userNameInput?.value.trim() || 'User',
             enableRenderingPrompt: el.enableRenderingPromptInput?.checked !== false,
+            enableEmoticonPrompt: el.enableEmoticonPromptInput?.checked !== false,
             enableAdaptiveBubbleTip: el.enableAdaptiveBubbleTipInput?.checked !== false,
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
+            emoticonPrompt: getPromptTextareaRawValue(el.emoticonPromptInput),
             adaptiveBubbleTip: getPromptTextareaRawValue(el.adaptiveBubbleTipInput),
             dailyNoteGuide: getPromptTextareaRawValue(el.dailyNoteGuideInput),
             enableAgentBubbleTheme: el.enableAgentBubbleTheme?.checked === true,
@@ -2586,6 +2642,9 @@ function createSettingsController(deps = {}) {
         const renderingRaw = settings.enableRenderingPrompt === false
             ? ''
             : (settings.renderingPrompt || el.renderingPromptInput?.value || DEFAULT_RENDERING_PROMPT);
+        const emoticonRaw = settings.enableEmoticonPrompt === false
+            ? ''
+            : (settings.emoticonPrompt || el.emoticonPromptInput?.value || DEFAULT_EMOTICON_PROMPT);
         const adaptiveRaw = settings.enableAdaptiveBubbleTip === false
             ? ''
             : (settings.adaptiveBubbleTip || el.adaptiveBubbleTipInput?.value || DEFAULT_ADAPTIVE_BUBBLE_TIP);
@@ -2596,11 +2655,15 @@ function createSettingsController(deps = {}) {
         const bubbleThemeRaw = settings.enableAgentBubbleTheme === true
             ? (getPromptTextareaRawValue(el.agentBubbleThemePrompt) || el.agentBubbleThemePrompt?.value || DEFAULT_AGENT_BUBBLE_THEME_PROMPT)
             : '';
+        const promptAlreadyContainsEmoticon = /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(normalizedBasePrompt);
         const promptAlreadyContainsDailyNote = normalizedBasePrompt.includes('—— 日记 (DailyNote) ——')
             || /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(normalizedBasePrompt);
         const finalSystemPrompt = [
             normalizedBasePrompt,
             settings.enableAgentBubbleTheme === true ? bubbleThemeRaw : '',
+            settings.enableEmoticonPrompt !== false && !promptAlreadyContainsEmoticon
+                ? emoticonRaw
+                : '',
             dailyNoteEnabled && settings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false && !promptAlreadyContainsDailyNote
                 ? dailyNoteRaw
                 : '',
@@ -2623,6 +2686,18 @@ function createSettingsController(deps = {}) {
                     referencedInBasePrompt: /{{\s*(VarDivRender|VarRendering)\s*}}/.test(normalizedBasePrompt),
                     rawPrompt: renderingRaw,
                     resolvedPrompt: renderingRaw,
+                },
+                emoticonPrompt: {
+                    enabled: settings.enableEmoticonPrompt !== false,
+                    available: true,
+                    packCount: 0,
+                    source: String(settings.emoticonPrompt || '').trim() ? 'custom' : 'default',
+                    referencedInBasePrompt: /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(normalizedBasePrompt),
+                    appended: settings.enableEmoticonPrompt !== false && !promptAlreadyContainsEmoticon,
+                    skippedBecausePromptAlreadyContainsVariable: promptAlreadyContainsEmoticon,
+                    skippedBecausePromptAlreadyContainsSameContent: false,
+                    rawPrompt: emoticonRaw,
+                    resolvedPrompt: emoticonRaw,
                 },
                 adaptiveBubbleTip: {
                     enabled: settings.enableAdaptiveBubbleTip !== false,
@@ -2712,6 +2787,7 @@ function createSettingsController(deps = {}) {
         lastFinalSystemPromptPreview = preview;
 
         hydratePromptTextarea(el.renderingPromptInput, preview?.segments?.rendering?.rawPrompt || DEFAULT_RENDERING_PROMPT);
+        hydratePromptTextarea(el.emoticonPromptInput, preview?.segments?.emoticonPrompt?.rawPrompt || DEFAULT_EMOTICON_PROMPT);
         hydratePromptTextarea(el.adaptiveBubbleTipInput, preview?.segments?.adaptiveBubbleTip?.rawPrompt || DEFAULT_ADAPTIVE_BUBBLE_TIP);
         hydratePromptTextarea(el.agentBubbleThemePrompt, preview?.segments?.bubbleTheme?.rawPrompt || DEFAULT_AGENT_BUBBLE_THEME_PROMPT);
         hydratePromptTextarea(el.dailyNoteGuideInput, getDailyNoteDefaultPromptText());
@@ -2828,6 +2904,9 @@ function createSettingsController(deps = {}) {
         if (el.enableRenderingPromptInput) {
             el.enableRenderingPromptInput.checked = settings.enableRenderingPrompt !== false;
         }
+        if (el.enableEmoticonPromptInput) {
+            el.enableEmoticonPromptInput.checked = settings.enableEmoticonPrompt !== false;
+        }
         if (el.enableAdaptiveBubbleTipInput) {
             el.enableAdaptiveBubbleTipInput.checked = settings.enableAdaptiveBubbleTip !== false;
         }
@@ -2851,6 +2930,15 @@ function createSettingsController(deps = {}) {
                 markPromptTextareaCustom(el.renderingPromptInput);
             } else {
                 markPromptTextareaDefault(el.renderingPromptInput, DEFAULT_RENDERING_PROMPT);
+            }
+        }
+        if (el.emoticonPromptInput) {
+            const storedEmoticonPrompt = settings.emoticonPrompt || '';
+            el.emoticonPromptInput.value = storedEmoticonPrompt || DEFAULT_EMOTICON_PROMPT;
+            if (storedEmoticonPrompt.trim()) {
+                markPromptTextareaCustom(el.emoticonPromptInput);
+            } else {
+                markPromptTextareaDefault(el.emoticonPromptInput, DEFAULT_EMOTICON_PROMPT);
             }
         }
         if (el.adaptiveBubbleTipInput) {
@@ -2966,6 +3054,7 @@ function createSettingsController(deps = {}) {
             kbCandidateTopK: Number(el.kbCandidateTopK.value || 20),
             kbScoreThreshold: Number(el.kbScoreThreshold.value || 0.25),
             enableRenderingPrompt: el.enableRenderingPromptInput?.checked !== false,
+            enableEmoticonPrompt: el.enableEmoticonPromptInput?.checked !== false,
             enableAdaptiveBubbleTip: el.enableAdaptiveBubbleTipInput?.checked !== false,
             chatFontPreset: el.chatFontPreset.value,
             chatCodeFontPreset: el.chatCodeFontPreset.value,
@@ -2973,6 +3062,7 @@ function createSettingsController(deps = {}) {
             enableAgentBubbleTheme: el.enableAgentBubbleTheme.checked,
             agentBubbleThemePrompt: getPromptTextareaRawValue(el.agentBubbleThemePrompt),
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
+            emoticonPrompt: getPromptTextareaRawValue(el.emoticonPromptInput),
             adaptiveBubbleTip: getPromptTextareaRawValue(el.adaptiveBubbleTipInput),
             dailyNoteGuide: getPromptTextareaRawValue(el.dailyNoteGuideInput),
             followUpPromptTemplate: getPromptTextareaRawValue(el.followUpPromptTemplateInput),
@@ -3690,6 +3780,11 @@ function createSettingsController(deps = {}) {
             void refreshFinalSystemPromptPreview();
             scheduleGlobalSettingsSave();
         });
+        el.enableEmoticonPromptInput?.addEventListener('change', () => {
+            syncPromptInjectionState();
+            void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
+        });
         el.enableAdaptiveBubbleTipInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             void refreshFinalSystemPromptPreview();
@@ -3726,6 +3821,21 @@ function createSettingsController(deps = {}) {
             hydratePromptTextarea(el.renderingPromptInput, DEFAULT_RENDERING_PROMPT);
             if (el.renderingPromptInput?.value.trim()) {
                 el.renderingPromptInput.dataset.usingDefaultPrompt = el.renderingPromptInput.value.trim() === DEFAULT_RENDERING_PROMPT.trim()
+                    ? 'true'
+                    : 'false';
+            }
+            void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
+        });
+        el.emoticonPromptInput?.addEventListener('input', () => {
+            markPromptTextareaCustom(el.emoticonPromptInput);
+            void refreshFinalSystemPromptPreview();
+            scheduleGlobalSettingsSave();
+        });
+        el.emoticonPromptInput?.addEventListener('blur', () => {
+            hydratePromptTextarea(el.emoticonPromptInput, DEFAULT_EMOTICON_PROMPT);
+            if (el.emoticonPromptInput?.value.trim()) {
+                el.emoticonPromptInput.dataset.usingDefaultPrompt = el.emoticonPromptInput.value.trim() === DEFAULT_EMOTICON_PROMPT.trim()
                     ? 'true'
                     : 'false';
             }

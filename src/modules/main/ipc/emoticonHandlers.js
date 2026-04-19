@@ -2,11 +2,18 @@ const { ipcMain } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const {
+    invalidateBundledEmoticonCatalog,
+    loadBundledEmoticonCatalog,
+} = require('../emoticons/bundledCatalog');
 
 let emoticonLibrary = [];
+let userEmoticonLibrary = [];
+let bundledEmoticonLibrary = [];
 let emoticonLibraryPath = '';
 let emoticonAssetsDir = '';
-let legacyGeneratedListsPath = '';
+let generatedListsPath = '';
+let projectRoot = '';
 let handlersRegistered = false;
 
 function makeId(prefix) {
@@ -39,6 +46,8 @@ function normalizeLibraryItem(item = {}) {
     const filename = sanitizeText(item.filename || path.basename(item.assetPath || ''), `${name}.png`);
     const assetPath = sanitizeText(item.assetPath);
     const url = assetPath ? buildAssetUrl(assetPath) : sanitizeText(item.url);
+    const createdAt = Number(item.createdAt);
+    const updatedAt = Number(item.updatedAt);
 
     return {
         id: sanitizeText(item.id, makeId('emoticon')),
@@ -49,9 +58,12 @@ function normalizeLibraryItem(item = {}) {
         tags: normalizeTags(item.tags),
         assetPath,
         url,
-        searchKey: `${category.toLowerCase()}/${name.toLowerCase()}/${normalizeTags(item.tags).join('/')}`,
-        createdAt: Number(item.createdAt || Date.now()),
-        updatedAt: Number(item.updatedAt || Date.now()),
+        renderPath: sanitizeText(item.renderPath, ''),
+        readonly: item.readonly === true,
+        source: sanitizeText(item.source, 'user'),
+        searchKey: `${category.toLowerCase()}/${name.toLowerCase()}/${filename.toLowerCase()}/${normalizeTags(item.tags).join('/')}`,
+        createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+        updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
     };
 }
 
@@ -60,23 +72,43 @@ async function ensureStorage() {
     await fs.ensureDir(emoticonAssetsDir);
 }
 
-async function loadLibrary() {
+async function loadBundledLibrary(options = {}) {
+    const catalog = await loadBundledEmoticonCatalog({
+        projectRoot,
+        dataRoot: generatedListsPath ? path.dirname(generatedListsPath) : '',
+        force: options.forceBundled === true,
+    });
+    bundledEmoticonLibrary = catalog.items.map((item) => normalizeLibraryItem(item));
+    return bundledEmoticonLibrary;
+}
+
+async function loadUserLibrary() {
     await ensureStorage();
     if (!await fs.pathExists(emoticonLibraryPath)) {
-        emoticonLibrary = [];
-        return emoticonLibrary;
+        userEmoticonLibrary = [];
+        return userEmoticonLibrary;
     }
 
     const payload = await fs.readJson(emoticonLibraryPath).catch(() => []);
-    emoticonLibrary = Array.isArray(payload)
+    userEmoticonLibrary = Array.isArray(payload)
         ? payload.map((item) => normalizeLibraryItem(item))
         : [];
+    return userEmoticonLibrary;
+}
+
+async function loadLibrary(options = {}) {
+    await loadBundledLibrary(options);
+    await loadUserLibrary();
+    emoticonLibrary = [
+        ...bundledEmoticonLibrary,
+        ...userEmoticonLibrary,
+    ];
     return emoticonLibrary;
 }
 
 async function saveLibrary() {
     await ensureStorage();
-    await fs.writeJson(emoticonLibraryPath, emoticonLibrary, { spaces: 2 });
+    await fs.writeJson(emoticonLibraryPath, userEmoticonLibrary, { spaces: 2 });
 }
 
 async function copyAssetIntoLibrary(sourcePath) {
@@ -91,46 +123,23 @@ async function copyAssetIntoLibrary(sourcePath) {
     return targetPath;
 }
 
-async function importLegacyGeneratedLists() {
-    if (!await fs.pathExists(legacyGeneratedListsPath)) {
-        return [];
-    }
-
-    const files = await fs.readdir(legacyGeneratedListsPath).catch(() => []);
-    const txtFiles = files.filter((fileName) => fileName.endsWith('表情包.txt'));
-    const imported = [];
-
-    for (const txtFile of txtFiles) {
-        const category = path.basename(txtFile, '.txt');
-        const fileContent = await fs.readFile(path.join(legacyGeneratedListsPath, txtFile), 'utf8').catch(() => '');
-        const names = fileContent.split('|').map((item) => item.trim()).filter(Boolean);
-        for (const name of names) {
-            imported.push(normalizeLibraryItem({
-                name: path.basename(name, path.extname(name)),
-                filename: name,
-                category,
-                tags: [],
-                assetPath: '',
-                url: '',
-            }));
-        }
-    }
-
-    return imported;
-}
-
 async function initialize(paths) {
     const libraryRoot = path.join(paths.DATA_ROOT, 'Emoticons');
     emoticonLibraryPath = path.join(libraryRoot, 'library.json');
     emoticonAssetsDir = path.join(libraryRoot, 'assets');
-    legacyGeneratedListsPath = path.join(paths.DATA_ROOT, 'generated_lists');
-    await loadLibrary();
+    generatedListsPath = path.join(paths.DATA_ROOT, 'generated_lists');
+    projectRoot = sanitizeText(paths.PROJECT_ROOT, '');
+    await loadLibrary({ forceBundled: true });
 }
 
 async function saveEmoticonItem(payload = {}) {
     await loadLibrary();
-    const existingIndex = emoticonLibrary.findIndex((item) => item.id === payload.id);
-    const existing = existingIndex >= 0 ? emoticonLibrary[existingIndex] : null;
+    if (payload?.id && bundledEmoticonLibrary.some((item) => item.id === payload.id)) {
+        throw new Error('Bundled emoticons are read-only.');
+    }
+
+    const existingIndex = userEmoticonLibrary.findIndex((item) => item.id === payload.id);
+    const existing = existingIndex >= 0 ? userEmoticonLibrary[existingIndex] : null;
     let assetPath = existing?.assetPath || '';
     if (sanitizeText(payload.sourcePath)) {
         assetPath = await copyAssetIntoLibrary(payload.sourcePath);
@@ -145,20 +154,26 @@ async function saveEmoticonItem(payload = {}) {
     });
 
     if (existingIndex >= 0) {
-        emoticonLibrary[existingIndex] = nextItem;
+        userEmoticonLibrary[existingIndex] = nextItem;
     } else {
-        emoticonLibrary.unshift(nextItem);
+        userEmoticonLibrary.unshift(nextItem);
     }
 
     await saveLibrary();
+    await loadLibrary();
     return nextItem;
 }
 
 async function deleteEmoticonItem(id) {
     await loadLibrary();
-    const existing = emoticonLibrary.find((item) => item.id === id);
-    emoticonLibrary = emoticonLibrary.filter((item) => item.id !== id);
+    if (bundledEmoticonLibrary.some((item) => item.id === id)) {
+        throw new Error('Bundled emoticons cannot be deleted.');
+    }
+
+    const existing = userEmoticonLibrary.find((item) => item.id === id);
+    userEmoticonLibrary = userEmoticonLibrary.filter((item) => item.id !== id);
     await saveLibrary();
+    await loadLibrary();
 
     if (existing?.assetPath && await fs.pathExists(existing.assetPath)) {
         await fs.remove(existing.assetPath).catch(() => {});
@@ -166,7 +181,7 @@ async function deleteEmoticonItem(id) {
 }
 
 async function importEmoticonItems(payload = {}) {
-    await loadLibrary();
+    await loadUserLibrary();
     const items = Array.isArray(payload.items)
         ? payload.items
         : (Array.isArray(payload.paths) ? payload.paths.map((sourcePath) => ({ sourcePath })) : []);
@@ -227,12 +242,8 @@ function setupEmoticonHandlers() {
     });
 
     ipcMain.on('regenerate-emoticon-library', async () => {
-        if (emoticonLibrary.length > 0) {
-            return;
-        }
-
-        emoticonLibrary = await importLegacyGeneratedLists();
-        await saveLibrary();
+        invalidateBundledEmoticonCatalog();
+        await loadLibrary({ forceBundled: true });
     });
 
     handlersRegistered = true;

@@ -160,6 +160,8 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
     assert.equal(settings.userName, DEFAULT_SETTINGS.userName);
     assert.equal(settings.kbEmbeddingModel, DEFAULT_SETTINGS.kbEmbeddingModel);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
+    assert.equal(settings.enableEmoticonPrompt, DEFAULT_SETTINGS.enableEmoticonPrompt);
+    assert.equal(settings.emoticonPrompt, DEFAULT_SETTINGS.emoticonPrompt);
     assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);
     assert.equal(settings.followUpDefaultModel, DEFAULT_SETTINGS.followUpDefaultModel);
     assert.equal(settings.topicTitleDefaultModel, DEFAULT_SETTINGS.topicTitleDefaultModel);
@@ -181,6 +183,8 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.userName, 'Legacy User');
     assert.equal(settings.enableAgentBubbleTheme, true);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
+    assert.equal(settings.enableEmoticonPrompt, DEFAULT_SETTINGS.enableEmoticonPrompt);
+    assert.equal(settings.emoticonPrompt, DEFAULT_SETTINGS.emoticonPrompt);
     assert.equal(settings.followUpDefaultModel, DEFAULT_SETTINGS.followUpDefaultModel);
     assert.equal(settings.followUpPromptTemplate, DEFAULT_SETTINGS.followUpPromptTemplate);
     assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);

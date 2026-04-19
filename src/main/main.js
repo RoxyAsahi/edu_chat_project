@@ -477,6 +477,7 @@ async function registerDomainIpc() {
     await emoticonHandlers.initialize({
         SETTINGS_FILE,
         DATA_ROOT,
+        PROJECT_ROOT: REPO_ROOT,
     });
     emoticonHandlers.setupEmoticonHandlers();
 
@@ -485,6 +486,7 @@ async function registerDomainIpc() {
         USER_AVATAR_FILE,
         AGENT_DIR,
         DATA_ROOT,
+        PROJECT_ROOT: REPO_ROOT,
         settingsManager,
         agentConfigManager,
     });
@@ -517,6 +519,7 @@ async function registerDomainIpc() {
         AGENT_DIR,
         USER_DATA_DIR,
         DATA_ROOT,
+        PROJECT_ROOT: REPO_ROOT,
         fileWatcher,
         settingsManager,
         agentConfigManager,
