@@ -58,6 +58,7 @@ async function initializeAppRuntime(deps = {}) {
     const messageRendererApi = deps.messageRendererApi;
     const interruptRequest = deps.interruptRequest;
     const appendAttachments = deps.appendAttachments;
+    const addEmoticonAttachment = deps.addEmoticonAttachment;
     const generateFollowUpsForAssistantMessage = deps.generateFollowUpsForAssistantMessage || (async () => []);
     const setActiveRequestId = deps.setActiveRequestId || (() => {});
     const windowObj = deps.windowObj || window;
@@ -104,6 +105,7 @@ async function initializeAppRuntime(deps = {}) {
         await windowObj.emoticonManager.initialize({
             emoticonPanel: el.emoticonPanel,
             messageInput: el.messageInput,
+            onEmoticonSelected: addEmoticonAttachment,
         });
     }
 

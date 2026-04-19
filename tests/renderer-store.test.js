@@ -26,6 +26,7 @@ test('createInitialAppState groups renderer state into the expected slices', asy
     ]);
     assert.equal(state.settings.settings.currentThemeMode, 'system');
     assert.equal(state.settings.settings.agentBubbleThemePrompt, 'Output formatting requirement: {{VarDivRender}}');
+    assert.equal(state.settings.settings.enableEmoticonPrompt, true);
     assert.equal(state.settings.settings.studyProfile.timezone, 'Asia/Hong_Kong');
     assert.equal(state.layout.sidePanelTab, 'notes');
     assert.equal(state.session.currentTopicId, null);

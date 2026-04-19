@@ -122,6 +122,117 @@ test('send-to-vcp resolves local prompt variables before calling the upstream cl
     assert.equal(result.promptVariableResolution.substitutions.Nova, 'Nova');
 });
 
+test('send-to-vcp injects bundled emoticon prompt text before calling the upstream client', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-emoticon-prompt-resolution-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const projectRoot = path.join(tempRoot, 'project-root');
+    const bundledPackDir = path.join(projectRoot, '通用表情包');
+    await fs.ensureDir(bundledPackDir);
+    await fs.writeFile(path.join(bundledPackDir, '阿巴阿巴.jpg'), Buffer.from([255, 216, 255]));
+    await fs.writeFile(path.join(bundledPackDir, '啊？.png'), Buffer.from([137, 80, 78, 71]));
+
+    let capturedRequest = null;
+    const vcpClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequest = request;
+            return { ok: true };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        PROJECT_ROOT: projectRoot,
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    userName: 'SmokeUser',
+                    enableEmoticonPrompt: true,
+                    emoticonPrompt: 'Path {{GeneralEmoticonPath}}\nList {{GeneralEmoticonList}}',
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendToVcp = handlers.get('send-to-vcp');
+    const result = await sendToVcp({ sender: {} }, {
+        requestId: 'req_emoticon_1',
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        messages: [{ role: 'system', content: '表情包说明：{{VarEmoticonPrompt}}' }],
+        modelConfig: { stream: false },
+        context: {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(capturedRequest);
+    assert.equal(capturedRequest.messages[0].content.includes('{{VarEmoticonPrompt}}'), false);
+    assert.match(capturedRequest.messages[0].content, /Path \/通用表情包/);
+    assert.match(capturedRequest.messages[0].content, /阿巴阿巴.jpg\|啊？.png/);
+    assert.equal((capturedRequest.messages[0].content.match(/Path \/通用表情包/g) || []).length, 1);
+});
+
+test('send-to-vcp auto-appends emoticon prompt when the base prompt does not reference emoticon variables', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-emoticon-prompt-resolution-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const projectRoot = path.join(tempRoot, 'project-root');
+    const bundledPackDir = path.join(projectRoot, '通用表情包');
+    await fs.ensureDir(bundledPackDir);
+    await fs.writeFile(path.join(bundledPackDir, '阿巴阿巴.jpg'), Buffer.from([255, 216, 255]));
+
+    let capturedRequest = null;
+    const vcpClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequest = request;
+            return { ok: true };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        PROJECT_ROOT: projectRoot,
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    userName: 'SmokeUser',
+                    enableEmoticonPrompt: true,
+                    emoticonPrompt: 'Auto emoticon path {{GeneralEmoticonPath}}',
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendToVcp = handlers.get('send-to-vcp');
+    const result = await sendToVcp({ sender: {} }, {
+        requestId: 'req_emoticon_auto',
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        messages: [{ role: 'system', content: '原始系统提示词' }],
+        modelConfig: { stream: false },
+        context: {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(capturedRequest);
+    assert.match(capturedRequest.messages[0].content, /原始系统提示词/);
+    assert.match(capturedRequest.messages[0].content, /Auto emoticon path \/通用表情包/);
+});
+
 test('send-to-vcp skips bubble theme injection when the configured prompt is blank', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));

@@ -8,6 +8,7 @@ const emoticonManager = (() => {
     let isInitialized = false;
     let emoticonPanel = null;
     let messageInput = null;
+    let onEmoticonSelected = null;
     let currentTargetInput = null;
     let currentUserName = '';
     let activeCategory = ALL_CATEGORY_KEY;
@@ -26,6 +27,10 @@ const emoticonManager = (() => {
 
     function getConfirm(message) {
         return window.confirm(message);
+    }
+
+    function showToast(message, type = 'info', duration = 3000) {
+        window.uiHelperFunctions?.showToastNotification?.(message, type, duration);
     }
 
     function getCategoryPriority(category) {
@@ -65,6 +70,9 @@ const emoticonManager = (() => {
 
         emoticonPanel = elements.emoticonPanel;
         messageInput = elements.messageInput || null;
+        onEmoticonSelected = typeof elements.onEmoticonSelected === 'function'
+            ? elements.onEmoticonSelected
+            : null;
 
         if (!emoticonPanel) {
             console.error('[EmoticonManager] Emoticon panel element not provided.');
@@ -268,27 +276,32 @@ const emoticonManager = (() => {
             if (manageMode) {
                 const meta = document.createElement('div');
                 meta.className = 'emoticon-card__meta';
+                const tag = emoticon.readonly === true || emoticon.source === 'bundled'
+                    ? '内置'
+                    : '自定义';
                 meta.innerHTML = `
                     <strong>${emoticon.name || emoticon.filename}</strong>
-                    <span>${emoticon.category}</span>
+                    <span>${emoticon.category} · ${tag}</span>
                 `;
                 card.appendChild(meta);
 
-                const actions = document.createElement('div');
-                actions.className = 'emoticon-card__actions';
-                actions.innerHTML = `
-                    <button type="button" class="ghost-button icon-text-btn" data-action="edit">编辑</button>
-                    <button type="button" class="ghost-button icon-text-btn" data-action="delete">删除</button>
-                `;
-                actions.querySelector('[data-action="edit"]')?.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    void editEmoticon(emoticon);
-                });
-                actions.querySelector('[data-action="delete"]')?.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    void deleteEmoticon(emoticon);
-                });
-                card.appendChild(actions);
+                if (emoticon.readonly !== true && emoticon.source !== 'bundled') {
+                    const actions = document.createElement('div');
+                    actions.className = 'emoticon-card__actions';
+                    actions.innerHTML = `
+                        <button type="button" class="ghost-button icon-text-btn" data-action="edit">编辑</button>
+                        <button type="button" class="ghost-button icon-text-btn" data-action="delete">删除</button>
+                    `;
+                    actions.querySelector('[data-action="edit"]')?.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        void editEmoticon(emoticon);
+                    });
+                    actions.querySelector('[data-action="delete"]')?.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        void deleteEmoticon(emoticon);
+                    });
+                    card.appendChild(actions);
+                }
             }
 
             grid.appendChild(card);
@@ -327,10 +340,28 @@ const emoticonManager = (() => {
         }
     }
 
-    function insertEmoticon(emoticon) {
+    async function insertEmoticon(emoticon) {
         if (!currentTargetInput || manageMode) return;
 
-        const imgTag = `<img src="${decodeURIComponent(emoticon.url)}" width="80">`;
+        if (currentTargetInput === messageInput && typeof onEmoticonSelected === 'function') {
+            try {
+                const result = await onEmoticonSelected(emoticon, currentTargetInput);
+                if (result?.success === false) {
+                    showToast(result.error || '添加表情失败。', 'warning');
+                    return;
+                }
+
+                currentTargetInput.focus();
+                hidePanel();
+                return;
+            } catch (error) {
+                showToast(`添加表情失败：${error?.message || '未知错误'}`, 'error');
+                return;
+            }
+        }
+
+        const source = emoticon.renderPath || decodeURIComponent(emoticon.url);
+        const imgTag = `<img src="${source}" width="80">`;
         const currentValue = currentTargetInput.value;
         const separator = currentValue.length > 0 && !/\s$/.test(currentValue) ? ' ' : '';
 

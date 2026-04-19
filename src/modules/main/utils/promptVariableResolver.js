@@ -149,7 +149,9 @@ function buildPromptVariableMap(options = {}) {
     const studyLogPolicy = isPlainObject(settings.studyLogPolicy) ? settings.studyLogPolicy : {};
     const promptVariables = isPlainObject(settings.promptVariables) ? settings.promptVariables : {};
     const renderingPromptEnabled = settings.enableRenderingPrompt !== false;
+    const emoticonPromptEnabled = settings.enableEmoticonPrompt !== false;
     const adaptiveBubbleTipEnabled = settings.enableAdaptiveBubbleTip !== false;
+    const emoticonPromptData = isPlainObject(context.emoticonPromptData) ? context.emoticonPromptData : {};
     const timeZone = context.timeZone || studyProfile.timezone || 'Asia/Hong_Kong';
     const now = new Date();
     const formattedNow = formatDateParts(now, timeZone);
@@ -216,6 +218,51 @@ function buildPromptVariableMap(options = {}) {
     } else {
         variableMap.VarDivRender = { value: '', source: 'rendering-prompt-disabled', forceResolve: true };
         variableMap.VarRendering = { value: '', source: 'rendering-prompt-disabled', forceResolve: true };
+    }
+    if (isPlainObject(emoticonPromptData.variables)) {
+        for (const [key, value] of Object.entries(emoticonPromptData.variables)) {
+            const normalizedKey = normalizeVariableKey(key);
+            if (!normalizedKey) {
+                continue;
+            }
+
+            const normalizedValue = typeof value === 'string' ? value.trim() : '';
+            if (normalizedValue) {
+                mergeVariable(variableMap, normalizedKey, normalizedValue, 'bundled-emoticon');
+                continue;
+            }
+
+            variableMap[normalizedKey] = {
+                value: '',
+                source: 'bundled-emoticon',
+                forceResolve: true,
+            };
+        }
+    }
+    if (emoticonPromptEnabled && normalizeVariableValue(emoticonPromptData.resolvedPrompt)) {
+        mergeVariable(
+            variableMap,
+            'VarEmoticonPrompt',
+            emoticonPromptData.resolvedPrompt,
+            'bundled-emoticon'
+        );
+        mergeVariable(
+            variableMap,
+            'VarEmojiPrompt',
+            emoticonPromptData.resolvedPrompt,
+            'bundled-emoticon'
+        );
+    } else {
+        variableMap.VarEmoticonPrompt = {
+            value: '',
+            source: emoticonPromptEnabled ? 'bundled-emoticon-unavailable' : 'emoticon-prompt-disabled',
+            forceResolve: true,
+        };
+        variableMap.VarEmojiPrompt = {
+            value: '',
+            source: emoticonPromptEnabled ? 'bundled-emoticon-unavailable' : 'emoticon-prompt-disabled',
+            forceResolve: true,
+        };
     }
     if (adaptiveBubbleTipEnabled) {
         mergeVariable(

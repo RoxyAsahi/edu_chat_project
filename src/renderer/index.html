@@ -882,6 +882,18 @@
                       </div>
                       <div class="settings-prompt-editor">
                         <span class="settings-prompt-editor__title">
+                          <label><input id="enableEmoticonPromptInput" type="checkbox" /> 表情包提示</label>
+                          <code>{{VarEmoticonPrompt}} / {{VarEmojiPrompt}}</code>
+                        </span>
+                        <textarea
+                          id="emoticonPromptInput"
+                          rows="7"
+                          placeholder="用于控制内置表情包的文件列表和伪路径提示；启用后会自动追加到 system prompt，除非当前 agent prompt 已自带对应变量。"
+                        ></textarea>
+                        <span class="settings-caption">控制模型是否知道当前内置表情包、可用文件名，以及应该输出怎样的 <code>&lt;img src=&quot;/通用表情包/文件名&quot; width=&quot;120&quot;&gt;</code> 伪路径。启用后会自动追加到最终 system prompt；如果当前 agent prompt 已经显式写了 <code>{{VarEmoticonPrompt}}</code> 或 <code>{{VarEmojiPrompt}}</code>，系统会跳过自动追加以避免重复。留空时会自动显示并使用内置默认文案。</span>
+                      </div>
+                      <div class="settings-prompt-editor">
+                        <span class="settings-prompt-editor__title">
                           <label><input id="enableAdaptiveBubbleTipInput" type="checkbox" /> 简洁气泡补充</label>
                           <code>{{VarAdaptiveBubbleTip}}</code>
                         </span>

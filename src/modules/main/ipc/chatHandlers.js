@@ -6,6 +6,7 @@ const contextSanitizer = require('../contextSanitizer');
 const knowledgeBase = require('../knowledge-base');
 const vcpClient = require('../vcpClient');
 const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
+const { loadBundledEmoticonPromptData } = require('../emoticons/bundledCatalog');
 const {
     DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
     DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE,
@@ -232,6 +233,48 @@ function applyAgentBubbleTheme(messages, injectionPrompt = DEFAULT_AGENT_BUBBLE_
     return nextMessages;
 }
 
+function applyEmoticonPrompt(messages, settings = {}, promptResolutionOptions = {}) {
+    if (settings?.enableEmoticonPrompt === false) {
+        return messages;
+    }
+
+    const emoticonPromptData = promptResolutionOptions?.context?.emoticonPromptData || {};
+    const resolvedPrompt = typeof emoticonPromptData.resolvedPrompt === 'string'
+        ? emoticonPromptData.resolvedPrompt.trim()
+        : '';
+    const rawPrompt = typeof settings?.emoticonPrompt === 'string' && settings.emoticonPrompt.trim()
+        ? settings.emoticonPrompt.trim()
+        : (typeof emoticonPromptData.promptTemplate === 'string' ? emoticonPromptData.promptTemplate.trim() : '');
+    const normalizedPrompt = rawPrompt || resolvedPrompt;
+    if (!normalizedPrompt || emoticonPromptData.available === false) {
+        return messages;
+    }
+
+    const nextMessages = [...messages];
+    let systemMessageIndex = nextMessages.findIndex((message) => message.role === 'system');
+
+    if (systemMessageIndex === -1) {
+        nextMessages.unshift({ role: 'system', content: normalizedPrompt });
+        return nextMessages;
+    }
+
+    const systemMessage = nextMessages[systemMessageIndex];
+    const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
+    const alreadyReferenced = /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(currentContent);
+    const alreadyIncluded = currentContent.includes(normalizedPrompt)
+        || (resolvedPrompt ? currentContent.includes(resolvedPrompt) : false);
+    if (alreadyReferenced || alreadyIncluded) {
+        return nextMessages;
+    }
+
+    nextMessages[systemMessageIndex] = {
+        ...systemMessage,
+        content: `${currentContent}\n\n${normalizedPrompt}`.trim(),
+    };
+
+    return nextMessages;
+}
+
 function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions = {}) {
     if (settings?.studyLogPolicy?.enabled === false) {
         return messages;
@@ -306,7 +349,14 @@ function applyContextSanitizer(messages, settings) {
     return [...systemMessages, ...sanitizedMessages];
 }
 
-async function buildPromptResolutionOptions({ settings, context, modelConfig, agentConfigManager }) {
+async function buildPromptResolutionOptions({
+    settings,
+    context,
+    modelConfig,
+    agentConfigManager,
+    dataRoot = '',
+    projectRoot = '',
+}) {
     const nextContext = { ...(context || {}) };
     let agentConfig = null;
 
@@ -329,6 +379,24 @@ async function buildPromptResolutionOptions({ settings, context, modelConfig, ag
                 nextContext.topicName = matchedTopic.name;
             }
         }
+    }
+
+    try {
+        nextContext.emoticonPromptData = await loadBundledEmoticonPromptData({
+            dataRoot,
+            projectRoot,
+            settings,
+        });
+    } catch (error) {
+        console.warn('[Main - sendToVCP] Failed to load bundled emoticon prompt data:', error);
+        nextContext.emoticonPromptData = {
+            available: false,
+            packCount: 0,
+            packs: [],
+            variables: {},
+            promptTemplate: '',
+            resolvedPrompt: '',
+        };
     }
 
     return {
@@ -666,6 +734,7 @@ function initialize(mainWindow, context) {
         AGENT_DIR,
         USER_DATA_DIR,
         DATA_ROOT,
+        PROJECT_ROOT,
         fileWatcher,
         settingsManager,
         agentConfigManager,
@@ -1246,6 +1315,8 @@ function initialize(mainWindow, context) {
                 context,
                 modelConfig: finalModelConfig,
                 agentConfigManager,
+                dataRoot: DATA_ROOT,
+                projectRoot: PROJECT_ROOT,
             });
         } catch (error) {
             console.warn('[Main - sendToVCP] Failed to pre-read agent context for DailyNote protocol injection:', error);
@@ -1260,6 +1331,7 @@ function initialize(mainWindow, context) {
             }
 
             processedMessages = normalizeLegacyStudyLogPromptMessages(processedMessages);
+            processedMessages = applyEmoticonPrompt(processedMessages, settings, promptResolutionOptions);
             processedMessages = applyDailyNoteProtocol(processedMessages, settings, promptResolutionOptions);
 
             if (settings.enableThoughtChainInjection !== true) {

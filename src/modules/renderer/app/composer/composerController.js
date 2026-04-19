@@ -18,6 +18,17 @@ function escapeHtml(text) {
         .replace(/'/g, '&#39;');
 }
 
+function inferImageMimeTypeFromName(fileName = '') {
+    const normalized = String(fileName || '').trim().toLowerCase();
+    if (normalized.endsWith('.png')) return 'image/png';
+    if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg';
+    if (normalized.endsWith('.gif')) return 'image/gif';
+    if (normalized.endsWith('.webp')) return 'image/webp';
+    if (normalized.endsWith('.bmp')) return 'image/bmp';
+    if (normalized.endsWith('.svg')) return 'image/svg+xml';
+    return 'image/png';
+}
+
 function createComposerController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -172,6 +183,41 @@ function createComposerController(deps = {}) {
 
         state.pendingAttachments = [...state.pendingAttachments, ...normalized];
         refreshAttachmentPreview();
+    }
+
+    async function addEmoticonAttachment(emoticon = {}) {
+        const previewSrc = typeof emoticon?.url === 'string' ? emoticon.url.trim() : '';
+        if (!previewSrc) {
+            return { success: false, error: '表情资源地址无效。' };
+        }
+
+        const fileName = typeof emoticon?.filename === 'string' && emoticon.filename.trim()
+            ? emoticon.filename.trim()
+            : `${String(emoticon?.name || 'emoticon').trim() || 'emoticon'}.png`;
+        const attachment = normalizeStoredAttachment({
+            id: `emoticon_attachment_${String(emoticon?.id || Date.now())}_${Date.now()}`,
+            name: fileName,
+            originalName: fileName,
+            type: inferImageMimeTypeFromName(fileName),
+            src: previewSrc,
+            internalPath: previewSrc.startsWith('file://') ? previewSrc : '',
+            renderPath: typeof emoticon?.renderPath === 'string' ? emoticon.renderPath : '',
+            emoticonId: typeof emoticon?.id === 'string' ? emoticon.id : '',
+            emoticonCategory: typeof emoticon?.category === 'string' ? emoticon.category : '',
+            source: typeof emoticon?.source === 'string' ? emoticon.source : 'emoticon',
+        });
+
+        if (!attachment) {
+            return { success: false, error: '表情附件创建失败。' };
+        }
+
+        appendStoredAttachments([attachment]);
+        el.messageInput?.focus?.();
+
+        return {
+            success: true,
+            attachment,
+        };
     }
 
     function resetState(options = {}) {
@@ -841,6 +887,7 @@ function createComposerController(deps = {}) {
 
     return {
         addFiles,
+        addEmoticonAttachment,
         appendStoredAttachments,
         bindEvents,
         buildApiMessages,

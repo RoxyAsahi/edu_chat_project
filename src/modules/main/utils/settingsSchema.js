@@ -10,6 +10,9 @@ const {
     createDefaultModelService,
     normalizeModelService,
 } = require('./modelService');
+const {
+    DEFAULT_EMOTICON_PROMPT,
+} = require('../emoticons/bundledCatalog');
 
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{VarDivRender}}';
 const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
@@ -82,8 +85,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     vcpLogKey: '',
     networkNotesPaths: [],
     enableRenderingPrompt: true,
+    enableEmoticonPrompt: true,
     enableAdaptiveBubbleTip: true,
     renderingPrompt: '',
+    emoticonPrompt: '',
     adaptiveBubbleTip: '',
     dailyNoteGuide: '',
     followUpPromptTemplate: '',
@@ -210,6 +215,11 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
+    if (typeof validated.enableEmoticonPrompt !== 'boolean') {
+        validated.enableEmoticonPrompt = defaultSettings.enableEmoticonPrompt;
+        hasIssues = true;
+    }
+
     if (typeof validated.enableAdaptiveBubbleTip !== 'boolean') {
         validated.enableAdaptiveBubbleTip = defaultSettings.enableAdaptiveBubbleTip;
         hasIssues = true;
@@ -226,6 +236,14 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         validated.renderingPrompt = normalizePromptText(
             legacyPromptSource.renderingPrompt,
             defaultSettings.renderingPrompt
+        );
+        hasIssues = true;
+    }
+
+    if (typeof sourceSettings.emoticonPrompt !== 'string') {
+        validated.emoticonPrompt = normalizePromptText(
+            legacyPromptSource.emoticonPrompt,
+            defaultSettings.emoticonPrompt
         );
         hasIssues = true;
     }
@@ -376,6 +394,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
 
 module.exports = {
     DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
+    DEFAULT_EMOTICON_PROMPT,
     DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE,
     DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE,
     DEFAULT_STUDY_LOG_POLICY,

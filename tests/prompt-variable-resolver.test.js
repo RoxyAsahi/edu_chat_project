@@ -77,6 +77,28 @@ test('resolvePromptVariables suppresses DailyNoteTool when study log loop is dis
     assert.deepEqual(result.unresolvedTokens, []);
 });
 
+test('resolvePromptVariables resolves bundled emoticon variables and aliases', () => {
+    const result = resolvePromptVariables('{{VarEmoticonPrompt}}\n{{VarEmojiPrompt}}\n{{GeneralEmoticonPath}}', {
+        settings: {
+            enableEmoticonPrompt: true,
+        },
+        context: {
+            emoticonPromptData: {
+                resolvedPrompt: 'Use <img src="/通用表情包/阿巴阿巴.jpg" width="120">.',
+                variables: {
+                    GeneralEmoticonPath: '/通用表情包',
+                    GeneralEmoticonList: '阿巴阿巴.jpg|啊？.jpg',
+                    EmoticonPackSummary: '通用表情包 (/通用表情包): 阿巴阿巴.jpg|啊？.jpg',
+                },
+            },
+        },
+    });
+
+    assert.match(result.resolvedPrompt, /Use <img src="\/通用表情包\/阿巴阿巴.jpg" width="120">/);
+    assert.match(result.resolvedPrompt, /\/通用表情包/);
+    assert.deepEqual(result.unresolvedTokens, []);
+});
+
 test('resolvePromptMessageSet resolves text content inside message arrays', () => {
     const result = resolvePromptMessageSet([{
         role: 'system',

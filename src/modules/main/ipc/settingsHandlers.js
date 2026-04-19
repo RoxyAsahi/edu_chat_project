@@ -10,7 +10,9 @@ const {
 } = require('../utils/promptVariableResolver');
 const {
     DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
+    DEFAULT_EMOTICON_PROMPT,
 } = require('../utils/settingsSchema');
+const { loadBundledEmoticonPromptData } = require('../emoticons/bundledCatalog');
 const {
     resolveDailyNoteToolInstruction,
     rewriteLegacyStudyLogPromptText,
@@ -111,9 +113,19 @@ const SETTINGS_PERSISTENCE_FIELD_SPECS = [
         type: 'boolean',
     },
     {
+        id: 'enableEmoticonPrompt',
+        path: ['enableEmoticonPrompt'],
+        type: 'boolean',
+    },
+    {
         id: 'enableAdaptiveBubbleTip',
         path: ['enableAdaptiveBubbleTip'],
         type: 'boolean',
+    },
+    {
+        id: 'emoticonPrompt',
+        path: ['emoticonPrompt'],
+        type: 'string',
     },
     {
         id: 'studyLogPolicy.enableDailyNotePromptVariables',
@@ -257,6 +269,48 @@ function applyAgentBubbleTheme(messages, injectionPrompt = DEFAULT_AGENT_BUBBLE_
     return { messages: nextMessages, appended: true };
 }
 
+function applyEmoticonPrompt(messages, settings = {}, promptResolutionOptions = {}) {
+    if (settings?.enableEmoticonPrompt === false) {
+        return { messages, appended: false, skippedByToken: false, skippedByDuplicate: false };
+    }
+
+    const emoticonPromptData = promptResolutionOptions?.context?.emoticonPromptData || {};
+    const resolvedPrompt = typeof emoticonPromptData.resolvedPrompt === 'string'
+        ? emoticonPromptData.resolvedPrompt.trim()
+        : '';
+    const rawPrompt = typeof settings?.emoticonPrompt === 'string' && settings.emoticonPrompt.trim()
+        ? settings.emoticonPrompt.trim()
+        : (typeof emoticonPromptData.promptTemplate === 'string' ? emoticonPromptData.promptTemplate.trim() : '');
+    const normalizedPrompt = rawPrompt || resolvedPrompt;
+    if (!normalizedPrompt || emoticonPromptData.available === false) {
+        return { messages, appended: false, skippedByToken: false, skippedByDuplicate: false };
+    }
+
+    const nextMessages = [...messages];
+    let systemMessageIndex = nextMessages.findIndex((message) => message.role === 'system');
+
+    if (systemMessageIndex === -1) {
+        nextMessages.unshift({ role: 'system', content: normalizedPrompt });
+        return { messages: nextMessages, appended: true, skippedByToken: false, skippedByDuplicate: false };
+    }
+
+    const systemMessage = nextMessages[systemMessageIndex];
+    const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
+    const skippedByToken = /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(currentContent);
+    const skippedByDuplicate = currentContent.includes(normalizedPrompt)
+        || (resolvedPrompt ? currentContent.includes(resolvedPrompt) : false);
+    if (skippedByToken || skippedByDuplicate) {
+        return { messages: nextMessages, appended: false, skippedByToken, skippedByDuplicate };
+    }
+
+    nextMessages[systemMessageIndex] = {
+        ...systemMessage,
+        content: `${currentContent}\n\n${normalizedPrompt}`.trim(),
+    };
+
+    return { messages: nextMessages, appended: true, skippedByToken: false, skippedByDuplicate: false };
+}
+
 function normalizeLegacyStudyLogPromptMessages(messages = []) {
     return (Array.isArray(messages) ? messages : []).map((message) => {
         if (!message || message.role !== 'system' || typeof message.content !== 'string') {
@@ -325,6 +379,7 @@ function initialize(paths) {
         USER_AVATAR_FILE,
         AGENT_DIR,
         DATA_ROOT,
+        PROJECT_ROOT,
         settingsManager,
         agentConfigManager,
     } = paths;
@@ -430,6 +485,7 @@ function initialize(paths) {
                     enableAgentBubbleThemeMatched: enableAgentBubbleThemeCheck?.matched !== false,
                     promptToggleFieldsMatched: [
                         'enableRenderingPrompt',
+                        'enableEmoticonPrompt',
                         'enableAdaptiveBubbleTip',
                         'studyLogPolicy.enableDailyNotePromptVariables',
                         'studyLogPolicy.autoInjectDailyNoteProtocol',
@@ -539,10 +595,31 @@ function initialize(paths) {
                 }
             }
 
+            let emoticonPromptData = {
+                available: false,
+                packCount: 0,
+                packs: [],
+                variables: {},
+                promptTemplate: previewSettings.emoticonPrompt || DEFAULT_EMOTICON_PROMPT,
+                resolvedPrompt: '',
+            };
+            try {
+                emoticonPromptData = await loadBundledEmoticonPromptData({
+                    dataRoot: DATA_ROOT,
+                    projectRoot: PROJECT_ROOT,
+                    settings: previewSettings,
+                });
+            } catch (error) {
+                console.warn('[SettingsHandlers] Failed to load bundled emoticon prompt data:', error);
+            }
+
             const promptResolutionOptions = {
                 settings: previewSettings,
                 agentConfig,
-                context: previewContext,
+                context: {
+                    ...previewContext,
+                    emoticonPromptData,
+                },
                 modelConfig: previewModelConfig,
             };
 
@@ -552,6 +629,9 @@ function initialize(paths) {
             let messages = basePrompt ? [{ role: 'system', content: basePrompt }] : [];
 
             const renderingPromptSource = sanitizeText(previewSettings.renderingPrompt)
+                ? 'custom'
+                : 'default';
+            const emoticonPromptSource = sanitizeText(previewSettings.emoticonPrompt)
                 ? 'custom'
                 : 'default';
             const adaptiveBubbleSource = sanitizeText(previewSettings.adaptiveBubbleTip)
@@ -567,6 +647,9 @@ function initialize(paths) {
             const renderingRaw = previewSettings.enableRenderingPrompt === false
                 ? ''
                 : (sanitizeText(previewSettings.renderingPrompt) || DEFAULT_DIV_RENDER_INSTRUCTION);
+            const emoticonRaw = previewSettings.enableEmoticonPrompt === false
+                ? ''
+                : (sanitizeText(previewSettings.emoticonPrompt) || DEFAULT_EMOTICON_PROMPT);
             const adaptiveBubbleRaw = previewSettings.enableAdaptiveBubbleTip === false
                 ? ''
                 : (sanitizeText(previewSettings.adaptiveBubbleTip) || DEFAULT_ADAPTIVE_BUBBLE_TIP);
@@ -589,8 +672,13 @@ function initialize(paths) {
             const bubbleThemeApplied = previewSettings.enableAgentBubbleTheme === true
                 ? applyAgentBubbleTheme(normalizedMessages, previewSettings.agentBubbleThemePrompt)
                 : { messages: normalizedMessages, appended: false };
-            const dailyNoteApplied = applyDailyNoteProtocol(
+            const emoticonApplied = applyEmoticonPrompt(
                 bubbleThemeApplied.messages,
+                previewSettings,
+                promptResolutionOptions
+            );
+            const dailyNoteApplied = applyDailyNoteProtocol(
+                emoticonApplied.messages,
                 previewSettings,
                 promptResolutionOptions
             );
@@ -599,6 +687,9 @@ function initialize(paths) {
 
             const renderingResolved = renderingRaw
                 ? resolvePromptVariables(renderingRaw, promptResolutionOptions)
+                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+            const emoticonResolved = emoticonRaw
+                ? resolvePromptVariables(emoticonRaw, promptResolutionOptions)
                 : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
             const adaptiveBubbleResolved = adaptiveBubbleRaw
                 ? resolvePromptVariables(adaptiveBubbleRaw, promptResolutionOptions)
@@ -613,6 +704,7 @@ function initialize(paths) {
             const normalizedBasePrompt = rewriteLegacyStudyLogPromptText(basePrompt || '');
             const references = {
                 renderingInBasePrompt: /{{\s*(VarDivRender|VarRendering)\s*}}/.test(normalizedBasePrompt),
+                emoticonInBasePrompt: /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(normalizedBasePrompt),
                 adaptiveInBasePrompt: /{{\s*VarAdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
                 dailyNoteInBasePrompt: /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(normalizedBasePrompt),
             };
@@ -635,6 +727,18 @@ function initialize(paths) {
                             referencedInBasePrompt: references.renderingInBasePrompt,
                             rawPrompt: renderingRaw,
                             resolvedPrompt: renderingResolved.resolvedPrompt || '',
+                        },
+                        emoticonPrompt: {
+                            enabled: previewSettings.enableEmoticonPrompt !== false,
+                            available: emoticonPromptData.available === true,
+                            packCount: emoticonPromptData.packCount || 0,
+                            source: emoticonPromptSource,
+                            referencedInBasePrompt: references.emoticonInBasePrompt,
+                            appended: emoticonApplied.appended === true,
+                            skippedBecausePromptAlreadyContainsVariable: emoticonApplied.skippedByToken === true,
+                            skippedBecausePromptAlreadyContainsSameContent: emoticonApplied.skippedByDuplicate === true,
+                            rawPrompt: emoticonRaw,
+                            resolvedPrompt: emoticonResolved.resolvedPrompt || '',
                         },
                         adaptiveBubbleTip: {
                             enabled: previewSettings.enableAdaptiveBubbleTip !== false,
