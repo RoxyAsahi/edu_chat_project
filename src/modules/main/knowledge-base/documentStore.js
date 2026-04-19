@@ -65,7 +65,29 @@ function createDocumentStore(deps = {}) {
             const { hash, storedPath, fileSize } = await copyDocumentToStore(sourcePath, displayName);
             const duplicateId = await repository.findDocumentIdByHash(kbId, hash);
             if (duplicateId) {
-                imported.push(await repository.getDocumentById(duplicateId));
+                const duplicateDocument = await repository.getDocumentById(duplicateId);
+                if (duplicateDocument?.status === 'failed') {
+                    await repository.updateDocumentState(duplicateId, {
+                        status: 'pending',
+                        error: null,
+                        lastError: null,
+                        chunkCount: 0,
+                        processedAt: null,
+                        processingStartedAt: null,
+                        failedAt: null,
+                        completedAt: null,
+                    });
+                    await repository.updateDocumentGuideState(duplicateId, {
+                        guideStatus: 'idle',
+                        guideMarkdown: '',
+                        guideGeneratedAt: null,
+                        guideError: null,
+                    });
+                    enqueueDocument(duplicateId);
+                    imported.push(await repository.getDocumentById(duplicateId));
+                } else {
+                    imported.push(duplicateDocument);
+                }
                 continue;
             }
 

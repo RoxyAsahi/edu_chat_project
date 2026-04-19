@@ -33,6 +33,8 @@ function createKnowledgeBaseRepository(deps = {}) {
             guideMarkdown: row.guide_markdown || '',
             guideGeneratedAt: toNumber(row.guide_generated_at, null),
             guideError: row.guide_error || null,
+            extractedText: row.extracted_text || '',
+            extractedContentType: row.extracted_content_type || null,
         };
     }
 
@@ -148,7 +150,8 @@ function createKnowledgeBaseRepository(deps = {}) {
         const db = getDbImpl();
         const result = await db.execute({
             sql: `SELECT id, kb_id, name, stored_path, mime_type, file_size, file_hash, status, error, chunk_count, created_at, updated_at, processed_at,
-                attempt_count, processing_started_at, failed_at, completed_at, last_error, content_type, guide_status, guide_markdown, guide_generated_at, guide_error
+                attempt_count, processing_started_at, failed_at, completed_at, last_error, content_type, guide_status, guide_markdown, guide_generated_at, guide_error,
+                extracted_text, extracted_content_type
                 FROM kb_document
                 WHERE kb_id = ?
                 ORDER BY created_at DESC`,
@@ -162,7 +165,8 @@ function createKnowledgeBaseRepository(deps = {}) {
         const db = getDbImpl();
         const result = await db.execute({
             sql: `SELECT id, kb_id, name, stored_path, mime_type, file_size, file_hash, status, error, chunk_count, created_at, updated_at, processed_at,
-                attempt_count, processing_started_at, failed_at, completed_at, last_error, content_type, guide_status, guide_markdown, guide_generated_at, guide_error
+                attempt_count, processing_started_at, failed_at, completed_at, last_error, content_type, guide_status, guide_markdown, guide_generated_at, guide_error,
+                extracted_text, extracted_content_type
                 FROM kb_document
                 WHERE id = ?
                 LIMIT 1`,
@@ -275,6 +279,36 @@ function createKnowledgeBaseRepository(deps = {}) {
                 nextDocument.guideMarkdown || '',
                 nextDocument.guideGeneratedAt,
                 nextDocument.guideError,
+                nextDocument.updatedAt,
+                documentId,
+            ],
+        });
+
+        await touchKnowledgeBase(document.kbId);
+        return nextDocument;
+    }
+
+    async function updateDocumentDerivedContent(documentId, patch = {}) {
+        const document = await getDocumentById(documentId);
+        if (!document) {
+            return null;
+        }
+
+        const nextDocument = {
+            ...document,
+            extractedText: typeof patch.extractedText === 'string' ? patch.extractedText : (document.extractedText || ''),
+            extractedContentType: patch.extractedContentType ?? document.extractedContentType ?? null,
+            updatedAt: Date.now(),
+        };
+
+        const db = getDbImpl();
+        await db.execute({
+            sql: `UPDATE kb_document
+                SET extracted_text = ?, extracted_content_type = ?, updated_at = ?
+                WHERE id = ?`,
+            args: [
+                nextDocument.extractedText || '',
+                nextDocument.extractedContentType,
                 nextDocument.updatedAt,
                 documentId,
             ],
@@ -398,6 +432,7 @@ function createKnowledgeBaseRepository(deps = {}) {
         createDocument,
         updateDocumentState,
         updateDocumentGuideState,
+        updateDocumentDerivedContent,
         updateDocumentMimeType,
         deleteDocumentChunks,
         insertDocumentChunk,

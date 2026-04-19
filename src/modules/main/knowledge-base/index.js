@@ -2,7 +2,7 @@ const fs = require('fs-extra');
 const { chunkText } = require('./chunking');
 const { requestEmbeddings, cosineSimilarity, resolveRetrievalConfig } = require('./embeddings');
 const { requestRerank, resolveRerankConfig } = require('./rerank');
-const { parseKnowledgeBaseDocument } = require('./parserAdapter');
+const { parseKnowledgeBaseDocument, isImageMimeType, inferMimeType } = require('./parserAdapter');
 const { KB_UNSUPPORTED_OCR_ERROR } = require('./constants');
 const vcpClient = require('../vcpClient');
 const { createKnowledgeBaseRuntime } = require('./runtime');
@@ -13,16 +13,24 @@ const { createDocumentProcessor } = require('./documentProcessor');
 const { createRetrievalService } = require('./retrievalService');
 const { createGuideService } = require('./guideService');
 const { buildReaderViewFromParsedDocument } = require('./readerProjection');
+const { createImageDocumentTranscriber } = require('./imageDocumentTranscriber');
 
 const runtime = createKnowledgeBaseRuntime();
 const repository = createKnowledgeBaseRepository();
+const imageDocumentTranscriber = createImageDocumentTranscriber({
+    runtime,
+    vcpClient,
+});
 const processor = createDocumentProcessor({
     runtime,
     repository,
     parseKnowledgeBaseDocument,
+    transcribeImageDocument: imageDocumentTranscriber.transcribeImageDocument,
+    inferMimeType,
     chunkText,
     requestEmbeddings,
     KB_UNSUPPORTED_OCR_ERROR,
+    isImageMimeType,
 });
 const processingQueue = createProcessingQueue({
     runtime,
