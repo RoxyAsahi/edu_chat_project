@@ -962,6 +962,7 @@
   justify-content: space-between;
   text-align: left;
   transition: transform 180ms ease, background-color 180ms ease;
+  color: #1f2b44;
 }
 
 .subject-overview-card {
@@ -977,10 +978,6 @@
 .subject-overview-empty:focus-visible {
   transform: translateY(-2px);
   box-shadow: none;
-}
-
-.subject-overview-card--current {
-  background: #eceffd;
 }
 
 .subject-overview-card__topline,
@@ -1004,6 +1001,55 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+.subject-overview-card--violet {
+  background: #e9edff;
+}
+
+.subject-overview-card--green {
+  background: #e7f5ea;
+}
+
+.subject-overview-card--warm {
+  background: #f6f0df;
+}
+
+.subject-overview-card--rose {
+  background: #f8ebea;
+}
+
+.subject-overview-card--slate {
+  background: #edf1f7;
+}
+
+.subject-overview-card--violet .subject-overview-card__badge,
+.subject-overview-card--violet .subject-overview-card__metric {
+  color: #5968a7;
+}
+
+.subject-overview-card--green .subject-overview-card__badge,
+.subject-overview-card--green .subject-overview-card__metric {
+  color: #427556;
+}
+
+.subject-overview-card--warm .subject-overview-card__badge,
+.subject-overview-card--warm .subject-overview-card__metric {
+  color: #8e6727;
+}
+
+.subject-overview-card--rose .subject-overview-card__badge,
+.subject-overview-card--rose .subject-overview-card__metric {
+  color: #a85a52;
+}
+
+.subject-overview-card--slate .subject-overview-card__badge,
+.subject-overview-card--slate .subject-overview-card__metric {
+  color: #65748a;
+}
+
+.subject-overview-card--current {
+  box-shadow: inset 0 0 0 2px rgba(116, 132, 255, 0.18);
 }
 
 .subject-overview-card--current .subject-overview-card__badge {
