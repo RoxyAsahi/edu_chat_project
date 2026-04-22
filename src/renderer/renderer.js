@@ -19,7 +19,7 @@ import { createSettingsController } from '../modules/renderer/app/settings/setti
 import { createSourceController } from '../modules/renderer/app/source/sourceController.js';
 import { createTopicTitleController } from '../modules/renderer/app/topicTitles/topicTitleController.js';
 import { createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
-import { buildSubjectOverviewMarkup } from '../modules/renderer/app/workspace/workspaceOverview.js';
+import { buildSubjectCollectionMarkup, buildSubjectOverviewMarkup } from '../modules/renderer/app/workspace/workspaceOverview.js';
 import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime } from '../modules/renderer/app/bootstrap.js';
 import {
     createMarkdownFragmentRenderer,
@@ -340,6 +340,7 @@ workspaceController = createWorkspaceController({
     clearTopicKnowledgeBaseDocuments,
     getGlobalSettings: () => getSettingsSlice().settings,
     buildSubjectOverviewMarkup,
+    buildSubjectCollectionMarkup,
     syncMobileWorkspaceLayout,
     refreshWorkspaceLayout: scheduleLayoutRefresh,
 });
@@ -712,10 +713,19 @@ async function populateAgentForm(config) {
     el.agentTemperature.value = config.temperature ?? 0.7;
     el.agentContextTokenLimit.value = config.contextTokenLimit ?? 4000;
     el.agentMaxOutputTokens.value = config.maxOutputTokens ?? 1000;
+    if (el.agentThinkingBudget) {
+        el.agentThinkingBudget.value = config.thinkingBudget ?? '';
+    }
     el.agentTopP.value = config.top_p ?? '';
     el.agentTopK.value = config.top_k ?? '';
     el.agentStreamOutputTrue.checked = config.streamOutput !== false;
     el.agentStreamOutputFalse.checked = config.streamOutput === false;
+    if (el.agentEnableThinkingRequest) {
+        el.agentEnableThinkingRequest.checked = config.enableThinkingRequest === true;
+    }
+    if (el.agentIncludeUsageInStream) {
+        el.agentIncludeUsageInStream.checked = config.includeUsageInStream !== false;
+    }
     el.agentAvatarBorderColor.value = config.avatarBorderColor || '#3d5a80';
     el.agentAvatarBorderColorText.value = config.avatarBorderColor || '#3d5a80';
     el.agentNameTextColor.value = config.nameTextColor || '#ffffff';

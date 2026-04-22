@@ -122,6 +122,56 @@ test('send-to-vcp resolves local prompt variables before calling the upstream cl
     assert.equal(result.promptVariableResolution.substitutions.Nova, 'Nova');
 });
 
+test('send-to-vcp preserves assistant reasoning_content during preprocessing', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-reasoning-preprocess-'));
+    t.after(() => fs.remove(tempRoot));
+
+    let capturedRequest = null;
+    const vcpClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequest = request;
+            return { ok: true };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendToVcp = handlers.get('send-to-vcp');
+    const result = await sendToVcp({ sender: {} }, {
+        requestId: 'req_reasoning_1',
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        messages: [{
+            role: 'assistant',
+            content: '这是回答正文。',
+            reasoning_content: '这是上一轮的思考过程。',
+        }],
+        modelConfig: { stream: false },
+        context: {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(capturedRequest);
+    const assistantMessage = capturedRequest.messages.find((message) => message.role === 'assistant');
+    assert.ok(assistantMessage);
+    assert.equal(assistantMessage.reasoning_content, '这是上一轮的思考过程。');
+});
+
 test('send-to-vcp injects bundled emoticon prompt text before calling the upstream client', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-emoticon-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));

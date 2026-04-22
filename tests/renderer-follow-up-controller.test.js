@@ -423,6 +423,152 @@ test('composerController sendFollowUp sends only the clicked prompt and preserve
     );
 });
 
+test('composerController forwards prior assistant reasoning_content and stores new non-stream reasoning replies', async (t) => {
+    const { createComposerController } = await loadComposerControllerModule();
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatInputCard"></div>
+          <textarea id="messageInput"></textarea>
+          <button id="sendMessageBtn" type="button">send</button>
+          <button id="attachFileBtn" type="button">attach</button>
+          <button id="emoticonTriggerBtn" type="button">emoji</button>
+          <button id="composerQuickNewTopicBtn" type="button">topic</button>
+          <div id="attachmentPreviewArea"></div>
+          <div id="selectionContextPreview"></div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const state = {
+        session: {
+            currentSelectedItem: {
+                id: 'agent-1',
+                name: 'Agent One',
+                avatarUrl: '',
+                config: {
+                    model: 'agent-model',
+                    temperature: 0.7,
+                    maxOutputTokens: 1000,
+                    streamOutput: false,
+                },
+            },
+            currentTopicId: 'topic-1',
+            currentChatHistory: [{
+                id: 'assistant_existing',
+                role: 'assistant',
+                name: 'Agent One',
+                content: '上一轮回答',
+                reasoning_content: '上一轮思考',
+                timestamp: Date.now() - 1000,
+            }],
+        },
+        settings: {
+            settings: {
+                vcpServerUrl: 'http://example.com/v1/chat/completions',
+                vcpApiKey: 'secret',
+            },
+        },
+        composer: {
+            pendingAttachments: [],
+            pendingSelectionContextRefs: [],
+            activeRequestId: null,
+        },
+    };
+    const store = createStore(state);
+    let requestPayload = null;
+    const finalizedPayloads = [];
+
+    const controller = createComposerController({
+        store,
+        el: {
+            chatInputCard: dom.window.document.getElementById('chatInputCard'),
+            messageInput: dom.window.document.getElementById('messageInput'),
+            sendMessageBtn: dom.window.document.getElementById('sendMessageBtn'),
+            attachFileBtn: dom.window.document.getElementById('attachFileBtn'),
+            emoticonTriggerBtn: dom.window.document.getElementById('emoticonTriggerBtn'),
+            composerQuickNewTopicBtn: dom.window.document.getElementById('composerQuickNewTopicBtn'),
+            attachmentPreviewArea: dom.window.document.getElementById('attachmentPreviewArea'),
+            selectionContextPreview: dom.window.document.getElementById('selectionContextPreview'),
+        },
+        chatAPI: {
+            async getActiveSystemPrompt() {
+                return { success: false, systemPrompt: '' };
+            },
+            async sendToVCP(payload) {
+                requestPayload = payload;
+                return {
+                    response: {
+                        choices: [{
+                            message: {
+                                content: '新的助手回复',
+                                reasoning_content: '新的模型思考',
+                            },
+                        }],
+                    },
+                };
+            },
+        },
+        ui: {
+            updateAttachmentPreview() {},
+            showToastNotification() {},
+            autoResizeTextarea() {},
+        },
+        windowObj: dom.window,
+        documentObj: dom.window.document,
+        interruptRequest: async () => ({ success: true }),
+        messageRendererApi: {
+            async renderMessage() {},
+            startStreamingMessage() {},
+            async finalizeStreamedMessage(messageId, finishReason, context, payload) {
+                finalizedPayloads.push({ messageId, finishReason, context, payload });
+            },
+        },
+        createId: (() => {
+            let count = 0;
+            return (prefix) => `${prefix}_${++count}`;
+        })(),
+        getCurrentTopic: () => ({
+            id: 'topic-1',
+            name: 'Topic One',
+            knowledgeBaseId: '',
+        }),
+        loadTopics: async () => {},
+        loadAgents: async () => {},
+        buildTopicContext: () => ({
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+        }),
+        persistHistory: async () => {},
+        resolveLivePrompt: async () => '',
+        autoResizeTextarea: () => {},
+        decorateChatMessages: () => {},
+        generateFollowUpsForAssistantMessage: async () => [],
+        updateCurrentChatHistory: (updater) => {
+            state.session.currentChatHistory = updater(state.session.currentChatHistory);
+            return state.session.currentChatHistory;
+        },
+        getCurrentSelectedItem: () => state.session.currentSelectedItem,
+        getCurrentTopicId: () => state.session.currentTopicId,
+        getCurrentChatHistory: () => state.session.currentChatHistory,
+        getGlobalSettings: () => state.settings.settings,
+    });
+
+    await controller.sendFollowUp('继续追问');
+
+    assert.ok(requestPayload);
+    assert.equal(
+        requestPayload.messages.find((message) => message.role === 'assistant')?.reasoning_content,
+        '上一轮思考'
+    );
+
+    const latestAssistantMessage = state.session.currentChatHistory[state.session.currentChatHistory.length - 1];
+    assert.equal(latestAssistantMessage.role, 'assistant');
+    assert.equal(latestAssistantMessage.content, '新的助手回复');
+    assert.equal(latestAssistantMessage.reasoning_content, '新的模型思考');
+    assert.equal(finalizedPayloads.length, 1);
+    assert.equal(finalizedPayloads[0].payload.reasoningContent, '新的模型思考');
+});
+
 test('composerController adds selected emoticons into the shared attachment preview flow', async (t) => {
     const { createComposerController } = await loadComposerControllerModule();
     const dom = new JSDOM(`

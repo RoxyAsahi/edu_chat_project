@@ -362,6 +362,9 @@ class ContextSanitizer {
             if (msg.name) sanitizedMsg.name = msg.name;
             if (msg.tool_calls) sanitizedMsg.tool_calls = msg.tool_calls;
             if (msg.tool_call_id) sanitizedMsg.tool_call_id = msg.tool_call_id;
+            if (typeof msg.reasoning_content === 'string' && msg.reasoning_content.trim()) {
+                sanitizedMsg.reasoning_content = msg.reasoning_content;
+            }
 
             return sanitizedMsg;
         });

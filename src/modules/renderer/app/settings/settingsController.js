@@ -3266,9 +3266,18 @@ function createSettingsController(deps = {}) {
             temperature: Number(el.agentTemperature.value || 0.7),
             contextTokenLimit: Number(el.agentContextTokenLimit.value || 4000),
             maxOutputTokens: Number(el.agentMaxOutputTokens.value || 1000),
+            ...(el.agentThinkingBudget
+                ? { thinkingBudget: el.agentThinkingBudget.value === '' ? undefined : Number(el.agentThinkingBudget.value) }
+                : {}),
             top_p: el.agentTopP.value === '' ? undefined : Number(el.agentTopP.value),
             top_k: el.agentTopK.value === '' ? undefined : Number(el.agentTopK.value),
             streamOutput: el.agentStreamOutputTrue.checked,
+            ...(el.agentEnableThinkingRequest
+                ? { enableThinkingRequest: el.agentEnableThinkingRequest.checked }
+                : {}),
+            ...(el.agentIncludeUsageInStream
+                ? { includeUsageInStream: el.agentIncludeUsageInStream.checked }
+                : {}),
             avatarBorderColor: el.agentAvatarBorderColor.value,
             nameTextColor: el.agentNameTextColor.value,
             disableCustomColors: el.disableCustomColors.checked,

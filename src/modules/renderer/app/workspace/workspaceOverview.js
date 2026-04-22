@@ -137,6 +137,99 @@ function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'vi
     `;
 }
 
+function buildSubjectListRow({ agent, stats = {}, isCurrent = false, tone = 'violet' } = {}) {
+    const agentId = agent?.id || '';
+    const agentName = agent?.name || agentId || '未命名学科';
+    const topicCount = Math.max(0, Number(stats?.topicCount || 0));
+    const unreadCount = Math.max(0, Number(stats?.unreadCount || 0));
+    const lastTopicName = stats?.lastTopicName || '从一个新话题开始今天的学习';
+    const toneClass = `subject-overview-list__item--${escapeHtml(tone)}`;
+
+    return `
+        <button
+            type="button"
+            class="subject-overview-list__item ${toneClass}${isCurrent ? ' subject-overview-list__item--current' : ''}"
+            data-subject-card
+            data-agent-id="${escapeHtml(agentId)}"
+        >
+            <span class="subject-overview-list__badge">${isCurrent ? '当前学科' : '学习空间'}</span>
+            <div class="subject-overview-list__main">
+                <strong>${escapeHtml(agentName)}</strong>
+                <p>${escapeHtml(lastTopicName)}</p>
+            </div>
+            <div class="subject-overview-list__stats">
+                <span>${topicCount} 个话题</span>
+                <span>${unreadCount} 项待处理</span>
+            </div>
+            <span class="subject-overview-list__cta">
+                <span class="material-symbols-outlined" aria-hidden="true">arrow_outward</span>
+                进入学习
+            </span>
+        </button>
+    `;
+}
+
+function buildSubjectCreateCard(viewMode = 'grid') {
+    if (viewMode === 'list') {
+        return `
+            <button
+                type="button"
+                class="subject-overview-list__item subject-overview-list__item--create"
+                data-create-subject-card
+            >
+                <span class="subject-overview-list__badge subject-overview-list__badge--create">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                </span>
+                <div class="subject-overview-list__main">
+                    <strong>新建笔记本</strong>
+                    <p>创建一个新的学科学习空间，放在这里随时开始。</p>
+                </div>
+                <span class="subject-overview-list__cta">立即创建</span>
+            </button>
+        `;
+    }
+
+    return `
+        <button
+            type="button"
+            class="subject-overview-card subject-overview-card--create"
+            data-create-subject-card
+        >
+            <div class="subject-overview-card__create-body">
+                <span class="subject-overview-card__create-icon" aria-hidden="true">
+                    <span class="material-symbols-outlined">add</span>
+                </span>
+                <strong>新建笔记本</strong>
+            </div>
+        </button>
+    `;
+}
+
+function buildSubjectCollectionMarkup({
+    agents = [],
+    statsByAgent = {},
+    selectedAgentId = null,
+    viewMode = 'grid',
+} = {}) {
+    const subjectTones = ['violet', 'green', 'warm', 'rose', 'slate'];
+    const subjectItemsMarkup = agents.map((agent, index) => {
+        const payload = {
+            agent,
+            stats: statsByAgent[agent.id] || {},
+            isCurrent: agent.id === selectedAgentId,
+            tone: subjectTones[index % subjectTones.length],
+        };
+        return viewMode === 'list'
+            ? buildSubjectListRow(payload)
+            : buildSubjectWallCard(payload);
+    }).join('');
+    const itemsMarkup = `${buildSubjectCreateCard(viewMode)}${subjectItemsMarkup}`;
+
+    return viewMode === 'list'
+        ? `<div class="subject-overview-list" data-subject-collection data-view-mode="list">${itemsMarkup}</div>`
+        : `<div class="overview-subject-wall" data-subject-collection data-view-mode="grid">${itemsMarkup}</div>`;
+}
+
 function buildSubjectOverviewMarkup({
     agents = [],
     statsByAgent = {},
@@ -145,7 +238,6 @@ function buildSubjectOverviewMarkup({
     currentTopicName = '',
     learningMetrics = {},
 } = {}) {
-    const subjectTones = ['violet', 'green', 'warm', 'rose', 'slate'];
     const hasAgents = agents.length > 0;
     const totalTopics = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.topicCount || 0), 0);
     const totalUnread = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.unreadCount || 0), 0);
@@ -195,44 +287,75 @@ function buildSubjectOverviewMarkup({
         </article>
     `).join('');
 
-    const subjectCardsMarkup = agents.map((agent, index) => buildSubjectWallCard({
-        agent,
-        stats: statsByAgent[agent.id] || {},
-        isCurrent: agent.id === selectedAgentId,
-        tone: subjectTones[index % subjectTones.length],
-    })).join('');
-
     const subjectWallMarkup = hasAgents
         ? `
             <section class="overview-subject-section overview-subject-section--pending" aria-label="学科入口">
-                <div class="overview-subject-section__header">
-                    <div>
-                        <p class="overview-subject-section__eyebrow">All Subjects</p>
-                        <h3>全部学科</h3>
-                        <p class="overview-subject-section__caption">点击任意卡片即可进入对应学科</p>
-                    </div>
-                    <div class="overview-subject-section__summary">
-                        <span>学习天数 ${escapeHtml(totalLearningDays)} 天</span>
-                        <span>共 ${escapeHtml(totalTopics)} 个话题</span>
-                        <span>${escapeHtml(totalUnread)} 项待处理</span>
-                    </div>
-                </div>
-                <div class="overview-subject-section__body">
-                    <div class="overview-subject-wall">
-                    ${subjectCardsMarkup}
-                    </div>
-                    <div class="overview-subject-section__cta">
+                <div class="overview-subject-browser">
+                    <div class="overview-subject-browser__toolbar">
+                        <div class="overview-subject-browser__view-toggle" role="tablist" aria-label="学科视图切换">
+                            <button
+                                type="button"
+                                class="overview-subject-browser__toggle-btn is-active"
+                                data-subject-view="grid"
+                                aria-pressed="true"
+                            >
+                                <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>
+                                <span>卡片</span>
+                            </button>
+                            <button
+                                type="button"
+                                class="overview-subject-browser__toggle-btn"
+                                data-subject-view="list"
+                                aria-pressed="false"
+                            >
+                                <span class="material-symbols-outlined" aria-hidden="true">view_list</span>
+                                <span>列表</span>
+                            </button>
+                        </div>
+                        <button
+                            type="button"
+                            class="overview-subject-browser__sort"
+                            data-subject-sort="recent"
+                        >
+                            <span data-subject-sort-label>最近</span>
+                            <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
+                        </button>
                         <button
                             id="subjectOverviewCreateCard"
                             type="button"
-                            class="subject-overview-create-pill subject-overview-create-pill--inline"
+                            class="overview-subject-browser__create"
                         >
                             <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                            <span>新建学科</span>
+                            <span>新建</span>
                         </button>
-                        <button type="button" class="accent-button overview-dashboard__footer-button" data-home-action="continue-learning">
-                            继续学习
-                        </button>
+                    </div>
+
+                    <div class="overview-subject-browser__meta">
+                        <div class="overview-subject-browser__tabs" role="tablist" aria-label="学科筛选">
+                            <button
+                                type="button"
+                                class="overview-subject-browser__tab is-active"
+                                data-subject-filter="all"
+                                aria-pressed="true"
+                            >
+                                全部
+                            </button>
+                            <button type="button" class="overview-subject-browser__tab" data-subject-filter="current" aria-pressed="false">
+                                当前学科
+                            </button>
+                            <button type="button" class="overview-subject-browser__tab" data-subject-filter="pending" aria-pressed="false">
+                                待整理
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overview-subject-section__body" id="subjectOverviewCollectionHost">
+                        ${buildSubjectCollectionMarkup({
+                            agents,
+                            statsByAgent,
+                            selectedAgentId,
+                            viewMode: 'grid',
+                        })}
                     </div>
                 </div>
             </section>
@@ -318,4 +441,4 @@ function buildSubjectOverviewMarkup({
     };
 }
 
-export { buildSubjectOverviewMarkup };
+export { buildSubjectCollectionMarkup, buildSubjectOverviewMarkup };
