@@ -1056,8 +1056,8 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: 62px;
-  height: 62px;
+  min-height: 72px;
+  height: 72px;
   border-radius: 14px;
   padding: 8px 34px 8px 10px;
   justify-content: space-between;
@@ -1116,7 +1116,7 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 }
 
 .notes-tool-tile__icon {
-  font-size: 20px;
+  font-size: 28px;
   width: auto;
   height: auto;
   display: inline-flex;
@@ -1151,7 +1151,7 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   top: 50%;
   right: 14px;
   transform: translateY(-50%);
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1;
   opacity: 0.7;
   pointer-events: none;
