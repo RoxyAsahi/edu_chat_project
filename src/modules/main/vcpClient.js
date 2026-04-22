@@ -95,6 +95,9 @@ function normalizeMessage(message) {
     if (message.name) normalized.name = message.name;
     if (message.tool_calls) normalized.tool_calls = message.tool_calls;
     if (message.tool_call_id) normalized.tool_call_id = message.tool_call_id;
+    if (typeof message.reasoning_content === 'string' && message.reasoning_content.trim()) {
+        normalized.reasoning_content = message.reasoning_content;
+    }
 
     return normalized;
 }
@@ -141,6 +144,30 @@ function extractTextDelta(chunk) {
         chunk?.delta?.content,
         chunk?.content,
         chunk?.message?.content,
+    ];
+
+    for (const candidate of candidates) {
+        const text = extractTextFromCandidate(candidate);
+        if (text) {
+            return text;
+        }
+    }
+
+    return '';
+}
+
+function extractReasoningDelta(chunk) {
+    const candidates = [
+        chunk?.choices?.[0]?.delta?.reasoning_content,
+        chunk?.choices?.[0]?.delta?.reasoning,
+        chunk?.choices?.[0]?.message?.reasoning_content,
+        chunk?.choices?.[0]?.message?.reasoning,
+        chunk?.delta?.reasoning_content,
+        chunk?.delta?.reasoning,
+        chunk?.message?.reasoning_content,
+        chunk?.message?.reasoning,
+        chunk?.reasoning_content,
+        chunk?.reasoning,
     ];
 
     for (const candidate of candidates) {
@@ -215,6 +242,7 @@ function invokeFinalizeCallback(requestState, payload) {
                 requestId: requestState.requestId,
                 context: requestState.context,
                 content: payload.fullResponse || '',
+                reasoningContent: payload.reasoning_content || '',
                 finishReason: payload.finishReason,
                 interrupted: payload.interrupted === true,
                 timedOut: payload.timedOut === true,
@@ -227,6 +255,7 @@ function invokeFinalizeCallback(requestState, payload) {
             requestId: requestState.requestId,
             context: requestState.context,
             content: payload.partialResponse || '',
+            reasoningContent: payload.reasoning_content || '',
             error: payload.error,
             interrupted: payload.interrupted === true,
             timedOut: payload.timedOut === true,
@@ -306,6 +335,7 @@ async function processStreamResponse(response, requestState) {
                         requestId: requestState.requestId,
                         context: requestState.context,
                         fullResponse: requestState.accumulatedResponse,
+                        reasoning_content: requestState.accumulatedReasoning,
                         finishReason: requestState.finishReason || 'completed',
                         interrupted: false,
                         timedOut: false,
@@ -316,8 +346,12 @@ async function processStreamResponse(response, requestState) {
                 try {
                     const parsedChunk = JSON.parse(jsonData);
                     const textDelta = extractTextDelta(parsedChunk);
+                    const reasoningDelta = extractReasoningDelta(parsedChunk);
                     if (textDelta) {
                         requestState.accumulatedResponse += textDelta;
+                    }
+                    if (reasoningDelta) {
+                        requestState.accumulatedReasoning += reasoningDelta;
                     }
 
                     const finishReason = extractFinishReason(parsedChunk);
@@ -331,7 +365,9 @@ async function processStreamResponse(response, requestState) {
                         context: requestState.context,
                         chunk: parsedChunk,
                         textDelta,
+                        reasoningDelta,
                         hasRenderableText: Boolean(textDelta),
+                        hasRenderableReasoning: Boolean(reasoningDelta),
                     }, requestState.streamChannel);
                 } catch (_error) {
                     emitStreamEvent(requestState.webContents, {
@@ -340,7 +376,9 @@ async function processStreamResponse(response, requestState) {
                         context: requestState.context,
                         chunk: { raw: jsonData, error: 'json_parse_error' },
                         textDelta: '',
+                        reasoningDelta: '',
                         hasRenderableText: false,
+                        hasRenderableReasoning: false,
                     }, requestState.streamChannel);
                 }
             }
@@ -351,6 +389,7 @@ async function processStreamResponse(response, requestState) {
                     requestId: requestState.requestId,
                     context: requestState.context,
                     fullResponse: requestState.accumulatedResponse,
+                    reasoning_content: requestState.accumulatedReasoning,
                     finishReason: requestState.finishReason || 'completed',
                     interrupted: false,
                     timedOut: false,
@@ -365,6 +404,7 @@ async function processStreamResponse(response, requestState) {
                 requestId: requestState.requestId,
                 context: requestState.context,
                 fullResponse: requestState.accumulatedResponse,
+                reasoning_content: requestState.accumulatedReasoning,
                 finishReason: requestState.timedOut ? 'timed_out' : 'cancelled_by_user',
                 interrupted: requestState.interrupted === true,
                 timedOut: requestState.timedOut === true,
@@ -378,6 +418,7 @@ async function processStreamResponse(response, requestState) {
             context: requestState.context,
             error: `VCP stream failed: ${error.message}`,
             partialResponse: requestState.accumulatedResponse,
+            reasoning_content: requestState.accumulatedReasoning,
             interrupted: requestState.interrupted === true,
             timedOut: requestState.timedOut === true,
         });
@@ -445,6 +486,7 @@ async function send(request) {
         streamChannel,
         onStreamEnd,
         accumulatedResponse: '',
+        accumulatedReasoning: '',
         finishReason: null,
         interrupted: false,
         timedOut: false,

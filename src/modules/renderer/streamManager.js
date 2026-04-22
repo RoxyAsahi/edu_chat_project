@@ -1036,6 +1036,9 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
     const cleanedAccumulatedText = stripThinkingPlaceholderPrefix(accumulatedText);
     const payloadFullResponse = typeof finalPayload?.fullResponse === 'string' ? finalPayload.fullResponse : "";
     const payloadError = typeof finalPayload?.error === 'string' ? finalPayload.error.trim() : "";
+    const payloadReasoningContent = typeof finalPayload?.reasoningContent === 'string'
+        ? finalPayload.reasoningContent
+        : (typeof finalPayload?.reasoning_content === 'string' ? finalPayload.reasoning_content : "");
     const streamedTextIsUsable = cleanedAccumulatedText.trim() !== "" && !isThinkingPlaceholderText(cleanedAccumulatedText);
     const payloadResponseIsUsable = payloadFullResponse.trim() !== "" && !isThinkingPlaceholderText(payloadFullResponse);
 
@@ -1070,6 +1073,9 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
     message.content = finalFullText;
     message.finishReason = finishReason;
     message.isThinking = false;
+    if (payloadReasoningContent.trim()) {
+        message.reasoning_content = payloadReasoningContent;
+    }
     
     // Update UI if it's the current view
     if (isForCurrentView) {
@@ -1086,7 +1092,10 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
                 const globalSettings = refs.globalSettingsRef.get();
                 // Use the more thorough preprocessFullContent for the final render
                 const processedFinalText = refs.preprocessFullContent(finalFullText, globalSettings);
-                const rawHtml = markedInstance.parse(processedFinalText);
+                let rawHtml = markedInstance.parse(processedFinalText);
+                if (typeof refs.prependNativeReasoningBubble === 'function') {
+                    rawHtml = refs.prependNativeReasoningBubble(rawHtml, message);
+                }
                 
                 // Perform the final, high-quality render using the original global refresh method.
                 // This ensures images, KaTeX, code highlighting, etc., are all processed correctly.

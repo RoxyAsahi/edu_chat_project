@@ -75,53 +75,6 @@
     <div class="workspace-pages">
       <section id="workspaceOverviewPage" class="workspace-overview-page">
         <div class="workspace-overview-page__inner">
-          <header class="workspace-overview-page__header">
-            <div class="workspace-overview-page__header-main">
-              <p class="workspace-overview-page__eyebrow">UniStudy Home</p>
-              <h1 id="subjectOverviewHeadline">学习首页</h1>
-              <p id="subjectOverviewSummary" class="workspace-overview-page__summary">从这里继续学习、进入对话，并查看所有学科入口。</p>
-              <div id="workspaceOverviewHighlights" class="workspace-overview-page__highlights" aria-label="首页快捷入口"></div>
-            </div>
-            <button id="workspaceOverviewCreateAgentBtn" class="accent-button icon-text-btn workspace-overview-page__action" type="button">
-              <span class="material-symbols-outlined">add</span> 新建学科
-            </button>
-          </header>
-
-          <section class="workspace-overview-page__island-row" aria-label="首页专注计时">
-            <div id="dynamicIsland" class="dynamic-island dynamic-island--overview">
-              <div class="dynamic-island__bar">
-                <button
-                  id="dynamicIslandStatusBtn"
-                  class="ghost-button dynamic-island__status-button"
-                  type="button"
-                  aria-expanded="false"
-                  aria-controls="dynamicIslandPanel"
-                >
-                  <span id="dynamicIslandStatusEyebrow" class="dynamic-island__status-eyebrow">专注计时</span>
-                  <strong id="dynamicIslandStatusText" class="dynamic-island__status-text">番茄钟</strong>
-                </button>
-              </div>
-              <div id="dynamicIslandPanel" class="dynamic-island__panel" aria-hidden="true">
-                <div class="dynamic-island__panel-main">
-                  <div class="dynamic-island__panel-copy">
-                    <span class="dynamic-island__panel-label">番茄钟</span>
-                    <strong id="dynamicIslandTimerDisplay" class="dynamic-island__timer-display">25:00</strong>
-                  </div>
-                  <label class="dynamic-island__duration-field" for="dynamicIslandMinutesInput">
-                    <span>专注分钟</span>
-                    <input id="dynamicIslandMinutesInput" type="number" min="1" max="180" step="1" value="25" inputmode="numeric" />
-                  </label>
-                </div>
-                <div class="dynamic-island__panel-actions">
-                  <button id="dynamicIslandStartBtn" class="accent-button dynamic-island__action" type="button">开始</button>
-                  <button id="dynamicIslandPauseBtn" class="ghost-button dynamic-island__action hidden" type="button">暂停</button>
-                  <button id="dynamicIslandResumeBtn" class="accent-button dynamic-island__action hidden" type="button">继续</button>
-                  <button id="dynamicIslandResetBtn" class="ghost-button dynamic-island__action" type="button">重置</button>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <section id="subjectOverviewGrid" class="subject-overview-grid" aria-label="学科总览"></section>
         </div>
       </section>
@@ -715,6 +668,10 @@
                   <span class="material-symbols-outlined">brush</span>
                   <span>显示设置</span>
                 </button>
+                <button id="settingsNavAgentBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="agent">
+                  <span class="material-symbols-outlined">school</span>
+                  <span>当前学科</span>
+                </button>
               </div>
             </div>
           </nav>
@@ -1121,11 +1078,20 @@
                       <span>最大输出 Token</span>
                       <input id="agentMaxOutputTokens" type="number" min="1" step="1" />
                     </label>
+                    <label>
+                      <span>思考预算 (Thinking Budget)</span>
+                      <input id="agentThinkingBudget" type="number" min="1" step="1" placeholder="留空使用服务端默认值" />
+                      <span class="settings-caption">仅在启用原生思考请求时生效；留空时由模型服务自行决定。</span>
+                    </label>
                   </div>
                   <div class="radio-row" style="margin-top: 12px; font-weight: 500; font-size: 13px;">
                     <span style="display:block; margin-bottom: 4px;">流式输出</span>
                     <label><input id="agentStreamOutputTrue" type="radio" name="agentStreamOutput" checked /> 开启</label>
                     <label><input id="agentStreamOutputFalse" type="radio" name="agentStreamOutput" /> 关闭</label>
+                  </div>
+                  <div class="checkbox-row" style="margin-top: 12px;">
+                    <label><input id="agentEnableThinkingRequest" type="checkbox" /> 启用原生思考请求</label>
+                    <label><input id="agentIncludeUsageInStream" type="checkbox" checked /> 流式附带 Usage</label>
                   </div>
                 </section>
 

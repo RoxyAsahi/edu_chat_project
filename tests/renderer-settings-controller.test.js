@@ -96,7 +96,32 @@ function createDom() {
           <input type="radio" name="themeMode" value="light" />
           <input type="radio" name="themeMode" value="dark" />
           <input type="radio" name="themeMode" value="system" checked />
+          <button id="globalSettingsBtn" type="button">global-settings</button>
+          <button id="currentAgentSettingsBtn" type="button">agent-settings</button>
           <button id="saveGlobalSettingsBtn" type="button">save</button>
+          <div id="workspaceOverviewPage"></div>
+          <div id="workspaceSubjectPage" class="hidden"></div>
+          <div id="manualNotesLibraryPage" class="hidden"></div>
+          <div id="settingsModal" class="hidden"></div>
+          <div id="settingsModalBackdrop"></div>
+          <div id="settingsModalTitle"></div>
+          <div id="settingsModalTitleDisplay"></div>
+          <div id="settingsModalSubtitle"></div>
+          <button id="settingsModalCloseBtn" type="button">close</button>
+          <div id="settingsModalFooter"></div>
+          <button id="settingsNavServicesBtn" type="button" data-settings-section-button="services">services</button>
+          <button id="settingsNavDefaultModelBtn" type="button" data-settings-section-button="default-model">default-model</button>
+          <button id="settingsNavRetrievalBtn" type="button" data-settings-section-button="retrieval">retrieval</button>
+          <button id="settingsNavPromptsBtn" type="button" data-settings-section-button="prompts">prompts</button>
+          <button id="settingsNavDisplayBtn" type="button" data-settings-section-button="display">display</button>
+          <button id="settingsNavAgentBtn" type="button" data-settings-section-button="agent">agent</button>
+          <section id="settingsModalSectionServices"></section>
+          <section id="settingsModalSectionDefaultModel" class="hidden"></section>
+          <section id="settingsModalSectionRetrieval" class="hidden"></section>
+          <section id="settingsModalSectionPrompts" class="hidden"></section>
+          <section id="settingsModalSectionDisplay" class="hidden"></section>
+          <section id="settingsModalSectionAgent" class="hidden"></section>
+          <section id="settingsModalSectionKnowledgeBase" class="hidden"></section>
           <div id="modal-container"></div>
 
           <input id="editingAgentId" />
@@ -109,10 +134,13 @@ function createDom() {
           <input id="agentTemperature" />
           <input id="agentContextTokenLimit" />
           <input id="agentMaxOutputTokens" />
+          <input id="agentThinkingBudget" />
           <input id="agentTopP" />
           <input id="agentTopK" />
           <input id="agentStreamOutputTrue" type="radio" name="agentStreamOutput" />
           <input id="agentStreamOutputFalse" type="radio" name="agentStreamOutput" />
+          <input id="agentEnableThinkingRequest" type="checkbox" />
+          <input id="agentIncludeUsageInStream" type="checkbox" />
           <input id="agentAvatarBorderColor" />
           <input id="agentAvatarBorderColorText" />
           <input id="agentNameTextColor" />
@@ -187,18 +215,28 @@ function createElementMap(documentObj) {
         enableWideChatLayout: documentObj.getElementById('enableWideChatLayout'),
         enableSmoothStreaming: documentObj.getElementById('enableSmoothStreaming'),
         saveGlobalSettingsBtn: documentObj.getElementById('saveGlobalSettingsBtn'),
-        currentAgentSettingsBtn: null,
-        globalSettingsBtn: null,
-        settingsModalCloseBtn: null,
-        settingsModalBackdrop: null,
-        settingsNavButtons: [],
+        currentAgentSettingsBtn: documentObj.getElementById('currentAgentSettingsBtn'),
+        globalSettingsBtn: documentObj.getElementById('globalSettingsBtn'),
+        settingsModalCloseBtn: documentObj.getElementById('settingsModalCloseBtn'),
+        settingsModalBackdrop: documentObj.getElementById('settingsModalBackdrop'),
+        settingsNavButtons: documentObj.querySelectorAll('[data-settings-section-button]'),
         themeToggleBtn: null,
+        workspaceOverviewPage: documentObj.getElementById('workspaceOverviewPage'),
+        workspaceSubjectPage: documentObj.getElementById('workspaceSubjectPage'),
+        manualNotesLibraryPage: documentObj.getElementById('manualNotesLibraryPage'),
+        settingsModal: documentObj.getElementById('settingsModal'),
+        settingsModalSectionServices: documentObj.getElementById('settingsModalSectionServices'),
+        settingsModalSectionDefaultModel: documentObj.getElementById('settingsModalSectionDefaultModel'),
+        settingsModalSectionRetrieval: documentObj.getElementById('settingsModalSectionRetrieval'),
+        settingsModalSectionPrompts: documentObj.getElementById('settingsModalSectionPrompts'),
+        settingsModalSectionDisplay: documentObj.getElementById('settingsModalSectionDisplay'),
         settingsModalSectionGlobal: null,
-        settingsModalSectionAgent: null,
-        settingsModalSectionKnowledgeBase: null,
-        settingsModalTitle: null,
-        settingsModalSubtitle: null,
-        settingsModalFooter: null,
+        settingsModalSectionAgent: documentObj.getElementById('settingsModalSectionAgent'),
+        settingsModalSectionKnowledgeBase: documentObj.getElementById('settingsModalSectionKnowledgeBase'),
+        settingsModalTitle: documentObj.getElementById('settingsModalTitle'),
+        settingsModalTitleDisplay: documentObj.getElementById('settingsModalTitleDisplay'),
+        settingsModalSubtitle: documentObj.getElementById('settingsModalSubtitle'),
+        settingsModalFooter: documentObj.getElementById('settingsModalFooter'),
         editingAgentId: documentObj.getElementById('editingAgentId'),
         agentNameInput: documentObj.getElementById('agentNameInput'),
         agentAvatarPreview: documentObj.getElementById('agentAvatarPreview'),
@@ -209,10 +247,13 @@ function createElementMap(documentObj) {
         agentTemperature: documentObj.getElementById('agentTemperature'),
         agentContextTokenLimit: documentObj.getElementById('agentContextTokenLimit'),
         agentMaxOutputTokens: documentObj.getElementById('agentMaxOutputTokens'),
+        agentThinkingBudget: documentObj.getElementById('agentThinkingBudget'),
         agentTopP: documentObj.getElementById('agentTopP'),
         agentTopK: documentObj.getElementById('agentTopK'),
         agentStreamOutputTrue: documentObj.getElementById('agentStreamOutputTrue'),
         agentStreamOutputFalse: documentObj.getElementById('agentStreamOutputFalse'),
+        agentEnableThinkingRequest: documentObj.getElementById('agentEnableThinkingRequest'),
+        agentIncludeUsageInStream: documentObj.getElementById('agentIncludeUsageInStream'),
         agentAvatarBorderColor: documentObj.getElementById('agentAvatarBorderColor'),
         agentAvatarBorderColorText: documentObj.getElementById('agentAvatarBorderColorText'),
         agentNameTextColor: documentObj.getElementById('agentNameTextColor'),
@@ -739,6 +780,57 @@ test('settingsController shows the default follow-up template in the UI but save
     assert.equal(savedPatch.topicTitlePromptTemplate, '');
 });
 
+test('settingsController lets the global settings navigation switch into the current agent section', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    const documentObj = dom.window.document;
+    const store = createStore();
+    const el = createElementMap(documentObj);
+    const controller = createSettingsController({
+        store,
+        el,
+        chatAPI: {},
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+    });
+
+    controller.bindEvents();
+
+    el.globalSettingsBtn.click();
+    assert.equal(store.getState().settings.settingsModalSection, 'services');
+    assert.equal(el.settingsModal.classList.contains('hidden'), false);
+    assert.equal(el.settingsModalTitle.textContent, '模型服务');
+
+    const agentNavButton = documentObj.getElementById('settingsNavAgentBtn');
+    agentNavButton.click();
+
+    assert.equal(store.getState().settings.settingsModalSection, 'agent');
+    assert.equal(el.settingsModalSectionAgent.classList.contains('hidden'), false);
+    assert.equal(el.settingsModalSectionServices.classList.contains('hidden'), true);
+    assert.equal(agentNavButton.classList.contains('settings-modal__nav-button--active'), true);
+    assert.equal(agentNavButton.getAttribute('aria-current'), 'page');
+    assert.equal(el.settingsModalTitle.textContent, '智能体设置');
+    assert.equal(el.settingsModalTitleDisplay.textContent, '智能体设置');
+    assert.equal(el.settingsModalSubtitle.textContent, '调整当前学科入口的模型、提示词、输出参数与聊天样式。');
+    assert.equal(el.settingsModalFooter.classList.contains('hidden'), true);
+});
+
 test('settingsController saves native agent VCP fields', async (t) => {
     const { createSettingsController } = await loadSettingsControllerModule();
     const dom = createDom();
@@ -768,9 +860,12 @@ test('settingsController saves native agent VCP fields', async (t) => {
     el.agentTemperature.value = '0.2';
     el.agentContextTokenLimit.value = '100000';
     el.agentMaxOutputTokens.value = '4000';
+    el.agentThinkingBudget.value = '2048';
     el.agentTopP.value = '0.95';
     el.agentTopK.value = '40';
     el.agentStreamOutputTrue.checked = true;
+    el.agentEnableThinkingRequest.checked = true;
+    el.agentIncludeUsageInStream.checked = false;
     el.agentAvatarBorderColor.value = '#3d5a80';
     el.agentNameTextColor.value = '#ffffff';
     el.disableCustomColors.checked = false;
@@ -812,9 +907,12 @@ test('settingsController saves native agent VCP fields', async (t) => {
             temperature: 0.2,
             contextTokenLimit: 100000,
             maxOutputTokens: 4000,
+            thinkingBudget: 2048,
             top_p: 0.95,
             top_k: 40,
             streamOutput: true,
+            enableThinkingRequest: true,
+            includeUsageInStream: false,
             avatarBorderColor: '#3d5a80',
             nameTextColor: '#ffffff',
             disableCustomColors: false,

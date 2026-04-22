@@ -65,6 +65,7 @@ function createWorkspaceController(deps = {}) {
         statsRowMarkup: '',
         gridMarkup: '',
     }));
+    const buildOverviewCollectionMarkup = deps.buildSubjectCollectionMarkup || (() => '');
     const nowProvider = deps.nowProvider || (() => new Date());
     const setIntervalFn = deps.setIntervalFn || ((handler, timeout) => windowObj.setInterval(handler, timeout));
     const clearIntervalFn = deps.clearIntervalFn || ((timerId) => windowObj.clearInterval(timerId));
@@ -149,6 +150,12 @@ function createWorkspaceController(deps = {}) {
     let overviewClockTimerId = null;
     let overviewSubjectRevealObserver = null;
     let overviewSubjectRevealResetTimerId = null;
+    const overviewSubjectBrowserState = {
+        search: '',
+        viewMode: 'grid',
+        sortMode: 'recent',
+        filterMode: 'all',
+    };
 
     function normalizeDateToDayStart(value) {
         const date = new Date(Number(value || Date.now()));
@@ -618,6 +625,169 @@ function createWorkspaceController(deps = {}) {
         return agentOverviewStats;
     }
 
+    function getFilteredOverviewAgents() {
+        const search = String(overviewSubjectBrowserState.search || '').trim().toLowerCase();
+        const selectedAgentId = state.currentSelectedItem.id;
+
+        const normalized = (Array.isArray(state.agents) ? state.agents : []).map((agent, index) => ({
+            agent,
+            stats: agentOverviewStats[agent.id] || {},
+            index,
+        })).filter(({ agent, stats }) => {
+            if (overviewSubjectBrowserState.filterMode === 'current' && agent.id !== selectedAgentId) {
+                return false;
+            }
+            if (overviewSubjectBrowserState.filterMode === 'pending' && Number(stats.unreadCount || 0) <= 0) {
+                return false;
+            }
+            if (!search) {
+                return true;
+            }
+            const haystack = [
+                agent.name,
+                agent.id,
+                stats.lastTopicName,
+            ].join(' ').toLowerCase();
+            return haystack.includes(search);
+        });
+
+        normalized.sort((left, right) => {
+            switch (overviewSubjectBrowserState.sortMode) {
+            case 'name':
+                return String(left.agent.name || left.agent.id || '').localeCompare(String(right.agent.name || right.agent.id || ''), 'zh-CN');
+            case 'topics':
+                return Number(right.stats.topicCount || 0) - Number(left.stats.topicCount || 0)
+                    || left.index - right.index;
+            case 'recent':
+            default:
+                return left.index - right.index;
+            }
+        });
+
+        return normalized.map(({ agent }) => agent);
+    }
+
+    function renderOverviewSubjectCollection() {
+        const host = el.subjectOverviewGrid?.querySelector('#subjectOverviewCollectionHost');
+        if (!host) {
+            return;
+        }
+
+        const agents = getFilteredOverviewAgents();
+        host.innerHTML = buildOverviewCollectionMarkup({
+            agents,
+            statsByAgent: agentOverviewStats,
+            selectedAgentId: state.currentSelectedItem.id,
+            viewMode: overviewSubjectBrowserState.viewMode,
+        });
+
+        const collection = host.querySelector('[data-subject-collection]');
+        collection?.classList.toggle('is-empty', agents.length === 0);
+        if (!agents.length) {
+            host.innerHTML = `
+                <div class="subject-overview-browser-empty">
+                    <span class="material-symbols-outlined" aria-hidden="true">search_off</span>
+                    <strong>没有匹配的学科</strong>
+                    <p>试试切换筛选条件，或者换个关键词搜索。</p>
+                </div>
+            `;
+            return;
+        }
+
+        host.querySelectorAll('[data-subject-card]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const { agentId } = button.dataset;
+                if (!agentId) {
+                    return;
+                }
+                void selectAgent(agentId);
+            });
+        });
+        host.querySelectorAll('[data-create-subject-card]').forEach((button) => {
+            button.addEventListener('click', () => {
+                void createAgent();
+            });
+        });
+    }
+
+    function syncOverviewSubjectBrowserUi() {
+        const root = el.subjectOverviewGrid;
+        if (!root) {
+            return;
+        }
+
+        root.querySelectorAll('[data-subject-view]').forEach((button) => {
+            const isActive = button.dataset.subjectView === overviewSubjectBrowserState.viewMode;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        root.querySelectorAll('[data-subject-filter]').forEach((button) => {
+            const isActive = button.dataset.subjectFilter === overviewSubjectBrowserState.filterMode;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        const sortButton = root.querySelector('[data-subject-sort]');
+        const sortLabel = root.querySelector('[data-subject-sort-label]');
+        if (sortButton) {
+            sortButton.dataset.subjectSort = overviewSubjectBrowserState.sortMode;
+        }
+        if (sortLabel) {
+            const labels = {
+                recent: '最近',
+                name: '名称',
+                topics: '话题数',
+            };
+            sortLabel.textContent = labels[overviewSubjectBrowserState.sortMode] || '最近';
+        }
+    }
+
+    function bindOverviewSubjectBrowser() {
+        const root = el.subjectOverviewGrid;
+        if (!root) {
+            return;
+        }
+
+        root.querySelectorAll('[data-subject-view]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const nextView = button.dataset.subjectView;
+                if (!nextView || nextView === overviewSubjectBrowserState.viewMode) {
+                    return;
+                }
+                overviewSubjectBrowserState.viewMode = nextView;
+                syncOverviewSubjectBrowserUi();
+                renderOverviewSubjectCollection();
+            });
+        });
+
+        root.querySelectorAll('[data-subject-filter]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const nextFilter = button.dataset.subjectFilter;
+                if (!nextFilter || nextFilter === overviewSubjectBrowserState.filterMode) {
+                    return;
+                }
+                overviewSubjectBrowserState.filterMode = nextFilter;
+                syncOverviewSubjectBrowserUi();
+                renderOverviewSubjectCollection();
+            });
+        });
+
+        const sortButton = root.querySelector('[data-subject-sort]');
+        sortButton?.addEventListener('click', () => {
+            const order = ['recent', 'name', 'topics'];
+            const currentIndex = order.indexOf(overviewSubjectBrowserState.sortMode);
+            overviewSubjectBrowserState.sortMode = order[(currentIndex + 1) % order.length];
+            syncOverviewSubjectBrowserUi();
+            renderOverviewSubjectCollection();
+        });
+
+        const createButton = root.querySelector('#subjectOverviewCreateCard');
+        createButton?.addEventListener('click', () => {
+            void createAgent();
+        });
+    }
+
     function renderSubjectOverview() {
         if (!el.subjectOverviewGrid) {
             return;
@@ -653,15 +823,9 @@ function createWorkspaceController(deps = {}) {
                 handleHomeAction(homeAction, button.dataset);
             });
         });
-        el.subjectOverviewGrid.querySelectorAll('[data-subject-card]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const { agentId } = button.dataset;
-                if (!agentId) {
-                    return;
-                }
-                void selectAgent(agentId);
-            });
-        });
+        syncOverviewSubjectBrowserUi();
+        bindOverviewSubjectBrowser();
+        renderOverviewSubjectCollection();
         el.subjectOverviewGrid.querySelectorAll('[data-delete-subject-card]').forEach((button) => {
             button.addEventListener('click', (event) => {
                 event.preventDefault();
@@ -672,11 +836,6 @@ function createWorkspaceController(deps = {}) {
                 }
                 void deleteAgentById(agentId, { agentName });
             });
-        });
-
-        const createCard = el.subjectOverviewGrid.querySelector('#subjectOverviewCreateCard');
-        createCard?.addEventListener('click', () => {
-            void createAgent();
         });
 
         el.subjectOverviewGrid.querySelectorAll('[data-home-action]').forEach((button) => {

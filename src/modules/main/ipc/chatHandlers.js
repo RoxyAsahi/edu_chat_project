@@ -181,6 +181,9 @@ function normalizeMessageForPreprocessing(message) {
     if (message.name) normalized.name = message.name;
     if (message.tool_calls) normalized.tool_calls = message.tool_calls;
     if (message.tool_call_id) normalized.tool_call_id = message.tool_call_id;
+    if (typeof message.reasoning_content === 'string' && message.reasoning_content.trim()) {
+        normalized.reasoning_content = message.reasoning_content;
+    }
 
     return normalized;
 }

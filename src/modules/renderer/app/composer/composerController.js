@@ -50,6 +50,71 @@ function buildEmoticonMarkup(renderPath = '', width = 80) {
     return `<img src="${normalizedPath}" width="${width}">`;
 }
 
+function extractTextFromResponseCandidate(candidate) {
+    if (typeof candidate === 'string') {
+        return candidate;
+    }
+
+    if (Array.isArray(candidate)) {
+        return candidate
+            .map((part) => extractTextFromResponseCandidate(part?.text ?? part?.content ?? part))
+            .filter(Boolean)
+            .join('');
+    }
+
+    if (candidate && typeof candidate === 'object') {
+        if (typeof candidate.text === 'string') {
+            return candidate.text;
+        }
+        if (typeof candidate.content === 'string') {
+            return candidate.content;
+        }
+        if (Array.isArray(candidate.content)) {
+            return extractTextFromResponseCandidate(candidate.content);
+        }
+    }
+
+    return '';
+}
+
+function extractReasoningContentFromResponseMessage(message = {}) {
+    const candidates = [
+        message?.reasoning_content,
+        message?.reasoning,
+    ];
+
+    for (const candidate of candidates) {
+        const text = extractTextFromResponseCandidate(candidate);
+        if (text) {
+            return text;
+        }
+    }
+
+    return '';
+}
+
+function getThinkingRequestOptions(agentConfig, useStreaming) {
+    const enableThinking = agentConfig?.enableThinkingRequest === true;
+    const parsedBudget = Number.parseInt(agentConfig?.thinkingBudget, 10);
+    const includeUsageInStream = agentConfig?.includeUsageInStream !== false;
+
+    return {
+        ...(enableThinking && { enable_thinking: true }),
+        ...(enableThinking && Number.isInteger(parsedBudget) && parsedBudget > 0
+            ? { thinking_budget: parsedBudget }
+            : {}),
+        ...(enableThinking && useStreaming && includeUsageInStream
+            ? { stream_options: { include_usage: true } }
+            : {}),
+    };
+}
+
+function getReasoningContentForRequest(message = {}) {
+    return typeof message?.reasoning_content === 'string' && message.reasoning_content.trim()
+        ? message.reasoning_content
+        : undefined;
+}
+
 function createComposerController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -375,7 +440,12 @@ function createComposerController(deps = {}) {
 
         for (const message of history.filter((item) => !item.isThinking)) {
             if (message.role !== 'user') {
-                messages.push({ role: message.role, content: message.content, name: message.name });
+                const messageForApi = { role: message.role, content: message.content, name: message.name };
+                const reasoningContent = getReasoningContentForRequest(message);
+                if (reasoningContent) {
+                    messageForApi.reasoning_content = reasoningContent;
+                }
+                messages.push(messageForApi);
                 continue;
             }
 
@@ -603,6 +673,13 @@ function createComposerController(deps = {}) {
             ...entry,
             toolEvents: Array.isArray(payload?.toolEvents) ? payload.toolEvents : (entry.toolEvents || []),
             studyMemoryRefs: Array.isArray(payload?.studyMemoryRefs) ? payload.studyMemoryRefs : (entry.studyMemoryRefs || []),
+            ...(extractReasoningContentFromResponseMessage(payload?.response?.choices?.[0]?.message || payload?.response?.message || {})
+                ? {
+                    reasoning_content: extractReasoningContentFromResponseMessage(
+                        payload?.response?.choices?.[0]?.message || payload?.response?.message || {}
+                    ),
+                }
+                : {}),
         }));
     }
 
@@ -679,13 +756,15 @@ function createComposerController(deps = {}) {
         messageRendererApi.startStreamingMessage(assistantMessage);
         decorateChatMessages();
 
+        const useStreaming = requestContext.selectedItem.config?.streamOutput !== false;
         const modelConfig = {
             model: requestContext.selectedItem.config?.model || 'gemini-3.1-flash-lite-preview',
             temperature: Number(requestContext.selectedItem.config?.temperature ?? 0.7),
             max_tokens: Number(requestContext.selectedItem.config?.maxOutputTokens ?? 1000),
             top_p: requestContext.selectedItem.config?.top_p,
             top_k: requestContext.selectedItem.config?.top_k,
-            stream: requestContext.selectedItem.config?.streamOutput !== false,
+            ...getThinkingRequestOptions(requestContext.selectedItem.config, useStreaming),
+            stream: useStreaming,
         };
 
         state.activeRequestId = assistantMessage.id;
@@ -728,15 +807,19 @@ function createComposerController(deps = {}) {
         await persistHistory();
 
         if (!modelConfig.stream && response?.response) {
-            const content = response.response?.choices?.[0]?.message?.content || '';
+            const responseMessage = response.response?.choices?.[0]?.message || response.response?.message || {};
+            const content = extractTextFromResponseCandidate(responseMessage?.content);
+            const reasoningContent = extractReasoningContentFromResponseMessage(responseMessage);
             patchCurrentHistoryMessage(assistantMessage.id, (entry) => ({
                 ...entry,
                 isThinking: false,
                 content,
+                ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
             }));
             await persistHistory();
             await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'completed', requestPayloadContext, {
                 fullResponse: content,
+                reasoningContent,
             });
             decorateChatMessages();
             state.activeRequestId = null;
@@ -837,6 +920,7 @@ function createComposerController(deps = {}) {
             fullResponse,
             finishReason,
             interrupted,
+            reasoning_content,
             timedOut,
         } = eventData || {};
 
@@ -853,6 +937,7 @@ function createComposerController(deps = {}) {
             const resolvedFinishReason = finishReason || (timedOut ? 'timed_out' : interrupted ? 'cancelled_by_user' : 'completed');
             await messageRendererApi.finalizeStreamedMessage(requestId, resolvedFinishReason, context, {
                 fullResponse,
+                reasoningContent: typeof reasoning_content === 'string' ? reasoning_content : '',
                 error: error || (timedOut ? 'Request timed out.' : ''),
             });
             decorateChatMessages();
@@ -876,6 +961,7 @@ function createComposerController(deps = {}) {
         if (type === 'error') {
             await messageRendererApi.finalizeStreamedMessage(requestId, 'error', context, {
                 fullResponse: partialResponse || fullResponse,
+                reasoningContent: typeof reasoning_content === 'string' ? reasoning_content : '',
                 error,
             });
             decorateChatMessages();
