@@ -14,6 +14,7 @@ const CHAT_CONTEXT_MENU_ACTIONS = Object.freeze({
     paste: 'paste',
     cancelEdit: 'cancel-edit',
     readMode: 'read-mode',
+    addToNotes: 'add-to-notes',
     regenerate: 'regenerate',
     delete: 'delete',
 });
@@ -86,6 +87,7 @@ export function buildChatContextMenuModel({
     isEditing = false,
     isThinkingOrStreaming = false,
     canRegenerate = false,
+    canCreateNote = false,
 }) {
     const model = {
         sections: [],
@@ -151,6 +153,15 @@ export function buildChatContextMenuModel({
                 label: '阅读模式',
                 tone: 'info',
             },
+            ...(canCreateNote
+                ? [
+                    {
+                        id: CHAT_CONTEXT_MENU_ACTIONS.addToNotes,
+                        icon: 'note_add',
+                        label: '记入笔记',
+                    },
+                ]
+                : []),
             ...(canRegenerate
                 ? [
                     {
@@ -239,10 +250,12 @@ function showContextMenu(event, messageItem, message) {
     const isEditing = messageItem.classList.contains('message-item-editing');
     const textarea = isEditing ? messageItem.querySelector('.message-edit-textarea') : null;
     const canRegenerate = message.role === 'assistant' && currentSelectedItemVal.type === 'agent';
+    const canCreateNote = message.role === 'assistant' && currentSelectedItemVal.type === 'agent';
     const model = buildChatContextMenuModel({
         isEditing,
         isThinkingOrStreaming,
         canRegenerate,
+        canCreateNote,
     });
 
     const actionHandlers = {
@@ -335,6 +348,14 @@ function showContextMenu(event, messageItem, message) {
             const contentString = typeof rawContent === 'string' ? rawContent : (rawContent?.text || '');
             const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
             await electronAPI.openTextInNewWindow(contentString, `Read: ${String(message.id).slice(0, 10)}...`, currentTheme);
+        },
+        [CHAT_CONTEXT_MENU_ACTIONS.addToNotes]: async () => {
+            closeContextMenu();
+            if (typeof contextMenuDependencies.createNoteFromMessage !== 'function') {
+                uiHelper.showToastNotification('当前消息暂时无法记入笔记。', 'warning');
+                return;
+            }
+            await contextMenuDependencies.createNoteFromMessage(message.id);
         },
         [CHAT_CONTEXT_MENU_ACTIONS.regenerate]: async () => {
             closeContextMenu();

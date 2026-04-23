@@ -557,7 +557,7 @@ test('notes refresh re-renders flashcard practice when the flashcards panel is a
     assert.equal(renderPracticeCalls, 2);
 });
 
-test('decorateChatMessages only shows favorite and note actions for assistant messages', async () => {
+test('decorateChatMessages no longer renders inline note actions on chat bubbles', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 
     const { controller, el } = createNotesControllerHarness(createNotesController, {
@@ -587,8 +587,8 @@ test('decorateChatMessages only shows favorite and note actions for assistant me
     controller.decorateChatMessages();
 
     assert.equal(
-        el.chatMessages.querySelector('.message-item.assistant .study-message-actions')?.children.length,
-        2
+        el.chatMessages.querySelector('.message-item.assistant .study-message-actions'),
+        null
     );
     assert.equal(
         el.chatMessages.querySelector('.message-item.user .study-message-actions'),

@@ -68,8 +68,6 @@ function createNotesDom(deps = {}) {
     const openNoteDetail = deps.openNoteDetail || (() => {});
     const toggleNoteSelection = deps.toggleNoteSelection || (() => {});
     const deleteNoteRecord = deps.deleteNoteRecord || (async () => {});
-    const createNoteFromMessage = deps.createNoteFromMessage || (async () => null);
-    const toggleMessageFavorite = deps.toggleMessageFavorite || (async () => null);
     const closeTopicActionMenu = deps.closeTopicActionMenu || (() => {});
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
 
@@ -585,35 +583,6 @@ function createNotesDom(deps = {}) {
             }
 
             wrapper.querySelector('.study-message-actions')?.remove();
-
-            if (message.role !== 'assistant') {
-                continue;
-            }
-
-            const actions = documentObj.createElement('div');
-            actions.className = 'study-message-actions';
-
-            const favoriteButton = documentObj.createElement('button');
-            favoriteButton.type = 'button';
-            favoriteButton.className = `study-message-action${message.favorited ? ' study-message-action--active' : ''}`;
-            favoriteButton.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">star</span>${message.favorited ? '已收藏' : '收藏'}`;
-            favoriteButton.addEventListener('click', (event) => {
-                event.stopPropagation();
-                void toggleMessageFavorite(message.id);
-            });
-
-            const noteButton = documentObj.createElement('button');
-            noteButton.type = 'button';
-            noteButton.className = 'study-message-action';
-            noteButton.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">note_add</span>${message.noteRefs?.length > 0 ? '新增笔记' : '记入笔记'}`;
-            noteButton.addEventListener('click', (event) => {
-                event.stopPropagation();
-                void createNoteFromMessage(message.id);
-            });
-
-            actions.appendChild(favoriteButton);
-            actions.appendChild(noteButton);
-            wrapper.appendChild(actions);
         }
     }
 

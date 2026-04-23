@@ -1055,6 +1055,7 @@ let mainRendererReferences = {
         // ... other uiHelper functions ...
     },
     summarizeTopicFromMessages: async () => "",
+    createNoteFromMessage: async () => null,
     // activeStreamingMessageId: null, // ID of the message currently being streamed - REMOVED
 };
 
@@ -1345,6 +1346,7 @@ function initializeMessageRenderer(refs) {
         interruptHandler: mainRendererReferences.interruptHandler,
         setActiveRequestId: mainRendererReferences.setActiveRequestId,
         generateFollowUpsForAssistantMessage: mainRendererReferences.generateFollowUpsForAssistantMessage,
+        createNoteFromMessage: mainRendererReferences.createNoteFromMessage,
         updateMessageContent: updateMessageContent, // Pass through updateMessageContent.
         extractSpeakableTextFromContentElement: extractSpeakableTextFromContentElement,
     });

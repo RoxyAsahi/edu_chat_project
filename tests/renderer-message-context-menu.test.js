@@ -16,6 +16,7 @@ test('buildChatContextMenuModel returns assistant actions with regenerate and de
         isEditing: false,
         isThinkingOrStreaming: false,
         canRegenerate: true,
+        canCreateNote: true,
     });
 
     assert.equal(Object.prototype.hasOwnProperty.call(model, 'header'), false);
@@ -26,7 +27,7 @@ test('buildChatContextMenuModel returns assistant actions with regenerate and de
     );
     assert.deepEqual(
         model.sections[1].items.map((item) => item.id),
-        ['read-mode', 'regenerate']
+        ['read-mode', 'add-to-notes', 'regenerate']
     );
     assert.deepEqual(
         model.sections[2].items.map((item) => item.id),
@@ -41,6 +42,7 @@ test('buildChatContextMenuModel returns editing actions only while editing', asy
         isEditing: true,
         isThinkingOrStreaming: false,
         canRegenerate: false,
+        canCreateNote: false,
     });
 
     assert.equal(model.sections.length, 1);
@@ -57,6 +59,7 @@ test('buildChatContextMenuModel collapses to interrupt when message is streaming
         isEditing: false,
         isThinkingOrStreaming: true,
         canRegenerate: true,
+        canCreateNote: true,
     });
 
     assert.equal(model.sections.length, 1);

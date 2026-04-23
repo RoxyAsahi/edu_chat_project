@@ -407,6 +407,7 @@ const { bootstrap } = createAppBootstrap({
         appendAttachments: (...args) => composerController?.appendStoredAttachments?.(...args),
         addEmoticonAttachment: (...args) => composerController?.addEmoticonAttachment?.(...args),
         generateFollowUpsForAssistantMessage: (...args) => followUpController?.generateForAssistantMessage?.(...args),
+        createNoteFromMessage: (...args) => notesController?.createNoteFromMessage?.(...args),
         setActiveRequestId: (...args) => composerController?.setActiveRequestId?.(...args),
         windowObj: window,
     }),
