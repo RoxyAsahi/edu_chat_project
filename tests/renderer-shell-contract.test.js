@@ -56,6 +56,7 @@ test('renderer shell keeps the critical DOM anchors for controller wiring', asyn
         'topicKnowledgeBaseFiles',
         'workspaceReaderPanel',
         'chatMessages',
+        'messageCitationPopover',
         'messageInput',
         'settingsPanel',
         'noteDetailModal',
@@ -83,6 +84,9 @@ test('renderer chat stylesheet keeps assistant hover timestamps and bubble-only 
     assert.equal(css.includes('background: transparent;'), true);
     assert.equal(css.includes('border-radius: 0;'), true);
     assert.equal(css.includes('padding: 0;'), true);
+    assert.equal(css.includes('.message-citation-chip'), true);
+    assert.equal(css.includes('.message-citation-popover'), true);
+    assert.equal(css.includes('.message-kb-refs'), false);
     assert.equal(css.includes('.context-menu__header'), false);
     assert.equal(css.includes('.context-menu__description'), false);
     assert.equal(css.includes('.context-menu__hint'), false);

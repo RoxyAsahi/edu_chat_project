@@ -93,6 +93,7 @@ async function initializeAppRuntime(deps = {}) {
         },
         setActiveRequestId,
         chatMessagesDiv: el.chatMessages,
+        messageCitationPopover: el.messageCitationPopover,
         electronAPI: chatAPI,
         markedInstance,
         uiHelper: ui,

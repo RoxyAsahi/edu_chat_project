@@ -1020,48 +1020,116 @@ body.dark-theme .context-menu__item--danger:focus-visible {
   text-align: center;
 }
 
-.message-kb-refs {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px dashed var(--line);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
+.message-inline-citations {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin-left: 2px;
+  vertical-align: super;
+  position: relative;
+  top: -0.18em;
+}
+
+.message-citation-chip {
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 10%, var(--panel) 90%);
+  color: color-mix(in srgb, var(--muted) 82%, var(--ink) 18%);
+  padding: 1px 4px;
+  min-height: auto;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: color 0.16s ease, background-color 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
+}
+
+.message-citation-chip:hover,
+.message-citation-chip:focus-visible,
+.message-citation-chip--active {
+  background: color-mix(in srgb, var(--muted) 16%, var(--panel) 84%);
+  color: color-mix(in srgb, var(--accent-strong) 68%, var(--ink) 32%);
+  opacity: 1;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-soft) 8%, transparent);
+  outline: none;
+}
+
+.message-citation-chip:hover {
+  opacity: 1;
+}
+
+.message-citation-popover {
+  position: fixed;
+  z-index: 2100;
+  width: min(320px, calc(100vw - 24px));
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  background: color-mix(in srgb, var(--panel) 97%, transparent);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.message-kb-refs__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
+.message-citation-popover__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
-.message-kb-refs__item {
-  width: 100%;
-  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--panel-strong) 76%, transparent);
-  padding: 10px 12px;
-  text-align: left;
-  font-size: 12px;
-  color: var(--muted);
+.message-citation-popover__badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--panel) 28%);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
-.message-kb-refs__item strong {
-  display: block;
-  margin-bottom: 4px;
+.message-citation-popover__title {
   color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
 }
 
-.message-kb-refs__item span {
-  display: block;
+.message-citation-popover__meta {
+  color: var(--muted);
+  font-size: 12px;
   line-height: 1.5;
 }
 
-.message-kb-refs__item:hover {
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--line) 70%);
-  box-shadow: var(--shadow-elevation-1);
+.message-citation-popover__snippet {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.message-citation-popover__action {
+  align-self: flex-start;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-soft) 52%, var(--panel) 48%);
+  color: var(--accent-strong);
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.message-citation-popover__action:hover,
+.message-citation-popover__action:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line) 66%);
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--panel) 28%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-soft) 22%, transparent);
+  outline: none;
 }
 
 .selection-context-preview {

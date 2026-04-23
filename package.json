@@ -25,6 +25,7 @@
     "test:e2e:preload-bridge": "node scripts/electron-preload-bridge-smoke.js",
     "test:e2e:css-removal": "node scripts/electron-deprecated-css-removal.js",
     "test:e2e:smoke": "node scripts/electron-unistudy-smoke.js",
+    "test:e2e:citation-smoke": "node scripts/electron-citation-ui-smoke.js",
     "test:kb:endpoints": "node scripts/kb-endpoint-normalization.js",
     "test:kb:smoke": "node scripts/kb-smoke.js",
     "test:kb:real": "node scripts/kb-real-service-validation.js"
