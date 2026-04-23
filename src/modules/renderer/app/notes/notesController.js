@@ -988,8 +988,6 @@ function createNotesController(deps = {}) {
         openNoteDetail,
         toggleNoteSelection,
         deleteNoteRecord: (...args) => notesOperationsApi?.deleteNoteRecord?.(...args),
-        createNoteFromMessage: (...args) => notesOperationsApi?.createNoteFromMessage?.(...args),
-        toggleMessageFavorite: (...args) => notesOperationsApi?.toggleMessageFavorite?.(...args),
     });
 
     notesOperationsApi = createNotesOperations({
@@ -1026,6 +1024,7 @@ function createNotesController(deps = {}) {
         closeNoteActionMenu: (...args) => notesDomApi.closeNoteActionMenu(...args),
         closeNoteDetail,
         createBlankNote,
+        createNoteFromMessage: (...args) => notesOperationsApi?.createNoteFromMessage?.(...args),
         decorateChatMessages: (...args) => notesDomApi.decorateChatMessages(...args),
         findNoteById,
         getActiveNote,

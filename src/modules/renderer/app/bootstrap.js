@@ -61,6 +61,7 @@ async function initializeAppRuntime(deps = {}) {
     const addEmoticonAttachment = deps.addEmoticonAttachment;
     const generateFollowUpsForAssistantMessage = deps.generateFollowUpsForAssistantMessage || (async () => []);
     const setActiveRequestId = deps.setActiveRequestId || (() => {});
+    const createNoteFromMessage = deps.createNoteFromMessage || (async () => null);
     const windowObj = deps.windowObj || window;
 
     const markedInstance = initMarked();
@@ -99,6 +100,7 @@ async function initializeAppRuntime(deps = {}) {
         uiHelper: ui,
         interruptHandler: { interrupt: interruptRequest },
         generateFollowUpsForAssistantMessage,
+        createNoteFromMessage,
         summarizeTopicFromMessages: async () => null,
     });
 
