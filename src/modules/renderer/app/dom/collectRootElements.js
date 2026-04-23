@@ -62,6 +62,7 @@ function collectRootElements(rootDocument = document) {
         topicActionMenu: rootDocument.getElementById('topicActionMenu'),
         noteActionMenu: rootDocument.getElementById('noteActionMenu'),
         sourceFileTooltip: rootDocument.getElementById('sourceFileTooltip'),
+        messageCitationPopover: rootDocument.getElementById('messageCitationPopover'),
         sourceFileActionMenu: rootDocument.getElementById('sourceFileActionMenu'),
         chatMessages: rootDocument.getElementById('chatMessages'),
         chatInputCard: rootDocument.querySelector('.chat-input-card'),

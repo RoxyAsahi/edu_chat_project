@@ -13,11 +13,21 @@ import { createMessageSkeleton, formatMessageTimestamp } from './domBuilder.js';
 import * as streamManager from './streamManager.js';
 import * as emoticonUrlFixer from './emoticonUrlFixer.js';
 import { createContentPipeline, PIPELINE_MODES } from './contentPipeline.js';
+import { positionFloatingElement } from './app/dom/positionFloatingElement.js';
+import {
+    createCitationPopoverController,
+    renderInlineCitationBadges,
+} from './messageCitations.js';
 
 const colorExtractionPromises = new Map();
 let delegatedClickHandler = null;
 let delegatedContextMenuHandler = null;
 let delegatedEventTarget = null;
+let citationPopoverController = null;
+let citationDocumentClickHandler = null;
+let citationKeydownHandler = null;
+let citationScrollHandler = null;
+let citationScrollTarget = null;
 
 async function getDominantAvatarColorCached(url) {
     if (!colorExtractionPromises.has(url)) {
@@ -1035,6 +1045,7 @@ let mainRendererReferences = {
     generateFollowUpsForAssistantMessage: async () => [],
 
     chatMessagesDiv: null,
+    messageCitationPopover: null,
     electronAPI: null,
     markedInstance: null,
     uiHelper: {
@@ -1066,6 +1077,7 @@ function isRenderSessionActive(sessionId) {
 }
 
 function removeMessageById(messageId, saveHistory = false) {
+    citationPopoverController?.hide?.();
     const item = mainRendererReferences.chatMessagesDiv.querySelector(`.message-item[data-message-id="${messageId}"]`);
     if (item) {
         // --- NEW: Cleanup dynamic content before removing from DOM ---
@@ -1106,6 +1118,7 @@ function removeMessageById(messageId, saveHistory = false) {
 function clearChat(options = {}) {
     const { preserveHistory = false } = options;
     invalidateRenderSession();
+    citationPopoverController?.hide?.();
 
     if (mainRendererReferences.chatMessagesDiv) {
         // --- NEW: Cleanup all messages before clearing the container ---
@@ -1142,6 +1155,21 @@ function initializeMessageRenderer(refs) {
     if (delegatedEventTarget && delegatedContextMenuHandler) {
         delegatedEventTarget.removeEventListener('contextmenu', delegatedContextMenuHandler);
     }
+    if (citationDocumentClickHandler) {
+        document.removeEventListener('click', citationDocumentClickHandler);
+        citationDocumentClickHandler = null;
+    }
+    if (citationKeydownHandler) {
+        document.removeEventListener('keydown', citationKeydownHandler);
+        citationKeydownHandler = null;
+    }
+    if (citationScrollTarget && citationScrollHandler) {
+        citationScrollTarget.removeEventListener('scroll', citationScrollHandler);
+    }
+    citationScrollHandler = null;
+    citationScrollTarget = null;
+    citationPopoverController?.destroy?.();
+    citationPopoverController = null;
 
     Object.assign(mainRendererReferences, refs);
 
@@ -1194,6 +1222,28 @@ function initializeMessageRenderer(refs) {
     // --- Event Delegation ---
     delegatedEventTarget = mainRendererReferences.chatMessagesDiv;
     delegatedClickHandler = (e) => {
+        const citationChip = e.target.closest('.message-citation-chip');
+        if (citationChip) {
+            e.preventDefault();
+            e.stopPropagation();
+            const messageItem = citationChip.closest('.message-item');
+            const messageId = messageItem?.dataset?.messageId || '';
+            const refIndex = Number.parseInt(citationChip.dataset.messageCitationIndex || '-1', 10);
+            const message = mainRendererReferences.currentChatHistoryRef.get()
+                .find((item) => item.id === messageId);
+            const refs = Array.isArray(message?.kbContextRefs) ? message.kbContextRefs : [];
+            const ref = Number.isInteger(refIndex) && refIndex >= 0 ? refs[refIndex] : null;
+            if (ref) {
+                citationPopoverController?.toggle?.({
+                    anchorElement: citationChip,
+                    messageId,
+                    refIndex,
+                    ref,
+                });
+            }
+            return;
+        }
+
         // 1. Handle collapsible tool results and thought chains
         const toolHeader = e.target.closest('.unistudy-tool-result-header');
         if (toolHeader) {
@@ -1231,6 +1281,33 @@ function initializeMessageRenderer(refs) {
     };
     mainRendererReferences.chatMessagesDiv.addEventListener('contextmenu', delegatedContextMenuHandler);
     // --- End Event Delegation ---
+
+    citationPopoverController = createCitationPopoverController({
+        popoverEl: mainRendererReferences.messageCitationPopover,
+        documentObj: document,
+        windowObj: window,
+        positionFloatingElement,
+        escapeHtmlFn: escapeHtml,
+        onOpenRef: (ref) => {
+            document.dispatchEvent(new CustomEvent('unistudy-open-kb-ref', {
+                detail: ref,
+            }));
+        },
+    });
+
+    citationDocumentClickHandler = (event) => {
+        citationPopoverController?.handleDocumentClick?.(event);
+    };
+    citationKeydownHandler = (event) => {
+        citationPopoverController?.handleKeyDown?.(event);
+    };
+    citationScrollTarget = scrollContainer || mainRendererReferences.chatMessagesDiv;
+    citationScrollHandler = () => {
+        citationPopoverController?.handleScroll?.();
+    };
+    document.addEventListener('click', citationDocumentClickHandler);
+    document.addEventListener('keydown', citationKeydownHandler);
+    citationScrollTarget?.addEventListener('scroll', citationScrollHandler, { passive: true });
 
     // Create a new marked instance wrapper specifically for the stream manager.
     const originalMarkedParse = mainRendererReferences.markedInstance.parse.bind(mainRendererReferences.markedInstance);
@@ -1421,58 +1498,14 @@ async function renderAttachments(message, contentDiv) {
     }
 }
 
-function renderKnowledgeBaseRefs(message, contentDiv) {
-    if (!Array.isArray(message?.kbContextRefs) || message.kbContextRefs.length === 0) {
+function renderInlineMessageCitations(message, contentDiv) {
+    if (!message || message.role !== 'assistant' || message.isThinking) {
         return;
     }
-
-    const refsContainer = document.createElement('div');
-    refsContainer.className = 'message-kb-refs';
-
-    const title = document.createElement('div');
-    title.className = 'message-kb-refs__title';
-    title.textContent = 'KB 引用';
-    refsContainer.appendChild(title);
-
-    message.kbContextRefs.forEach((ref) => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'message-kb-refs__item';
-        const scoreParts = [];
-        if (typeof ref.score === 'number') {
-            scoreParts.push(`score ${ref.score}`);
-        }
-        if (typeof ref.vectorScore === 'number') {
-            scoreParts.push(`vec ${ref.vectorScore}`);
-        }
-        if (typeof ref.rerankScore === 'number') {
-            scoreParts.push(`rerank ${ref.rerankScore}`);
-        }
-        const locationParts = [];
-        if (ref.pageNumber !== null && ref.pageNumber !== undefined && Number.isFinite(Number(ref.pageNumber))) {
-            locationParts.push(`第 ${Number(ref.pageNumber)} 页`);
-        }
-        if (ref.paragraphIndex !== null && ref.paragraphIndex !== undefined && Number.isFinite(Number(ref.paragraphIndex))) {
-            locationParts.push(`第 ${Number(ref.paragraphIndex)} 段`);
-        }
-        if (ref.sectionTitle) {
-            locationParts.push(String(ref.sectionTitle));
-        }
-        item.innerHTML = `
-            <strong>${escapeHtml(ref.documentName || ref.documentId || '未知文档')}</strong>
-            <span>${escapeHtml(locationParts.join(' · ') || '点击回到阅读区')}</span>
-            ${ref.snippet ? `<span>${escapeHtml(ref.snippet)}</span>` : ''}
-            ${scoreParts.length > 0 ? `<span>${escapeHtml(scoreParts.join(' · '))}</span>` : ''}
-        `;
-        item.addEventListener('click', () => {
-            document.dispatchEvent(new CustomEvent('unistudy-open-kb-ref', {
-                detail: ref,
-            }));
-        });
-        refsContainer.appendChild(item);
-    });
-
-    contentDiv.appendChild(refsContainer);
+    if (!Array.isArray(message.kbContextRefs) || message.kbContextRefs.length === 0) {
+        return;
+    }
+    renderInlineCitationBadges(contentDiv, message.kbContextRefs);
 }
 
 async function renderMessage(message, isInitialLoad = false, appendToDom = true, renderSessionId = getActiveRenderSessionId()) {
@@ -1682,9 +1715,9 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
             }
 
             renderAttachments(message, contentDiv);
-            renderKnowledgeBaseRefs(message, contentDiv);
             contentProcessor.processRenderedContent(contentDiv, globalSettings);
             await renderMermaidDiagrams(contentDiv); // Render mermaid diagrams
+            renderInlineMessageCitations(message, contentDiv);
 
             if (!isRenderSessionActive(renderSessionId) || !messageItem.isConnected || !contentDiv.isConnected) {
                 return;
@@ -2033,6 +2066,7 @@ function scheduleMessagePretextEstimate(messageId, text, container) {
 
 function updateMessageContent(messageId, newContent) {
     const { chatMessagesDiv, markedInstance, globalSettingsRef } = mainRendererReferences;
+    citationPopoverController?.hide?.();
     const messageItem = chatMessagesDiv.querySelector(`.message-item[data-message-id="${messageId}"]`);
     if (!messageItem) return;
 
@@ -2076,14 +2110,14 @@ function updateMessageContent(messageId, newContent) {
     if (messageInHistory) {
         const existingAttachments = contentDiv.querySelector('.message-attachments');
         if (existingAttachments) existingAttachments.remove();
-        const existingRefs = contentDiv.querySelector('.message-kb-refs');
-        if (existingRefs) existingRefs.remove();
         renderAttachments({ ...messageInHistory, content: newContent }, contentDiv);
-        renderKnowledgeBaseRefs({ ...messageInHistory, content: newContent }, contentDiv);
     }
 
     // 3. Synchronous processing (KaTeX, buttons, etc.)
     contentProcessor.processRenderedContent(contentDiv, globalSettings);
+    if (messageInHistory) {
+        renderInlineMessageCitations({ ...messageInHistory, content: newContent }, contentDiv);
+    }
     renderMermaidDiagrams(contentDiv); // Fire-and-forget async rendering
 
     // 4. Asynchronous, deferred highlighting for DOM stability
