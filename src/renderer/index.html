@@ -23,11 +23,22 @@
 </head>
 <body class="light-theme unistudy-shell">
   <div id="appBootLoading" class="app-boot-loading" aria-live="polite" aria-hidden="false">
-    <div class="app-boot-loading__panel">
-      <div class="app-boot-loading__badge">UniStudy</div>
-      <h1>正在准备学习工作台</h1>
-      <p>正在恢复上次会话、加载学科和渲染聊天内容。</p>
-      <div class="app-boot-loading__bar" aria-hidden="true"><span></span></div>
+    <div class="app-boot-loading__stage">
+      <div class="app-boot-loading__brand">
+        <div class="app-boot-loading__logo-wrap" aria-hidden="true">
+          <div class="app-boot-loading__orbit"></div>
+          <img class="app-boot-loading__logo" src="../../logo_flat_vector.svg" alt="" />
+          <div class="app-boot-loading__pulse"></div>
+          <div class="app-boot-loading__pulse app-boot-loading__pulse--delayed"></div>
+        </div>
+        <div class="app-boot-loading__title">UniStudy</div>
+        <div class="app-boot-loading__subtitle">正在准备学习工作台</div>
+        <div class="app-boot-loading__hint">
+          <span class="app-boot-loading__dot"></span>
+          <span class="app-boot-loading__dot"></span>
+          <span class="app-boot-loading__dot"></span>
+        </div>
+      </div>
     </div>
   </div>
   <div class="window-shell">
