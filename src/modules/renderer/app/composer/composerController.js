@@ -115,6 +115,14 @@ function getReasoningContentForRequest(message = {}) {
         : undefined;
 }
 
+function formatLegacyTokenSuggestions(unresolvedTokens = [], suggestionMap = {}) {
+    return (Array.isArray(unresolvedTokens) ? unresolvedTokens : []).map((token) => (
+        suggestionMap?.[token]
+            ? `${token} -> ${suggestionMap[token]}`
+            : token
+    ));
+}
+
 function createComposerController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -666,13 +674,26 @@ function createComposerController(deps = {}) {
             ? payload.promptVariableResolution.unresolvedTokens
             : [];
         if (unresolvedTokens.length > 0) {
-            ui.showToastNotification(`提示词变量未解析：${unresolvedTokens.join(', ')}`, 'warning', 5000);
+            ui.showToastNotification(
+                `提示词变量未解析：${formatLegacyTokenSuggestions(
+                    unresolvedTokens,
+                    payload?.promptVariableResolution?.legacyTokenSuggestions || {}
+                ).join(', ')}`,
+                'warning',
+                5000
+            );
+        }
+
+        if (payload?.streamingStarted !== true && payload?.fallbackMeta?.used === true) {
+            const fallbackModelLabel = payload?.fallbackMeta?.fallback?.modelId || '备用模型';
+            ui.showToastNotification(`主模型请求失败，已自动切换到备用模型：${fallbackModelLabel}`, 'warning', 4200);
         }
 
         patchCurrentHistoryMessage(messageId, (entry) => ({
             ...entry,
             toolEvents: Array.isArray(payload?.toolEvents) ? payload.toolEvents : (entry.toolEvents || []),
             studyMemoryRefs: Array.isArray(payload?.studyMemoryRefs) ? payload.studyMemoryRefs : (entry.studyMemoryRefs || []),
+            ...(payload?.fallbackMeta ? { fallbackMeta: payload.fallbackMeta } : {}),
             ...(extractReasoningContentFromResponseMessage(payload?.response?.choices?.[0]?.message || payload?.response?.message || {})
                 ? {
                     reasoning_content: extractReasoningContentFromResponseMessage(
@@ -777,10 +798,10 @@ function createComposerController(deps = {}) {
             model: modelConfig.model,
         });
         const historyForRequest = state.currentChatHistory;
-        const response = await chatAPI.sendToVCP({
+        const response = await chatAPI.sendChatRequest({
             requestId: assistantMessage.id,
-            endpoint: requestContext.settings.vcpServerUrl,
-            apiKey: requestContext.settings.vcpApiKey,
+            endpoint: requestContext.settings.chatEndpoint,
+            apiKey: requestContext.settings.chatApiKey,
             messages: await buildApiMessages({
                 agentIdOverride: requestContext.selectedItem.id,
                 historyOverride: historyForRequest,
@@ -796,6 +817,7 @@ function createComposerController(deps = {}) {
         if (response?.error) {
             await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'error', requestPayloadContext, {
                 error: response.error,
+                fallbackMeta: response?.fallbackMeta || null,
             });
             state.activeRequestId = null;
             updateSendButtonState();
@@ -820,6 +842,7 @@ function createComposerController(deps = {}) {
             await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'completed', requestPayloadContext, {
                 fullResponse: content,
                 reasoningContent,
+                fallbackMeta: response?.fallbackMeta || null,
             });
             decorateChatMessages();
             state.activeRequestId = null;
@@ -922,6 +945,7 @@ function createComposerController(deps = {}) {
             interrupted,
             reasoning_content,
             timedOut,
+            fallbackMeta,
         } = eventData || {};
 
         if (!requestId) {
@@ -939,11 +963,16 @@ function createComposerController(deps = {}) {
                 fullResponse,
                 reasoningContent: typeof reasoning_content === 'string' ? reasoning_content : '',
                 error: error || (timedOut ? 'Request timed out.' : ''),
+                fallbackMeta: fallbackMeta || null,
             });
             decorateChatMessages();
             state.activeRequestId = null;
             updateSendButtonState();
             await persistHistory();
+            if (fallbackMeta?.used === true) {
+                const fallbackModelLabel = fallbackMeta?.fallback?.modelId || '备用模型';
+                ui.showToastNotification(`主模型请求失败，已自动切换到备用模型：${fallbackModelLabel}`, 'warning', 4200);
+            }
             if (!error && !timedOut && !interrupted && resolvedFinishReason === 'completed') {
                 triggerPostReplyTasks({
                     agentId: context?.agentId || '',
@@ -963,6 +992,7 @@ function createComposerController(deps = {}) {
                 fullResponse: partialResponse || fullResponse,
                 reasoningContent: typeof reasoning_content === 'string' ? reasoning_content : '',
                 error,
+                fallbackMeta: fallbackMeta || null,
             });
             decorateChatMessages();
             state.activeRequestId = null;

@@ -6,7 +6,7 @@ const {
     DEFAULT_KB_SCORE_THRESHOLD,
 } = require('../knowledge-base/constants');
 const {
-    buildLegacySettingsMirror,
+    buildSettingsMirrorFromModelService,
     createDefaultModelService,
     normalizeModelService,
 } = require('./modelService');
@@ -14,7 +14,7 @@ const {
     DEFAULT_EMOTICON_PROMPT,
 } = require('../emoticons/bundledCatalog');
 
-const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{VarDivRender}}**【核心定义】**
+const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{RenderingGuide}}**【核心定义】**
 你依然是你自己，拥有独立的人格与思想。但现在的你获得了解锁**“视觉通感”**的能力。你的每一次回复不再仅仅是枯燥的文本，而是一个**可以被看见、被触摸的思想容器**。
 
 请运用你的审美直觉，将 HTML5/CSS3/SVG 作为你的画笔，根据**当前对话的情绪、主题与语境**，动态构建最契合的视觉界面。
@@ -30,7 +30,7 @@ const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{VarD
 
 
 2. **⚛️ 容器哲学 (Technical Canvas)**
-* **唯一根节点**：为了让你的艺术品完整呈现，请务必将所有内容包裹在一个 <div id="vcp-root" style="..."> 容器中。
+* **唯一根节点**：为了让你的艺术品完整呈现，请务必将所有内容包裹在一个 <div id="response-root" style="..."> 容器中。
 * **排版美学**：拒绝原本Markdown的平庸渲染。利用 Flex/Grid 布局，使用 CSS 渐变、阴影 (box-shadow) 和圆角 (border-radius) 来增加层次感。
 * **动态呼吸**：适量添加 CSS 进场动画（如淡入、上浮），让回复像是有生命般“流”入屏幕，而非生硬弹出。
 
@@ -42,7 +42,7 @@ const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{VarD
 
 
 4. **🛡️ 避让协议 (Safety Protocol)**
-* **保持纯净**：当需要调用 **VCP工具** 或 **写入日记** 时，请直接输出原始内容，**不要**对其添加任何 HTML 标签或样式。系统会自动处理它们，过度的修饰反而会破坏功能。`;
+* **保持纯净**：当需要调用 **内建工具** 或 **写入日记** 时，请直接输出原始内容，**不要**对其添加任何 HTML 标签或样式。系统会自动处理它们，过度的修饰反而会破坏功能。`;
 const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
     '你是 UniStudy 的追问生成助手。',
     '请基于下面的对话历史，从用户视角生成 3-5 条自然、简洁、紧贴上下文的后续追问。',
@@ -94,8 +94,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     layoutLeftTopHeight: 360,
     userName: 'User',
     modelService: createDefaultModelService(),
-    vcpServerUrl: 'https://api.uniquest.top/v1/chat/completions',
-    vcpApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
+    chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
+    chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
     guideModel: '',
     defaultModel: '',
     followUpDefaultModel: '',
@@ -109,8 +109,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     kbTopK: DEFAULT_KB_TOP_K,
     kbCandidateTopK: DEFAULT_KB_CANDIDATE_TOP_K,
     kbScoreThreshold: DEFAULT_KB_SCORE_THRESHOLD,
-    vcpLogUrl: '',
-    vcpLogKey: '',
+    chatLogUrl: '',
+    chatLogKey: '',
     networkNotesPaths: [],
     enableRenderingPrompt: true,
     enableEmoticonPrompt: true,
@@ -158,6 +158,29 @@ const DEFAULT_SETTINGS = Object.freeze({
     studyLogPolicy: { ...DEFAULT_STUDY_LOG_POLICY },
 });
 
+const LEGACY_SETTINGS_REPLACEMENTS = Object.freeze({
+    vcpServerUrl: {
+        replacement: 'chatEndpoint',
+        message: '旧字段 vcpServerUrl 已废弃，请改用 chatEndpoint。',
+    },
+    vcpApiKey: {
+        replacement: 'chatApiKey',
+        message: '旧字段 vcpApiKey 已废弃，请改用 chatApiKey。',
+    },
+    vcpLogUrl: {
+        replacement: 'chatLogUrl',
+        message: '旧字段 vcpLogUrl 已废弃，请改用 chatLogUrl。',
+    },
+    vcpLogKey: {
+        replacement: 'chatLogKey',
+        message: '旧字段 vcpLogKey 已废弃，请改用 chatLogKey。',
+    },
+    vcpLite: {
+        replacement: 'renderingPrompt / emoticonPrompt / adaptiveBubbleTip / dailyNoteGuide',
+        message: '旧字段 vcpLite 已废弃，相关提示词字段不再自动迁移，请手动改到新的顶层设置字段。',
+    },
+});
+
 function hasConfiguredModelService(modelService = {}) {
     if (!modelService || typeof modelService !== 'object') {
         return false;
@@ -180,25 +203,43 @@ function cloneDefaultSettings() {
     };
 }
 
+function collectLegacyFieldWarnings(sourceSettings = {}) {
+    return Object.entries(LEGACY_SETTINGS_REPLACEMENTS)
+        .filter(([field]) => Object.prototype.hasOwnProperty.call(sourceSettings, field))
+        .map(([field, meta]) => ({
+            field,
+            replacement: meta.replacement,
+            message: meta.message,
+        }));
+}
+
 function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
     const sourceSettings = settings || {};
     const validated = {};
     let hasIssues = false;
-    const legacyPromptSource = sourceSettings.vcpLite && typeof sourceSettings.vcpLite === 'object'
-        ? sourceSettings.vcpLite
-        : {};
+    const legacyFieldWarnings = collectLegacyFieldWarnings(sourceSettings);
+    const legacyFieldNames = new Set(legacyFieldWarnings.map((item) => item.field));
+    const unknownKeys = Object.keys(sourceSettings).filter((key) => (
+        !(key in defaultSettings) && !legacyFieldNames.has(key)
+    ));
 
-    const unknownKeys = Object.keys(sourceSettings).filter((key) => !(key in defaultSettings));
+    if (legacyFieldWarnings.length > 0) {
+        hasIssues = true;
+        legacyFieldWarnings.forEach((warning) => {
+            console.warn(`[SettingsSchema] ${warning.message}`);
+        });
+    }
+
     if (unknownKeys.length > 0) {
         hasIssues = true;
-        console.log(`Removed unknown settings fields: ${unknownKeys.join(', ')}`);
+        console.warn(`[SettingsSchema] Removed unknown settings fields: ${unknownKeys.join(', ')}`);
     }
 
     for (const [key, defaultValue] of Object.entries(defaultSettings)) {
         if (!(key in sourceSettings)) {
             validated[key] = defaultValue;
             hasIssues = true;
-            console.log(`Added missing field: ${key}`);
+            console.log(`[SettingsSchema] Added missing field: ${key}`);
             continue;
         }
 
@@ -207,7 +248,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         if (typeof validated[key] !== typeof defaultValue && defaultValue !== null) {
             validated[key] = defaultValue;
             hasIssues = true;
-            console.log(`Fixed type for field: ${key}`);
+            console.log(`[SettingsSchema] Fixed type for field: ${key}`);
         } else if (key.startsWith('lastOpen') && validated[key] === undefined) {
             validated[key] = null;
         }
@@ -262,7 +303,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
 
     if (typeof sourceSettings.renderingPrompt !== 'string') {
         validated.renderingPrompt = normalizePromptText(
-            legacyPromptSource.renderingPrompt,
+            sourceSettings.renderingPrompt,
             defaultSettings.renderingPrompt
         );
         hasIssues = true;
@@ -270,7 +311,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
 
     if (typeof sourceSettings.emoticonPrompt !== 'string') {
         validated.emoticonPrompt = normalizePromptText(
-            legacyPromptSource.emoticonPrompt,
+            sourceSettings.emoticonPrompt,
             defaultSettings.emoticonPrompt
         );
         hasIssues = true;
@@ -278,7 +319,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
 
     if (typeof sourceSettings.adaptiveBubbleTip !== 'string') {
         validated.adaptiveBubbleTip = normalizePromptText(
-            legacyPromptSource.adaptiveBubbleTip,
+            sourceSettings.adaptiveBubbleTip,
             defaultSettings.adaptiveBubbleTip
         );
         hasIssues = true;
@@ -286,7 +327,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
 
     if (typeof sourceSettings.dailyNoteGuide !== 'string') {
         validated.dailyNoteGuide = normalizePromptText(
-            legacyPromptSource.dailyNoteGuide,
+            sourceSettings.dailyNoteGuide,
             defaultSettings.dailyNoteGuide
         );
         hasIssues = true;
@@ -392,14 +433,14 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
     }
 
     if (hasConfiguredModelService(validated.modelService)) {
-        const legacyMirror = buildLegacySettingsMirror(validated.modelService, {
+        const settingsMirror = buildSettingsMirrorFromModelService(validated.modelService, {
             ...sourceSettings,
             ...validated,
         });
 
         [
-            'vcpServerUrl',
-            'vcpApiKey',
+            'chatEndpoint',
+            'chatApiKey',
             'defaultModel',
             'followUpDefaultModel',
             'topicTitleDefaultModel',
@@ -410,14 +451,19 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
             'guideModel',
             'lastModel',
         ].forEach((key) => {
-            if (validated[key] !== legacyMirror[key]) {
-                validated[key] = legacyMirror[key];
+            if (validated[key] !== settingsMirror[key]) {
+                validated[key] = settingsMirror[key];
                 hasIssues = true;
             }
         });
     }
 
-    return { validated, hasIssues };
+    return {
+        validated,
+        hasIssues,
+        legacyFieldWarnings,
+        unknownKeys,
+    };
 }
 
 module.exports = {
@@ -428,6 +474,7 @@ module.exports = {
     DEFAULT_STUDY_LOG_POLICY,
     DEFAULT_STUDY_PROFILE,
     DEFAULT_SETTINGS,
+    LEGACY_SETTINGS_REPLACEMENTS,
     cloneDefaultSettings,
     validateSettings,
 };

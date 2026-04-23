@@ -707,8 +707,8 @@
                 </div>
                 <div class="hidden" aria-hidden="true">
                   <input id="userNameInput" type="text" placeholder="User" />
-                  <input id="vcpServerUrl" type="text" placeholder="http://host:port/v1/chat/completions" />
-                  <input id="vcpApiKey" type="password" />
+                  <input id="chatEndpoint" type="text" placeholder="http://host:port/v1/chat/completions" />
+                  <input id="chatApiKey" type="password" />
                   <input id="kbBaseUrl" type="text" />
                   <input id="kbApiKey" type="password" />
                   <input id="kbEmbeddingModel" type="text" placeholder="BAAI/bge-m3" />
@@ -768,7 +768,7 @@
                   </label>
                   <label>
                     <span>所在城市</span>
-                    <input id="studyCityInput" type="text" placeholder="用于 {{VarCity}}" />
+                    <input id="studyCityInput" type="text" placeholder="用于 {{City}}" />
                   </label>
                   <label>
                     <span>学习工作区</span>
@@ -828,7 +828,7 @@
                       <div class="settings-prompt-editor">
                         <span class="settings-prompt-editor__title">
                           <label><input id="enableRenderingPromptInput" type="checkbox" /> 结构化渲染提示</label>
-                          <code>{{VarDivRender}} / {{VarRendering}}</code>
+                          <code>{{RenderingGuide}} / {{RenderingGuide}}</code>
                         </span>
                         <textarea
                           id="renderingPromptInput"
@@ -840,19 +840,19 @@
                       <div class="settings-prompt-editor">
                         <span class="settings-prompt-editor__title">
                           <label><input id="enableEmoticonPromptInput" type="checkbox" /> 表情包提示</label>
-                          <code>{{VarEmoticonPrompt}} / {{VarEmojiPrompt}}</code>
+                          <code>{{EmoticonGuide}} / {{EmoticonGuide}}</code>
                         </span>
                         <textarea
                           id="emoticonPromptInput"
                           rows="7"
                           placeholder="用于控制内置表情包的文件列表和伪路径提示；启用后会自动追加到 system prompt，除非当前 agent prompt 已自带对应变量。"
                         ></textarea>
-                        <span class="settings-caption">控制模型是否知道当前内置表情包、可用文件名，以及应该输出怎样的 <code>&lt;img src=&quot;/通用表情包/文件名&quot; width=&quot;120&quot;&gt;</code> 伪路径。启用后会自动追加到最终 system prompt；如果当前 agent prompt 已经显式写了 <code>{{VarEmoticonPrompt}}</code> 或 <code>{{VarEmojiPrompt}}</code>，系统会跳过自动追加以避免重复。留空时会自动显示并使用内置默认文案。</span>
+                        <span class="settings-caption">控制模型是否知道当前内置表情包、可用文件名，以及应该输出怎样的 <code>&lt;img src=&quot;/通用表情包/文件名&quot; width=&quot;120&quot;&gt;</code> 伪路径。启用后会自动追加到最终 system prompt；如果当前 agent prompt 已经显式写了 <code>{{EmoticonGuide}}</code> 或 <code>{{EmoticonGuide}}</code>，系统会跳过自动追加以避免重复。留空时会自动显示并使用内置默认文案。</span>
                       </div>
                       <div class="settings-prompt-editor">
                         <span class="settings-prompt-editor__title">
                           <label><input id="enableAdaptiveBubbleTipInput" type="checkbox" /> 简洁气泡补充</label>
-                          <code>{{VarAdaptiveBubbleTip}}</code>
+                          <code>{{AdaptiveBubbleTip}}</code>
                         </span>
                         <textarea
                           id="adaptiveBubbleTipInput"
@@ -877,7 +877,7 @@
                       <div class="settings-prompt-editor">
                         <span class="settings-prompt-editor__title">
                           <span>DailyNote 协议文本（全局）</span>
-                          <code>{{DailyNoteTool}} / auto inject</code>
+                          <code>{{DailyNoteGuide}} / auto inject</code>
                         </span>
                         <div class="settings-prompt-editor__toggles">
                           <label><input id="studyLogEnablePromptVariablesInput" type="checkbox" /> 作为内建变量注入</label>
@@ -888,7 +888,7 @@
                           rows="7"
                           placeholder="这里定义全局 DailyNote 协议文本。启用内建变量或自动注入后，都会使用这里的内容。"
                         ></textarea>
-                        <span class="settings-caption">这份文本会作为 <code>{{DailyNoteTool}}</code>、<code>{{VarDailyNoteGuide}}</code> 的展开内容，也会被“自动追加到 system prompt”复用。<code>{{StudyLogTool}}</code> 仅作为兼容别名继续可用。留空时会直接显示并使用默认协议。</span>
+                        <span class="settings-caption">这份文本会作为 <code>{{DailyNoteGuide}}</code>、<code>{{DailyNoteGuide}}</code> 的展开内容，也会被“自动追加到 system prompt”复用。<code>{{DailyNoteGuide}}</code> 仅作为兼容别名继续可用。留空时会直接显示并使用默认协议。</span>
                       </div>
                       <div class="settings-prompt-editor">
                         <span class="settings-prompt-editor__title">
@@ -1029,7 +1029,7 @@
                       <label>
                         <span>兼容 Alias（每行一个）</span>
                         <textarea
-                          id="agentVcpAliasesInput"
+                          id="agentPromptAliasesInput"
                           rows="4"
                           placeholder="Nova"
                         ></textarea>
@@ -1037,7 +1037,7 @@
                       </label>
                       <label>
                         <span>兼容署名</span>
-                        <input id="agentVcpMaidInput" type="text" placeholder="[UniStudy/{{AgentName}}]{{VarUser}}" />
+                        <input id="agentToolSignatureInput" type="text" placeholder="[UniStudy/{{AgentName}}]{{UserName}}" />
                         <span class="settings-caption">工具调用时优先使用这里的署名；留空时回退到全局 Maid 签名模板。</span>
                       </label>
                     </div>

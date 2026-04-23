@@ -39,8 +39,8 @@ function createBaseState(overrides = {}) {
     const base = {
         settings: {
             settings: {
-                vcpServerUrl: '',
-                vcpApiKey: '',
+                chatEndpoint: '',
+                chatApiKey: '',
             },
             settingsModalSection: 'global',
             promptModule: null,
@@ -287,7 +287,7 @@ function createNotesControllerHarness(createNotesController, options = {}) {
         listTopicNotes: async () => ({ success: true, items: [] }),
         listAgentNotes: async () => ({ success: true, items: [] }),
         retrieveKnowledgeBaseContext: async () => ({ success: false }),
-        sendToVCP: async () => ({ response: { choices: [{ message: { content: 'fixture-response' } }] } }),
+        sendChatRequest: async () => ({ response: { choices: [{ message: { content: 'fixture-response' } }] } }),
         saveTopicNote: async (_agentId, _topicId, payload) => ({
             success: true,
             item: {
@@ -719,8 +719,8 @@ test('notes tool actions read endpoint settings from the settings slice before c
         stateOverrides: {
             settings: {
                 settings: {
-                    vcpServerUrl: 'https://study.example.test/v1/chat',
-                    vcpApiKey: 'fixture-api-key',
+                    chatEndpoint: 'https://study.example.test/v1/chat',
+                    chatApiKey: 'fixture-api-key',
                 },
             },
             notes: {
@@ -735,7 +735,7 @@ test('notes tool actions read endpoint settings from the settings slice before c
             },
         },
         chatApiOverrides: {
-            sendToVCP: async (payload) => {
+            sendChatRequest: async (payload) => {
                 upstreamPayload = payload;
                 resolveUpstreamCall();
                 return {
@@ -778,8 +778,8 @@ test('notes tool actions can consume selected manual notes from the agent librar
         stateOverrides: {
             settings: {
                 settings: {
-                    vcpServerUrl: 'https://study.example.test/v1/chat',
-                    vcpApiKey: 'fixture-api-key',
+                    chatEndpoint: 'https://study.example.test/v1/chat',
+                    chatApiKey: 'fixture-api-key',
                 },
             },
             notes: {
@@ -796,7 +796,7 @@ test('notes tool actions can consume selected manual notes from the agent librar
             },
         },
         chatApiOverrides: {
-            sendToVCP: async (payload) => {
+            sendChatRequest: async (payload) => {
                 upstreamPayload = payload;
                 resolveUpstreamCall();
                 return {

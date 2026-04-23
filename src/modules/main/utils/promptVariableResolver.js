@@ -1,5 +1,5 @@
 const TOKEN_PATTERN = /{{\s*([A-Za-z0-9_]+)\s*}}/g;
-const { resolveDailyNoteToolInstruction } = require('../study/toolProtocol');
+const { resolveDailyNoteGuideInstruction } = require('../study/toolProtocol');
 
 const DEFAULT_DIV_RENDER_INSTRUCTION = [
     'When structured rendering helps, emit semantic HTML div blocks that the client can render directly.',
@@ -10,6 +10,20 @@ const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
     'Keep answers readable and compact when rich layout is unnecessary.',
     'Only switch to more structured rendering when it clearly helps comprehension.',
 ].join(' ');
+
+const LEGACY_PROMPT_TOKEN_REPLACEMENTS = Object.freeze({
+    VarUser: 'UserName',
+    VarCity: 'City',
+    VarTimeNow: 'CurrentDateTime',
+    VarDailyNoteGuide: 'DailyNoteGuide',
+    StudyLogTool: 'DailyNoteGuide',
+    DailyNoteTool: 'DailyNoteGuide',
+    VarDivRender: 'RenderingGuide',
+    VarRendering: 'RenderingGuide',
+    VarEmoticonPrompt: 'EmoticonGuide',
+    VarEmojiPrompt: 'EmoticonGuide',
+    VarAdaptiveBubbleTip: 'AdaptiveBubbleTip',
+});
 
 function isPlainObject(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -29,8 +43,7 @@ function normalizeVariableValue(value) {
         return '';
     }
 
-    const trimmed = value.trim();
-    return trimmed;
+    return value.trim();
 }
 
 function deriveAsciiNameTokens(value) {
@@ -56,6 +69,19 @@ function mergeVariable(variableMap, key, value, source, overwrite = false) {
     variableMap[normalizedKey] = {
         value: normalizedValue,
         source,
+    };
+}
+
+function setForceResolvedVariable(variableMap, key, source) {
+    const normalizedKey = normalizeVariableKey(key);
+    if (!normalizedKey) {
+        return;
+    }
+
+    variableMap[normalizedKey] = {
+        value: '',
+        source,
+        forceResolve: true,
     };
 }
 
@@ -125,8 +151,8 @@ function collectExplicitPromptVariables(agentConfig = {}) {
         }
     }
 
-    if (Array.isArray(normalizedAgentConfig.aliases)) {
-        for (const alias of normalizedAgentConfig.aliases) {
+    if (Array.isArray(normalizedAgentConfig.promptAliases)) {
+        for (const alias of normalizedAgentConfig.promptAliases) {
             if (typeof alias !== 'string') {
                 continue;
             }
@@ -135,6 +161,32 @@ function collectExplicitPromptVariables(agentConfig = {}) {
     }
 
     return variableMap;
+}
+
+function addDerivedAliasVariables(variableMap, candidates = []) {
+    for (const candidate of candidates) {
+        if (typeof candidate !== 'string' || !candidate.trim()) {
+            continue;
+        }
+
+        mergeVariable(variableMap, candidate, candidate, 'derived-agent-alias');
+        for (const token of deriveAsciiNameTokens(candidate)) {
+            mergeVariable(variableMap, token, token, 'derived-agent-alias');
+        }
+    }
+}
+
+function buildLegacyTokenSuggestions(tokens = []) {
+    const suggestions = {};
+
+    for (const token of Array.isArray(tokens) ? tokens : []) {
+        const replacement = LEGACY_PROMPT_TOKEN_REPLACEMENTS[token];
+        if (replacement) {
+            suggestions[token] = replacement;
+        }
+    }
+
+    return suggestions;
 }
 
 function buildPromptVariableMap(options = {}) {
@@ -148,19 +200,18 @@ function buildPromptVariableMap(options = {}) {
     const studyProfile = isPlainObject(settings.studyProfile) ? settings.studyProfile : {};
     const studyLogPolicy = isPlainObject(settings.studyLogPolicy) ? settings.studyLogPolicy : {};
     const promptVariables = isPlainObject(settings.promptVariables) ? settings.promptVariables : {};
+    const emoticonPromptData = isPlainObject(context.emoticonPromptData) ? context.emoticonPromptData : {};
     const renderingPromptEnabled = settings.enableRenderingPrompt !== false;
     const emoticonPromptEnabled = settings.enableEmoticonPrompt !== false;
     const adaptiveBubbleTipEnabled = settings.enableAdaptiveBubbleTip !== false;
-    const emoticonPromptData = isPlainObject(context.emoticonPromptData) ? context.emoticonPromptData : {};
+    const protocolVariablesEnabled = studyLogPolicy.enabled !== false
+        && studyLogPolicy.enableDailyNotePromptVariables !== false;
     const timeZone = context.timeZone || studyProfile.timezone || 'Asia/Hong_Kong';
-    const now = new Date();
-    const formattedNow = formatDateParts(now, timeZone);
-    const dailyNoteInstruction = resolveDailyNoteToolInstruction(settings.dailyNoteGuide, {
+    const formattedNow = formatDateParts(new Date(), timeZone);
+    const dailyNoteInstruction = resolveDailyNoteGuideInstruction(settings.dailyNoteGuide, {
         agentConfig,
         context,
     });
-    const protocolVariablesEnabled = studyLogPolicy.enabled !== false
-        && studyLogPolicy.enableDailyNotePromptVariables !== false;
 
     const variableMap = collectExplicitPromptVariables(agentConfig);
 
@@ -171,54 +222,44 @@ function buildPromptVariableMap(options = {}) {
     }
 
     for (const [key, value] of Object.entries(promptVariables)) {
-        mergeVariable(variableMap, key, value, 'settings-prompt-variable', false);
+        mergeVariable(variableMap, key, value, 'settings-prompt-variable');
     }
 
     mergeVariable(variableMap, 'AgentId', context.agentId || agentConfig.id, 'context');
     mergeVariable(variableMap, 'AgentName', context.agentName || agentConfig.name, 'context');
     mergeVariable(variableMap, 'TopicId', context.topicId, 'context');
     mergeVariable(variableMap, 'TopicName', context.topicName, 'context');
-    mergeVariable(variableMap, 'UserName', settings.userName, 'settings');
+    mergeVariable(variableMap, 'UserName', settings.userName || studyProfile.studentName, 'settings');
     mergeVariable(variableMap, 'StudentName', studyProfile.studentName || settings.userName, 'settings');
-    mergeVariable(variableMap, 'VarUser', settings.userName || studyProfile.studentName, 'settings');
-    mergeVariable(variableMap, 'VarCity', studyProfile.city, 'settings');
+    mergeVariable(variableMap, 'City', studyProfile.city, 'settings');
     mergeVariable(variableMap, 'StudyWorkspace', studyProfile.studyWorkspace, 'settings');
     mergeVariable(variableMap, 'WorkEnvironment', studyProfile.workEnvironment, 'settings');
     mergeVariable(variableMap, 'CurrentDate', formattedNow.date, 'builtin');
     mergeVariable(variableMap, 'CurrentDateTime', formattedNow.dateTime, 'builtin');
-    mergeVariable(variableMap, 'VarTimeNow', formattedNow.dateTime, 'builtin');
-    if (protocolVariablesEnabled) {
-        mergeVariable(variableMap, 'DailyNoteTool', dailyNoteInstruction, 'builtin');
-        mergeVariable(variableMap, 'StudyLogTool', dailyNoteInstruction, 'builtin');
-        mergeVariable(variableMap, 'VarDailyNoteGuide', dailyNoteInstruction, 'builtin');
-    } else {
-        variableMap.DailyNoteTool = { value: '', source: 'study-log-policy-disabled', forceResolve: true };
-        variableMap.StudyLogTool = { value: '', source: 'study-log-policy-disabled', forceResolve: true };
-        variableMap.VarDailyNoteGuide = { value: '', source: 'study-log-policy-disabled', forceResolve: true };
-    }
     mergeVariable(
         variableMap,
         'Model',
         context.model || modelConfig.model || agentConfig.model,
         'model-config'
     );
+
+    if (protocolVariablesEnabled) {
+        mergeVariable(variableMap, 'DailyNoteGuide', dailyNoteInstruction, 'builtin');
+    } else {
+        setForceResolvedVariable(variableMap, 'DailyNoteGuide', 'study-log-policy-disabled');
+    }
+
     if (renderingPromptEnabled) {
         mergeVariable(
             variableMap,
-            'VarDivRender',
-            normalizeVariableValue(settings.renderingPrompt) || DEFAULT_DIV_RENDER_INSTRUCTION,
-            'builtin'
-        );
-        mergeVariable(
-            variableMap,
-            'VarRendering',
+            'RenderingGuide',
             normalizeVariableValue(settings.renderingPrompt) || DEFAULT_DIV_RENDER_INSTRUCTION,
             'builtin'
         );
     } else {
-        variableMap.VarDivRender = { value: '', source: 'rendering-prompt-disabled', forceResolve: true };
-        variableMap.VarRendering = { value: '', source: 'rendering-prompt-disabled', forceResolve: true };
+        setForceResolvedVariable(variableMap, 'RenderingGuide', 'rendering-prompt-disabled');
     }
+
     if (isPlainObject(emoticonPromptData.variables)) {
         for (const [key, value] of Object.entries(emoticonPromptData.variables)) {
             const normalizedKey = normalizeVariableKey(key);
@@ -226,67 +267,48 @@ function buildPromptVariableMap(options = {}) {
                 continue;
             }
 
-            const normalizedValue = typeof value === 'string' ? value.trim() : '';
+            const normalizedValue = normalizeVariableValue(value);
             if (normalizedValue) {
                 mergeVariable(variableMap, normalizedKey, normalizedValue, 'bundled-emoticon');
-                continue;
+            } else {
+                setForceResolvedVariable(variableMap, normalizedKey, 'bundled-emoticon');
             }
-
-            variableMap[normalizedKey] = {
-                value: '',
-                source: 'bundled-emoticon',
-                forceResolve: true,
-            };
         }
     }
+
     if (emoticonPromptEnabled && normalizeVariableValue(emoticonPromptData.resolvedPrompt)) {
         mergeVariable(
             variableMap,
-            'VarEmoticonPrompt',
-            emoticonPromptData.resolvedPrompt,
-            'bundled-emoticon'
-        );
-        mergeVariable(
-            variableMap,
-            'VarEmojiPrompt',
+            'EmoticonGuide',
             emoticonPromptData.resolvedPrompt,
             'bundled-emoticon'
         );
     } else {
-        variableMap.VarEmoticonPrompt = {
-            value: '',
-            source: emoticonPromptEnabled ? 'bundled-emoticon-unavailable' : 'emoticon-prompt-disabled',
-            forceResolve: true,
-        };
-        variableMap.VarEmojiPrompt = {
-            value: '',
-            source: emoticonPromptEnabled ? 'bundled-emoticon-unavailable' : 'emoticon-prompt-disabled',
-            forceResolve: true,
-        };
+        setForceResolvedVariable(
+            variableMap,
+            'EmoticonGuide',
+            emoticonPromptEnabled ? 'bundled-emoticon-unavailable' : 'emoticon-prompt-disabled'
+        );
     }
+
     if (adaptiveBubbleTipEnabled) {
         mergeVariable(
             variableMap,
-            'VarAdaptiveBubbleTip',
+            'AdaptiveBubbleTip',
             normalizeVariableValue(settings.adaptiveBubbleTip) || DEFAULT_ADAPTIVE_BUBBLE_TIP,
             'builtin'
         );
     } else {
-        variableMap.VarAdaptiveBubbleTip = { value: '', source: 'adaptive-bubble-tip-disabled', forceResolve: true };
+        setForceResolvedVariable(variableMap, 'AdaptiveBubbleTip', 'adaptive-bubble-tip-disabled');
     }
 
-    const aliasCandidates = [
+    addDerivedAliasVariables(variableMap, [
+        ...(Array.isArray(agentConfig.promptAliases) ? agentConfig.promptAliases : []),
         agentConfig.name,
         context.agentName,
         agentConfig.id,
         context.agentId,
-    ];
-
-    for (const candidate of aliasCandidates) {
-        for (const token of deriveAsciiNameTokens(candidate)) {
-            mergeVariable(variableMap, token, token, 'derived-agent-alias');
-        }
-    }
+    ]);
 
     return variableMap;
 }
@@ -298,6 +320,7 @@ function resolvePromptVariables(prompt, options = {}) {
             unresolvedTokens: [],
             substitutions: {},
             variableSources: {},
+            legacyTokenSuggestions: {},
         };
     }
 
@@ -306,10 +329,13 @@ function resolvePromptVariables(prompt, options = {}) {
     const variableSources = {};
     const unresolvedTokens = new Set();
 
-    const resolvedPrompt = prompt.replace(TOKEN_PATTERN, (match, token) => {
-        const entry = variableMap[token];
+    const resolvedPrompt = prompt.replace(TOKEN_PATTERN, (match, rawToken) => {
+        const token = normalizeVariableKey(rawToken);
+        const entry = token ? variableMap[token] : null;
         if (!entry || (!entry.forceResolve && !entry.value)) {
-            unresolvedTokens.add(token);
+            if (token) {
+                unresolvedTokens.add(token);
+            }
             return match;
         }
 
@@ -318,11 +344,13 @@ function resolvePromptVariables(prompt, options = {}) {
         return entry.value;
     });
 
+    const unresolvedTokenList = [...unresolvedTokens];
     return {
         resolvedPrompt,
-        unresolvedTokens: [...unresolvedTokens],
+        unresolvedTokens: unresolvedTokenList,
         substitutions,
         variableSources,
+        legacyTokenSuggestions: buildLegacyTokenSuggestions(unresolvedTokenList),
     };
 }
 
@@ -330,6 +358,7 @@ function resolvePromptMessageSet(messages, options = {}) {
     const unresolvedTokens = new Set();
     const substitutions = {};
     const variableSources = {};
+    const legacyTokenSuggestions = {};
 
     const resolvedMessages = Array.isArray(messages)
         ? messages.map((message) => {
@@ -342,6 +371,7 @@ function resolvePromptMessageSet(messages, options = {}) {
                 result.unresolvedTokens.forEach((token) => unresolvedTokens.add(token));
                 Object.assign(substitutions, result.substitutions);
                 Object.assign(variableSources, result.variableSources);
+                Object.assign(legacyTokenSuggestions, result.legacyTokenSuggestions);
                 return {
                     ...message,
                     content: result.resolvedPrompt,
@@ -360,6 +390,7 @@ function resolvePromptMessageSet(messages, options = {}) {
                         result.unresolvedTokens.forEach((token) => unresolvedTokens.add(token));
                         Object.assign(substitutions, result.substitutions);
                         Object.assign(variableSources, result.variableSources);
+                        Object.assign(legacyTokenSuggestions, result.legacyTokenSuggestions);
                         return {
                             ...part,
                             text: result.resolvedPrompt,
@@ -377,13 +408,16 @@ function resolvePromptMessageSet(messages, options = {}) {
         unresolvedTokens: [...unresolvedTokens],
         substitutions,
         variableSources,
+        legacyTokenSuggestions,
     };
 }
 
 module.exports = {
     DEFAULT_DIV_RENDER_INSTRUCTION,
     DEFAULT_ADAPTIVE_BUBBLE_TIP,
+    LEGACY_PROMPT_TOKEN_REPLACEMENTS,
     buildPromptVariableMap,
+    buildLegacyTokenSuggestions,
     resolvePromptVariables,
     resolvePromptMessageSet,
 };

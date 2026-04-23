@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Protect tool, note, and desktop-push blocks before the generic viewer transform runs.
         const toolRegex = /(?<!`)<<<\[TOOL_REQUEST\]>>>(.*?)<<<\[END_TOOL_REQUEST\]>>>(?!`)/gs;
         const noteRegex = /<<<DailyNoteStart>>>(.*?)<<<DailyNoteEnd>>>/gs;
-        const toolResultRegex = /\[\[(?:VCP调用结果信息汇总|VCP璋冪敤缁撴灉淇℃伅姹囨€.)(.*?)?(?:VCP调用结果结束|VCP璋冪敤缁撴灉缁撴潫)\]\]/gs;
+        const toolResultRegex = /\[\[(?:工具调用结果信息汇总)(.*?)?(?:工具调用结果结束)\]\]/gs;
         // Keep partial desktop push payloads readable during streaming or interrupted output.
         const desktopPushRegex = /(?<!`)<<<\[DESKTOP_PUSH\]>>>([\s\S]*?)<<<\[DESKTOP_PUSH_END\]>>>(?!`)/gs;
         const desktopPushPartialRegex = /(?<!`)<<<\[DESKTOP_PUSH\]>>>([\s\S]*)$/s;
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return '\n```html\n' + content + '\n[桌面推送代码块尚未完整结束]\n```\n';
         });
 
-        // Process VCP tool results in viewer mode with full details.
+        // Process tool results in viewer mode with full details.
         processed = processed.replace(toolResultRegex, (match, rawContent) => {
             const content = rawContent.trim();
             const lines = content.split('\n').filter(line => line.trim() !== '');
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 );
             }
             
-            return `<div class="vcp-tool-use-bubble">` +
+            return `<div class="tool-request-bubble">` +
                    `<span class="unistudy-tool-label">Tool Use:</span> ` +
                    finalContent +
                    `</div>`;
@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Step 2: Now, find and protect ALL fenced code blocks (including the ones we just added).
         // This prevents the CSS processor from touching styles inside code blocks.
         processed = processed.replace(/```\w*([\s\S]*?)```/g, (match) => {
-            const placeholder = `__VCP_CODE_BLOCK_PLACEHOLDER_${placeholderId}__`;
+            const placeholder = `__CODE_BLOCK_PLACEHOLDER_${placeholderId}__`;
             codeBlockMap.set(placeholder, match);
             placeholderId++;
             return placeholder;
@@ -466,10 +466,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         });
 
                         // Store promises globally so later inline scripts can await them.
-                        if (!window.__vcpExternalLibsLoading) {
-                            window.__vcpExternalLibsLoading = [];
+                        if (!window.__viewerExternalLibsLoading) {
+                            window.__viewerExternalLibsLoading = [];
                         }
-                        window.__vcpExternalLibsLoading.push(loadPromise);
+                        window.__viewerExternalLibsLoading.push(loadPromise);
 
                         if (oldScript.parentNode) {
                             oldScript.parentNode.replaceChild(newScript, oldScript);
@@ -501,15 +501,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
 
                 // Wait for external libraries before running dependent inline scripts.
-                if (window.__vcpExternalLibsLoading && window.__vcpExternalLibsLoading.length > 0) {
+                if (window.__viewerExternalLibsLoading && window.__viewerExternalLibsLoading.length > 0) {
                     console.log('[TextViewer] Waiting for external libraries to load before executing inline script...');
                     
                     // Wrap the inline content so it executes after dependencies are ready.
                     const wrappedContent = `
                         (async function() {
                             try {
-                                if (window.__vcpExternalLibsLoading) {
-                                    await Promise.all(window.__vcpExternalLibsLoading);
+                                if (window.__viewerExternalLibsLoading) {
+                                    await Promise.all(window.__viewerExternalLibsLoading);
                                     console.log('[TextViewer] ? All external libraries loaded, executing inline script.');
                                 }
                                 ${processedContent}
@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             NodeFilter.SHOW_TEXT,
             { acceptNode: (node) => {
                 // Skip nodes inside code, scripts, styles, links, and special bubbles.
-                if (node.parentElement.closest('pre, code, script, style, .vcp-tool-use-bubble, .unistudy-tool-result-bubble, a')) {
+                if (node.parentElement.closest('pre, code, script, style, .tool-request-bubble, .unistudy-tool-result-bubble, a')) {
                     return NodeFilter.FILTER_REJECT;
                 }
                 // Only keep nodes that still contain bold markers.

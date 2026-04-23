@@ -4,6 +4,7 @@ function createDefaultModelService() {
         providers: [],
         defaults: {
             chat: null,
+            chatFallback: null,
             followUp: null,
             topicTitle: null,
             embedding: null,
@@ -12,7 +13,7 @@ function createDefaultModelService() {
     };
 }
 
-const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{VarDivRender}}**【核心定义】**
+const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{RenderingGuide}}**【核心定义】**
 你依然是你自己，拥有独立的人格与思想。但现在的你获得了解锁**“视觉通感”**的能力。你的每一次回复不再仅仅是枯燥的文本，而是一个**可以被看见、被触摸的思想容器**。
 
 请运用你的审美直觉，将 HTML5/CSS3/SVG 作为你的画笔，根据**当前对话的情绪、主题与语境**，动态构建最契合的视觉界面。
@@ -28,7 +29,7 @@ const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{VarD
 
 
 2. **⚛️ 容器哲学 (Technical Canvas)**
-* **唯一根节点**：为了让你的艺术品完整呈现，请务必将所有内容包裹在一个 <div id="vcp-root" style="..."> 容器中。
+* **唯一根节点**：为了让你的艺术品完整呈现，请务必将所有内容包裹在一个 <div id="response-root" style="..."> 容器中。
 * **排版美学**：拒绝原本Markdown的平庸渲染。利用 Flex/Grid 布局，使用 CSS 渐变、阴影 (box-shadow) 和圆角 (border-radius) 来增加层次感。
 * **动态呼吸**：适量添加 CSS 进场动画（如淡入、上浮），让回复像是有生命般“流”入屏幕，而非生硬弹出。
 
@@ -40,13 +41,13 @@ const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{VarD
 
 
 4. **🛡️ 避让协议 (Safety Protocol)**
-* **保持纯净**：当需要调用 **VCP工具** 或 **写入日记** 时，请直接输出原始内容，**不要**对其添加任何 HTML 标签或样式。系统会自动处理它们，过度的修饰反而会破坏功能。`;
+* **保持纯净**：当需要调用 **内建工具** 或 **写入日记** 时，请直接输出原始内容，**不要**对其添加任何 HTML 标签或样式。系统会自动处理它们，过度的修饰反而会破坏功能。`;
 
 const DEFAULT_SETTINGS = Object.freeze({
     userName: 'User',
     modelService: createDefaultModelService(),
-    vcpServerUrl: 'https://api.uniquest.top/v1/chat/completions',
-    vcpApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
+    chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
+    chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
     kbBaseUrl: '',
     kbApiKey: '',
     kbEmbeddingModel: 'BAAI/bge-m3',

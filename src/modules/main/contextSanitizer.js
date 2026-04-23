@@ -130,14 +130,14 @@ class ContextSanitizer {
             }
         });
 
-        // 规则3：✅ 保留 VCP 特殊块（已美化的）
+        // 规则3：✅ 保留已美化的工具协议块
         // 优先级高于未美化的块
-        this.turndownService.addRule('vcpPrettifiedBlocks', {
+        this.turndownService.addRule('toolRequestPrettifiedBlocks', {
             filter: (node) => {
                 if (node.nodeName !== 'PRE') return false;
 
                 // ✅ jsdom 支持 classList
-                return node.classList.contains('vcp-tool-use-bubble') ||
+                return node.classList.contains('tool-request-bubble') ||
                     node.classList.contains('maid-diary-bubble');
             },
             replacement: (content, node) => {
@@ -149,19 +149,19 @@ class ContextSanitizer {
                     return rawContent;
                 }
 
-                console.warn('[ContextSanitizer] VCP special block missing data-raw-content:',
+                console.warn('[ContextSanitizer] Tool block missing data-raw-content:',
                     node.className, node.textContent.substring(0, 50));
                 return ''; // 返回空，避免污染
             }
         });
 
         // 规则4：✅ 保留未美化但包含特殊标记的块
-        this.turndownService.addRule('vcpRawBlocks', {
+        this.turndownService.addRule('toolRequestRawBlocks', {
             filter: (node) => {
                 if (node.nodeName !== 'PRE') return false;
 
                 // 排除已美化的（由上面的规则处理）
-                if (node.classList.contains('vcp-tool-use-bubble') ||
+                if (node.classList.contains('tool-request-bubble') ||
                     node.classList.contains('maid-diary-bubble')) {
                     return false;
                 }
@@ -178,18 +178,18 @@ class ContextSanitizer {
             }
         });
 
-        // 规则5：清理 VCP 元思考链
-        this.turndownService.addRule('vcpThoughtChains', {
+        // 规则5：清理模型思考过程块
+        this.turndownService.addRule('reasoningBlocks', {
             filter: (node) => {
                 if (node.nodeName !== 'DIV') return false;
-                return node.classList.contains('vcp-thought-chain-bubble');
+                return node.classList.contains('reasoning-bubble');
             },
             replacement: (content, node) => {
                 // 检查 TurndownService 实例上的自定义属性
                 if (this.turndownService.keepThoughtChains) {
                     const title = node.getAttribute('data-thought-title') || '';
                     const titlePart = title ? `: "${title}"` : '';
-                    return `\n\n[--- VCP元思考链${titlePart} ---]\n${content}\n[--- 元思考链结束 ---]\n\n`;
+                    return `\n\n[--- 模型思考过程${titlePart} ---]\n${content}\n[--- 模型思考过程结束 ---]\n\n`;
                 }
                 return '';
             }
@@ -203,7 +203,7 @@ class ContextSanitizer {
      */
     stripThoughtChains(content) {
         if (typeof content !== 'string') return content;
-        const THOUGHT_CHAIN_REGEX = /\[--- VCP元思考链(?::\s*"([^"]*)")?\s*---\][\s\S]*?\[--- 元思考链结束 ---\]/gs;
+        const THOUGHT_CHAIN_REGEX = /\[--- 模型思考过程(?::\s*"([^"]*)")?\s*---\][\s\S]*?\[--- 模型思考过程结束 ---\]/gs;
         const CONVENTIONAL_THOUGHT_REGEX = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi;
         return content.replace(THOUGHT_CHAIN_REGEX, '').replace(CONVENTIONAL_THOUGHT_REGEX, '');
     }

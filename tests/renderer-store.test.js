@@ -10,7 +10,10 @@ async function loadAppStoreModule() {
 }
 
 test('createInitialAppState groups renderer state into the expected slices', async () => {
-    const { createInitialAppState } = await loadAppStoreModule();
+    const {
+        createInitialAppState,
+        DEFAULT_SETTINGS,
+    } = await loadAppStoreModule();
 
     const state = createInitialAppState();
 
@@ -25,7 +28,10 @@ test('createInitialAppState groups renderer state into the expected slices', asy
         'composer',
     ]);
     assert.equal(state.settings.settings.currentThemeMode, 'system');
-    assert.equal(state.settings.settings.agentBubbleThemePrompt, 'Output formatting requirement: {{VarDivRender}}');
+    assert.equal(state.settings.settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
+    assert.match(state.settings.settings.agentBubbleThemePrompt, /\{\{RenderingGuide\}\}/);
+    assert.match(state.settings.settings.agentBubbleThemePrompt, /response-root/);
+    assert.equal(state.settings.settings.modelService.defaults.chatFallback, null);
     assert.equal(state.settings.settings.enableEmoticonPrompt, true);
     assert.equal(state.settings.settings.studyProfile.timezone, 'Asia/Hong_Kong');
     assert.equal(state.layout.sidePanelTab, 'notes');

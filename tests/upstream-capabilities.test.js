@@ -13,7 +13,7 @@ test('buildInterruptEndpoint rewrites the endpoint to /v1/interrupt', () => {
 
 test('describeUpstreamCapabilities summarizes chat and knowledge-base endpoints', () => {
     const capabilities = describeUpstreamCapabilities({
-        vcpServerUrl: 'http://example.com/v1/chat/completions',
+        chatEndpoint: 'http://example.com/v1/chat/completions',
         kbBaseUrl: 'http://kb.example.com/v1',
     });
 
@@ -28,7 +28,7 @@ test('describeUpstreamCapabilities summarizes chat and knowledge-base endpoints'
 
 test('describeUpstreamCapabilities records invalid endpoint warnings', () => {
     const capabilities = describeUpstreamCapabilities({
-        vcpServerUrl: 'not a url',
+        chatEndpoint: 'not a url',
         kbBaseUrl: 'still not a url',
     });
 
@@ -38,9 +38,9 @@ test('describeUpstreamCapabilities records invalid endpoint warnings', () => {
     assert.equal(capabilities.warnings.length, 3);
 });
 
-test('describeUpstreamCapabilities prefers modelService-resolved endpoints over legacy mirrors', () => {
+test('describeUpstreamCapabilities prefers modelService-resolved endpoints over settings mirrors', () => {
     const capabilities = describeUpstreamCapabilities({
-        vcpServerUrl: 'http://legacy.example.com/v1/chat/completions',
+        chatEndpoint: 'http://legacy.example.com/v1/chat/completions',
         kbBaseUrl: 'http://legacy-kb.example.com',
         modelService: {
             version: 1,

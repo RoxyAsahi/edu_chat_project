@@ -12,7 +12,7 @@ function initialize(context = {}) {
     studyServices = createStudyServices({
         dataRoot: context.DATA_ROOT,
         settingsManager: context.settingsManager,
-        vcpClient: context.vcpClient,
+        chatClient: context.chatClient,
     });
 
     ipcMain.handle('list-study-log-days', async (_event, payload = {}) => {

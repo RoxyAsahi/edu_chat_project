@@ -2,6 +2,7 @@ const MODEL_SERVICE_VERSION = 1;
 
 const MODEL_SERVICE_DEFAULT_KEYS = Object.freeze([
     'chat',
+    'chatFallback',
     'followUp',
     'topicTitle',
     'embedding',
@@ -69,6 +70,7 @@ const DEFAULT_MODEL_SERVICE = Object.freeze({
     providers: [],
     defaults: {
         chat: null,
+        chatFallback: null,
         followUp: null,
         topicTitle: null,
         embedding: null,
@@ -90,6 +92,7 @@ function createDefaultModelService() {
         providers: [],
         defaults: {
             chat: null,
+            chatFallback: null,
             followUp: null,
             topicTitle: null,
             embedding: null,
@@ -513,11 +516,11 @@ function resolveDefaultRefForProvider(provider, modelId = '') {
     };
 }
 
-function migrateLegacySettingsToModelService(settings = {}) {
-    const chatBaseUrl = normalizeApiBaseUrl(settings?.vcpServerUrl);
-    const kbBaseUrl = normalizeApiBaseUrl(settings?.kbBaseUrl || settings?.vcpServerUrl);
-    const chatApiKeys = normalizeApiKeys(settings?.vcpApiKey);
-    const kbApiKeys = normalizeApiKeys(settings?.kbApiKey || settings?.vcpApiKey);
+function buildModelServiceFromSettings(settings = {}) {
+    const chatBaseUrl = normalizeApiBaseUrl(settings?.chatEndpoint);
+    const kbBaseUrl = normalizeApiBaseUrl(settings?.kbBaseUrl || settings?.chatEndpoint);
+    const chatApiKeys = normalizeApiKeys(settings?.chatApiKey);
+    const kbApiKeys = normalizeApiKeys(settings?.kbApiKey || settings?.chatApiKey);
 
     const chatModels = collectLegacyModels(settings, [
         [settings?.defaultModel, 'chat', { chat: true }],
@@ -590,6 +593,7 @@ function migrateLegacySettingsToModelService(settings = {}) {
                 normalizeText(settings?.defaultModel) || normalizeText(settings?.lastModel) || normalizeText(settings?.guideModel)
             )
             : null,
+        chatFallback: null,
         followUp: primaryProvider
             ? resolveDefaultRefForProvider(
                 primaryProvider,
@@ -820,8 +824,8 @@ function resolveExecutionConfig(settings = {}, options = {}) {
                 ? { id: normalizeText(settings.kbEmbeddingModel), name: normalizeText(settings.kbEmbeddingModel) }
                 : null,
             ref: null,
-            endpoint: buildEmbeddingsEndpoint(settings?.kbBaseUrl || settings?.vcpServerUrl),
-            apiKey: normalizeText(settings?.kbApiKey || settings?.vcpApiKey),
+            endpoint: buildEmbeddingsEndpoint(settings?.kbBaseUrl || settings?.chatEndpoint),
+            apiKey: normalizeText(settings?.kbApiKey || settings?.chatApiKey),
             extraHeaders: {},
         };
     }
@@ -835,8 +839,8 @@ function resolveExecutionConfig(settings = {}, options = {}) {
                 ? { id: normalizeText(settings.kbRerankModel), name: normalizeText(settings.kbRerankModel) }
                 : null,
             ref: null,
-            endpoint: buildRerankEndpoint(settings?.kbBaseUrl || settings?.vcpServerUrl),
-            apiKey: normalizeText(settings?.kbApiKey || settings?.vcpApiKey),
+            endpoint: buildRerankEndpoint(settings?.kbBaseUrl || settings?.chatEndpoint),
+            apiKey: normalizeText(settings?.kbApiKey || settings?.chatApiKey),
             extraHeaders: {},
         };
     }
@@ -850,10 +854,18 @@ function resolveExecutionConfig(settings = {}, options = {}) {
         provider: null,
         model: legacyModel ? { id: legacyModel, name: legacyModel } : null,
         ref: null,
-        endpoint: normalizeText(options.fallbackEndpoint) || buildLegacyChatEndpoint(settings?.vcpServerUrl),
-        apiKey: normalizeText(options.fallbackApiKey || settings?.vcpApiKey),
+        endpoint: normalizeText(options.fallbackEndpoint) || buildLegacyChatEndpoint(settings?.chatEndpoint),
+        apiKey: normalizeText(options.fallbackApiKey || settings?.chatApiKey),
         extraHeaders: {},
     };
+}
+
+function resolveChatFallbackExecution(settings = {}, options = {}) {
+    const normalizedSettings = settings?.modelService
+        ? normalizeModelService(settings.modelService)
+        : createDefaultModelService();
+    const resolved = resolveDefaultModelRef(normalizedSettings, 'chatFallback', options);
+    return buildResolvedExecution(resolved, 'chat');
 }
 
 function getLegacyFallbackModel(service = DEFAULT_MODEL_SERVICE, taskKey = 'chat') {
@@ -861,7 +873,7 @@ function getLegacyFallbackModel(service = DEFAULT_MODEL_SERVICE, taskKey = 'chat
     return resolved?.model?.id || '';
 }
 
-function buildLegacySettingsMirror(modelService = DEFAULT_MODEL_SERVICE, previousSettings = {}) {
+function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVICE, previousSettings = {}) {
     const normalizedModelService = normalizeModelService(modelService);
     const chatExecution = resolveExecutionConfig({ modelService: normalizedModelService }, { purpose: 'chat' });
     const embeddingExecution = resolveExecutionConfig({ modelService: normalizedModelService }, { purpose: 'embedding' });
@@ -877,8 +889,8 @@ function buildLegacySettingsMirror(modelService = DEFAULT_MODEL_SERVICE, previou
         : rerankExecution;
 
     return {
-        vcpServerUrl: chatExecution?.endpoint || '',
-        vcpApiKey: chatExecution?.apiKey || '',
+        chatEndpoint: chatExecution?.endpoint || '',
+        chatApiKey: chatExecution?.apiKey || '',
         defaultModel: chatModel,
         followUpDefaultModel: followUpModel,
         topicTitleDefaultModel: topicTitleModel,
@@ -971,7 +983,7 @@ module.exports = {
     buildChatEndpoint,
     buildEmbeddingsEndpoint,
     buildInterruptEndpoint,
-    buildLegacySettingsMirror,
+    buildSettingsMirrorFromModelService,
     buildModelsEndpoint,
     buildRerankEndpoint,
     cloneModelService,
@@ -983,7 +995,7 @@ module.exports = {
     listEnabledModels,
     mergeFetchedModelsIntoProvider,
     mergeModelServices,
-    migrateLegacySettingsToModelService,
+    buildModelServiceFromSettings,
     normalizeApiBaseUrl,
     normalizeApiKeys,
     normalizeDefaults,
@@ -993,6 +1005,7 @@ module.exports = {
     normalizeModelService,
     normalizeProviderConfig,
     resolveDefaultModelRef,
+    resolveChatFallbackExecution,
     resolveExecutionConfig,
     resolveModelById,
     resolveModelRef,

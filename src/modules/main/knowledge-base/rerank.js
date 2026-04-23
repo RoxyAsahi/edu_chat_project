@@ -2,7 +2,7 @@ const {
     DEFAULT_KB_CANDIDATE_TOP_K,
 } = require('./constants');
 const { resolveExecutionConfig } = require('../utils/modelService');
-const { buildRequestHeaders } = require('../vcpClient');
+const { buildRequestHeaders } = require('../chatClient');
 
 const DEFAULT_RERANK_TIMEOUT_MS = 15000;
 

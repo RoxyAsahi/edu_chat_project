@@ -4,7 +4,7 @@ const { requestEmbeddings, cosineSimilarity, resolveRetrievalConfig } = require(
 const { requestRerank, resolveRerankConfig } = require('./rerank');
 const { parseKnowledgeBaseDocument, isImageMimeType, inferMimeType } = require('./parserAdapter');
 const { KB_UNSUPPORTED_OCR_ERROR } = require('./constants');
-const vcpClient = require('../vcpClient');
+const chatClient = require('../chatClient');
 const { createKnowledgeBaseRuntime } = require('./runtime');
 const { createKnowledgeBaseRepository } = require('./repository');
 const { createDocumentStore } = require('./documentStore');
@@ -19,7 +19,7 @@ const runtime = createKnowledgeBaseRuntime();
 const repository = createKnowledgeBaseRepository();
 const imageDocumentTranscriber = createImageDocumentTranscriber({
     runtime,
-    vcpClient,
+    chatClient,
 });
 const processor = createDocumentProcessor({
     runtime,
@@ -55,7 +55,7 @@ const guideService = createGuideService({
     runtime,
     repository,
     parseKnowledgeBaseDocument,
-    vcpClient,
+    chatClient,
 });
 
 async function initializeKnowledgeBase(options = {}) {

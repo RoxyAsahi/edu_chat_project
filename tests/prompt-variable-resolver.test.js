@@ -29,8 +29,19 @@ test('resolvePromptVariables keeps unresolved tokens visible and reports them', 
     assert.deepEqual(result.unresolvedTokens, ['MissingAlias']);
 });
 
-test('resolvePromptVariables resolves VarDivRender locally', () => {
-    const result = resolvePromptVariables('Output formatting requirement: {{VarDivRender}}');
+test('resolvePromptVariables reports replacement hints for legacy prompt tokens', () => {
+    const result = resolvePromptVariables('Hello {{VarDivRender}} and {{VarUser}}');
+
+    assert.equal(result.resolvedPrompt, 'Hello {{VarDivRender}} and {{VarUser}}');
+    assert.deepEqual(result.unresolvedTokens, ['VarDivRender', 'VarUser']);
+    assert.deepEqual(result.legacyTokenSuggestions, {
+        VarDivRender: 'RenderingGuide',
+        VarUser: 'UserName',
+    });
+});
+
+test('resolvePromptVariables resolves RenderingGuide locally', () => {
+    const result = resolvePromptVariables('Output formatting requirement: {{RenderingGuide}}');
 
     assert.equal(
         result.resolvedPrompt,
@@ -39,8 +50,8 @@ test('resolvePromptVariables resolves VarDivRender locally', () => {
     assert.deepEqual(result.unresolvedTokens, []);
 });
 
-test('resolvePromptVariables resolves study profile variables and DailyNoteTool locally', () => {
-    const result = resolvePromptVariables('{{StudentName}} @ {{StudyWorkspace}} / {{WorkEnvironment}}\n{{DailyNoteTool}}', {
+test('resolvePromptVariables resolves study profile variables and DailyNoteGuide locally', () => {
+    const result = resolvePromptVariables('{{StudentName}} @ {{StudyWorkspace}} / {{WorkEnvironment}}\n{{DailyNoteGuide}}', {
         settings: {
             userName: 'FallbackUser',
             studyProfile: {
@@ -51,8 +62,8 @@ test('resolvePromptVariables resolves study profile variables and DailyNoteTool 
         },
         agentConfig: {
             name: 'Hornet_验收',
-            vcpAliases: ['Hornet'],
-            vcpMaid: '[Hornet]Hornet',
+            promptAliases: ['Hornet'],
+            toolSignature: '[Hornet]Hornet',
         },
     });
 
@@ -63,8 +74,8 @@ test('resolvePromptVariables resolves study profile variables and DailyNoteTool 
     assert.deepEqual(result.unresolvedTokens, []);
 });
 
-test('resolvePromptVariables suppresses DailyNoteTool when study log loop is disabled', () => {
-    const result = resolvePromptVariables('协议：{{DailyNoteTool}}', {
+test('resolvePromptVariables suppresses DailyNoteGuide when study log loop is disabled', () => {
+    const result = resolvePromptVariables('协议：{{DailyNoteGuide}}', {
         settings: {
             studyLogPolicy: {
                 enabled: false,
@@ -78,7 +89,7 @@ test('resolvePromptVariables suppresses DailyNoteTool when study log loop is dis
 });
 
 test('resolvePromptVariables resolves bundled emoticon variables and aliases', () => {
-    const result = resolvePromptVariables('{{VarEmoticonPrompt}}\n{{VarEmojiPrompt}}\n{{GeneralEmoticonPath}}', {
+    const result = resolvePromptVariables('{{EmoticonGuide}}\n{{EmoticonGuide}}\n{{GeneralEmoticonPath}}', {
         settings: {
             enableEmoticonPrompt: true,
         },

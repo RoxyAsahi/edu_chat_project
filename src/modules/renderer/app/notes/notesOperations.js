@@ -464,10 +464,10 @@ function createNotesOperations(deps = {}) {
 
         ui.showToastNotification('正在生成内容，请稍候…', 'info', 2500);
 
-        const response = await chatAPI.sendToVCP({
+        const response = await chatAPI.sendChatRequest({
             requestId: createId(`study_${kind}`),
-            endpoint: state.settings.vcpServerUrl,
-            apiKey: state.settings.vcpApiKey,
+            endpoint: state.settings.chatEndpoint,
+            apiKey: state.settings.chatApiKey,
             messages: [
                 {
                     role: 'system',

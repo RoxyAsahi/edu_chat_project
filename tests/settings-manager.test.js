@@ -31,11 +31,11 @@ test('validateSettings normalizes unknown keys, types, and bounds', () => {
     assert.equal('rogueField' in validated, false);
   });
 
-test('validateSettings preserves legacy model service fields when modelService is absent', () => {
+test('validateSettings preserves direct settings fields when modelService is absent', () => {
     const { validated } = validateSettings({
         userName: 'Legacy Model User',
-        vcpServerUrl: 'https://chat.example.com/proxy/v1/chat/completions',
-        vcpApiKey: 'chat-key',
+        chatEndpoint: 'https://chat.example.com/proxy/v1/chat/completions',
+        chatApiKey: 'chat-key',
         defaultModel: 'gpt-4o',
         followUpDefaultModel: 'gpt-4.1-mini',
         topicTitleDefaultModel: 'gpt-4.1-nano',
@@ -47,15 +47,16 @@ test('validateSettings preserves legacy model service fields when modelService i
 
     assert.equal(validated.modelService.providers.length, 0);
     assert.equal(validated.modelService.defaults.chat, null);
+    assert.equal(validated.modelService.defaults.chatFallback, null);
     assert.equal(validated.modelService.defaults.followUp, null);
     assert.equal(validated.modelService.defaults.topicTitle, null);
     assert.equal(validated.modelService.defaults.embedding, null);
     assert.equal(validated.modelService.defaults.rerank, null);
-    assert.equal(validated.vcpServerUrl, 'https://chat.example.com/proxy/v1/chat/completions');
+    assert.equal(validated.chatEndpoint, 'https://chat.example.com/proxy/v1/chat/completions');
     assert.equal(validated.kbBaseUrl, 'https://kb.example.com/openai/v1/embeddings');
 });
 
-test('validateSettings mirrors explicit modelService back into legacy compatibility fields', () => {
+test('validateSettings mirrors explicit modelService back into native settings fields', () => {
     const { validated } = validateSettings({
         ...DEFAULT_SETTINGS,
         modelService: {
@@ -128,19 +129,20 @@ test('validateSettings mirrors explicit modelService back into legacy compatibil
             ],
             defaults: {
                 chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
+                chatFallback: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 followUp: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 topicTitle: { providerId: 'chat-provider', modelId: 'gpt-4.1-nano' },
                 embedding: { providerId: 'kb-provider', modelId: 'bge-m3' },
                 rerank: { providerId: 'kb-provider', modelId: 'bge-reranker-v2' },
             },
         },
-        vcpServerUrl: 'https://legacy.example.com/ignored',
+        chatEndpoint: 'https://legacy.example.com/ignored',
         kbBaseUrl: 'https://legacy-kb.example.com/ignored',
     });
 
     assert.equal(validated.modelService.providers.length, 2);
-    assert.equal(validated.vcpServerUrl, 'https://chat.example.com/proxy/v1/chat/completions');
-    assert.equal(validated.vcpApiKey, 'chat-key-1');
+    assert.equal(validated.chatEndpoint, 'https://chat.example.com/proxy/v1/chat/completions');
+    assert.equal(validated.chatApiKey, 'chat-key-1');
     assert.equal(validated.defaultModel, 'gpt-4o');
     assert.equal(validated.followUpDefaultModel, 'gpt-4.1-mini');
     assert.equal(validated.topicTitleDefaultModel, 'gpt-4.1-nano');
@@ -148,6 +150,11 @@ test('validateSettings mirrors explicit modelService back into legacy compatibil
     assert.equal(validated.kbApiKey, 'kb-key-1');
     assert.equal(validated.kbEmbeddingModel, 'bge-m3');
     assert.equal(validated.kbRerankModel, 'bge-reranker-v2');
+    assert.deepEqual(validated.modelService.defaults.chatFallback, {
+        providerId: 'chat-provider',
+        modelId: 'gpt-4.1-mini',
+    });
+    assert.equal('chatFallback' in validated, false);
 });
 
 test('readSettings falls back to defaults when the file is missing', async (t) => {
@@ -192,7 +199,7 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.topicTitlePromptTemplate, DEFAULT_SETTINGS.topicTitlePromptTemplate);
 });
 
-test('readSettings promotes legacy vcpLite prompt fields to top-level native settings', async (t) => {
+test('readSettings flags legacy vcpLite prompt fields without migrating them', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
@@ -210,10 +217,14 @@ test('readSettings promotes legacy vcpLite prompt fields to top-level native set
     const settings = await manager.readSettings();
     const rawWritten = await fs.readJson(settingsPath);
 
-    assert.equal(settings.renderingPrompt, 'legacy rendering prompt');
-    assert.equal(settings.adaptiveBubbleTip, 'legacy bubble tip');
-    assert.equal(settings.dailyNoteGuide, 'legacy daily note guide');
+    assert.equal(settings.renderingPrompt, '');
+    assert.equal(settings.adaptiveBubbleTip, '');
+    assert.equal(settings.dailyNoteGuide, '');
     assert.equal('vcpLite' in rawWritten, false);
+    assert.deepEqual(
+        settings.__validationIssues.legacyFieldWarnings.map((item) => item.field),
+        ['vcpLite']
+    );
 });
 
 test('readSettings recovers from a valid backup when the primary file is corrupted', async (t) => {

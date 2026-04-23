@@ -7,6 +7,39 @@ const {
     validateSettings,
 } = require('./settingsSchema');
 
+function createValidationIssues(result = {}) {
+    const legacyFieldWarnings = Array.isArray(result.legacyFieldWarnings)
+        ? result.legacyFieldWarnings.map((item) => ({ ...item }))
+        : [];
+    const unknownKeys = Array.isArray(result.unknownKeys)
+        ? [...result.unknownKeys]
+        : [];
+
+    return {
+        hasIssues: result.hasIssues === true,
+        legacyFieldWarnings,
+        unknownKeys,
+    };
+}
+
+function attachValidationIssues(settings = {}, issues = null) {
+    if (!settings || typeof settings !== 'object') {
+        return settings;
+    }
+
+    Object.defineProperty(settings, '__validationIssues', {
+        value: issues || { hasIssues: false, legacyFieldWarnings: [], unknownKeys: [] },
+        enumerable: false,
+        configurable: true,
+        writable: true,
+    });
+    return settings;
+}
+
+function cloneSettingsWithIssues(settings = {}, issues = null) {
+    return attachValidationIssues({ ...(settings || {}) }, issues);
+}
+
 class SettingsManager extends EventEmitter {
     constructor(settingsPath) {
         super();
@@ -15,6 +48,7 @@ class SettingsManager extends EventEmitter {
         this.processing = false;
         this.cache = null;
         this.cacheTimestamp = 0;
+        this.cacheValidationIssues = null;
         this.lockFile = settingsPath + '.lock';
         this.cleanupTimer = null;
         this.autoBackupTimer = null;
@@ -44,12 +78,14 @@ class SettingsManager extends EventEmitter {
             // Use the cache when the on-disk file has not changed.
             const stats = await fs.stat(this.settingsPath).catch(() => null);
             if (stats && this.cache && stats.mtimeMs <= this.cacheTimestamp) {
-                return { ...this.cache };
+                return cloneSettingsWithIssues(this.cache, this.cacheValidationIssues);
             }
 
             const content = await fs.readFile(this.settingsPath, 'utf8');
             const settings = JSON.parse(content.replace(/^\uFEFF/, ''));
-            const { validated, hasIssues } = validateSettings(settings, this.defaultSettings);
+            const validationResult = validateSettings(settings, this.defaultSettings);
+            const { validated, hasIssues } = validationResult;
+            const validationIssues = createValidationIssues(validationResult);
 
             if (hasIssues) {
                 const tempFile = this.settingsPath + '.tmp';
@@ -67,12 +103,17 @@ class SettingsManager extends EventEmitter {
             // Refresh the in-memory cache.
             const refreshedStats = await fs.stat(this.settingsPath).catch(() => stats);
             this.cache = validated;
+            this.cacheValidationIssues = validationIssues;
             this.cacheTimestamp = refreshedStats ? refreshedStats.mtimeMs : Date.now();
             
-            return { ...validated };
+            return cloneSettingsWithIssues(validated, validationIssues);
         } catch (error) {
             if (error.code === 'ENOENT') {
-                return { ...this.defaultSettings };
+                return cloneSettingsWithIssues(this.defaultSettings, {
+                    hasIssues: false,
+                    legacyFieldWarnings: [],
+                    unknownKeys: [],
+                });
             }
             
             console.error('Error reading settings, attempting recovery:', error);
@@ -83,18 +124,23 @@ class SettingsManager extends EventEmitter {
                 try {
                     const backupContent = await fs.readFile(backupPath, 'utf8');
                     const backupSettings = JSON.parse(backupContent.replace(/^\uFEFF/, ''));
-                    const { validated: validatedBackup } = validateSettings(backupSettings, this.defaultSettings);
+                    const backupValidation = validateSettings(backupSettings, this.defaultSettings);
+                    const { validated: validatedBackup } = backupValidation;
+                    const backupIssues = createValidationIssues(backupValidation);
                     
                     // Only recover from a backup that contains meaningful user state.
                     const isNonDefault = validatedBackup && (
                         (Array.isArray(validatedBackup.combinedItemOrder) && validatedBackup.combinedItemOrder.length > 0) ||
                         (validatedBackup.userName && validatedBackup.userName !== 'User') ||
-                        validatedBackup.vcpServerUrl
+                        validatedBackup.chatEndpoint
                     );
 
                     if (isNonDefault) {
                         console.log('Recovered settings from valid backup');
-                        return { ...validatedBackup };
+                        this.cache = validatedBackup;
+                        this.cacheValidationIssues = backupIssues;
+                        this.cacheTimestamp = Date.now();
+                        return cloneSettingsWithIssues(validatedBackup, backupIssues);
                     } else {
                         console.warn('Backup exists but appears to be default or empty, skipping recovery to prevent overwrite');
                     }
@@ -114,7 +160,9 @@ class SettingsManager extends EventEmitter {
         
         try {
             // Validate against the Lite schema before writing.
-            const { validated } = validateSettings(settings, this.defaultSettings);
+            const validationResult = validateSettings(settings, this.defaultSettings);
+            const { validated } = validationResult;
+            const validationIssues = createValidationIssues(validationResult);
             
             // Write through a temp file first.
             await fs.writeJson(tempFile, validated, { spaces: 2 });
@@ -134,6 +182,7 @@ class SettingsManager extends EventEmitter {
             // Refresh the cache after the write succeeds.
             const newTimestamp = Date.now();
             this.cache = { ...validated };
+            this.cacheValidationIssues = validationIssues;
             this.cacheTimestamp = newTimestamp;
             
             // Notify listeners after the new state is durable.
@@ -257,6 +306,7 @@ class SettingsManager extends EventEmitter {
     clearCache() {
         this.cache = null;
         this.cacheTimestamp = 0;
+        this.cacheValidationIssues = null;
     }
 
     // 强制刷新缓存

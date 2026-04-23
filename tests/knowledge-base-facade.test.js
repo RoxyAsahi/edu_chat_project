@@ -182,7 +182,7 @@ function loadKnowledgeBaseFacade() {
                     KB_UNSUPPORTED_OCR_ERROR: 'KB_UNSUPPORTED_OCR_ERROR',
                 };
             }
-            if (request === '../vcpClient') {
+            if (request === '../chatClient') {
                 return {};
             }
             if (request === './runtime') {

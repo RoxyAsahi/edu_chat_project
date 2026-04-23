@@ -307,8 +307,8 @@ test('composerController sendFollowUp sends only the clicked prompt and preserve
         },
         settings: {
             settings: {
-                vcpServerUrl: 'http://example.com/v1/chat/completions',
-                vcpApiKey: 'secret',
+                chatEndpoint: 'http://example.com/v1/chat/completions',
+                chatApiKey: 'secret',
             },
         },
         composer: {
@@ -346,7 +346,7 @@ test('composerController sendFollowUp sends only the clicked prompt and preserve
             async getActiveSystemPrompt() {
                 return { success: false, systemPrompt: '' };
             },
-            async sendToVCP(payload) {
+            async sendChatRequest(payload) {
                 requestPayload = payload;
                 return {
                     response: {
@@ -464,8 +464,8 @@ test('composerController forwards prior assistant reasoning_content and stores n
         },
         settings: {
             settings: {
-                vcpServerUrl: 'http://example.com/v1/chat/completions',
-                vcpApiKey: 'secret',
+                chatEndpoint: 'http://example.com/v1/chat/completions',
+                chatApiKey: 'secret',
             },
         },
         composer: {
@@ -494,7 +494,7 @@ test('composerController forwards prior assistant reasoning_content and stores n
             async getActiveSystemPrompt() {
                 return { success: false, systemPrompt: '' };
             },
-            async sendToVCP(payload) {
+            async sendChatRequest(payload) {
                 requestPayload = payload;
                 return {
                     response: {

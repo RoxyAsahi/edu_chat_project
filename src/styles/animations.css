@@ -1,6 +1,6 @@
 /* styles/animations.css */
 
-@keyframes vcp-shimmer-bg {
+@keyframes chat-shimmer-bg {
     0% { background-position: 150% 0; }
     100% { background-position: -150% 0; }
 }
@@ -111,7 +111,7 @@ body:not(.light-theme) .topic-item.active-topic-glowing {
  * =======================================================
  */
 
-@keyframes vcp-border-flow {
+@keyframes chat-border-flow {
   0% {
     background-position: 0% 50%;
   }
@@ -143,7 +143,7 @@ body:not(.light-theme) .topic-item.active-topic-glowing {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   
-  animation: vcp-border-flow 3s linear infinite;
+  animation: chat-border-flow 3s linear infinite;
   pointer-events: none;
   z-index: 1;
   opacity: 0.8;
@@ -262,7 +262,7 @@ body:not(.light-theme) .topic-item.active-topic-glowing {
 }
 
 /* =======================================================
- * VCPChat Title: Animated Gradient Text (Removed for performance)
+ * UniStudy Title: Animated Gradient Text (Removed for performance)
  * ======================================================= */
 
 /* =======================================================

@@ -331,7 +331,7 @@ export function pauseMessageAnimations(messageItem) {
  */
 function applyPauseToState(messageItem, state) {
     // 1. CSS 动画：添加暂停类
-    messageItem.classList.add('vcp-paused');
+    messageItem.classList.add('render-paused');
 
     // 2. Web Animations API
     // 重新扫描以捕获新创建的动画
@@ -381,7 +381,7 @@ function applyPauseToState(messageItem, state) {
                 ctx.pauseCallback();
             }
             ctx.canvas.style.visibility = 'hidden';
-            ctx.canvas.dataset.vcpPaused = 'true';
+            ctx.canvas.dataset.renderPaused = 'true';
             ctx.isPaused = true;
         }
     });
@@ -389,7 +389,7 @@ function applyPauseToState(messageItem, state) {
     // 6. 视频/音频
     state.mediaElements.forEach(media => {
         if (media.isConnected && !media.paused) {
-            media.dataset.vcpWasPlaying = 'true';
+            media.dataset.wasPlayingBeforePause = 'true';
             media.pause();
         }
     });
@@ -417,7 +417,7 @@ export function resumeMessageAnimations(messageItem) {
     if (!state || !state.isPaused) return;
 
     // 1. 恢复 CSS 动画：移除暂停类
-    messageItem.classList.remove('vcp-paused');
+    messageItem.classList.remove('render-paused');
 
     // 2. 恢复 Web Animations API
     state.webAnimations.forEach(anim => {
@@ -454,16 +454,16 @@ export function resumeMessageAnimations(messageItem) {
                 ctx.resumeCallback();
             }
             ctx.canvas.style.visibility = 'visible';
-            delete ctx.canvas.dataset.vcpPaused;
+            delete ctx.canvas.dataset.renderPaused;
             ctx.isPaused = false;
         }
     });
 
     // 6. 视频/音频
     state.mediaElements.forEach(media => {
-        if (media.isConnected && media.dataset.vcpWasPlaying === 'true') {
+        if (media.isConnected && media.dataset.wasPlayingBeforePause === 'true') {
             media.play().catch(() => { });
-            delete media.dataset.vcpWasPlaying;
+            delete media.dataset.wasPlayingBeforePause;
         }
     });
 

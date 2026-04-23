@@ -14,8 +14,8 @@ import * as visibilityOptimizer from './visibilityOptimizer.js';
 import { createPausableRAF, registerCanvasAnimation } from './visibilityOptimizer.js';
 
 // 🔥 全局跟踪已加载的脚本，防止跨消息重复加载
-if (!window._vcp_loaded_scripts) {
-    window._vcp_loaded_scripts = new Set();
+if (!window._loadedRendererScripts) {
+    window._loadedRendererScripts = new Set();
 }
 
 function replaceCdnUrls(scriptContent) {
@@ -147,11 +147,11 @@ function patchThreeJS() {
 }
 
 function loadScript(src, onLoad, onError) {
-    if (window._vcp_loaded_scripts.has(src)) {
+    if (window._loadedRendererScripts.has(src)) {
         if(onLoad) onLoad();
         return;
     }
-    window._vcp_loaded_scripts.add(src); // Pre-mark to prevent race conditions
+    window._loadedRendererScripts.add(src); // Pre-mark to prevent race conditions
     
     const scriptEl = document.createElement('script');
     scriptEl.src = src;
@@ -161,7 +161,7 @@ function loadScript(src, onLoad, onError) {
     };
     scriptEl.onerror = () => {
         console.error(`[Animation] ❌ Failed to load: ${src}`);
-        window._vcp_loaded_scripts.delete(src); // Allow retry on failure
+        window._loadedRendererScripts.delete(src); // Allow retry on failure
         if (onError) onError();
     };
     document.head.appendChild(scriptEl);
@@ -183,7 +183,7 @@ function processScripts(containerElement) {
         // 🛡️ 拦截 anime.js 的创建，以便自动注册
         const originalAnime = window.anime;
         let animePatched = false;
-        if (originalAnime && !originalAnime._vcp_patched) {
+        if (originalAnime && !originalAnime._rendererPatched) {
             window.anime = function(options) {
                 const instance = originalAnime(options);
                 if (messageItem) {
@@ -192,7 +192,7 @@ function processScripts(containerElement) {
                 return instance;
             };
             Object.assign(window.anime, originalAnime);
-            window.anime._vcp_patched = true;
+            window.anime._rendererPatched = true;
             animePatched = true;
         }
 
@@ -227,7 +227,7 @@ function processScripts(containerElement) {
 
                     // 3. 影子注入：通过 IIFE 重新定义局部作用域内的 API
                     // 我们将 pausableRAF 挂载到一个临时全局变量上，以便注入脚本读取
-                    const tempRafId = `_vcp_raf_${Math.random().toString(36).slice(2, 11)}`;
+                    const tempRafId = `_render_raf_${Math.random().toString(36).slice(2, 11)}`;
                     window[tempRafId] = pausableRAF;
                     
                     // [优化] 拦截脚本中的 requestAnimationFrame，强制指向 pausableRAF

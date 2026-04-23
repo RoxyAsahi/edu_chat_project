@@ -3,6 +3,7 @@ const {
     buildChatEndpoint,
     listEnabledModels,
     normalizeModelService,
+    resolveChatFallbackExecution,
     resolveExecutionConfig,
     resolveProviderApiKey,
 } = require('../utils/modelService');
@@ -107,13 +108,14 @@ function resolveVisionExecution(settings = {}) {
 function createImageDocumentTranscriber(deps = {}) {
     const runtime = deps.runtime;
     const fsImpl = deps.fs || fs;
-    const vcpClient = deps.vcpClient;
+    const chatClient = deps.chatClient;
 
     async function transcribeImageDocument(document = {}) {
         const settings = await runtime.readSettings();
         const execution = resolveVisionExecution(settings);
-        const endpoint = String(execution?.endpoint || settings?.vcpServerUrl || '').trim();
-        const apiKey = String(execution?.apiKey || settings?.vcpApiKey || '').trim();
+        const fallbackExecution = resolveChatFallbackExecution(settings);
+        const endpoint = String(execution?.endpoint || settings?.chatEndpoint || '').trim();
+        const apiKey = String(execution?.apiKey || settings?.chatApiKey || '').trim();
         const model = String(
             execution?.model?.id
             || settings?.defaultModel
@@ -130,7 +132,7 @@ function createImageDocumentTranscriber(deps = {}) {
         const imageDataUrl = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
         const prompt = buildImageTranscriptionPrompt(document);
 
-        const response = await vcpClient.send({
+        const response = await chatClient.send({
             requestId: `kb_image_${document.id || Date.now()}`,
             endpoint,
             apiKey,
@@ -158,6 +160,8 @@ function createImageDocumentTranscriber(deps = {}) {
                 documentId: document.id || null,
             },
             timeoutMs: 300000,
+            fallbackExecution,
+            requiredCapability: 'vision',
         });
 
         if (response?.error) {

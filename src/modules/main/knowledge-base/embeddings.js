@@ -3,7 +3,7 @@ const {
     DEFAULT_KB_TOP_K,
 } = require('./constants');
 const { resolveExecutionConfig } = require('../utils/modelService');
-const { buildRequestHeaders } = require('../vcpClient');
+const { buildRequestHeaders } = require('../chatClient');
 
 const DEFAULT_EMBEDDING_BATCH_SIZE = 64;
 

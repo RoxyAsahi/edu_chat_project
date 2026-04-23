@@ -50,8 +50,8 @@ function createDom() {
           <input id="studyMemoryTopKInput" />
           <input id="studyMemoryFallbackTopKInput" />
           <textarea id="promptVariablesInput"></textarea>
-          <input id="vcpServerUrl" />
-          <input id="vcpApiKey" />
+          <input id="chatEndpoint" />
+          <input id="chatApiKey" />
           <input id="kbBaseUrl" />
           <input id="kbApiKey" />
           <input id="kbEmbeddingModel" />
@@ -129,8 +129,8 @@ function createDom() {
           <img id="agentAvatarPreview" />
           <input id="agentAvatarInput" type="file" />
           <input id="agentModel" />
-          <textarea id="agentVcpAliasesInput"></textarea>
-          <input id="agentVcpMaidInput" />
+          <textarea id="agentPromptAliasesInput"></textarea>
+          <input id="agentToolSignatureInput" />
           <input id="agentTemperature" />
           <input id="agentContextTokenLimit" />
           <input id="agentMaxOutputTokens" />
@@ -172,8 +172,8 @@ function createElementMap(documentObj) {
         studyMemoryTopKInput: documentObj.getElementById('studyMemoryTopKInput'),
         studyMemoryFallbackTopKInput: documentObj.getElementById('studyMemoryFallbackTopKInput'),
         promptVariablesInput: documentObj.getElementById('promptVariablesInput'),
-        vcpServerUrl: documentObj.getElementById('vcpServerUrl'),
-        vcpApiKey: documentObj.getElementById('vcpApiKey'),
+        chatEndpoint: documentObj.getElementById('chatEndpoint'),
+        chatApiKey: documentObj.getElementById('chatApiKey'),
         kbBaseUrl: documentObj.getElementById('kbBaseUrl'),
         kbApiKey: documentObj.getElementById('kbApiKey'),
         kbEmbeddingModel: documentObj.getElementById('kbEmbeddingModel'),
@@ -242,8 +242,8 @@ function createElementMap(documentObj) {
         agentAvatarPreview: documentObj.getElementById('agentAvatarPreview'),
         agentAvatarInput: documentObj.getElementById('agentAvatarInput'),
         agentModel: documentObj.getElementById('agentModel'),
-        agentVcpAliasesInput: documentObj.getElementById('agentVcpAliasesInput'),
-        agentVcpMaidInput: documentObj.getElementById('agentVcpMaidInput'),
+        agentPromptAliasesInput: documentObj.getElementById('agentPromptAliasesInput'),
+        agentToolSignatureInput: documentObj.getElementById('agentToolSignatureInput'),
         agentTemperature: documentObj.getElementById('agentTemperature'),
         agentContextTokenLimit: documentObj.getElementById('agentContextTokenLimit'),
         agentMaxOutputTokens: documentObj.getElementById('agentMaxOutputTokens'),
@@ -365,7 +365,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     enableTopicTitleGeneration: false,
                     topicTitlePromptTemplate: 'title template with {{CHAT_HISTORY}}',
                     enableAgentBubbleTheme: false,
-                    agentBubbleThemePrompt: 'Custom bubble prompt: {{VarDivRender}}',
+                    agentBubbleThemePrompt: 'Custom bubble prompt: {{RenderingGuide}}',
                     enableWideChatLayout: true,
                     enableSmoothStreaming: false,
                     currentThemeMode: 'dark',
@@ -389,17 +389,17 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     enabled: payload.enabled,
                     willInject: true,
                     resolvedPrompt: `PREVIEW::${payload.prompt
-                        .replace('{{VarDivRender}}', 'DIV_RENDER')
-                        .replace('{{VarUser}}', 'Alice')
+                        .replace('{{RenderingGuide}}', 'DIV_RENDER')
+                        .replace('{{UserName}}', 'Alice')
                         .replace('{{AgentName}}', payload.context?.agentName || 'Agent One')}`,
                     unresolvedTokens: [],
                     substitutions: {
-                        VarDivRender: 'DIV_RENDER',
-                        VarUser: 'Alice',
+                        RenderingGuide: 'DIV_RENDER',
+                        UserName: 'Alice',
                     },
                     variableSources: {
-                        VarDivRender: 'builtin',
-                        VarUser: 'settings',
+                        RenderingGuide: 'builtin',
+                        UserName: 'settings',
                     },
                 };
             },
@@ -420,7 +420,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     ? ''
                     : (payload.settings?.dailyNoteGuide || 'default daily note guide');
                 const bubbleText = payload.settings?.enableAgentBubbleTheme === true
-                    ? (payload.settings?.agentBubbleThemePrompt || 'Output formatting requirement: {{VarDivRender}}')
+                    ? (payload.settings?.agentBubbleThemePrompt || 'Output formatting requirement: {{RenderingGuide}}')
                     : '';
                 return {
                     success: true,
@@ -435,7 +435,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                             emoticonText && `EMOTICON::${emoticonText.replace('{{GeneralEmoticonPath}}', '/通用表情包')}`,
                             adaptiveText && `ADAPTIVE::${adaptiveText}`,
                             dailyText && `DAILY::${dailyText}`,
-                            bubbleText && `BUBBLE::${bubbleText.replace('{{VarDivRender}}', 'DIV_RENDER')}`,
+                            bubbleText && `BUBBLE::${bubbleText.replace('{{RenderingGuide}}', 'DIV_RENDER')}`,
                         ].filter(Boolean).join('\n'),
                         unresolvedTokens: [],
                         substitutions: {},
@@ -486,7 +486,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                                 source: payload.settings?.agentBubbleThemePrompt ? 'custom' : 'default',
                                 appended: payload.settings?.enableAgentBubbleTheme === true,
                                 rawPrompt: bubbleText,
-                                resolvedPrompt: bubbleText.replace('{{VarDivRender}}', 'DIV_RENDER'),
+                                resolvedPrompt: bubbleText.replace('{{RenderingGuide}}', 'DIV_RENDER'),
                             },
                         },
                     },
@@ -529,7 +529,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     await flushAsyncWork();
     controller.bindEvents();
 
-    assert.equal(el.agentBubbleThemePrompt.value, 'Custom bubble prompt: {{VarDivRender}}');
+    assert.equal(el.agentBubbleThemePrompt.value, 'Custom bubble prompt: {{RenderingGuide}}');
     assert.equal(el.agentBubbleThemePrompt.readOnly, true);
     assert.equal(el.agentBubbleThemePrompt.classList.contains('settings-textarea--readonly'), true);
     assert.equal(el.agentBubbleThemeResolvedPreview.value, '');
@@ -540,6 +540,10 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chat"]')?.value || '',
         /::chat-default-model$/
+    );
+    assert.equal(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chatFallback"]')?.value || '',
+        ''
     );
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="followUp"]')?.value || '',
@@ -595,14 +599,24 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.topicTitlePromptTemplateInput.readOnly, false);
     assert.equal(el.topicTitlePromptTemplateInput.classList.contains('settings-textarea--readonly'), false);
 
-    el.agentBubbleThemePrompt.value = 'Editable prompt: {{VarDivRender}}';
+    el.agentBubbleThemePrompt.value = 'Editable prompt: {{RenderingGuide}}';
     el.agentBubbleThemePrompt.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     el.emoticonPromptInput.value = 'Editable emoticon prompt: {{GeneralEmoticonPath}}';
     el.emoticonPromptInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     await addModelThroughWorkbench(el, dom, 'updated-chat-default-model', 'Updated Chat Default Model');
+    await addModelThroughWorkbench(el, dom, 'updated-fallback-model', 'Updated Fallback Model');
     await addModelThroughWorkbench(el, dom, 'updated-follow-up-model', 'Updated Follow-up Model');
     await addModelThroughWorkbench(el, dom, 'updated-topic-title-model', 'Updated Topic Title Model');
     await selectDefaultModel(el, dom, 'chat', 'updated-chat-default-model');
+    await selectDefaultModel(el, dom, 'chatFallback', 'updated-chat-default-model');
+    assert.match(
+        el.modelServiceDefaultSelectors
+            .querySelector('[data-model-service-default="chatFallback"]')
+            ?.closest('.model-service-default-row')
+            ?.textContent || '',
+        /当前与默认聊天模型相同/
+    );
+    await selectDefaultModel(el, dom, 'chatFallback', 'updated-fallback-model');
     await selectDefaultModel(el, dom, 'followUp', 'updated-follow-up-model');
     await selectDefaultModel(el, dom, 'topicTitle', 'updated-topic-title-model');
     assert.equal(el.defaultModelInput.value, 'updated-chat-default-model');
@@ -632,14 +646,16 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(savedPatch.followUpDefaultModel, 'updated-follow-up-model');
     assert.equal(savedPatch.topicTitleDefaultModel, 'updated-topic-title-model');
     assert.equal(savedPatch.modelService.defaults.chat.modelId, 'updated-chat-default-model');
+    assert.equal(savedPatch.modelService.defaults.chatFallback.modelId, 'updated-fallback-model');
     assert.equal(savedPatch.modelService.defaults.followUp.modelId, 'updated-follow-up-model');
     assert.equal(savedPatch.modelService.defaults.topicTitle.modelId, 'updated-topic-title-model');
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-chat-default-model'));
+    assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-fallback-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-follow-up-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-topic-title-model'));
     assert.equal(savedPatch.enableEmoticonPrompt, true);
     assert.equal(savedPatch.enableAgentBubbleTheme, true);
-    assert.equal(savedPatch.agentBubbleThemePrompt, 'Editable prompt: {{VarDivRender}}');
+    assert.equal(savedPatch.agentBubbleThemePrompt, 'Editable prompt: {{RenderingGuide}}');
     assert.equal(savedPatch.renderingPrompt, 'native rendering text');
     assert.equal(savedPatch.emoticonPrompt, 'native emoticon prompt: {{GeneralEmoticonPath}}');
     assert.equal(savedPatch.adaptiveBubbleTip, 'native adaptive tip');
@@ -831,7 +847,7 @@ test('settingsController lets the global settings navigation switch into the cur
     assert.equal(el.settingsModalFooter.classList.contains('hidden'), true);
 });
 
-test('settingsController saves native agent VCP fields', async (t) => {
+test('settingsController saves native agent prompt alias and tool signature fields', async (t) => {
     const { createSettingsController } = await loadSettingsControllerModule();
     const dom = createDom();
     const previousWindow = global.window;
@@ -855,8 +871,8 @@ test('settingsController saves native agent VCP fields', async (t) => {
 
     el.agentNameInput.value = 'Nova Agent';
     el.agentModel.value = 'qwen3.5-plus';
-    el.agentVcpAliasesInput.value = 'Nova\nTutor';
-    el.agentVcpMaidInput.value = '[Nova]Nova';
+    el.agentPromptAliasesInput.value = 'Nova\nTutor';
+    el.agentToolSignatureInput.value = '[Nova]Nova';
     el.agentTemperature.value = '0.2';
     el.agentContextTokenLimit.value = '100000';
     el.agentMaxOutputTokens.value = '4000';
@@ -902,8 +918,8 @@ test('settingsController saves native agent VCP fields', async (t) => {
         patch: {
             name: 'Nova Agent',
             model: 'qwen3.5-plus',
-            vcpAliases: ['Nova', 'Tutor'],
-            vcpMaid: '[Nova]Nova',
+            promptAliases: ['Nova', 'Tutor'],
+            toolSignature: '[Nova]Nova',
             temperature: 0.2,
             contextTokenLimit: 100000,
             maxOutputTokens: 4000,

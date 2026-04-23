@@ -9,7 +9,7 @@ const {
     normalizeApiKeys,
     normalizeProviderConfig,
 } = require('../utils/modelService');
-const { buildRequestHeaders } = require('../vcpClient');
+const { buildRequestHeaders } = require('../chatClient');
 
 let initialized = false;
 

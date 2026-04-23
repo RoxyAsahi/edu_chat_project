@@ -702,13 +702,13 @@ async function populateAgentForm(config) {
     el.agentNameInput.value = config.name || '';
     el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';
     el.agentModel.value = config.model || '';
-    if (el.agentVcpAliasesInput) {
-        el.agentVcpAliasesInput.value = Array.isArray(config.vcpAliases)
-            ? config.vcpAliases.join('\n')
-            : (typeof config.vcpAliases === 'string' ? config.vcpAliases : '');
+    if (el.agentPromptAliasesInput) {
+        el.agentPromptAliasesInput.value = Array.isArray(config.promptAliases)
+            ? config.promptAliases.join('\n')
+            : (typeof config.promptAliases === 'string' ? config.promptAliases : '');
     }
-    if (el.agentVcpMaidInput) {
-        el.agentVcpMaidInput.value = config.vcpMaid || '';
+    if (el.agentToolSignatureInput) {
+        el.agentToolSignatureInput.value = config.toolSignature || '';
     }
     el.agentTemperature.value = config.temperature ?? 0.7;
     el.agentContextTokenLimit.value = config.contextTokenLimit ?? 4000;
