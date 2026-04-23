@@ -29,24 +29,27 @@ test('buildSubjectOverviewMarkup renders the current dashboard cards, recent act
         },
     });
 
-    assert.equal(result.headline, '学习首页');
-    assert.match(result.highlightsMarkup, /学科仪表盘/);
-    assert.match(result.highlightsMarkup, /对话学习/);
-    assert.match(result.highlightsMarkup, /来源阅读/);
-    assert.match(result.gridMarkup, /overview-dashboard/);
+    assert.equal(result.headline, '学习工作台');
+    assert.equal(result.highlightsMarkup, '');
+    assert.match(result.gridMarkup, /app-home/);
     assert.match(result.gridMarkup, /学科辅导/);
     assert.match(result.gridMarkup, /知识沉淀/);
     assert.match(result.gridMarkup, /训练转化/);
     assert.match(result.gridMarkup, /成长复盘/);
-    assert.match(result.gridMarkup, /最近成长动态/);
+    assert.match(result.gridMarkup, /学习动态/);
     assert.match(result.gridMarkup, /全部学科/);
-    assert.match(result.gridMarkup, /overview-subject-browser/);
+    assert.match(result.gridMarkup, /bento-subjects/);
     assert.match(result.gridMarkup, /subject-overview-card--current/);
     assert.match(result.gridMarkup, /函数复习/);
     assert.match(result.gridMarkup, /data-agent-id="math"/);
     assert.match(result.gridMarkup, /data-agent-id="english"/);
     assert.match(result.gridMarkup, /当前学习空间/);
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
+    assert.match(result.gridMarkup, /学习日历/);
+    assert.match(result.gridMarkup, /bento-calendar/);
+    assert.match(result.gridMarkup, /学习统计/);
+    assert.match(result.gridMarkup, /bento-stats/);
+    assert.match(result.gridMarkup, /本周学习时长/);
 });
 
 test('buildSubjectOverviewMarkup keeps the current subject visible when it is the only subject card', async () => {
@@ -67,8 +70,8 @@ test('buildSubjectOverviewMarkup keeps the current subject visible when it is th
         },
     });
 
-    assert.equal(result.headline, '学习首页');
-    assert.match(result.gridMarkup, /overview-dashboard/);
+    assert.equal(result.headline, '学习工作台');
+    assert.match(result.gridMarkup, /app-home/);
     assert.match(result.gridMarkup, /subject-overview-card--current/);
     assert.match(result.gridMarkup, /单学科/);
     assert.match(result.gridMarkup, /data-agent-id="solo"/);
@@ -86,14 +89,13 @@ test('buildSubjectOverviewMarkup renders the onboarding empty state when there a
         selectedAgentId: null,
     });
 
-    assert.equal(result.headline, '学习首页');
-    assert.match(result.gridMarkup, /overview-dashboard/);
-    assert.match(result.gridMarkup, /创建第一个学科/);
-    assert.match(result.gridMarkup, /沉淀你的学习过程/);
-    assert.match(result.gridMarkup, /继续完成当天任务/);
-    assert.match(result.gridMarkup, /subject-overview-empty/);
-    assert.match(result.gridMarkup, /Ready/);
+    assert.equal(result.headline, '学习工作台');
+    assert.match(result.gridMarkup, /app-home/);
+    assert.match(result.gridMarkup, /准备好开始你的学习之旅了吗/);
+    assert.match(result.gridMarkup, /bento-welcome--empty/);
+    assert.match(result.gridMarkup, /创建第一个学科，把资料、对话和笔记组织起来/);
+    assert.match(result.gridMarkup, /立即创建/);
     assert.match(result.gridMarkup, /创建你的第一个学科工作台/);
-    assert.match(result.gridMarkup, /立即开始/);
+    assert.match(result.gridMarkup, /把资料、对话、笔记和复盘收进同一个学习入口/);
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
 });
