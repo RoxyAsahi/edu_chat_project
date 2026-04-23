@@ -339,7 +339,7 @@ body.light-theme .notes-section > button:hover {
     );
     background-size: 250% 100%;
     /* 移除通知项的持续流光动画，减少空闲时的重绘 */
-    /* animation: vcp-shimmer-bg 7s linear infinite; */
+    /* animation: chat-shimmer-bg 7s linear infinite; */
 }
 
 .notification-item.visible {
@@ -465,7 +465,7 @@ body.light-theme .notification-item {
     );
     background-size: 300% 100%;
     /* 移除悬浮通知的持续流光动画，减少空闲时的重绘 */
-    /* animation: vcp-shimmer-bg 5s linear infinite; */
+    /* animation: chat-shimmer-bg 5s linear infinite; */
 }
 
 body.dark-theme .floating-toast-notification {
@@ -718,7 +718,7 @@ body.light-theme .floating-toast-notification {
     z-index: 2;
 }
 
-.vcp-btn {
+.action-btn {
     padding: 6px 16px;
     border-radius: 6px;
     border: none;
@@ -729,30 +729,30 @@ body.light-theme .floating-toast-notification {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.vcp-btn:hover {
+.action-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
-.vcp-btn:active {
+.action-btn:active {
     transform: translateY(0);
 }
 
-.vcp-btn-success {
+.action-btn-success {
     background-color: var(--success-color);
     color: white;
 }
 
-.vcp-btn-success:hover {
+.action-btn-success:hover {
     background-color: #5db060; /* Slightly lighter than success-color */
 }
 
-.vcp-btn-danger {
+.action-btn-danger {
     background-color: var(--danger-color);
     color: white;
 }
 
-.vcp-btn-danger:hover {
+.action-btn-danger:hover {
     background-color: var(--danger-hover-bg);
 }
 

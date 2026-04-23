@@ -4,7 +4,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const contextSanitizer = require('../contextSanitizer');
 const knowledgeBase = require('../knowledge-base');
-const vcpClient = require('../vcpClient');
+const chatClient = require('../chatClient');
 const { resolvePromptMessageSet } = require('../utils/promptVariableResolver');
 const { loadBundledEmoticonPromptData } = require('../emoticons/bundledCatalog');
 const {
@@ -16,6 +16,7 @@ const {
     TASK_KEY_BY_LEGACY_SETTINGS_KEY,
     normalizeModelService,
     resolveDefaultModelRef,
+    resolveChatFallbackExecution,
     resolveExecutionConfig,
 } = require('../utils/modelService');
 const { createStudyServices } = require('../study');
@@ -25,7 +26,7 @@ const {
 } = require('../utils/topicTitles');
 const {
     extractResponseContent,
-    resolveDailyNoteToolInstruction,
+    resolveDailyNoteGuideInstruction,
     rewriteLegacyStudyLogPromptText,
 } = require('../study/toolProtocol');
 
@@ -263,7 +264,7 @@ function applyEmoticonPrompt(messages, settings = {}, promptResolutionOptions = 
 
     const systemMessage = nextMessages[systemMessageIndex];
     const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
-    const alreadyReferenced = /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(currentContent);
+    const alreadyReferenced = /{{\s*EmoticonGuide\s*}}/.test(currentContent);
     const alreadyIncluded = currentContent.includes(normalizedPrompt)
         || (resolvedPrompt ? currentContent.includes(resolvedPrompt) : false);
     if (alreadyReferenced || alreadyIncluded) {
@@ -286,7 +287,7 @@ function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions
         return messages;
     }
 
-    const dailyNotePrompt = resolveDailyNoteToolInstruction(settings?.dailyNoteGuide, {
+    const dailyNotePrompt = resolveDailyNoteGuideInstruction(settings?.dailyNoteGuide, {
         agentConfig: promptResolutionOptions.agentConfig,
         context: promptResolutionOptions.context,
     });
@@ -307,7 +308,7 @@ function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions
     const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
     if (
         currentContent.includes('—— 日记 (DailyNote) ——')
-        || /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(currentContent)
+        || /{{\s*DailyNoteGuide\s*}}/.test(currentContent)
     ) {
         return nextMessages;
     }
@@ -367,7 +368,7 @@ async function buildPromptResolutionOptions({
         try {
             agentConfig = await agentConfigManager.readAgentConfig(nextContext.agentId);
         } catch (error) {
-            console.warn(`[Main - sendToVCP] Failed to read agent config for prompt resolution (${nextContext.agentId}):`, error);
+            console.warn(`[Main - sendChatRequest] Failed to read agent config for prompt resolution (${nextContext.agentId}):`, error);
         }
     }
 
@@ -391,7 +392,7 @@ async function buildPromptResolutionOptions({
             settings,
         });
     } catch (error) {
-        console.warn('[Main - sendToVCP] Failed to load bundled emoticon prompt data:', error);
+        console.warn('[Main - sendChatRequest] Failed to load bundled emoticon prompt data:', error);
         nextContext.emoticonPromptData = {
             available: false,
             packCount: 0,
@@ -621,11 +622,12 @@ async function requestFollowUpsOnce({
     endpoint = '',
     apiKey = '',
     extraHeaders = {},
+    fallbackExecution = null,
     prompt = '',
     model = '',
     context = {},
 }) {
-    const response = await vcpClient.send({
+    const response = await chatClient.send({
         requestId: `${requestIdBase}_attempt_${attempt}`,
         round: attempt,
         endpoint,
@@ -644,6 +646,7 @@ async function requestFollowUpsOnce({
         },
         context,
         timeoutMs: 120000,
+        fallbackExecution,
     });
 
     if (response?.error) {
@@ -651,6 +654,7 @@ async function requestFollowUpsOnce({
             error: response.error,
             followUps: [],
             rawContent: '',
+            fallbackMeta: response?.fallbackMeta || null,
         };
     }
 
@@ -658,6 +662,7 @@ async function requestFollowUpsOnce({
     return {
         rawContent,
         followUps: parseFollowUpsResponse(rawContent),
+        fallbackMeta: response?.fallbackMeta || null,
     };
 }
 
@@ -749,11 +754,11 @@ function initialize(mainWindow, context) {
         ? context.getMainWindow
         : (typeof mainWindow === 'function' ? mainWindow : () => mainWindow || null);
 
-    vcpClient.initialize({ settingsManager });
+    chatClient.initialize({ settingsManager });
     studyServices = createStudyServices({
         dataRoot: DATA_ROOT,
         settingsManager,
-        vcpClient,
+        chatClient,
     });
 
     // Ensure the watcher is in a clean state on initialization
@@ -1255,7 +1260,7 @@ function initialize(mainWindow, context) {
         }
     });
 
-    ipcMain.handle('send-to-vcp', async (event, request) => {
+    ipcMain.handle('send-chat-request', async (event, request) => {
         const {
             requestId,
             endpoint,
@@ -1266,7 +1271,7 @@ function initialize(mainWindow, context) {
         } = request || {};
 
         if (!request || typeof request !== 'object' || Array.isArray(request)) {
-            return { error: 'send-to-vcp expects a request object.' };
+            return { error: 'send-chat-request expects a request object.' };
         }
 
         let processedMessages;
@@ -1275,7 +1280,7 @@ function initialize(mainWindow, context) {
                 ? messages.map(normalizeMessageForPreprocessing)
                 : [];
         } catch (error) {
-            console.error('[Main - sendToVCP] Message normalization failed:', error);
+            console.error('[Main - sendChatRequest] Message normalization failed:', error);
             return { error: `Message normalization failed: ${error.message}` };
         }
 
@@ -1285,7 +1290,7 @@ function initialize(mainWindow, context) {
                 ? await settingsManager.readSettings()
                 : {};
         } catch (error) {
-            console.error('[Main - sendToVCP] Failed to read settings:', error);
+            console.error('[Main - sendChatRequest] Failed to read settings:', error);
         }
 
         const executionConfig = resolveExecutionConfig(settings, {
@@ -1299,11 +1304,13 @@ function initialize(mainWindow, context) {
             ...modelConfig,
             ...(executionConfig?.model?.id ? { model: executionConfig.model.id } : {}),
         };
+        const fallbackExecution = resolveChatFallbackExecution(settings);
 
         let promptVariableResolution = {
             unresolvedTokens: [],
             substitutions: {},
             variableSources: {},
+            legacyTokenSuggestions: {},
         };
         let promptResolutionOptions = {
             settings,
@@ -1322,7 +1329,7 @@ function initialize(mainWindow, context) {
                 projectRoot: PROJECT_ROOT,
             });
         } catch (error) {
-            console.warn('[Main - sendToVCP] Failed to pre-read agent context for DailyNote protocol injection:', error);
+            console.warn('[Main - sendChatRequest] Failed to pre-read agent context for DailyNote protocol injection:', error);
         }
 
         try {
@@ -1343,7 +1350,7 @@ function initialize(mainWindow, context) {
 
             processedMessages = applyContextSanitizer(processedMessages, settings);
         } catch (error) {
-            console.error('[Main - sendToVCP] Message preprocessing failed:', error);
+            console.error('[Main - sendChatRequest] Message preprocessing failed:', error);
             return { error: `Message preprocessing failed: ${error.message}` };
         }
 
@@ -1363,15 +1370,16 @@ function initialize(mainWindow, context) {
                 unresolvedTokens: resolution.unresolvedTokens,
                 substitutions: resolution.substitutions,
                 variableSources: resolution.variableSources,
+                legacyTokenSuggestions: resolution.legacyTokenSuggestions || {},
             };
 
             if (resolution.unresolvedTokens.length > 0) {
                 console.warn(
-                    `[Main - sendToVCP] Unresolved prompt variables for request ${requestId || 'unknown'}: ${resolution.unresolvedTokens.join(', ')}`
+                    `[Main - sendChatRequest] Unresolved prompt variables for request ${requestId || 'unknown'}: ${resolution.unresolvedTokens.join(', ')}`
                 );
             }
         } catch (error) {
-            console.error('[Main - sendToVCP] Prompt variable resolution failed:', error);
+            console.error('[Main - sendChatRequest] Prompt variable resolution failed:', error);
                 return { error: `Prompt variable resolution failed: ${error.message}` };
         }
 
@@ -1394,12 +1402,13 @@ function initialize(mainWindow, context) {
             endpoint: executionConfig?.endpoint || endpoint,
             apiKey: executionConfig?.apiKey || apiKey,
             extraHeaders: executionConfig?.extraHeaders || {},
+            fallbackExecution,
             messages: processedMessages,
             modelConfig: finalModelConfig,
             context: enrichedContext,
             settings,
             webContents: event.sender,
-            streamChannel: 'vcp-stream-event',
+            streamChannel: 'chat-stream-event',
         });
 
         if (orchestrationResult?.error) {
@@ -1408,6 +1417,7 @@ function initialize(mainWindow, context) {
                 promptVariableResolution,
                 toolEvents: orchestrationResult.toolEvents || [],
                 studyMemoryRefs: orchestrationResult.studyMemoryRefs || [],
+                fallbackMeta: orchestrationResult.fallbackMeta || null,
             };
         }
 
@@ -1415,6 +1425,7 @@ function initialize(mainWindow, context) {
             ...(orchestrationResult || {}),
             toolEvents: orchestrationResult?.toolEvents || [],
             studyMemoryRefs: orchestrationResult?.studyMemoryRefs || [],
+            fallbackMeta: orchestrationResult?.fallbackMeta || null,
             promptVariableResolution,
         };
     });
@@ -1432,8 +1443,8 @@ function initialize(mainWindow, context) {
             const settings = settingsManager && typeof settingsManager.readSettings === 'function'
                 ? await settingsManager.readSettings()
                 : {};
-            const legacyEndpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
-            const legacyApiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
+            const configuredEndpoint = typeof settings?.chatEndpoint === 'string' ? settings.chatEndpoint.trim() : '';
+            const configuredApiKey = typeof settings?.chatApiKey === 'string' ? settings.chatApiKey.trim() : '';
 
             const model = await resolveFollowUpModel({
                 agentId: requestPayload.agentId,
@@ -1444,14 +1455,15 @@ function initialize(mainWindow, context) {
             const executionConfig = resolveExecutionConfig(settings, {
                 purpose: 'followUp',
                 requestedModel: model,
-                fallbackEndpoint: legacyEndpoint,
-                fallbackApiKey: legacyApiKey,
+                fallbackEndpoint: configuredEndpoint,
+                fallbackApiKey: configuredApiKey,
                 fallbackModel: model,
             });
-            const endpoint = executionConfig?.endpoint || legacyEndpoint;
-            const apiKey = executionConfig?.apiKey || legacyApiKey;
+            const endpoint = executionConfig?.endpoint || configuredEndpoint;
+            const apiKey = executionConfig?.apiKey || configuredApiKey;
+            const fallbackExecution = resolveChatFallbackExecution(settings);
             if (!endpoint) {
-                return { success: false, error: 'VCP 服务配置不完整。', followUps: [] };
+                return { success: false, error: '模型服务配置不完整。', followUps: [] };
             }
 
             const prompt = buildFollowUpPrompt(settings.followUpPromptTemplate, visibleMessages);
@@ -1470,6 +1482,7 @@ function initialize(mainWindow, context) {
                     endpoint,
                     apiKey,
                     extraHeaders: executionConfig?.extraHeaders || {},
+                    fallbackExecution,
                     prompt,
                     model,
                     context: followUpContext,
@@ -1516,8 +1529,8 @@ function initialize(mainWindow, context) {
             const settings = settingsManager && typeof settingsManager.readSettings === 'function'
                 ? await settingsManager.readSettings()
                 : {};
-            const legacyEndpoint = typeof settings?.vcpServerUrl === 'string' ? settings.vcpServerUrl.trim() : '';
-            const legacyApiKey = typeof settings?.vcpApiKey === 'string' ? settings.vcpApiKey.trim() : '';
+            const configuredEndpoint = typeof settings?.chatEndpoint === 'string' ? settings.chatEndpoint.trim() : '';
+            const configuredApiKey = typeof settings?.chatApiKey === 'string' ? settings.chatApiKey.trim() : '';
 
             const model = await resolveTaskModel({
                 agentId: requestPayload.agentId,
@@ -1530,23 +1543,24 @@ function initialize(mainWindow, context) {
             const executionConfig = resolveExecutionConfig(settings, {
                 purpose: 'topicTitle',
                 requestedModel: model,
-                fallbackEndpoint: legacyEndpoint,
-                fallbackApiKey: legacyApiKey,
+                fallbackEndpoint: configuredEndpoint,
+                fallbackApiKey: configuredApiKey,
                 fallbackModel: model,
             });
-            const endpoint = executionConfig?.endpoint || legacyEndpoint;
-            const apiKey = executionConfig?.apiKey || legacyApiKey;
+            const endpoint = executionConfig?.endpoint || configuredEndpoint;
+            const apiKey = executionConfig?.apiKey || configuredApiKey;
+            const fallbackExecution = resolveChatFallbackExecution(settings);
             if (!endpoint) {
                 return {
                     success: true,
                     generated: false,
                     title: fallbackTitle,
-                    error: 'VCP 服务配置不完整。',
+                    error: '模型服务配置不完整。',
                 };
             }
 
             const prompt = buildTopicTitlePrompt(settings.topicTitlePromptTemplate, visibleMessages);
-            const response = await vcpClient.send({
+            const response = await chatClient.send({
                 requestId: `topic_title_${requestPayload.messageId || Date.now()}_${Date.now()}`,
                 endpoint,
                 apiKey,
@@ -1568,6 +1582,7 @@ function initialize(mainWindow, context) {
                     messageId: requestPayload.messageId || '',
                 },
                 timeoutMs: 120000,
+                fallbackExecution,
             });
 
             if (response?.error) {
@@ -1602,14 +1617,14 @@ function initialize(mainWindow, context) {
         }
     });
 
-    ipcMain.handle('interrupt-vcp-request', async (_event, request) => {
+    ipcMain.handle('interrupt-chat-request', async (_event, request) => {
         if (!request || typeof request !== 'object' || Array.isArray(request)) {
-            return { success: false, error: 'interrupt-vcp-request expects a request object.' };
+            return { success: false, error: 'interrupt-chat-request expects a request object.' };
         }
 
         const requestId = request.requestId;
         const localInterrupted = studyServices?.chatOrchestrator?.abortSyntheticRequest?.(requestId) === true;
-        const remoteResult = await vcpClient.interrupt(request);
+        const remoteResult = await chatClient.interrupt(request);
 
         if (localInterrupted && !remoteResult?.success) {
             return {

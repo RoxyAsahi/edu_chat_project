@@ -9,7 +9,7 @@ async function loadOverviewModule() {
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }
 
-test('buildSubjectOverviewMarkup renders clock, hero cards, stats, and subject wall for populated overview', async () => {
+test('buildSubjectOverviewMarkup renders the current dashboard cards, recent activity, and subject wall for populated overview', async () => {
     const { buildSubjectOverviewMarkup } = await loadOverviewModule();
 
     const result = buildSubjectOverviewMarkup({
@@ -29,30 +29,27 @@ test('buildSubjectOverviewMarkup renders clock, hero cards, stats, and subject w
         },
     });
 
-    assert.equal(result.headline, '学科总视图');
-    assert.match(result.clockMarkup, /overviewClockTime/);
-    assert.match(result.clockMarkup, /overviewClockDate/);
-    assert.match(result.clockMarkup, /当前时间/);
-    assert.match(result.statsRowMarkup, /overview-stat-card__label/);
-    assert.match(result.statsRowMarkup, /学科/);
-    assert.match(result.statsRowMarkup, /话题/);
-    assert.match(result.statsRowMarkup, /待处理/);
-    assert.match(result.gridMarkup, /overview-hero-grid/);
-    assert.match(result.gridMarkup, /overview-hero-card--summary/);
-    assert.match(result.gridMarkup, /overview-hero-card--current/);
-    assert.match(result.gridMarkup, /当前学科/);
-    assert.match(result.gridMarkup, /当前有 1 个待处理话题/);
-    assert.match(result.gridMarkup, /最近话题：函数复习/);
-    assert.doesNotMatch(result.gridMarkup, /subject-overview-card__badge">当前</);
-    assert.equal((result.gridMarkup.match(/data-subject-card data-agent-id="math"/g) || []).length, 1);
-    assert.match(result.gridMarkup, /subject-overview-card__chip">0 个话题</);
-    assert.match(result.gridMarkup, /data-subject-card data-agent-id="english"/);
-    assert.match(result.gridMarkup, /新建学科/);
-    assert.match(result.gridMarkup, /overview-subject-wall/);
+    assert.equal(result.headline, '学习首页');
+    assert.match(result.highlightsMarkup, /学科仪表盘/);
+    assert.match(result.highlightsMarkup, /对话学习/);
+    assert.match(result.highlightsMarkup, /来源阅读/);
+    assert.match(result.gridMarkup, /overview-dashboard/);
+    assert.match(result.gridMarkup, /学科辅导/);
+    assert.match(result.gridMarkup, /知识沉淀/);
+    assert.match(result.gridMarkup, /训练转化/);
+    assert.match(result.gridMarkup, /成长复盘/);
+    assert.match(result.gridMarkup, /最近成长动态/);
+    assert.match(result.gridMarkup, /全部学科/);
+    assert.match(result.gridMarkup, /overview-subject-browser/);
+    assert.match(result.gridMarkup, /subject-overview-card--current/);
+    assert.match(result.gridMarkup, /函数复习/);
+    assert.match(result.gridMarkup, /data-agent-id="math"/);
+    assert.match(result.gridMarkup, /data-agent-id="english"/);
+    assert.match(result.gridMarkup, /当前学习空间/);
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
 });
 
-test('buildSubjectOverviewMarkup omits the focused agent from the wall and shows helper empty state when it is the only subject', async () => {
+test('buildSubjectOverviewMarkup keeps the current subject visible when it is the only subject card', async () => {
     const { buildSubjectOverviewMarkup } = await loadOverviewModule();
 
     const result = buildSubjectOverviewMarkup({
@@ -70,13 +67,17 @@ test('buildSubjectOverviewMarkup omits the focused agent from the wall and shows
         },
     });
 
-    assert.match(result.gridMarkup, /overview-hero-card--current/);
+    assert.equal(result.headline, '学习首页');
+    assert.match(result.gridMarkup, /overview-dashboard/);
+    assert.match(result.gridMarkup, /subject-overview-card--current/);
     assert.match(result.gridMarkup, /单学科/);
-    assert.match(result.gridMarkup, /当前没有其他学科/);
-    assert.doesNotMatch(result.gridMarkup, /data-subject-card data-agent-id="solo"[\s\S]*data-subject-card data-agent-id="solo"/);
+    assert.match(result.gridMarkup, /data-agent-id="solo"/);
+    assert.equal((result.gridMarkup.match(/data-agent-id="solo"/g) || []).length, 1);
+    assert.doesNotMatch(result.gridMarkup, /subject-overview-browser-empty/);
+    assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
 });
 
-test('buildSubjectOverviewMarkup renders empty state when there are no agents', async () => {
+test('buildSubjectOverviewMarkup renders the onboarding empty state when there are no agents', async () => {
     const { buildSubjectOverviewMarkup } = await loadOverviewModule();
 
     const result = buildSubjectOverviewMarkup({
@@ -85,12 +86,14 @@ test('buildSubjectOverviewMarkup renders empty state when there are no agents', 
         selectedAgentId: null,
     });
 
-    assert.equal(result.headline, '创建你的第一个学科');
-    assert.match(result.clockMarkup, /overviewClockTime/);
-    assert.match(result.statsRowMarkup, /待处理/);
-    assert.match(result.gridMarkup, /overview-hero-card--summary/);
-    assert.match(result.gridMarkup, /overview-hero-card--current/);
+    assert.equal(result.headline, '学习首页');
+    assert.match(result.gridMarkup, /overview-dashboard/);
+    assert.match(result.gridMarkup, /创建第一个学科/);
+    assert.match(result.gridMarkup, /沉淀你的学习过程/);
+    assert.match(result.gridMarkup, /继续完成当天任务/);
     assert.match(result.gridMarkup, /subject-overview-empty/);
-    assert.match(result.gridMarkup, /Ready to start/);
+    assert.match(result.gridMarkup, /Ready/);
+    assert.match(result.gridMarkup, /创建你的第一个学科工作台/);
+    assert.match(result.gridMarkup, /立即开始/);
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
 });

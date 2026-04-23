@@ -63,7 +63,7 @@ function createDom() {
     `, { url: 'http://localhost' });
 }
 
-test('logsController degrades quietly when VCP Lite is unavailable', async (t) => {
+test('logsController degrades quietly when UniStudy is unavailable', async (t) => {
     const { createLogsController } = await loadLogsControllerModule();
     const dom = createDom();
     const previousWindow = global.window;

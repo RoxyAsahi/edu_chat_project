@@ -25,7 +25,7 @@ function loadChatHandlers() {
             return true;
         },
     };
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
     };
     const originalLoad = Module._load;
@@ -39,8 +39,8 @@ function loadChatHandlers() {
             if (request === '../knowledge-base') {
                 return knowledgeBaseStub;
             }
-            if (request === '../vcpClient') {
-                return vcpClientStub;
+            if (request === '../chatClient') {
+                return chatClientStub;
             }
             return originalLoad.call(this, request, parent, isMain);
         };

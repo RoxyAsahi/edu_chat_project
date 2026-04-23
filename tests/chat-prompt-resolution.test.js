@@ -13,7 +13,7 @@ const {
 
 const CHAT_HANDLERS_PATH = path.resolve(__dirname, '../src/modules/main/ipc/chatHandlers.js');
 
-function loadChatHandlers(vcpClientStub) {
+function loadChatHandlers(chatClientStub) {
     const handlers = new Map();
     const electronStub = {
         ipcMain: {
@@ -39,8 +39,8 @@ function loadChatHandlers(vcpClientStub) {
             if (request === '../knowledge-base') {
                 return knowledgeBaseStub;
             }
-            if (request === '../vcpClient') {
-                return vcpClientStub;
+            if (request === '../chatClient') {
+                return chatClientStub;
             }
             if (request === '../modelUsageTracker') {
                 return modelUsageTrackerStub;
@@ -55,7 +55,7 @@ function loadChatHandlers(vcpClientStub) {
     }
 }
 
-test('send-to-vcp resolves local prompt variables before calling the upstream client', async (t) => {
+test('send-chat-request resolves local prompt variables before calling the upstream client', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
@@ -74,7 +74,7 @@ test('send-to-vcp resolves local prompt variables before calling the upstream cl
     }, { spaces: 2 });
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -83,7 +83,7 @@ test('send-to-vcp resolves local prompt variables before calling the upstream cl
     };
 
     const manager = new AgentConfigManager(agentDir);
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: agentDir,
         USER_DATA_DIR: userDataDir,
@@ -94,7 +94,7 @@ test('send-to-vcp resolves local prompt variables before calling the upstream cl
                 return {
                     userName: 'SmokeUser',
                     enableAgentBubbleTheme: true,
-                    agentBubbleThemePrompt: 'Custom bubble theme: {{VarDivRender}}',
+                    agentBubbleThemePrompt: 'Custom bubble theme: {{RenderingGuide}}',
                     enableThoughtChainInjection: false,
                 };
             },
@@ -102,8 +102,8 @@ test('send-to-vcp resolves local prompt variables before calling the upstream cl
         agentConfigManager: manager,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    const result = await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    const result = await sendChatRequest({ sender: {} }, {
         requestId: 'req_1',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
@@ -117,17 +117,17 @@ test('send-to-vcp resolves local prompt variables before calling the upstream cl
     assert.equal(capturedRequest.messages[0].content.includes('{{Nova}}'), false);
     assert.equal(capturedRequest.messages[0].content.includes('我是Nova'), true);
     assert.equal(capturedRequest.messages[0].content.includes('Custom bubble theme:'), true);
-    assert.equal(capturedRequest.messages[0].content.includes('{{VarDivRender}}'), false);
+    assert.equal(capturedRequest.messages[0].content.includes('{{RenderingGuide}}'), false);
     assert.deepEqual(result.promptVariableResolution.unresolvedTokens, []);
     assert.equal(result.promptVariableResolution.substitutions.Nova, 'Nova');
 });
 
-test('send-to-vcp preserves assistant reasoning_content during preprocessing', async (t) => {
+test('send-chat-request preserves assistant reasoning_content during preprocessing', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-reasoning-preprocess-'));
     t.after(() => fs.remove(tempRoot));
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -135,7 +135,7 @@ test('send-to-vcp preserves assistant reasoning_content during preprocessing', a
         },
     };
 
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: path.join(tempRoot, 'agents'),
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -151,8 +151,8 @@ test('send-to-vcp preserves assistant reasoning_content during preprocessing', a
         agentConfigManager: null,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    const result = await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    const result = await sendChatRequest({ sender: {} }, {
         requestId: 'req_reasoning_1',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
@@ -172,7 +172,55 @@ test('send-to-vcp preserves assistant reasoning_content during preprocessing', a
     assert.equal(assistantMessage.reasoning_content, '这是上一轮的思考过程。');
 });
 
-test('send-to-vcp injects bundled emoticon prompt text before calling the upstream client', async (t) => {
+test('send-chat-request returns replacement hints for legacy prompt tokens', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-legacy-token-resolution-'));
+    t.after(() => fs.remove(tempRoot));
+
+    let capturedRequest = null;
+    const chatClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequest = request;
+            return { ok: true };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendChatRequest = handlers.get('send-chat-request');
+    const result = await sendChatRequest({ sender: {} }, {
+        requestId: 'req_legacy_token',
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        messages: [{ role: 'system', content: 'Legacy {{VarDivRender}}' }],
+        modelConfig: { stream: false },
+        context: {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(capturedRequest);
+    assert.equal(capturedRequest.messages[0].content.includes('{{VarDivRender}}'), true);
+    assert.deepEqual(result.promptVariableResolution.unresolvedTokens, ['VarDivRender']);
+    assert.deepEqual(result.promptVariableResolution.legacyTokenSuggestions, {
+        VarDivRender: 'RenderingGuide',
+    });
+});
+
+test('send-chat-request injects bundled emoticon prompt text before calling the upstream client', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-emoticon-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
@@ -183,7 +231,7 @@ test('send-to-vcp injects bundled emoticon prompt text before calling the upstre
     await fs.writeFile(path.join(bundledPackDir, '啊？.png'), Buffer.from([137, 80, 78, 71]));
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -191,7 +239,7 @@ test('send-to-vcp injects bundled emoticon prompt text before calling the upstre
         },
     };
 
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: path.join(tempRoot, 'agents'),
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -211,25 +259,25 @@ test('send-to-vcp injects bundled emoticon prompt text before calling the upstre
         agentConfigManager: null,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    const result = await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    const result = await sendChatRequest({ sender: {} }, {
         requestId: 'req_emoticon_1',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
-        messages: [{ role: 'system', content: '表情包说明：{{VarEmoticonPrompt}}' }],
+        messages: [{ role: 'system', content: '表情包说明：{{EmoticonGuide}}' }],
         modelConfig: { stream: false },
         context: {},
     });
 
     assert.equal(result.ok, true);
     assert.ok(capturedRequest);
-    assert.equal(capturedRequest.messages[0].content.includes('{{VarEmoticonPrompt}}'), false);
+    assert.equal(capturedRequest.messages[0].content.includes('{{EmoticonGuide}}'), false);
     assert.match(capturedRequest.messages[0].content, /Path \/通用表情包/);
     assert.match(capturedRequest.messages[0].content, /阿巴阿巴.jpg\|啊？.png/);
     assert.equal((capturedRequest.messages[0].content.match(/Path \/通用表情包/g) || []).length, 1);
 });
 
-test('send-to-vcp auto-appends emoticon prompt when the base prompt does not reference emoticon variables', async (t) => {
+test('send-chat-request auto-appends emoticon prompt when the base prompt does not reference emoticon variables', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-emoticon-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
@@ -239,7 +287,7 @@ test('send-to-vcp auto-appends emoticon prompt when the base prompt does not ref
     await fs.writeFile(path.join(bundledPackDir, '阿巴阿巴.jpg'), Buffer.from([255, 216, 255]));
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -247,7 +295,7 @@ test('send-to-vcp auto-appends emoticon prompt when the base prompt does not ref
         },
     };
 
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: path.join(tempRoot, 'agents'),
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -267,8 +315,8 @@ test('send-to-vcp auto-appends emoticon prompt when the base prompt does not ref
         agentConfigManager: null,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    const result = await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    const result = await sendChatRequest({ sender: {} }, {
         requestId: 'req_emoticon_auto',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
@@ -283,12 +331,12 @@ test('send-to-vcp auto-appends emoticon prompt when the base prompt does not ref
     assert.match(capturedRequest.messages[0].content, /Auto emoticon path \/通用表情包/);
 });
 
-test('send-to-vcp skips bubble theme injection when the configured prompt is blank', async (t) => {
+test('send-chat-request skips bubble theme injection when the configured prompt is blank', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -296,7 +344,7 @@ test('send-to-vcp skips bubble theme injection when the configured prompt is bla
         },
     };
 
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: path.join(tempRoot, 'agents'),
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -315,8 +363,8 @@ test('send-to-vcp skips bubble theme injection when the configured prompt is bla
         agentConfigManager: null,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    await sendChatRequest({ sender: {} }, {
         requestId: 'req_blank',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
@@ -330,12 +378,12 @@ test('send-to-vcp skips bubble theme injection when the configured prompt is bla
     assert.match(capturedRequest.messages[0].content, /—— 日记 \(DailyNote\) ——/);
 });
 
-test('send-to-vcp skips bubble theme injection when the feature is disabled', async (t) => {
+test('send-chat-request skips bubble theme injection when the feature is disabled', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -343,7 +391,7 @@ test('send-to-vcp skips bubble theme injection when the feature is disabled', as
         },
     };
 
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: path.join(tempRoot, 'agents'),
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -362,8 +410,8 @@ test('send-to-vcp skips bubble theme injection when the feature is disabled', as
         agentConfigManager: null,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    await sendChatRequest({ sender: {} }, {
         requestId: 'req_disabled',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
@@ -377,12 +425,12 @@ test('send-to-vcp skips bubble theme injection when the feature is disabled', as
     assert.match(capturedRequest.messages[0].content, /—— 日记 \(DailyNote\) ——/);
 });
 
-test('send-to-vcp does not append the bubble theme prompt twice', async (t) => {
+test('send-chat-request does not append the bubble theme prompt twice', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -390,7 +438,7 @@ test('send-to-vcp does not append the bubble theme prompt twice', async (t) => {
         },
     };
 
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: path.join(tempRoot, 'agents'),
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -409,8 +457,8 @@ test('send-to-vcp does not append the bubble theme prompt twice', async (t) => {
         agentConfigManager: null,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    await sendChatRequest({ sender: {} }, {
         requestId: 'req_nodup',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
@@ -427,7 +475,7 @@ test('send-to-vcp does not append the bubble theme prompt twice', async (t) => {
     assert.equal(matches.length, 1);
 });
 
-test('send-to-vcp executes local DailyNote tool requests and returns tool metadata', async (t) => {
+test('send-chat-request executes local DailyNote tool requests and returns tool metadata', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
@@ -438,12 +486,12 @@ test('send-to-vcp executes local DailyNote tool requests and returns tool metada
     await fs.writeJson(path.join(agentDir, agentId, 'config.json'), {
         id: agentId,
         name: 'Study Agent',
-        systemPrompt: '请按需使用 {{StudyLogTool}}\n默认使用 StudyLog.write；兼容 DailyNote.create / DailyNote.update 文本块。',
+        systemPrompt: '请按需使用 {{DailyNoteGuide}}\n默认使用 StudyLog.write；兼容 DailyNote.create / DailyNote.update 文本块。',
         topics: [{ id: topicId, name: '高数复习' }],
     }, { spaces: 2 });
 
     let sendCount = 0;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             sendCount += 1;
@@ -484,7 +532,7 @@ test('send-to-vcp executes local DailyNote tool requests and returns tool metada
     let capturedRequest = null;
 
     const manager = new AgentConfigManager(agentDir);
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: agentDir,
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -513,12 +561,12 @@ test('send-to-vcp executes local DailyNote tool requests and returns tool metada
         agentConfigManager: manager,
     });
 
-    const sendToVcp = handlers.get('send-to-vcp');
-    const result = await sendToVcp({ sender: {} }, {
+    const sendChatRequest = handlers.get('send-chat-request');
+    const result = await sendChatRequest({ sender: {} }, {
         requestId: 'req_tool_loop',
         endpoint: 'http://example.com/v1/chat/completions',
         apiKey: 'demo-key',
-        messages: [{ role: 'system', content: '请按需使用 {{DailyNoteTool}}' }, { role: 'user', content: '帮我总结今天的学习。' }],
+        messages: [{ role: 'system', content: '请按需使用 {{DailyNoteGuide}}' }, { role: 'user', content: '帮我总结今天的学习。' }],
         modelConfig: { stream: false, model: 'demo-model' },
         context: {
             agentId,
@@ -636,7 +684,7 @@ test('generate-follow-ups retries once when the first upstream reply is malforme
 
     const requests = [];
     let sendCount = 0;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             requests.push(request);
@@ -666,7 +714,7 @@ test('generate-follow-ups retries once when the first upstream reply is malforme
         },
     };
 
-    const { chatHandlers, handlers } = loadChatHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: path.join(tempRoot, 'agents'),
         USER_DATA_DIR: path.join(tempRoot, 'user-data'),
@@ -675,8 +723,8 @@ test('generate-follow-ups retries once when the first upstream reply is malforme
         settingsManager: {
             async readSettings() {
                 return {
-                    vcpServerUrl: 'http://example.com/v1/chat/completions',
-                    vcpApiKey: 'demo-key',
+                    chatEndpoint: 'http://example.com/v1/chat/completions',
+                    chatApiKey: 'demo-key',
                     followUpPromptTemplate: '',
                     defaultModel: 'fixture-model',
                 };

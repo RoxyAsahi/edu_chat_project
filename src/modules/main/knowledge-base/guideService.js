@@ -4,7 +4,10 @@ const {
     truncateText,
 } = require('./helpers');
 const { splitReaderParagraphs } = require('./readerProjection');
-const { resolveExecutionConfig } = require('../utils/modelService');
+const {
+    resolveChatFallbackExecution,
+    resolveExecutionConfig,
+} = require('../utils/modelService');
 
 function buildGuideSegments(parsed) {
     if (parsed?.structure?.type === 'pdf') {
@@ -173,20 +176,21 @@ function createGuideService(deps = {}) {
     const runtime = deps.runtime;
     const repository = deps.repository;
     const parseKnowledgeBaseDocument = deps.parseKnowledgeBaseDocument;
-    const vcpClient = deps.vcpClient;
+    const chatClient = deps.chatClient;
 
     async function requestGuideFromModel(document, parsed, prompt, requestSuffix) {
         const settings = await runtime.readSettings();
         const execution = resolveExecutionConfig(settings, { purpose: 'chat' });
-        const endpoint = String(execution?.endpoint || settings?.vcpServerUrl || '').trim();
-        const apiKey = String(execution?.apiKey || settings?.vcpApiKey || '').trim();
+        const fallbackExecution = resolveChatFallbackExecution(settings);
+        const endpoint = String(execution?.endpoint || settings?.chatEndpoint || '').trim();
+        const apiKey = String(execution?.apiKey || settings?.chatApiKey || '').trim();
         const model = await runtime.resolveGuideModel(settings);
 
         if (!endpoint) {
-            throw new Error('VCP 服务配置不完整，无法生成来源指南。');
+            throw new Error('模型服务配置不完整，无法生成来源指南。');
         }
 
-        const response = await vcpClient.send({
+        const response = await chatClient.send({
             requestId: makeId(`guide_${requestSuffix}`),
             endpoint,
             apiKey,
@@ -211,6 +215,7 @@ function createGuideService(deps = {}) {
                 documentId: document.id,
             },
             timeoutMs: 300000,
+            fallbackExecution,
         });
 
         if (response?.error) {

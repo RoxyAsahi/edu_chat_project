@@ -119,8 +119,8 @@
     animation: unistudy-loading-dots 1.4s infinite;
 }
 
-/* 主气泡样式 - VCP ToolUse */
-.vcp-tool-use-bubble {
+/* 主气泡样式 - Tool Use */
+.tool-request-bubble {
     background: linear-gradient(145deg, #3a7bd5 0%, #00d2ff 100%) !important;
     background-size: 200% 200% !important;
     animation: unistudy-bubble-background-flow-kf 20s ease-in-out infinite;
@@ -138,7 +138,7 @@
     width: -moz-fit-content;
     width: fit-content;
     max-width: 100%;
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace) !important;
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace) !important;
     font-size: 0.95em !important;
     white-space: pre-wrap !important;
     /* Restore: Allow wrapping but preserve whitespace */
@@ -150,8 +150,8 @@
     /* 优化：工具气泡通常包含动画，提升为独立层 */
 }
 
-/* Animated Border for VCP ToolUse */
-.vcp-tool-use-bubble::after {
+/* Animated border for tool use */
+.tool-request-bubble::after {
     content: "";
     position: absolute;
     box-sizing: border-box;
@@ -175,7 +175,7 @@
 
 /* On hover, we don't need to force a width. `fit-content` will adjust to the new content. */
 /* We can keep a max-width to prevent it from becoming too wide. */
-.vcp-tool-use-bubble:hover {
+.tool-request-bubble:hover {
     max-width: 90%;
     /* Just constrain the max width on hover */
 }
@@ -199,7 +199,7 @@
     margin-top: 0;
 }
 
-.vcp-tool-use-bubble:hover .unistudy-tool-details {
+.tool-request-bubble:hover .unistudy-tool-details {
     max-height: 500px;
     /* Allow space for content to show */
     opacity: 1;
@@ -220,9 +220,9 @@
 }
 
 
-/* 内部 span 的重置 - VCP ToolUse */
-.vcp-tool-use-bubble .unistudy-tool-label,
-.vcp-tool-use-bubble .unistudy-tool-name-highlight {
+/* 内部 span 的重置 - Tool Use */
+.tool-request-bubble .unistudy-tool-label,
+.tool-request-bubble .unistudy-tool-name-highlight {
     background: none !important;
     border: none !important;
     padding: 0 !important;
@@ -240,14 +240,14 @@
 }
 
 /* "Tool Use:" 标签 */
-.vcp-tool-use-bubble .unistudy-tool-label {
+.tool-request-bubble .unistudy-tool-label {
     font-weight: bold;
     color: #f1c40f;
     margin-right: 6px;
 }
 
-/* 工具名高亮 - VCP ToolUse */
-.vcp-tool-use-bubble .unistudy-tool-name-highlight {
+/* 工具名高亮 - Tool Use */
+.tool-request-bubble .unistudy-tool-name-highlight {
     background: linear-gradient(90deg, #f1c40f, #ffffff, #00d2ff, #f1c40f) !important;
     background-size: 300% 100% !important;
     -webkit-background-clip: text !important;
@@ -262,8 +262,8 @@
     margin-left: 2px;
 }
 
-/* 左上角齿轮图标 - VCP ToolUse */
-.vcp-tool-use-bubble::before {
+/* 左上角齿轮图标 - Tool Use */
+.tool-request-bubble::before {
     content: "⚙️";
     position: absolute;
     top: 8px;
@@ -275,22 +275,22 @@
     transform-origin: center center;
 }
 
-/* 隐藏 VCP 气泡内的复制按钮 */
-.vcp-tool-use-bubble .code-copy {
-    /* This might target <code> inside <pre class="vcp-tool-use-bubble"> */
+/* 隐藏工具气泡内的复制按钮 */
+.tool-request-bubble .code-copy {
+    /* This might target <code> inside <pre class="tool-request-bubble"> */
     display: none !important;
 }
 
 /* Also hide if copy button is direct child of the bubble (if no inner code element) */
-.vcp-tool-use-bubble>.code-copy {
+.tool-request-bubble>.code-copy {
     display: none !important;
 }
 
-.vcp-tool-request-bubble>strong {
+.tool-request-bubble>strong {
     display: none !important;
 }
 
-/* Hide "VCP工具调用:" strong tag if it was ever added */
+/* Hide "内建工具调用:" strong tag if it was ever added */
 
 /* --- Learning Diary Bubble --- */
 
@@ -314,7 +314,7 @@
     /* Allow for potential pseudo-elements to peek out */
     line-height: 1.7;
     display: block !important;
-    font-family: var(--vcp-diary-font-family, 'Georgia', 'Times New Roman', serif) !important;
+    font-family: var(--diary-font-family, 'Georgia', 'Times New Roman', serif) !important;
     font-size: 1em !important;
     white-space: normal !important;
     /* Allow text to wrap naturally */
@@ -369,7 +369,7 @@
     font-size: 1.1em;
     color: #6d4c41;
     /* A rich, brownish color */
-    font-family: var(--vcp-diary-font-family, 'Georgia', 'Times New Roman', serif) !important;
+    font-family: var(--diary-font-family, 'Georgia', 'Times New Roman', serif) !important;
 }
 
 /* Date on the top right */
@@ -487,10 +487,10 @@ audio[controls]::after {
     padding: 2px;
     /* Border thickness */
     background: linear-gradient(60deg, #76c4f7, #00d2ff, #3a7bd5, #ffffff, #3a7bd5, #00d2ff, #76c4f7);
-    /* Same gradient as VCP ToolUse bubble */
+    /* Same gradient as the tool-use bubble */
     background-size: 300% 300%;
     animation: unistudy-bubble-border-flow-kf 7s linear infinite;
-    /* Same animation as VCP ToolUse bubble */
+    /* Same animation as the tool-use bubble */
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -813,7 +813,7 @@ body.light-theme {
     animation: unistudy-icon-rotate 1s linear infinite;
 }
 
-/* --- VCP Tool Result Bubble --- */
+/* --- Tool Result Bubble --- */
 .unistudy-tool-result-bubble {
     display: block !important;
     background: var(--tool-result-bg) !important;
@@ -825,7 +825,7 @@ body.light-theme {
     margin-top: 10px !important;
     margin-bottom: 12px !important;
     position: relative;
-    font-family: var(--vcp-tool-card-font-family, var(--vcp-chat-font-family, 'Segoe UI', 'Roboto', sans-serif)) !important;
+    font-family: var(--tool-card-font-family, var(--chat-font-family, 'Segoe UI', 'Roboto', sans-serif)) !important;
     font-size: 0.95em !important;
     line-height: 1.6;
     width: -moz-fit-content;
@@ -966,7 +966,7 @@ body.light-theme .unistudy-tool-result-status:containing("SUCCESS") {
 
 .unistudy-tool-result-bubble pre,
 .unistudy-tool-result-bubble code {
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace) !important;
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace) !important;
 }
 
 /* Markdown support inside tool result bubble */
@@ -1139,7 +1139,7 @@ body:not(.light-theme) .unistudy-tool-result-bubble th {
     padding: 8px 15px;
     border-radius: 6px;
     /* More rectangular */
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
     /* IDE font */
     font-size: 0.9em;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -1357,7 +1357,7 @@ body:not(.light-theme) .unistudy-html-preview-container {
 }
 
 /* --- UniStudy Thought Chain Bubble --- */
-.vcp-thought-chain-bubble {
+.reasoning-bubble {
     display: block !important;
     background: rgba(120, 120, 128, 0.05) !important;
     border-radius: 12px !important;
@@ -1365,7 +1365,7 @@ body:not(.light-theme) .unistudy-html-preview-container {
     padding: 10px 15px !important;
     margin: 10px 0 !important;
     position: relative;
-    font-family: var(--vcp-tool-card-font-family, var(--vcp-chat-font-family, var(--font-family, sans-serif))) !important;
+    font-family: var(--tool-card-font-family, var(--chat-font-family, var(--font-family, sans-serif))) !important;
     font-size: 0.92em !important;
     line-height: 1.6;
     width: fit-content;
@@ -1373,7 +1373,7 @@ body:not(.light-theme) .unistudy-html-preview-container {
     transition: all 0.3s ease;
 }
 
-body.light-theme .vcp-thought-chain-bubble {
+body.light-theme .reasoning-bubble {
     background: rgba(0, 0, 0, 0.03) !important;
     border-color: rgba(0, 0, 0, 0.1);
 }
@@ -1410,7 +1410,7 @@ body.light-theme .vcp-thought-chain-bubble {
     transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
-.vcp-thought-chain-bubble.expanded .unistudy-thought-chain-collapsible-content {
+.reasoning-bubble.expanded .unistudy-thought-chain-collapsible-content {
     max-height: 2000px;
     opacity: 1;
     margin-top: 10px;
@@ -1428,15 +1428,15 @@ body.light-theme .vcp-thought-chain-bubble {
     padding: 8px;
     border-radius: 6px;
     font-style: normal;
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
 }
 
 .unistudy-thought-chain-body code {
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
 }
 
 /* Reuse the toggle icon from tool results */
-.vcp-thought-chain-bubble .unistudy-result-toggle-icon {
+.reasoning-bubble .unistudy-result-toggle-icon {
     margin-left: 10px;
 }
 
@@ -1477,7 +1477,7 @@ body.light-theme .vcp-thought-chain-bubble {
     opacity: 0.5;
 }
 
-/* --- VCPdesktop Push Placeholder --- */
+/* --- Desktop Push Placeholder --- */
 .unistudy-desktop-push-placeholder {
     display: block !important;
     background: linear-gradient(145deg, rgba(30, 60, 90, 0.15), rgba(20, 40, 70, 0.25)) !important;
@@ -1486,7 +1486,7 @@ body.light-theme .vcp-thought-chain-bubble {
     padding: 12px 16px !important;
     margin: 10px 0 !important;
     position: relative;
-    font-family: var(--vcp-tool-card-font-family, var(--vcp-chat-font-family, 'Segoe UI', 'Roboto', sans-serif)) !important;
+    font-family: var(--tool-card-font-family, var(--chat-font-family, 'Segoe UI', 'Roboto', sans-serif)) !important;
     font-size: 0.92em !important;
     line-height: 1.5;
     width: fit-content;
@@ -1535,7 +1535,7 @@ body.light-theme .vcp-thought-chain-bubble {
     border-radius: 6px;
     white-space: pre-wrap;
     word-break: break-all;
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
     font-size: 0.9em;
     color: rgba(255, 255, 255, 0.6);
     max-height: 80px;

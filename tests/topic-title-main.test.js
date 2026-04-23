@@ -14,7 +14,7 @@ const {
 const CHAT_HANDLERS_PATH = path.resolve(__dirname, '../src/modules/main/ipc/chatHandlers.js');
 const AGENT_HANDLERS_PATH = path.resolve(__dirname, '../src/modules/main/ipc/agentHandlers.js');
 
-function loadMainHandlers(vcpClientStub = { initialize() {}, async send() { return {}; } }) {
+function loadMainHandlers(chatClientStub = { initialize() {}, async send() { return {}; } }) {
     const handlers = new Map();
     const electronStub = {
         ipcMain: {
@@ -41,8 +41,8 @@ function loadMainHandlers(vcpClientStub = { initialize() {}, async send() { retu
             if (request === '../knowledge-base') {
                 return knowledgeBaseStub;
             }
-            if (request === '../vcpClient') {
-                return vcpClientStub;
+            if (request === '../chatClient') {
+                return chatClientStub;
             }
             if (request === '../modelUsageTracker') {
                 return modelUsageTrackerStub;
@@ -149,7 +149,7 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
     }, { spaces: 2 });
 
     let capturedRequest = null;
-    const vcpClientStub = {
+    const chatClientStub = {
         initialize() {},
         async send(request) {
             capturedRequest = request;
@@ -165,7 +165,7 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
         },
     };
     const manager = new AgentConfigManager(agentDir);
-    const { chatHandlers, handlers } = loadMainHandlers(vcpClientStub);
+    const { chatHandlers, handlers } = loadMainHandlers(chatClientStub);
     chatHandlers.initialize(null, {
         AGENT_DIR: agentDir,
         USER_DATA_DIR: userDataDir,
@@ -176,8 +176,8 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
                 return {
                     topicTitleDefaultModel: 'topic-title-model',
                     defaultModel: 'global-model',
-                    vcpServerUrl: 'http://example.com/v1/chat/completions',
-                    vcpApiKey: 'secret',
+                    chatEndpoint: 'http://example.com/v1/chat/completions',
+                    chatApiKey: 'secret',
                     topicTitlePromptTemplate: '自定义标题模板\n{{CHAT_HISTORY}}',
                 };
             },
@@ -224,8 +224,8 @@ test('generate-topic-title falls back to the first user message when generation 
         settingsManager: {
             async readSettings() {
                 return {
-                    vcpServerUrl: 'http://example.com/v1/chat/completions',
-                    vcpApiKey: 'secret',
+                    chatEndpoint: 'http://example.com/v1/chat/completions',
+                    chatApiKey: 'secret',
                 };
             },
         },

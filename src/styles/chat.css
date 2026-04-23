@@ -97,11 +97,11 @@ body.light-theme #moon-icon {
     padding: 15px 20px 6px;
     display: flex;
     flex-direction: column;
-    font-family: var(--vcp-chat-font-family, inherit);
+    font-family: var(--chat-font-family, inherit);
 }
 
 /* --- Message Item QQ Style --- */
-.message-item.vcp-paused * {
+.message-item.render-paused * {
     animation-play-state: paused !important;
 }
 
@@ -513,13 +513,13 @@ body.light-theme .message-item.system.welcome-bubble {
     margin-top: 8px;
     border: 1px solid var(--border-color);
     color: #abb2bf; /* Default text color for dark theme code blocks (soft white) */
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
 }
 .message-item .md-content pre code {
     padding: 0;
     background: none;
     color: #abb2bf; /* Ensure code text is visible (soft white) */
-    font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+    font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
 }
 
 /* Dark Theme Syntax Highlighting Overrides (inspired by Atom One Dark / Dracula) */
@@ -680,7 +680,7 @@ body.light-theme .message-item.system.welcome-bubble {
 }
 
 
-.vcp-tool-request-bubble { /* This is for the old style, might conflict or be replaced by new .vcp-tool-use-bubble */
+.tool-request-bubble { /* This is for the old style, might conflict or be replaced by new .tool-request-bubble */
     background-color: var(--tool-bubble-bg);
     border: 1px solid var(--tool-bubble-border);
     border-radius: 8px;
@@ -692,10 +692,10 @@ body.light-theme .message-item.system.welcome-bubble {
     white-space: pre-wrap; 
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
-.vcp-tool-request-bubble strong { 
+.tool-request-bubble strong { 
     color: #81a2be; 
 }
-.vcp-tool-request-bubble span.vcp-param-value { 
+.tool-request-bubble span.tool-param-value { 
     color: #b5bd68; 
 }
 
@@ -809,7 +809,7 @@ body.light-theme .message-item.system.welcome-bubble {
     border-radius: 0;
     background-color: transparent;
     color: var(--primary-text);
-    font-family: var(--vcp-chat-font-family, inherit);
+    font-family: var(--chat-font-family, inherit);
     font-size: 1em;
     resize: none;
     margin: 0;
@@ -828,7 +828,7 @@ body.light-theme .message-item.system.welcome-bubble {
 .message-item .md-content h1, .message-item .md-content h2, .message-item .md-content h3 { margin-top: 0.8em; margin-bottom: 0.4em; color: var(--highlight-text); }
 .message-item .md-content ul, .message-item .md-content ol { margin-left: 20px; padding-left: 0; }
 .message-item .md-content blockquote { border-left: 3px solid var(--user-bubble-bg); margin-left: 0; padding-left: 1em; color: var(--secondary-text); }
-.message-item .md-content code { background-color: rgba(0,0,0,0.2); padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; font-family: var(--vcp-chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace); }
+.message-item .md-content code { background-color: rgba(0,0,0,0.2); padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; font-family: var(--chat-code-font-family, 'Consolas', 'Monaco', 'Courier New', monospace); }
 .message-item .md-content pre code { padding: 0; background: none; } 
 
 .message-edit-textarea {
@@ -842,7 +842,7 @@ body.light-theme .message-item.system.welcome-bubble {
     border-radius: 6px;
     background-color: var(--input-bg);
     color: var(--primary-text);
-    font-family: var(--vcp-chat-font-family, inherit);
+    font-family: var(--chat-font-family, inherit);
     font-size: 0.95em;
     resize: both; 
     max-width: 100%; 

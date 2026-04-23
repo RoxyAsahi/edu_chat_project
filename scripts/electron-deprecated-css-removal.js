@@ -73,14 +73,16 @@ async function prepareDataRoot(repoRoot) {
 
 async function launchApp(repoRoot, dataRoot) {
     await buildPreloadBundles();
+    const launchEnv = {
+        ...process.env,
+        UNISTUDY_DATA_ROOT: dataRoot,
+        ELECTRON_ENABLE_LOGGING: '1',
+    };
+    delete launchEnv.ELECTRON_RUN_AS_NODE;
     return electron.launch({
         args: [repoRoot],
         cwd: repoRoot,
-        env: {
-            ...process.env,
-            UNISTUDY_DATA_ROOT: dataRoot,
-            ELECTRON_ENABLE_LOGGING: '1',
-        },
+        env: launchEnv,
     });
 }
 

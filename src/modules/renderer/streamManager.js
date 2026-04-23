@@ -34,6 +34,7 @@ let globalRenderLoopRunning = false;
 // --- Pre-buffering state ---
 const preBufferedChunks = new Map(); // messageId -> array of chunks waiting for initialization
 const messageInitializationStatus = new Map(); // messageId -> 'pending' | 'ready' | 'finalized'
+const messageSnapshotMap = new Map(); // messageId -> latest known message snapshot for recovery
 
 // --- Message context mapping ---
 const messageContextMap = new Map(); // messageId -> { agentId, topicId, ... }
@@ -171,6 +172,56 @@ async function getHistoryForContext(context) {
     }
 
     return null;
+}
+
+function cloneHistorySnapshot(history) {
+    if (!Array.isArray(history)) {
+        return null;
+    }
+
+    return history.map((message) => ({ ...message }));
+}
+
+async function resolveHistorySnapshotForFinalization(messageId, context, isForCurrentView) {
+    const currentViewHistory = isForCurrentView
+        ? cloneHistorySnapshot(refs.currentChatHistoryRef.get())
+        : null;
+
+    if (currentViewHistory) {
+        return currentViewHistory;
+    }
+
+    const persistedHistory = await getHistoryForContext(context);
+    if (Array.isArray(persistedHistory)) {
+        return persistedHistory;
+    }
+
+    return currentViewHistory;
+}
+
+function recoverMissingHistoryMessage(history = [], messageId, context = {}) {
+    if (!Array.isArray(history)) {
+        return null;
+    }
+
+    const snapshot = messageSnapshotMap.get(messageId);
+    if (!snapshot) {
+        return null;
+    }
+
+    const recoveredMessage = {
+        ...snapshot,
+        id: messageId,
+        role: snapshot.role || 'assistant',
+        agentId: snapshot.agentId || context.agentId || '',
+        topicId: snapshot.topicId || context.topicId || '',
+        name: snapshot.name || context.agentName || '',
+        timestamp: snapshot.timestamp || Date.now(),
+        isThinking: false,
+    };
+
+    history.push(recoveredMessage);
+    return recoveredMessage;
 }
 
 // Debounced history saves
@@ -508,7 +559,7 @@ function renderStreamFrame(messageId) {
                 }
                 
                 // Preserve interactive button state.
-                if (fromEl.tagName === 'BUTTON' && fromEl.dataset.vcpInteractive === 'true') {
+                if (fromEl.tagName === 'BUTTON' && fromEl.dataset.interactivePreview === 'true') {
                     if (fromEl.disabled) {
                         toEl.disabled = true;
                         toEl.style.opacity = fromEl.style.opacity;
@@ -761,6 +812,10 @@ export async function startStreamingMessage(message, passedMessageItem = null) {
     } else {
         historyForThisMessage[historyIndex] = { ...historyForThisMessage[historyIndex], ...placeholderForHistory };
     }
+    const storedMessage = historyIndex === -1
+        ? historyForThisMessage[historyForThisMessage.length - 1]
+        : historyForThisMessage[historyIndex];
+    messageSnapshotMap.set(messageId, { ...storedMessage });
     
     // Save the history
     if (isForCurrentView) {
@@ -906,6 +961,22 @@ function processDesktopPushToken(_messageId, textToAppend) {
  */
 function cleanupDesktopPushState(_messageId) {}
 
+function cleanupFinalizedMessageState(messageId) {
+    streamingChunkQueues.delete(messageId);
+    accumulatedStreamText.delete(messageId);
+    streamSegmentStates.delete(messageId);
+    cleanupDesktopPushState(messageId);
+
+    setTimeout(() => {
+        messageDomCache.delete(messageId);
+        messageInitializationStatus.delete(messageId);
+        preBufferedChunks.delete(messageId);
+        messageContextMap.delete(messageId);
+        messageSnapshotMap.delete(messageId);
+        viewContextCache.delete(messageId);
+    }, 5000);
+}
+
 
 export function appendStreamChunk(messageId, chunkData, context) {
     const initStatus = messageInitializationStatus.get(messageId);
@@ -1023,129 +1094,138 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
     
     const { chatMessagesDiv, markedInstance, uiHelper } = refs;
     const isForCurrentView = isMessageForCurrentView(storedContext);
-    
-    // Get the correct history
-    let historyForThisMessage = await getHistoryForContext(storedContext);
-    if (!historyForThisMessage) {
-        console.error('[StreamManager] Could not load history for finalization', storedContext);
-        return;
-    }
-    
-    // Find and update the message
-    const accumulatedText = accumulatedStreamText.get(messageId) || "";
-    const cleanedAccumulatedText = stripThinkingPlaceholderPrefix(accumulatedText);
-    const payloadFullResponse = typeof finalPayload?.fullResponse === 'string' ? finalPayload.fullResponse : "";
-    const payloadError = typeof finalPayload?.error === 'string' ? finalPayload.error.trim() : "";
-    const payloadReasoningContent = typeof finalPayload?.reasoningContent === 'string'
-        ? finalPayload.reasoningContent
-        : (typeof finalPayload?.reasoning_content === 'string' ? finalPayload.reasoning_content : "");
-    const streamedTextIsUsable = cleanedAccumulatedText.trim() !== "" && !isThinkingPlaceholderText(cleanedAccumulatedText);
-    const payloadResponseIsUsable = payloadFullResponse.trim() !== "" && !isThinkingPlaceholderText(payloadFullResponse);
 
-    let finalFullText = cleanedAccumulatedText;
-    
-    // --- Consistency Logic: Choose the most complete text available ---
-    // If the main process payload has more content (as in error recovery) or is explicitly marked as recovery, prefer it.
-    if (payloadResponseIsUsable && (
-        !streamedTextIsUsable
-        || payloadFullResponse.length >= cleanedAccumulatedText.length
-        || cleanedAccumulatedText !== accumulatedText
-        || payloadFullResponse.includes('[!WARNING]')
-    )) {
-        finalFullText = payloadFullResponse;
-    }
-
-    if (!finalFullText || isThinkingPlaceholderText(finalFullText)) {
-        if (payloadError) {
-            finalFullText = `[System Error] ${payloadError}`;
-        } else {
-            finalFullText = "";
+    try {
+        // Get the most up-to-date history snapshot for this message. Current-view streams can
+        // finish before the debounced disk write lands, so prefer in-memory history first.
+        const historyForThisMessage = await resolveHistorySnapshotForFinalization(
+            messageId,
+            storedContext,
+            isForCurrentView,
+        );
+        if (!historyForThisMessage) {
+            console.error('[StreamManager] Could not load history for finalization', storedContext);
+            return;
         }
-    }
-    const messageIndex = historyForThisMessage.findIndex(msg => msg.id === messageId);
-    
-    if (messageIndex === -1) {
-        console.error(`[StreamManager] Message ${messageId} not found in history`, storedContext);
-        return;
-    }
-    
-    const message = historyForThisMessage[messageIndex];
-    message.content = finalFullText;
-    message.finishReason = finishReason;
-    message.isThinking = false;
-    if (payloadReasoningContent.trim()) {
-        message.reasoning_content = payloadReasoningContent;
-    }
-    
-    // Update UI if it's the current view
-    if (isForCurrentView) {
-        refs.currentChatHistoryRef.set([...historyForThisMessage]);
 
-        const messageItem = chatMessagesDiv.querySelector(`.message-item[data-message-id="${messageId}"]`);
-        if (messageItem) {
-            messageItem.classList.remove('streaming', 'thinking');
+        // Find and update the message
+        const accumulatedText = accumulatedStreamText.get(messageId) || "";
+        const cleanedAccumulatedText = stripThinkingPlaceholderPrefix(accumulatedText);
+        const payloadFullResponse = typeof finalPayload?.fullResponse === 'string' ? finalPayload.fullResponse : "";
+        const payloadError = typeof finalPayload?.error === 'string' ? finalPayload.error.trim() : "";
+        const payloadReasoningContent = typeof finalPayload?.reasoningContent === 'string'
+            ? finalPayload.reasoningContent
+            : (typeof finalPayload?.reasoning_content === 'string' ? finalPayload.reasoning_content : "");
+        const payloadFallbackMeta = finalPayload?.fallbackMeta && typeof finalPayload.fallbackMeta === 'object'
+            ? finalPayload.fallbackMeta
+            : null;
+        const streamedTextIsUsable = cleanedAccumulatedText.trim() !== "" && !isThinkingPlaceholderText(cleanedAccumulatedText);
+        const payloadResponseIsUsable = payloadFullResponse.trim() !== "" && !isThinkingPlaceholderText(payloadFullResponse);
 
-            const contentDiv = messageItem.querySelector('.md-content');
-            if (contentDiv) {
-                contentDiv.querySelectorAll('.unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
+        let finalFullText = cleanedAccumulatedText;
 
-                const globalSettings = refs.globalSettingsRef.get();
-                // Use the more thorough preprocessFullContent for the final render
-                const processedFinalText = refs.preprocessFullContent(finalFullText, globalSettings);
-                let rawHtml = markedInstance.parse(processedFinalText);
-                if (typeof refs.prependNativeReasoningBubble === 'function') {
-                    rawHtml = refs.prependNativeReasoningBubble(rawHtml, message);
-                }
-                
-                // Perform the final, high-quality render using the original global refresh method.
-                // This ensures images, KaTeX, code highlighting, etc., are all processed correctly.
-                refs.setContentAndProcessImages(contentDiv, rawHtml, messageId);
-                
-                // Step 1: Run synchronous processors (KaTeX, hljs, etc.)
-                refs.processRenderedContent(contentDiv);
+        // --- Consistency Logic: Choose the most complete text available ---
+        // If the main process payload has more content (as in error recovery) or is explicitly marked as recovery, prefer it.
+        if (payloadResponseIsUsable && (
+            !streamedTextIsUsable
+            || payloadFullResponse.length >= cleanedAccumulatedText.length
+            || cleanedAccumulatedText !== accumulatedText
+            || payloadFullResponse.includes('[!WARNING]')
+        )) {
+            finalFullText = payloadFullResponse;
+        }
 
-                // Step 2: Defer TreeWalker-based highlighters to ensure DOM is stable
-                setTimeout(() => {
-                    if (contentDiv && contentDiv.isConnected) {
-                        refs.runTextHighlights(contentDiv);
+        if (!finalFullText || isThinkingPlaceholderText(finalFullText)) {
+            if (payloadError) {
+                finalFullText = `[System Error] ${payloadError}`;
+            } else {
+                finalFullText = "";
+            }
+        }
+        let messageIndex = historyForThisMessage.findIndex((message) => message.id === messageId);
+        let message = messageIndex === -1 ? null : historyForThisMessage[messageIndex];
+
+        if (!message) {
+            message = recoverMissingHistoryMessage(historyForThisMessage, messageId, storedContext);
+            messageIndex = historyForThisMessage.findIndex((entry) => entry.id === messageId);
+            if (message) {
+                console.warn(`[StreamManager] Recovered missing message ${messageId} from stream snapshot`, storedContext);
+            }
+        }
+
+        if (!message || messageIndex === -1) {
+            console.error(`[StreamManager] Message ${messageId} not found in history`, storedContext);
+            return;
+        }
+
+        message.content = finalFullText;
+        message.finishReason = finishReason;
+        message.isThinking = false;
+        if (payloadReasoningContent.trim()) {
+            message.reasoning_content = payloadReasoningContent;
+        }
+        if (payloadFallbackMeta) {
+            message.fallbackMeta = payloadFallbackMeta;
+        }
+        messageSnapshotMap.set(messageId, { ...message });
+
+        // Update UI if it's the current view
+        if (isForCurrentView) {
+            refs.currentChatHistoryRef.set([...historyForThisMessage]);
+
+            const messageItem = chatMessagesDiv.querySelector(`.message-item[data-message-id="${messageId}"]`);
+            if (messageItem) {
+                messageItem.classList.remove('streaming', 'thinking');
+
+                const contentDiv = messageItem.querySelector('.md-content');
+                if (contentDiv) {
+                    contentDiv.querySelectorAll('.unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
+
+                    const globalSettings = refs.globalSettingsRef.get();
+                    // Use the more thorough preprocessFullContent for the final render
+                    const processedFinalText = refs.preprocessFullContent(finalFullText, globalSettings);
+                    let rawHtml = markedInstance.parse(processedFinalText);
+                    if (typeof refs.prependNativeReasoningBubble === 'function') {
+                        rawHtml = refs.prependNativeReasoningBubble(rawHtml, message);
                     }
-                }, 0);
 
-                // Step 3: Process animations, scripts, and 3D scenes
-                if (refs.processAnimationsInContent) {
-                    refs.processAnimationsInContent(contentDiv);
+                    // Perform the final, high-quality render using the original global refresh method.
+                    // This ensures images, KaTeX, code highlighting, etc., are all processed correctly.
+                    refs.setContentAndProcessImages(contentDiv, rawHtml, messageId);
+
+                    // Step 1: Run synchronous processors (KaTeX, hljs, etc.)
+                    refs.processRenderedContent(contentDiv);
+
+                    // Step 2: Defer TreeWalker-based highlighters to ensure DOM is stable
+                    setTimeout(() => {
+                        if (contentDiv && contentDiv.isConnected) {
+                            refs.runTextHighlights(contentDiv);
+                        }
+                    }, 0);
+
+                    // Step 3: Process animations, scripts, and 3D scenes
+                    if (refs.processAnimationsInContent) {
+                        refs.processAnimationsInContent(contentDiv);
+                    }
                 }
-            }
-            
-            const nameTimeBlock = messageItem.querySelector('.name-time-block');
-            if (nameTimeBlock && !nameTimeBlock.querySelector('.message-timestamp')) {
-                const timestampDiv = document.createElement('div');
-                timestampDiv.classList.add('message-timestamp');
-                timestampDiv.textContent = formatMessageTimestamp(message.timestamp || Date.now());
-                nameTimeBlock.appendChild(timestampDiv);
+
+                const nameTimeBlock = messageItem.querySelector('.name-time-block');
+                if (nameTimeBlock && !nameTimeBlock.querySelector('.message-timestamp')) {
+                    const timestampDiv = document.createElement('div');
+                    timestampDiv.classList.add('message-timestamp');
+                    timestampDiv.textContent = formatMessageTimestamp(message.timestamp || Date.now());
+                    nameTimeBlock.appendChild(timestampDiv);
+                }
+
+                uiHelper.scrollToBottom();
             }
 
-            uiHelper.scrollToBottom();
+            window.updateSendButtonState?.();
         }
 
-        window.updateSendButtonState?.();
+        // Save history through the debounced writer.
+        debouncedSaveHistory(storedContext, historyForThisMessage);
+    } finally {
+        cleanupFinalizedMessageState(messageId);
     }
-    
-    // Save history through the debounced writer.
-    debouncedSaveHistory(storedContext, historyForThisMessage);
-    
-    // Cleanup
-    streamingChunkQueues.delete(messageId);
-    accumulatedStreamText.delete(messageId);
-    streamSegmentStates.delete(messageId);
-    cleanupDesktopPushState(messageId);
-    
-    // Delayed cleanup
-    setTimeout(() => {
-        messageDomCache.delete(messageId);
-        messageInitializationStatus.delete(messageId);
-        preBufferedChunks.delete(messageId);
-        messageContextMap.delete(messageId);
-        viewContextCache.delete(messageId);
-    }, 5000);
 }

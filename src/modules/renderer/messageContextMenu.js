@@ -278,7 +278,7 @@ function showContextMenu(event, messageItem, message) {
             let textToCopy = normalizeTextContent(message.content);
             if (contentDiv) {
                 const contentClone = contentDiv.cloneNode(true);
-                contentClone.querySelectorAll('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, style, script').forEach((el) => el.remove());
+                contentClone.querySelectorAll('.tool-request-bubble, .unistudy-tool-result-bubble, style, script').forEach((el) => el.remove());
                 textToCopy = contentClone.innerText.replace(/\n{3,}/g, '\n\n').trim();
             }
             await navigator.clipboard.writeText(textToCopy);
@@ -638,20 +638,20 @@ async function handleRegenerateResponse(originalAssistantMessage) {
         }
 
         const promptResult = await electronAPI.getActiveSystemPrompt(currentSelectedItemVal.id).catch(() => ({ success: false, systemPrompt: '' }));
-        const messagesForVCP = [];
+        const messagesForChat = [];
         if (promptResult?.success && promptResult.systemPrompt) {
-            messagesForVCP.push({ role: 'system', content: promptResult.systemPrompt });
+            messagesForChat.push({ role: 'system', content: promptResult.systemPrompt });
         }
 
         for (const msg of historyForRegeneration) {
-            messagesForVCP.push({
+            messagesForChat.push({
                 role: msg.role,
                 content: await buildMessageContentForRegeneration(msg, electronAPI),
                 name: msg.name,
             });
         }
 
-        const modelConfigForVCP = {
+        const modelConfigForChat = {
             model: agentConfig.model || currentSelectedItemVal.config?.model || 'gemini-3.1-flash-lite-preview',
             temperature: Number(agentConfig.temperature ?? currentSelectedItemVal.config?.temperature ?? 0.7),
             max_tokens: Number(agentConfig.maxOutputTokens ?? currentSelectedItemVal.config?.maxOutputTokens ?? 1000),
@@ -660,24 +660,24 @@ async function handleRegenerateResponse(originalAssistantMessage) {
             stream: agentConfig.streamOutput !== false,
         };
 
-        if (modelConfigForVCP.stream) {
+        if (modelConfigForChat.stream) {
             contextMenuDependencies.startStreamingMessage({ ...regenerationThinkingMessage, content: '' });
         }
 
         contextMenuDependencies.setActiveRequestId?.(regenerationThinkingMessage.id);
 
-        const vcpResult = await electronAPI.sendToVCP({
+        const chatResult = await electronAPI.sendChatRequest({
             requestId: regenerationThinkingMessage.id,
-            endpoint: globalSettingsVal.vcpServerUrl,
-            apiKey: globalSettingsVal.vcpApiKey,
-            messages: messagesForVCP,
-            modelConfig: modelConfigForVCP,
+            endpoint: globalSettingsVal.chatEndpoint,
+            apiKey: globalSettingsVal.chatApiKey,
+            messages: messagesForChat,
+            modelConfig: modelConfigForChat,
             context,
         });
 
-        if (modelConfigForVCP.stream) {
-            if (vcpResult?.error || !vcpResult?.streamingStarted) {
-                const detailedError = vcpResult?.error || 'Unable to start streaming regeneration.';
+        if (modelConfigForChat.stream) {
+            if (chatResult?.error || !chatResult?.streamingStarted) {
+                const detailedError = chatResult?.error || 'Unable to start streaming regeneration.';
                 contextMenuDependencies.setActiveRequestId?.(null);
                 await contextMenuDependencies.finalizeStreamedMessage(regenerationThinkingMessage.id, 'error', context, {
                     error: detailedError,
@@ -687,7 +687,7 @@ async function handleRegenerateResponse(originalAssistantMessage) {
             return;
         }
 
-        const response = vcpResult?.response;
+        const response = chatResult?.response;
         if (response?.error) {
             throw new Error(response.error);
         }

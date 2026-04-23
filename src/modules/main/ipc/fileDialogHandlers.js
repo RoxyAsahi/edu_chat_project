@@ -248,7 +248,7 @@ function initialize(mainWindow, context) {
             } else { // Non-image file
                 console.log(`[Main - get-file-as-base64] Non-image file. Buffer length: ${originalFileBuffer.length}`);
                 const base64String = originalFileBuffer.toString('base64');
-                // This path is not expected to be hit for VCP messages, but we return a compatible format for robustness.
+                // This path is not expected to be hit for chat messages, but we return a compatible format for robustness.
                 return { success: true, base64Frames: [base64String], isGif: false };
             }
     

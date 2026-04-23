@@ -16,8 +16,8 @@ function initialize(api) {
  * @returns {Promise<{success: boolean, error?: string, message?: string}>}
  */
 async function interrupt(requestId) {
-    if (!electronAPI || typeof electronAPI.interruptVcpRequest !== 'function') {
-        const errorMsg = 'Interrupt handler is not initialized or interruptVcpRequest is not available on electronAPI.';
+    if (!electronAPI || typeof electronAPI.interruptChatRequest !== 'function') {
+        const errorMsg = 'Interrupt handler is not initialized or interruptChatRequest is not available on electronAPI.';
         console.error(errorMsg);
         return { success: false, error: errorMsg };
     }
@@ -28,7 +28,7 @@ async function interrupt(requestId) {
 
     console.log(`[InterruptHandler] Requesting interruption for requestId: ${requestId}`);
     try {
-        const result = await electronAPI.interruptVcpRequest({ requestId, remote: true });
+        const result = await electronAPI.interruptChatRequest({ requestId, remote: true });
         if (result.success) {
             console.log(`[InterruptHandler] Successfully sent interrupt for ${requestId}.`);
         } else {
@@ -36,7 +36,7 @@ async function interrupt(requestId) {
         }
         return result;
     } catch (error) {
-        console.error(`[InterruptHandler] Error calling interruptVcpRequest IPC for ${requestId}:`, error);
+        console.error(`[InterruptHandler] Error calling interruptChatRequest IPC for ${requestId}:`, error);
         return { success: false, error: error.message };
     }
 }

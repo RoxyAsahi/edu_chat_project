@@ -103,7 +103,7 @@ test('createAppBootstrap cleans up IPC subscriptions before re-registering them'
         onThemeUpdated: () => () => {
             themeUnsubscribed += 1;
         },
-        onVCPStreamEvent: () => () => {
+        onChatStreamEvent: () => () => {
             streamUnsubscribed += 1;
         },
         onHistoryFileUpdated: () => () => {

@@ -4,7 +4,7 @@ const { resolveExecutionConfig } = require('./modelService');
 
 function normalizeChatEndpoint(endpoint) {
     if (typeof endpoint !== 'string' || endpoint.trim() === '') {
-        throw new Error('VCP endpoint is required.');
+        throw new Error('Chat endpoint is required.');
     }
 
     return new URL(endpoint.trim()).toString();
@@ -23,7 +23,7 @@ function describeUpstreamCapabilities(settings = {}) {
     const chatExecution = resolveExecutionConfig(settings, { purpose: 'chat' });
     const embeddingExecution = resolveExecutionConfig(settings, { purpose: 'embedding' });
     const rerankExecution = resolveExecutionConfig(settings, { purpose: 'rerank' });
-    const chatEndpoint = String(chatExecution?.endpoint || settings?.vcpServerUrl || '').trim();
+    const chatEndpoint = String(chatExecution?.endpoint || settings?.chatEndpoint || '').trim();
     const kbBaseUrl = String(
         embeddingExecution?.provider?.apiBaseUrl
         || rerankExecution?.provider?.apiBaseUrl
@@ -73,7 +73,7 @@ function describeUpstreamCapabilities(settings = {}) {
             capabilities.interrupt.endpoint = buildInterruptEndpoint(normalizedChatEndpoint);
             capabilities.guideGeneration.supported = true;
         } catch (error) {
-            warnings.push(`Invalid vcpServerUrl: ${error.message}`);
+            warnings.push(`Invalid chatEndpoint: ${error.message}`);
         }
     }
 

@@ -164,7 +164,7 @@ function createAppBootstrap(deps = {}) {
 
         bootstrapSubscriptions = [
             chatAPI.onThemeUpdated?.((nextTheme) => applyTheme(nextTheme)),
-            chatAPI.onVCPStreamEvent?.(handleStreamEvent),
+            chatAPI.onChatStreamEvent?.(handleStreamEvent),
             chatAPI.onHistoryFileUpdated?.(async (payload) => {
                 const session = getSessionSlice(store);
                 if (payload?.agentId === session.currentSelectedItem.id && payload?.topicId === session.currentTopicId) {

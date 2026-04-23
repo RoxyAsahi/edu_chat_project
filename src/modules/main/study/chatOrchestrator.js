@@ -127,6 +127,7 @@ function makeSyntheticEndEvent(requestId, context, payload = {}) {
         interrupted: payload.interrupted === true,
         timedOut: payload.timedOut === true,
         error: payload.error || '',
+        fallbackMeta: payload.fallbackMeta || null,
     };
 }
 
@@ -138,6 +139,7 @@ function emitSyntheticStream(options = {}) {
         streamChannel,
         fullResponse,
         finishReason,
+        fallbackMeta,
     } = options;
 
     const isDestroyed = typeof webContents?.isDestroyed === 'function'
@@ -176,10 +178,35 @@ function emitSyntheticStream(options = {}) {
             fullResponse: state.aborted ? '' : fullResponse,
             finishReason: state.aborted ? 'cancelled_by_user' : finishReason,
             interrupted: state.aborted,
+            fallbackMeta,
         }));
         syntheticRequestState.delete(requestId);
     }, Math.max(chunks.length, 1) * DEFAULT_SYNTHETIC_STREAM_INTERVAL_MS + 4);
     state.timers.add(finalTimer);
+}
+
+function mergeFallbackMeta(current = null, next = null, round = 0) {
+    if (!next || typeof next !== 'object') {
+        return current;
+    }
+
+    const nextRoundMeta = {
+        ...next,
+        round,
+    };
+
+    return {
+        attempted: current?.attempted === true || next.attempted === true,
+        used: current?.used === true || next.used === true,
+        skippedReason: next.skippedReason || current?.skippedReason || '',
+        trigger: next.trigger || current?.trigger || null,
+        primary: next.primary || current?.primary || null,
+        fallback: next.fallback || current?.fallback || null,
+        rounds: [
+            ...(Array.isArray(current?.rounds) ? current.rounds : []),
+            nextRoundMeta,
+        ],
+    };
 }
 
 function abortSyntheticRequest(requestId) {
@@ -193,7 +220,7 @@ function abortSyntheticRequest(requestId) {
 }
 
 function createChatOrchestrator(options = {}) {
-    const vcpClient = options.vcpClient;
+    const chatClient = options.chatClient;
     const studyToolRuntime = options.studyToolRuntime;
     const studyMemoryService = options.studyMemoryService;
 
@@ -236,9 +263,10 @@ function createChatOrchestrator(options = {}) {
         let finishReason = 'completed';
         let rawResult = null;
         const visibleAssistantSegments = [];
+        let fallbackMeta = null;
 
         for (let round = 0; round < maxRounds; round += 1) {
-            const upstreamResult = await vcpClient.send({
+            const upstreamResult = await chatClient.send({
                 requestId,
                 endpoint,
                 apiKey,
@@ -251,13 +279,17 @@ function createChatOrchestrator(options = {}) {
                 },
                 context,
                 timeoutMs: request.timeoutMs,
+                fallbackExecution: request.fallbackExecution || null,
             });
+
+            fallbackMeta = mergeFallbackMeta(fallbackMeta, upstreamResult?.fallbackMeta, round + 1);
 
             if (upstreamResult?.error) {
                 return {
                     error: upstreamResult.error,
                     studyMemoryRefs: studyMemory.refs,
                     toolEvents,
+                    fallbackMeta,
                 };
             }
 
@@ -349,6 +381,7 @@ function createChatOrchestrator(options = {}) {
             rawResult,
             studyMemoryRefs: studyMemory.refs,
             toolEvents,
+            fallbackMeta,
         };
     }
 
@@ -366,6 +399,7 @@ function createChatOrchestrator(options = {}) {
                 streamChannel: request.streamChannel,
                 fullResponse: result.fullResponse || '',
                 finishReason: result.finishReason || 'completed',
+                fallbackMeta: result.fallbackMeta || null,
             });
 
             return {
@@ -374,6 +408,7 @@ function createChatOrchestrator(options = {}) {
                 context: request.context,
                 toolEvents: result.toolEvents,
                 studyMemoryRefs: result.studyMemoryRefs,
+                fallbackMeta: result.fallbackMeta || null,
             };
         }
 
@@ -381,6 +416,7 @@ function createChatOrchestrator(options = {}) {
             ...(result.rawResult || { response: result.response, requestId: request.requestId, context: request.context }),
             toolEvents: result.toolEvents,
             studyMemoryRefs: result.studyMemoryRefs,
+            fallbackMeta: result.fallbackMeta || null,
         };
     }
 

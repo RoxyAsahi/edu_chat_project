@@ -33,7 +33,7 @@ const SETTINGS_MODAL_META = Object.freeze({
     },
 });
 
-const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{VarDivRender}}';
+const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{RenderingGuide}}';
 const DEFAULT_RENDERING_PROMPT = [
     'When structured rendering helps, emit semantic HTML div blocks that the client can render directly.',
     'Prefer normal Markdown for standard prose.',
@@ -95,6 +95,7 @@ const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
 const MODEL_SERVICE_VERSION = 1;
 const MODEL_SERVICE_TASK_META = Object.freeze({
     chat: { label: '默认聊天模型', capability: 'chat', description: '普通对话与大部分聊天任务的兜底模型。' },
+    chatFallback: { label: '聊天回退模型', capability: 'chat', description: '聊天上游失败时自动切换，覆盖普通聊天、追问、命名、来源指南与图片转写等聊天用途任务。' },
     followUp: { label: '追问模型', capability: 'chat', description: '自动生成追问时优先使用。' },
     topicTitle: { label: '话题命名模型', capability: 'chat', description: '首轮回复后的自动命名任务使用。' },
     embedding: { label: 'Embedding 模型', capability: 'embedding', description: '知识库向量化时使用，可独立于聊天 Provider。' },
@@ -130,6 +131,7 @@ function createDefaultModelService() {
         providers: [],
         defaults: {
             chat: null,
+            chatFallback: null,
             followUp: null,
             topicTitle: null,
             embedding: null,
@@ -533,8 +535,8 @@ function buildModelServiceMirror(service = {}, currentSettings = {}) {
     const kbDefault = embeddingDefault || rerankDefault;
 
     return {
-        vcpServerUrl: chatDefault ? buildModelServiceEndpoint(chatDefault.provider.apiBaseUrl, '/v1/chat/completions') : '',
-        vcpApiKey: chatDefault ? String(chatDefault.provider.apiKeys?.[0] || '') : '',
+        chatEndpoint: chatDefault ? buildModelServiceEndpoint(chatDefault.provider.apiBaseUrl, '/v1/chat/completions') : '',
+        chatApiKey: chatDefault ? String(chatDefault.provider.apiKeys?.[0] || '') : '',
         defaultModel: chatDefault?.model?.id || '',
         followUpDefaultModel: followUpDefault?.model?.id || '',
         topicTitleDefaultModel: topicTitleDefault?.model?.id || '',
@@ -650,8 +652,8 @@ function buildBootstrapModelService(settings = {}) {
         name: 'Custom Provider',
         protocol: 'openai-compatible',
         enabled: true,
-        apiBaseUrl: settings.vcpServerUrl,
-        apiKeys: parseModelServiceApiKeysInput(settings.vcpApiKey),
+        apiBaseUrl: settings.chatEndpoint,
+        apiKeys: parseModelServiceApiKeysInput(settings.chatApiKey),
         extraHeaders: {},
         models: chatModels.map((modelId) => ({
             id: modelId,
@@ -672,8 +674,8 @@ function buildBootstrapModelService(settings = {}) {
     const needsSeparateKbProvider = Boolean(
         normalizeModelServiceText(settings.kbBaseUrl || settings.kbApiKey)
         && (
-            normalizeModelServiceBaseUrl(settings.kbBaseUrl || '') !== normalizeModelServiceBaseUrl(settings.vcpServerUrl || '')
-            || normalizeModelServiceText(settings.kbApiKey || '') !== normalizeModelServiceText(settings.vcpApiKey || '')
+            normalizeModelServiceBaseUrl(settings.kbBaseUrl || '') !== normalizeModelServiceBaseUrl(settings.chatEndpoint || '')
+            || normalizeModelServiceText(settings.kbApiKey || '') !== normalizeModelServiceText(settings.chatApiKey || '')
         )
     );
 
@@ -689,8 +691,8 @@ function buildBootstrapModelService(settings = {}) {
                 name: 'Knowledge Base Provider',
                 protocol: 'openai-compatible',
                 enabled: true,
-                apiBaseUrl: settings.kbBaseUrl || settings.vcpServerUrl || '',
-                apiKeys: parseModelServiceApiKeysInput(settings.kbApiKey || settings.vcpApiKey || ''),
+                apiBaseUrl: settings.kbBaseUrl || settings.chatEndpoint || '',
+                apiKeys: parseModelServiceApiKeysInput(settings.kbApiKey || settings.chatApiKey || ''),
                 extraHeaders: {},
                 models: [
                     settings.kbEmbeddingModel ? {
@@ -985,8 +987,8 @@ function createSettingsController(deps = {}) {
     function syncLegacyModelServiceFields(settings = getGlobalSettings()) {
         const mirrors = buildModelServiceMirror(settings.modelService || createDefaultModelService(), settings);
 
-        if (el.vcpServerUrl) el.vcpServerUrl.value = mirrors.vcpServerUrl || '';
-        if (el.vcpApiKey) el.vcpApiKey.value = mirrors.vcpApiKey || '';
+        if (el.chatEndpoint) el.chatEndpoint.value = mirrors.chatEndpoint || '';
+        if (el.chatApiKey) el.chatApiKey.value = mirrors.chatApiKey || '';
         if (el.kbBaseUrl) el.kbBaseUrl.value = mirrors.kbBaseUrl || '';
         if (el.kbApiKey) el.kbApiKey.value = mirrors.kbApiKey || '';
         if (el.kbEmbeddingModel) el.kbEmbeddingModel.value = mirrors.kbEmbeddingModel || '';
@@ -2033,6 +2035,7 @@ function createSettingsController(deps = {}) {
 
         const optionsByTask = Object.entries(MODEL_SERVICE_TASK_META).map(([taskKey, meta]) => {
             const currentRef = service.defaults?.[taskKey];
+            const chatDefaultRef = service.defaults?.chat || null;
             const availableModels = listModelServiceModels(service, {
                 capability: meta.capability,
                 onlyEnabled: true,
@@ -2041,13 +2044,23 @@ function createSettingsController(deps = {}) {
                 taskKey,
                 meta,
                 currentRef,
+                chatDefaultRef,
                 availableModels,
             };
         });
 
         el.modelServiceDefaultSelectors.innerHTML = `
             <div class="model-service-default-list">
-              ${optionsByTask.map(({ taskKey, meta, currentRef, availableModels }) => `
+              ${optionsByTask.map(({ taskKey, meta, currentRef, chatDefaultRef, availableModels }) => {
+                    const sameAsPrimary = taskKey === 'chatFallback'
+                        && currentRef
+                        && chatDefaultRef
+                        && currentRef.providerId === chatDefaultRef.providerId
+                        && currentRef.modelId === chatDefaultRef.modelId;
+                    const helperText = availableModels.length > 0
+                        ? `${availableModels.length} 个可选模型 · ${meta.capability}${sameAsPrimary ? ' · 当前与默认聊天模型相同，运行时会视为未配置回退' : ''}`
+                        : `暂无可用 ${meta.capability} 模型`;
+                    return `
                   <article class="model-service-default-row">
                     <div class="model-service-default-row__meta">
                       <strong>${escapeHtml(meta.label)}</strong>
@@ -2068,10 +2081,11 @@ function createSettingsController(deps = {}) {
                             `;
                         }).join('')}
                       </select>
-                      <span>${availableModels.length > 0 ? `${availableModels.length} 个可选模型 · ${meta.capability}` : `暂无可用 ${meta.capability} 模型`}</span>
+                      <span>${escapeHtml(helperText)}</span>
                     </label>
                   </article>
-              `).join('')}
+              `;
+                }).join('')}
             </div>
         `;
     }
@@ -2393,6 +2407,22 @@ function createSettingsController(deps = {}) {
         return `${text.slice(0, limit).trim()}...`;
     }
 
+    function formatLegacyTokenSuggestions(unresolvedTokens = [], suggestionMap = {}) {
+        return (Array.isArray(unresolvedTokens) ? unresolvedTokens : []).map((token) => (
+            suggestionMap?.[token]
+                ? `${token} -> ${suggestionMap[token]}`
+                : token
+        ));
+    }
+
+    function formatLegacyFieldWarnings(warnings = []) {
+        return (Array.isArray(warnings) ? warnings : []).map((warning) => (
+            warning?.replacement
+                ? `${warning.field} -> ${warning.replacement}`
+                : warning?.field
+        )).filter(Boolean);
+    }
+
     function renderPromptSegmentPreview(preview = {}) {
         if (!el.promptSegmentPreview) {
             return;
@@ -2402,22 +2432,22 @@ function createSettingsController(deps = {}) {
             {
                 key: 'rendering',
                 title: '结构化渲染',
-                description: '控制 {{VarDivRender}} / {{VarRendering}} 是否进入当前智能体提示词。',
+                description: '控制 {{RenderingGuide}} 是否进入当前智能体提示词。',
             },
             {
                 key: 'emoticonPrompt',
                 title: '表情包提示',
-                description: '启用后会自动把内置表情包说明追加到当前智能体提示词；若主 prompt 已显式引用 {{VarEmoticonPrompt}} / {{VarEmojiPrompt}}，则会跳过重复追加。',
+                description: '启用后会自动把内置表情包说明追加到当前智能体提示词；若主 prompt 已显式引用 {{EmoticonGuide}}，则会跳过重复追加。',
             },
             {
                 key: 'adaptiveBubbleTip',
                 title: '简洁气泡补充',
-                description: '控制 {{VarAdaptiveBubbleTip}} 是否进入当前智能体提示词。',
+                description: '控制 {{AdaptiveBubbleTip}} 是否进入当前智能体提示词。',
             },
             {
                 key: 'dailyNoteVariable',
                 title: 'DailyNote 变量',
-                description: '控制 {{StudyLogTool}} / {{DailyNoteTool}} / {{VarDailyNoteGuide}} 是否展开。',
+                description: '控制 {{DailyNoteGuide}} 是否展开。',
             },
             {
                 key: 'dailyNoteAutoInject',
@@ -2525,6 +2555,7 @@ function createSettingsController(deps = {}) {
         }
 
         const unresolvedTokens = Array.isArray(preview?.unresolvedTokens) ? preview.unresolvedTokens : [];
+        const legacyTokenSuggestions = preview?.legacyTokenSuggestions || {};
         const chips = [
             `智能体：${preview?.agentName || '未选择'}`,
             `话题：${preview?.topicName || '未选择'}`,
@@ -2545,7 +2576,7 @@ function createSettingsController(deps = {}) {
         } else if (emoticonPrompt.enabled && emoticonPrompt.skippedBecausePromptAlreadyContainsSameContent) {
             notes.push('当前 agent prompt 已经包含同样的表情包说明，所以系统不会重复追加。');
         } else if (!emoticonPrompt.enabled) {
-            notes.push('表情包提示当前关闭，{{VarEmoticonPrompt}} / {{VarEmojiPrompt}} 会解析为空。');
+            notes.push('表情包提示当前关闭，{{EmoticonGuide}} 会解析为空。');
         } else {
             notes.push('表情包提示已准备好；如果当前 prompt 没有显式自带说明，发送前会自动补上。');
         }
@@ -2569,7 +2600,7 @@ function createSettingsController(deps = {}) {
         }
 
         if (unresolvedTokens.length > 0) {
-            notes.push(`还有未解析变量：${unresolvedTokens.join(', ')}`);
+            notes.push(`还有未解析变量：${formatLegacyTokenSuggestions(unresolvedTokens, legacyTokenSuggestions).join(', ')}`);
         } else {
             notes.push('当前可见变量都已经成功展开。');
         }
@@ -2655,9 +2686,9 @@ function createSettingsController(deps = {}) {
         const bubbleThemeRaw = settings.enableAgentBubbleTheme === true
             ? (getPromptTextareaRawValue(el.agentBubbleThemePrompt) || el.agentBubbleThemePrompt?.value || DEFAULT_AGENT_BUBBLE_THEME_PROMPT)
             : '';
-        const promptAlreadyContainsEmoticon = /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(normalizedBasePrompt);
+        const promptAlreadyContainsEmoticon = /{{\s*EmoticonGuide\s*}}/.test(normalizedBasePrompt);
         const promptAlreadyContainsDailyNote = normalizedBasePrompt.includes('—— 日记 (DailyNote) ——')
-            || /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(normalizedBasePrompt);
+            || /{{\s*DailyNoteGuide\s*}}/.test(normalizedBasePrompt);
         const finalSystemPrompt = [
             normalizedBasePrompt,
             settings.enableAgentBubbleTheme === true ? bubbleThemeRaw : '',
@@ -2683,7 +2714,7 @@ function createSettingsController(deps = {}) {
                 rendering: {
                     enabled: settings.enableRenderingPrompt !== false,
                     source: String(settings.renderingPrompt || '').trim() ? 'custom' : 'default',
-                    referencedInBasePrompt: /{{\s*(VarDivRender|VarRendering)\s*}}/.test(normalizedBasePrompt),
+                    referencedInBasePrompt: /{{\s*RenderingGuide\s*}}/.test(normalizedBasePrompt),
                     rawPrompt: renderingRaw,
                     resolvedPrompt: renderingRaw,
                 },
@@ -2692,7 +2723,7 @@ function createSettingsController(deps = {}) {
                     available: true,
                     packCount: 0,
                     source: String(settings.emoticonPrompt || '').trim() ? 'custom' : 'default',
-                    referencedInBasePrompt: /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(normalizedBasePrompt),
+                    referencedInBasePrompt: /{{\s*EmoticonGuide\s*}}/.test(normalizedBasePrompt),
                     appended: settings.enableEmoticonPrompt !== false && !promptAlreadyContainsEmoticon,
                     skippedBecausePromptAlreadyContainsVariable: promptAlreadyContainsEmoticon,
                     skippedBecausePromptAlreadyContainsSameContent: false,
@@ -2702,14 +2733,14 @@ function createSettingsController(deps = {}) {
                 adaptiveBubbleTip: {
                     enabled: settings.enableAdaptiveBubbleTip !== false,
                     source: String(settings.adaptiveBubbleTip || '').trim() ? 'custom' : 'default',
-                    referencedInBasePrompt: /{{\s*VarAdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
+                    referencedInBasePrompt: /{{\s*AdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
                     rawPrompt: adaptiveRaw,
                     resolvedPrompt: adaptiveRaw,
                 },
                 dailyNoteVariable: {
                     enabled: dailyNoteEnabled && settings.studyLogPolicy?.enableDailyNotePromptVariables !== false,
                     source: String(settings.dailyNoteGuide || '').trim() ? 'custom' : 'default',
-                    referencedInBasePrompt: /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(normalizedBasePrompt),
+                    referencedInBasePrompt: /{{\s*DailyNoteGuide\s*}}/.test(normalizedBasePrompt),
                     rawPrompt: dailyNoteRaw,
                     resolvedPrompt: dailyNoteRaw,
                 },
@@ -2852,9 +2883,10 @@ function createSettingsController(deps = {}) {
         }
 
         if (Array.isArray(preview?.unresolvedTokens) && preview.unresolvedTokens.length > 0) {
+            el.agentBubbleThemeResolvedPreview.value = preview?.resolvedPrompt || trimmedPrompt;
             setAgentBubbleThemeCaptionStatus(
                 el.agentBubbleThemePreviewMeta,
-                `存在未解析变量：${preview.unresolvedTokens.join(', ')}`,
+                `存在未解析变量：${formatLegacyTokenSuggestions(preview.unresolvedTokens, preview.legacyTokenSuggestions || {}).join(', ')}`,
                 'warning'
             );
             return;
@@ -2891,10 +2923,10 @@ function createSettingsController(deps = {}) {
         if (el.studyMemoryTopKInput) el.studyMemoryTopKInput.value = settings.studyLogPolicy?.memoryTopK ?? 4;
         if (el.studyMemoryFallbackTopKInput) el.studyMemoryFallbackTopKInput.value = settings.studyLogPolicy?.memoryFallbackTopK ?? 2;
         if (el.promptVariablesInput) el.promptVariablesInput.value = JSON.stringify(settings.promptVariables || {}, null, 2);
-        if (el.vcpServerUrl) el.vcpServerUrl.value = settings.vcpServerUrl || '';
-        if (el.vcpApiKey) el.vcpApiKey.value = settings.vcpApiKey || '';
-        if (el.kbBaseUrl) el.kbBaseUrl.value = settings.kbBaseUrl || settings.vcpServerUrl || '';
-        if (el.kbApiKey) el.kbApiKey.value = settings.kbApiKey || settings.vcpApiKey || '';
+        if (el.chatEndpoint) el.chatEndpoint.value = settings.chatEndpoint || '';
+        if (el.chatApiKey) el.chatApiKey.value = settings.chatApiKey || '';
+        if (el.kbBaseUrl) el.kbBaseUrl.value = settings.kbBaseUrl || settings.chatEndpoint || '';
+        if (el.kbApiKey) el.kbApiKey.value = settings.kbApiKey || settings.chatApiKey || '';
         if (el.kbEmbeddingModel) el.kbEmbeddingModel.value = settings.kbEmbeddingModel || '';
         el.kbUseRerank.checked = settings.kbUseRerank !== false;
         if (el.kbRerankModel) el.kbRerankModel.value = settings.kbRerankModel || 'BAAI/bge-reranker-v2-m3';
@@ -3007,6 +3039,11 @@ function createSettingsController(deps = {}) {
         syncLayoutSettings(getGlobalSettings());
         messageRendererApi?.setUserAvatar(getGlobalSettings().userAvatarUrl || '../assets/default_user_avatar.png');
         messageRendererApi?.setUserAvatarColor(getGlobalSettings().userAvatarCalculatedColor || null);
+
+        const legacyFieldWarnings = formatLegacyFieldWarnings(loaded?.settingsIssues?.legacyFieldWarnings);
+        if (legacyFieldWarnings.length > 0) {
+            ui.showToastNotification(`检测到已废弃设置字段：${legacyFieldWarnings.join('，')}。请改用新字段名。`, 'warning', 7000);
+        }
     }
 
     async function saveGlobalSettings(options = {}) {
@@ -3043,8 +3080,8 @@ function createSettingsController(deps = {}) {
                 memoryTopK: Number(el.studyMemoryTopKInput?.value || 4),
                 memoryFallbackTopK: Number(el.studyMemoryFallbackTopKInput?.value || 2),
             },
-            vcpServerUrl: modelServiceMirror.vcpServerUrl || '',
-            vcpApiKey: modelServiceMirror.vcpApiKey || '',
+            chatEndpoint: modelServiceMirror.chatEndpoint || '',
+            chatApiKey: modelServiceMirror.chatApiKey || '',
             kbBaseUrl: modelServiceMirror.kbBaseUrl || '',
             kbApiKey: modelServiceMirror.kbApiKey || '',
             kbEmbeddingModel: modelServiceMirror.kbEmbeddingModel || '',
@@ -3261,8 +3298,8 @@ function createSettingsController(deps = {}) {
         const patch = {
             name: el.agentNameInput.value.trim(),
             model: el.agentModel.value.trim(),
-            vcpAliases: parseLineListInput(el.agentVcpAliasesInput?.value),
-            vcpMaid: el.agentVcpMaidInput?.value.trim() || '',
+            promptAliases: parseLineListInput(el.agentPromptAliasesInput?.value),
+            toolSignature: el.agentToolSignatureInput?.value.trim() || '',
             temperature: Number(el.agentTemperature.value || 0.7),
             contextTokenLimit: Number(el.agentContextTokenLimit.value || 4000),
             maxOutputTokens: Number(el.agentMaxOutputTokens.value || 1000),
@@ -3923,8 +3960,8 @@ function createSettingsController(deps = {}) {
             el.workEnvironmentInput,
             el.studyTimezoneInput,
             el.promptVariablesInput,
-            el.vcpServerUrl,
-            el.vcpApiKey,
+            el.chatEndpoint,
+            el.chatApiKey,
             el.kbEmbeddingModel,
             el.kbRerankModel,
             el.kbTopK,

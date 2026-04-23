@@ -1,5 +1,5 @@
 const DEFAULT_TIMEOUT_MS = 300000;
-const STREAM_CHANNEL = 'vcp-stream-event';
+const STREAM_CHANNEL = 'chat-stream-event';
 const {
     logOutboundRequest,
     logUpstreamRawReply,
@@ -13,7 +13,7 @@ let moduleConfig = {
 };
 
 function initialize(config = {}) {
-    const envTimeoutMs = Number(process.env.UNISTUDY_VCP_TIMEOUT_MS);
+    const envTimeoutMs = Number(process.env.UNISTUDY_CHAT_TIMEOUT_MS);
     moduleConfig = {
         settingsManager: config.settingsManager || null,
         defaultTimeoutMs: Number(config.defaultTimeoutMs) > 0
@@ -22,7 +22,7 @@ function initialize(config = {}) {
                 ? envTimeoutMs
             : DEFAULT_TIMEOUT_MS,
     };
-    console.log('[VCPClient] Initialized.');
+    console.log('[ChatClient] Initialized.');
 }
 
 async function readSettings() {
@@ -33,14 +33,14 @@ async function readSettings() {
     try {
         return await moduleConfig.settingsManager.readSettings();
     } catch (error) {
-        console.error('[VCPClient] Failed to read settings:', error);
+        console.error('[ChatClient] Failed to read settings:', error);
         return {};
     }
 }
 
 function normalizeEndpoint(endpoint) {
     if (typeof endpoint !== 'string' || endpoint.trim() === '') {
-        throw new Error('VCP endpoint is required.');
+        throw new Error('Chat endpoint is required.');
     }
 
     return new URL(endpoint.trim()).toString();
@@ -218,7 +218,206 @@ async function parseErrorResponse(response) {
     return {
         errorData,
         errorMessage,
-        formattedMessage: `VCP request failed: ${response.status} - ${errorMessage}`,
+        formattedMessage: `Chat request failed: ${response.status} - ${errorMessage}`,
+    };
+}
+
+function normalizeCapabilityList(requiredCapability = '') {
+    const values = Array.isArray(requiredCapability)
+        ? requiredCapability
+        : [requiredCapability];
+    return [...new Set(
+        values
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+    )];
+}
+
+function buildExecutionComparisonTarget(execution = {}, fallback = {}) {
+    const endpoint = typeof execution?.endpoint === 'string' && execution.endpoint.trim()
+        ? execution.endpoint.trim()
+        : (typeof fallback?.endpoint === 'string' ? fallback.endpoint.trim() : '');
+    const apiKey = typeof execution?.apiKey === 'string' && execution.apiKey.trim()
+        ? execution.apiKey.trim()
+        : (typeof fallback?.apiKey === 'string' ? fallback.apiKey.trim() : '');
+    const modelId = typeof execution?.model?.id === 'string' && execution.model.id.trim()
+        ? execution.model.id.trim()
+        : (typeof fallback?.modelId === 'string' ? fallback.modelId.trim() : '');
+    const extraHeaders = execution?.extraHeaders && typeof execution.extraHeaders === 'object' && !Array.isArray(execution.extraHeaders)
+        ? execution.extraHeaders
+        : (fallback?.extraHeaders && typeof fallback.extraHeaders === 'object' && !Array.isArray(fallback.extraHeaders)
+            ? fallback.extraHeaders
+            : {});
+
+    return {
+        providerId: typeof execution?.ref?.providerId === 'string' ? execution.ref.providerId : '',
+        modelId,
+        endpoint,
+        apiKey,
+        extraHeaders,
+    };
+}
+
+function buildExecutionDescriptor(execution = {}, fallback = {}) {
+    const comparable = buildExecutionComparisonTarget(execution, fallback);
+    return {
+        providerId: comparable.providerId,
+        modelId: comparable.modelId,
+        endpoint: comparable.endpoint,
+    };
+}
+
+function areExecutionTargetsEquivalent(primaryExecution = {}, fallbackExecution = {}) {
+    const primary = buildExecutionComparisonTarget(primaryExecution);
+    const fallback = buildExecutionComparisonTarget(fallbackExecution);
+    return String(primary?.endpoint || '') === String(fallback?.endpoint || '')
+        && String(primary?.apiKey || '') === String(fallback?.apiKey || '')
+        && String(primary?.modelId || '') === String(fallback?.modelId || '')
+        && String(primary?.providerId || '') === String(fallback?.providerId || '')
+        && JSON.stringify(primary?.extraHeaders || {}) === JSON.stringify(fallback?.extraHeaders || {});
+}
+
+function createFallbackMeta(primary = {}, fallback = null) {
+    return {
+        attempted: false,
+        used: false,
+        skippedReason: '',
+        trigger: null,
+        primary: buildExecutionDescriptor(primary),
+        fallback: fallback ? buildExecutionDescriptor(fallback) : null,
+    };
+}
+
+function isRetryableStatusCode(statusCode = 0) {
+    const code = Number(statusCode);
+    return code === 401
+        || code === 403
+        || code === 408
+        || code === 429
+        || code >= 500;
+}
+
+function buildHttpFailureMeta(statusCode = 0, errorMessage = '') {
+    return {
+        retryable: isRetryableStatusCode(statusCode),
+        trigger: {
+            type: 'http_error',
+            statusCode: Number(statusCode) || 0,
+            error: errorMessage || '',
+        },
+    };
+}
+
+function buildRuntimeFailureMeta(error, requestState) {
+    if (error?.name === 'AbortError') {
+        if (requestState?.timedOut === true) {
+            return {
+                retryable: true,
+                trigger: {
+                    type: 'timeout',
+                    error: 'Request timed out.',
+                },
+            };
+        }
+        return {
+            retryable: false,
+            trigger: {
+                type: 'cancelled',
+                error: 'Request cancelled.',
+            },
+        };
+    }
+
+    return {
+        retryable: true,
+        trigger: {
+            type: 'network_error',
+            error: error?.message || 'Unknown network error',
+        },
+    };
+}
+
+function resolveFallbackSkipReason({
+    primaryExecution = null,
+    fallbackExecution = null,
+    fallbackMeta = null,
+    requiredCapability = '',
+}) {
+    if (!fallbackExecution?.endpoint || !fallbackExecution?.model?.id) {
+        if (fallbackMeta) {
+            fallbackMeta.skippedReason = 'not-configured';
+        }
+        return 'not-configured';
+    }
+
+    const requiredCapabilities = normalizeCapabilityList(requiredCapability);
+    if (requiredCapabilities.length > 0) {
+        const capabilities = fallbackExecution?.model?.capabilities || {};
+        const isCompatible = requiredCapabilities.every((capability) => capabilities?.[capability] === true);
+        if (!isCompatible) {
+            if (fallbackMeta) {
+                fallbackMeta.skippedReason = 'incompatible-capability';
+            }
+            return 'incompatible-capability';
+        }
+    }
+
+    if (primaryExecution && fallbackExecution && areExecutionTargetsEquivalent(primaryExecution, fallbackExecution)) {
+        fallbackMeta.skippedReason = 'same-target';
+        return 'same-target';
+    }
+
+    return '';
+}
+
+function createRequestState({
+    requestId,
+    endpoint,
+    apiKey,
+    extraHeaders,
+    context,
+    webContents,
+    streamChannel,
+    onStreamEnd,
+    timeoutMs,
+    fallbackMeta = null,
+}) {
+    const requestState = {
+        requestId,
+        endpoint,
+        apiKey,
+        extraHeaders,
+        controller: new AbortController(),
+        context,
+        webContents,
+        streamChannel,
+        onStreamEnd,
+        accumulatedResponse: '',
+        accumulatedReasoning: '',
+        finishReason: null,
+        interrupted: false,
+        timedOut: false,
+        terminalSent: false,
+        cleanedUp: false,
+        timeoutId: null,
+        fallbackMeta,
+    };
+
+    requestState.timeoutId = setTimeout(() => {
+        requestState.timedOut = true;
+        requestState.controller.abort();
+    }, Number(timeoutMs) > 0 ? Number(timeoutMs) : moduleConfig.defaultTimeoutMs);
+
+    activeRequests.set(requestId, requestState);
+    return requestState;
+}
+
+function buildRequestAttemptBody(normalizedMessages, modelConfig, requestId) {
+    return {
+        messages: normalizedMessages,
+        ...modelConfig,
+        stream: modelConfig.stream === true,
+        requestId,
     };
 }
 
@@ -246,6 +445,7 @@ function invokeFinalizeCallback(requestState, payload) {
                 finishReason: payload.finishReason,
                 interrupted: payload.interrupted === true,
                 timedOut: payload.timedOut === true,
+                fallbackMeta: payload.fallbackMeta || requestState.fallbackMeta || null,
             });
             return;
         }
@@ -259,9 +459,10 @@ function invokeFinalizeCallback(requestState, payload) {
             error: payload.error,
             interrupted: payload.interrupted === true,
             timedOut: payload.timedOut === true,
+            fallbackMeta: payload.fallbackMeta || requestState.fallbackMeta || null,
         });
     } catch (error) {
-        console.error('[VCPClient] onStreamEnd callback failed:', error);
+        console.error('[ChatClient] onStreamEnd callback failed:', error);
     }
 }
 
@@ -339,6 +540,7 @@ async function processStreamResponse(response, requestState) {
                         finishReason: requestState.finishReason || 'completed',
                         interrupted: false,
                         timedOut: false,
+                        fallbackMeta: requestState.fallbackMeta || null,
                     });
                     return;
                 }
@@ -393,6 +595,7 @@ async function processStreamResponse(response, requestState) {
                     finishReason: requestState.finishReason || 'completed',
                     interrupted: false,
                     timedOut: false,
+                    fallbackMeta: requestState.fallbackMeta || null,
                 });
                 return;
             }
@@ -408,6 +611,7 @@ async function processStreamResponse(response, requestState) {
                 finishReason: requestState.timedOut ? 'timed_out' : 'cancelled_by_user',
                 interrupted: requestState.interrupted === true,
                 timedOut: requestState.timedOut === true,
+                fallbackMeta: requestState.fallbackMeta || null,
             });
             return;
         }
@@ -416,11 +620,12 @@ async function processStreamResponse(response, requestState) {
             type: 'error',
             requestId: requestState.requestId,
             context: requestState.context,
-            error: `VCP stream failed: ${error.message}`,
+            error: `Chat stream failed: ${error.message}`,
             partialResponse: requestState.accumulatedResponse,
             reasoning_content: requestState.accumulatedReasoning,
             interrupted: requestState.interrupted === true,
             timedOut: requestState.timedOut === true,
+            fallbackMeta: requestState.fallbackMeta || null,
         });
     } finally {
         try {
@@ -429,6 +634,136 @@ async function processStreamResponse(response, requestState) {
             // Ignore release failures.
         }
         cleanupRequest(requestState);
+    }
+}
+
+async function executeRequestAttempt({
+    requestId,
+    endpoint,
+    apiKey,
+    extraHeaders = {},
+    normalizedMessages,
+    modelConfig = {},
+    context = null,
+    webContents = null,
+    streamChannel = STREAM_CHANNEL,
+    onStreamEnd = null,
+    timeoutMs = moduleConfig.defaultTimeoutMs,
+    round = 1,
+    fallbackMeta = null,
+}) {
+    let serializedBody;
+    try {
+        serializedBody = JSON.stringify(buildRequestAttemptBody(normalizedMessages, modelConfig, requestId));
+    } catch (error) {
+        return {
+            error: `Failed to serialize request body: ${error.message}`,
+            failure: {
+                retryable: false,
+                trigger: {
+                    type: 'serialization_error',
+                    error: error.message,
+                },
+            },
+        };
+    }
+
+    const requestState = createRequestState({
+        requestId,
+        endpoint,
+        apiKey,
+        extraHeaders,
+        context,
+        webContents,
+        streamChannel,
+        onStreamEnd,
+        timeoutMs,
+        fallbackMeta,
+    });
+
+    try {
+        logOutboundRequest({
+            requestId,
+            round,
+            endpoint,
+            model: modelConfig.model || '',
+            context,
+            messages: normalizedMessages,
+        });
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: buildRequestHeaders(apiKey, extraHeaders),
+            body: serializedBody,
+            signal: requestState.controller.signal,
+        });
+
+        if (!response.ok) {
+            const { formattedMessage, errorMessage } = await parseErrorResponse(response);
+            cleanupRequest(requestState);
+            return {
+                error: formattedMessage,
+                failure: buildHttpFailureMeta(response.status, errorMessage),
+            };
+        }
+
+        if (modelConfig.stream === true) {
+            if (!response.body) {
+                cleanupRequest(requestState);
+                return {
+                    error: 'Streaming response did not contain a readable body.',
+                    failure: {
+                        retryable: false,
+                        trigger: {
+                            type: 'stream_body_missing',
+                            error: 'Streaming response did not contain a readable body.',
+                        },
+                    },
+                };
+            }
+
+            void processStreamResponse(response, requestState);
+            return {
+                streamingStarted: true,
+                requestId,
+                context,
+                fallbackMeta: requestState.fallbackMeta || null,
+            };
+        }
+
+        const parsedResponse = await response.json();
+        logUpstreamRawReply({
+            requestId,
+            round,
+            content: extractTextFromCandidate(
+                parsedResponse?.choices?.[0]?.message?.content
+                ?? parsedResponse?.message?.content
+                ?? parsedResponse?.content
+                ?? ''
+            ),
+        });
+        cleanupRequest(requestState);
+        return {
+            response: parsedResponse,
+            context,
+            requestId,
+            fallbackMeta: requestState.fallbackMeta || null,
+        };
+    } catch (error) {
+        cleanupRequest(requestState);
+        const failure = buildRuntimeFailureMeta(error, requestState);
+
+        if (error?.name === 'AbortError') {
+            return {
+                error: requestState.timedOut ? 'Request timed out.' : 'Request cancelled.',
+                failure,
+            };
+        }
+
+        return {
+            error: `Chat request error: ${error.message}`,
+            failure,
+        };
     }
 }
 
@@ -445,6 +780,8 @@ async function send(request) {
         streamChannel = STREAM_CHANNEL,
         onStreamEnd = null,
         timeoutMs = moduleConfig.defaultTimeoutMs,
+        fallbackExecution = null,
+        requiredCapability = '',
     } = request || {};
 
     if (!requestId || typeof requestId !== 'string') {
@@ -461,105 +798,120 @@ async function send(request) {
         return { error: error.message };
     }
 
-    const requestBody = {
-        messages: normalizedMessages,
-        ...modelConfig,
-        stream: modelConfig.stream === true,
-        requestId,
-    };
-
-    let serializedBody;
-    try {
-        serializedBody = JSON.stringify(requestBody);
-    } catch (error) {
-        return { error: `Failed to serialize request body: ${error.message}` };
+    let normalizedFallbackExecution = null;
+    if (fallbackExecution && typeof fallbackExecution === 'object') {
+        const fallbackEndpoint = typeof fallbackExecution.endpoint === 'string'
+            ? fallbackExecution.endpoint.trim()
+            : '';
+        if (fallbackEndpoint) {
+            try {
+                normalizedFallbackExecution = {
+                    ...fallbackExecution,
+                    endpoint: normalizeEndpoint(fallbackEndpoint),
+                    apiKey: typeof fallbackExecution.apiKey === 'string' ? fallbackExecution.apiKey.trim() : '',
+                    extraHeaders: fallbackExecution.extraHeaders && typeof fallbackExecution.extraHeaders === 'object' && !Array.isArray(fallbackExecution.extraHeaders)
+                        ? fallbackExecution.extraHeaders
+                        : {},
+                };
+            } catch (_error) {
+                normalizedFallbackExecution = null;
+            }
+        }
     }
 
-    const requestState = {
+    const primaryExecution = {
+        endpoint: finalEndpoint,
+        apiKey,
+        extraHeaders,
+        model: { id: modelConfig.model || '' },
+    };
+    const fallbackMeta = fallbackExecution || normalizeCapabilityList(requiredCapability).length > 0
+        ? createFallbackMeta(primaryExecution, normalizedFallbackExecution)
+        : null;
+
+    const primaryResult = await executeRequestAttempt({
         requestId,
         endpoint: finalEndpoint,
         apiKey,
         extraHeaders,
-        controller: new AbortController(),
+        normalizedMessages,
+        modelConfig,
         context,
         webContents,
         streamChannel,
         onStreamEnd,
-        accumulatedResponse: '',
-        accumulatedReasoning: '',
-        finishReason: null,
-        interrupted: false,
-        timedOut: false,
-        terminalSent: false,
-        cleanedUp: false,
-        timeoutId: null,
-    };
+        timeoutMs,
+        round: request.round || 1,
+        fallbackMeta,
+    });
 
-    requestState.timeoutId = setTimeout(() => {
-        requestState.timedOut = true;
-        requestState.controller.abort();
-    }, Number(timeoutMs) > 0 ? Number(timeoutMs) : moduleConfig.defaultTimeoutMs);
-
-    activeRequests.set(requestId, requestState);
-
-    try {
-        logOutboundRequest({
-            requestId,
-            round: request.round || 1,
-            endpoint: finalEndpoint,
-            model: modelConfig.model || '',
-            context,
-            messages: normalizedMessages,
-        });
-
-        const response = await fetch(finalEndpoint, {
-            method: 'POST',
-            headers: buildRequestHeaders(apiKey, extraHeaders),
-            body: serializedBody,
-            signal: requestState.controller.signal,
-        });
-
-        if (!response.ok) {
-            const { formattedMessage } = await parseErrorResponse(response);
-            cleanupRequest(requestState);
-            return { error: formattedMessage };
-        }
-
-        if (modelConfig.stream === true) {
-            if (!response.body) {
-                cleanupRequest(requestState);
-                return { error: 'Streaming response did not contain a readable body.' };
-            }
-
-            void processStreamResponse(response, requestState);
-            return { streamingStarted: true, requestId, context };
-        }
-
-        const parsedResponse = await response.json();
-        logUpstreamRawReply({
-            requestId,
-            round: request.round || 1,
-            content: extractTextFromCandidate(
-                parsedResponse?.choices?.[0]?.message?.content
-                ?? parsedResponse?.message?.content
-                ?? parsedResponse?.content
-                ?? ''
-            ),
-        });
-        cleanupRequest(requestState);
-        return { response: parsedResponse, context, requestId };
-    } catch (error) {
-        cleanupRequest(requestState);
-
-        if (error?.name === 'AbortError') {
-            if (requestState.timedOut) {
-                return { error: 'Request timed out.' };
-            }
-            return { error: 'Request cancelled.' };
-        }
-
-        return { error: `VCP request error: ${error.message}` };
+    if (!primaryResult?.error) {
+        return fallbackMeta
+            ? { ...primaryResult, fallbackMeta }
+            : primaryResult;
     }
+
+    if (!fallbackMeta) {
+        return primaryResult;
+    }
+
+    const skipReason = resolveFallbackSkipReason({
+        primaryExecution,
+        fallbackExecution: normalizedFallbackExecution,
+        fallbackMeta,
+        requiredCapability,
+    });
+    if (skipReason) {
+        return {
+            ...primaryResult,
+            fallbackMeta,
+        };
+    }
+
+    if (primaryResult?.failure?.retryable !== true) {
+        fallbackMeta.skippedReason = 'not-triggered';
+        return {
+            ...primaryResult,
+            fallbackMeta,
+        };
+    }
+
+    fallbackMeta.attempted = true;
+    fallbackMeta.trigger = primaryResult.failure.trigger || null;
+    fallbackMeta.skippedReason = '';
+
+    const fallbackResult = await executeRequestAttempt({
+        requestId,
+        endpoint: normalizedFallbackExecution.endpoint,
+        apiKey: normalizedFallbackExecution.apiKey || '',
+        extraHeaders: normalizedFallbackExecution.extraHeaders || {},
+        normalizedMessages,
+        modelConfig: {
+            ...modelConfig,
+            ...(normalizedFallbackExecution?.model?.id ? { model: normalizedFallbackExecution.model.id } : {}),
+        },
+        context,
+        webContents,
+        streamChannel,
+        onStreamEnd,
+        timeoutMs,
+        round: request.round || 1,
+        fallbackMeta,
+    });
+
+    if (fallbackResult?.error) {
+        return {
+            error: `${primaryResult.error}；回退后仍失败：${fallbackResult.error}`,
+            failure: fallbackResult.failure,
+            fallbackMeta,
+        };
+    }
+
+    fallbackMeta.used = true;
+    return {
+        ...fallbackResult,
+        fallbackMeta,
+    };
 }
 
 function buildInterruptUrl(endpoint) {
@@ -595,8 +947,8 @@ async function interrupt(request = {}) {
 
     if (remote) {
         const settings = await readSettings();
-        const endpoint = requestState?.endpoint || settings?.vcpServerUrl;
-        const apiKey = requestState?.apiKey || settings?.vcpApiKey;
+        const endpoint = requestState?.endpoint || settings?.chatEndpoint;
+        const apiKey = requestState?.apiKey || settings?.chatApiKey;
         const extraHeaders = requestState?.extraHeaders || {};
 
         if (endpoint) {

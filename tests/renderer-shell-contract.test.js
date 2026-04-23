@@ -45,8 +45,10 @@ test('renderer shell keeps the critical DOM anchors for controller wiring', asyn
     [
         'workspaceOverviewPage',
         'workspaceSubjectPage',
-        'workspaceOverviewCreateAgentBtn',
         'workspaceBackToOverviewBtn',
+        'workspaceOpenSubjectBtn',
+        'manualNotesLibraryBtn',
+        'openDiaryWallBtn',
         'subjectOverviewGrid',
         'globalSettingsBtn',
         'themeToggleBtn',
@@ -57,6 +59,7 @@ test('renderer shell keeps the critical DOM anchors for controller wiring', asyn
         'messageInput',
         'settingsPanel',
         'noteDetailModal',
+        'diaryWallModal',
     ].forEach((id) => {
         assert.ok(document.getElementById(id), `expected #${id} to exist`);
     });

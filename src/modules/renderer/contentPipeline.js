@@ -91,7 +91,7 @@ function createContentPipeline(deps = {}) {
 
         ctx.state.toolResultMap = new Map();
         const result = text.replace(toolResultRegex, (match) => {
-            const placeholder = `__VCP_TOOL_RESULT_PLACEHOLDER_${ctx.state.toolResultPlaceholderId}__`;
+            const placeholder = `__TOOL_RESULT_PLACEHOLDER_${ctx.state.toolResultPlaceholderId}__`;
             ctx.state.toolResultMap.set(placeholder, match);
             ctx.state.toolResultPlaceholderId += 1;
             return placeholder;
@@ -106,7 +106,7 @@ function createContentPipeline(deps = {}) {
 
         ctx.state.codeBlockMap = new Map();
         return text.replace(codeFenceRegex, (match) => {
-            const placeholder = `__VCP_CODE_BLOCK_PLACEHOLDER_${ctx.state.codeBlockPlaceholderId}__`;
+            const placeholder = `__CODE_BLOCK_PLACEHOLDER_${ctx.state.codeBlockPlaceholderId}__`;
             ctx.state.codeBlockMap.set(placeholder, match);
             ctx.state.codeBlockPlaceholderId += 1;
             return placeholder;

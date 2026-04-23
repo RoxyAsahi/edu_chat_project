@@ -100,15 +100,15 @@ function restoreLatexBlocks(html, map) {
 // --- Pre-compiled Regular Expressions for Performance ---
 const TOOL_REGEX = /(?<!`)<<<\[TOOL_REQUEST\]>>>(.*?)<<<\[END_TOOL_REQUEST\]>>>(?!`)/gs;
 const NOTE_REGEX = /<<<DailyNoteStart>>>(.*?)<<<DailyNoteEnd>>>/gs;
-const TOOL_RESULT_REGEX = /\[\[(?:\u0056\u0043\u0050\u8c03\u7528\u7ed3\u679c\u4fe1\u606f\u6c47\u603b)(.*?)?(?:\u0056\u0043\u0050\u8c03\u7528\u7ed3\u679c\u7ed3\u675f)\]\]/gs;
+const TOOL_RESULT_REGEX = /\[\[(?:\u5de5\u5177\u8c03\u7528\u7ed3\u679c\u4fe1\u606f\u6c47\u603b)(.*?)?(?:\u5de5\u5177\u8c03\u7528\u7ed3\u679c\u7ed3\u675f)\]\]/gs;
 const BUTTON_CLICK_REGEX = /\[\[(?:\u70b9\u51fb\u6309\u94ae):(.*?)\]\]/gs;
-const CANVAS_PLACEHOLDER_REGEX = /\{\{VCPChatCanvas\}\}/g;
+const CANVAS_PLACEHOLDER_REGEX = /\{\{ChatCanvas\}\}/g;
 const STYLE_REGEX = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
 const HTML_FENCE_CHECK_REGEX = /```\w*\n<!DOCTYPE html>/i;
 const MERMAID_CODE_REGEX = /<code.*?>\s*(flowchart|graph|mermaid)\s+([\s\S]*?)<\/code>/gi;
 const MERMAID_FENCE_REGEX = /```(mermaid|flowchart|graph)\n([\s\S]*?)```/g;
 const CODE_FENCE_REGEX = /```\w*([\s\S]*?)```/g;
-const THOUGHT_CHAIN_REGEX = /\[--- VCP(?:\u5143\u601d\u8003\u94fe)(?::\s*"([^"]*)")?\s*---\]([\s\S]*?)\[--- (?:\u5143\u601d\u8003\u94fe\u7ed3\u675f) ---\]/gs;
+const THOUGHT_CHAIN_REGEX = /\[--- \u6a21\u578b\u601d\u8003\u8fc7\u7a0b(?::\s*"([^"]*)")?\s*---\]([\s\S]*?)\[--- \u6a21\u578b\u601d\u8003\u8fc7\u7a0b\u7ed3\u675f ---\]/gs;
 const CONVENTIONAL_THOUGHT_REGEX = /<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/gi;
 const ROLE_DIVIDER_REGEX = /<<<\[(END_)?ROLE_DIVIDE_(SYSTEM|ASSISTANT|USER)\]>>>/g;
 const DESKTOP_PUSH_REGEX = /(?<!`)<<<\[DESKTOP_PUSH\]>>>([\s\S]*?)<<<\[DESKTOP_PUSH_END\]>>>(?!`)/gs;
@@ -171,7 +171,7 @@ function buildNativeReasoningBubbleHtml(reasoningContent) {
         processedContent = `<pre>${safeMarkdown}</pre>`;
     }
 
-    let html = `<div class="vcp-native-reasoning-bubble vcp-thought-chain-bubble collapsible" data-thought-title="原生思维链">`;
+    let html = `<div class="native-reasoning-bubble reasoning-bubble collapsible" data-thought-title="原生思维链">`;
     html += `<div class="unistudy-thought-chain-header">`;
     html += `<span class="unistudy-thought-chain-icon">AI</span>`;
     html += `<span class="unistudy-thought-chain-label">原生思维链</span>`;
@@ -330,7 +330,7 @@ function applyFrontendRegexRules(text, rules, role, depth) {
 }
 
 /**
- * Finds special VCP blocks (Tool Requests, Daily Notes) and transforms them
+ * Finds special tool-protocol blocks (tool requests, Daily Notes) and transforms them
  * directly into styled HTML divs, bypassing the need for markdown code fences.
  * @param {string} text The text content.
  * @param {Map} [codeBlockMap] Map of code block placeholders to their original content.
@@ -350,7 +350,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
         return res;
     };
 
-    // Process VCP tool results.
+    // Process tool-result summaries.
     processed = processed.replace(TOOL_RESULT_REGEX, (match, rawContent) => {
         const content = rawContent.trim();
         const lines = content.split('\n');
@@ -564,9 +564,9 @@ function transformSpecialBlocks(text, codeBlockMap) {
         const commandFromContent = readBlockValue(content, 'command') || readLineValue(content, 'command');
         const normalizedToolName = normalizeWrappedValue(toolNameFromContent);
         const normalizedCommand = normalizeWrappedValue(commandFromContent).toLowerCase();
-        const isDailyNoteTool = /DailyNote/i.test(normalizedToolName);
-        const isDailyNoteCreate = isDailyNoteTool && normalizedCommand === 'create';
-        const isDailyNoteUpdate = isDailyNoteTool && normalizedCommand === 'update';
+        const isDailyNoteGuide = /DailyNote/i.test(normalizedToolName);
+        const isDailyNoteCreate = isDailyNoteGuide && normalizedCommand === 'create';
+        const isDailyNoteUpdate = isDailyNoteGuide && normalizedCommand === 'update';
 
         if (isDailyNoteCreate || isDailyNoteUpdate) {
             const notebook = normalizeWrappedValue(readLineValue(content, 'maid') || readLineValue(content, 'maidName'));
@@ -611,7 +611,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
             }
 
             const escapedFullContent = escapeHtml(restoreBlocks(content));
-            return `<div class="vcp-tool-use-bubble">` +
+            return `<div class="tool-request-bubble">` +
                 `<div class="unistudy-tool-summary">` +
                 `<span class="unistudy-tool-label">Tool Use:</span> ` +
                 `<span class="unistudy-tool-name-highlight">${escapeHtml(toolName)}</span>` +
@@ -668,13 +668,13 @@ function transformSpecialBlocks(text, codeBlockMap) {
         return html;
     });
 
-        // Process VCP thought chains.
+        // Process serialized reasoning blocks.
     const renderThoughtChain = (theme, rawContent) => {
         const displayTheme = theme ? theme.trim() : '\u5143\u601d\u8003\u94fe';
         const content = rawContent.trim();
         const escapedContent = escapeHtml(restoreBlocks(content));
 
-        let html = `<div class="vcp-thought-chain-bubble collapsible">`;
+        let html = `<div class="reasoning-bubble collapsible">`;
         html += `<div class="unistudy-thought-chain-header">`;
         html += `<span class="unistudy-thought-chain-icon">?</span>`;
         html += `<span class="unistudy-thought-chain-label">${escapeHtml(displayTheme)}</span>`;
@@ -696,7 +696,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
 
         html += `<div class="unistudy-thought-chain-body">${processedContent}</div>`;
         html += `</div>`; // End of unistudy-thought-chain-collapsible-content
-        html += `</div>`; // End of vcp-thought-chain-bubble
+        html += `</div>`; // End of reasoning-bubble
 
         return html;
     };
@@ -755,7 +755,7 @@ function extractSpeakableTextFromContentElement(contentElement) {
 
     const contentClone = contentElement.cloneNode(true);
     contentClone.querySelectorAll(
-        '.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble, .unistudy-role-divider, .vcp-thought-chain-bubble, style, script'
+        '.tool-request-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble, .unistudy-role-divider, .reasoning-bubble, style, script'
     ).forEach(el => el.remove());
 
     return (contentClone.innerText || '')
@@ -1206,7 +1206,7 @@ function initializeMessageRenderer(refs) {
 
         const thoughtHeader = e.target.closest('.unistudy-thought-chain-header');
         if (thoughtHeader) {
-            const bubble = thoughtHeader.closest('.vcp-thought-chain-bubble.collapsible');
+            const bubble = thoughtHeader.closest('.reasoning-bubble.collapsible');
             if (bubble) {
                 bubble.classList.toggle('expanded');
             }
@@ -1585,7 +1585,7 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
             // Protect tool request blocks because payloads may contain complete HTML documents.
             // Reuse the hardened TOOL_REGEX so backtick-wrapped payloads stay untouched.
             let textWithProtectedBlocks = textToRender.replace(TOOL_REGEX, (match) => {
-                const placeholder = `__VCP_STYLE_PROTECT_${protectedBlocks.length}__`;
+                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
                 protectedBlocks.push(match);
                 return placeholder;
             });
@@ -1593,27 +1593,27 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
             // Protect start/end marker blocks because they may contain arbitrary HTML.
             // Their content is tool payload data and must not be interpreted as page markup.
             textWithProtectedBlocks = textWithProtectedBlocks.replace(/「始」[\s\S]*?(「末」|$)/g, (match) => {
-                const placeholder = `__VCP_STYLE_PROTECT_${protectedBlocks.length}__`;
+                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
                 protectedBlocks.push(match);
                 return placeholder;
             });
             
             // Protect desktop-push blocks before code-fence handling because they may include code fences.
             textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_REGEX, (match) => {
-                const placeholder = `__VCP_STYLE_PROTECT_${protectedBlocks.length}__`;
+                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
                 protectedBlocks.push(match);
                 return placeholder;
             });
             // Also protect incomplete desktop-push blocks during streaming.
             textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_PARTIAL_REGEX, (match) => {
-                const placeholder = `__VCP_STYLE_PROTECT_${protectedBlocks.length}__`;
+                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
                 protectedBlocks.push(match);
                 return placeholder;
             });
             
             // Protect fenced code blocks.
             textWithProtectedBlocks = textWithProtectedBlocks.replace(CODE_FENCE_REGEX, (match) => {
-                const placeholder = `__VCP_STYLE_PROTECT_${protectedBlocks.length}__`;
+                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
                 protectedBlocks.push(match);
                 return placeholder;
             });
@@ -1624,7 +1624,7 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
             // Restore every protected block after scoped CSS extraction.
             textToRender = contentWithoutStyles;
             protectedBlocks.forEach((block, i) => {
-                const placeholder = `__VCP_STYLE_PROTECT_${i}__`;
+                const placeholder = `__STYLE_PROTECT_${i}__`;
                 textToRender = textToRender.replace(placeholder, block);
             });
             // --- End protected-style handling ---
@@ -1712,11 +1712,11 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
             // If not, attach the processing function to the element itself.
             // The caller (e.g., a batch renderer) will be responsible for executing it
             // AFTER the element has been attached to the DOM.
-            messageItem._vcp_process = () => {
+            messageItem._renderProcess = () => {
                 if (!isRenderSessionActive(renderSessionId) || !messageItem.isConnected) return;
                 return runPostRenderProcessing();
             };
-            messageItem._vcp_renderSessionId = renderSessionId;
+            messageItem._renderSessionId = renderSessionId;
         }
     }
 
@@ -2107,7 +2107,7 @@ function prepareUserMessageText(text) {
         if (/on\w+\s*=/i.test(match) || /src\s*=\s*["']\s*javascript:/i.test(match)) {
             return match;
         }
-        const placeholder = `__VCP_USER_IMG_${userImgBlocks.length}__`;
+        const placeholder = `__USER_IMG_${userImgBlocks.length}__`;
         userImgBlocks.push(match);
         return placeholder;
     });
@@ -2115,7 +2115,7 @@ function prepareUserMessageText(text) {
     processedText = escapeHtml(processedText);
 
     userImgBlocks.forEach((img, i) => {
-        processedText = processedText.replace(`__VCP_USER_IMG_${i}__`, img);
+        processedText = processedText.replace(`__USER_IMG_${i}__`, img);
     });
 
     processedText = transformUserButtonClick(processedText);
@@ -2220,21 +2220,21 @@ async function renderMessageBatch(messages, scrollToBottom = false, renderSessio
             // Step 2: Now that they are in the DOM, run the deferred processing for each.
             messageElements.forEach(el => {
                 if (!isRenderSessionActive(renderSessionId) || !el.isConnected) {
-                    if (typeof el._vcp_process === 'function') {
-                        delete el._vcp_process;
+                    if (typeof el._renderProcess === 'function') {
+                        delete el._renderProcess;
                     }
-                    delete el._vcp_renderSessionId;
+                    delete el._renderSessionId;
                     return;
                 }
 
                 // Observe each batch-rendered message after it enters the DOM.
                 visibilityOptimizer.observeMessage(el);
 
-                if (typeof el._vcp_process === 'function') {
-                    el._vcp_process();
-                    delete el._vcp_process; // Clean up to avoid memory leaks
+                if (typeof el._renderProcess === 'function') {
+                    el._renderProcess();
+                    delete el._renderProcess; // Clean up to avoid memory leaks
                 }
-                delete el._vcp_renderSessionId;
+                delete el._renderSessionId;
             });
 
             if (scrollToBottom && isRenderSessionActive(renderSessionId)) {
@@ -2300,21 +2300,21 @@ async function renderOlderMessagesInBatches(olderMessages, batchSize, batchDelay
 
                 elementsForProcessing.forEach(el => {
                     if (!isRenderSessionActive(renderSessionId) || !el.isConnected) {
-                        if (typeof el._vcp_process === 'function') {
-                            delete el._vcp_process;
+                        if (typeof el._renderProcess === 'function') {
+                            delete el._renderProcess;
                         }
-                        delete el._vcp_renderSessionId;
+                        delete el._renderSessionId;
                         return;
                     }
 
                     // Observe each history message after it is appended to the DOM.
                     visibilityOptimizer.observeMessage(el);
 
-                    if (typeof el._vcp_process === 'function') {
-                        el._vcp_process();
-                        delete el._vcp_process;
+                    if (typeof el._renderProcess === 'function') {
+                        el._renderProcess();
+                        delete el._renderProcess;
                     }
-                    delete el._vcp_renderSessionId;
+                    delete el._renderSessionId;
                 });
 
                 resolve();
@@ -2376,21 +2376,21 @@ async function renderHistoryLegacy(history, renderSessionId = getActiveRenderSes
             // Step 2: Run the deferred processing for each element now that it's attached.
             allMessageElements.forEach(el => {
                 if (!isRenderSessionActive(renderSessionId) || !el.isConnected) {
-                    if (typeof el._vcp_process === 'function') {
-                        delete el._vcp_process;
+                    if (typeof el._renderProcess === 'function') {
+                        delete el._renderProcess;
                     }
-                    delete el._vcp_renderSessionId;
+                    delete el._renderSessionId;
                     return;
                 }
 
                 // Observe history messages after they are attached.
                 visibilityOptimizer.observeMessage(el);
 
-                if (typeof el._vcp_process === 'function') {
-                    el._vcp_process();
-                    delete el._vcp_process; // Clean up
+                if (typeof el._renderProcess === 'function') {
+                    el._renderProcess();
+                    delete el._renderProcess; // Clean up
                 }
-                delete el._vcp_renderSessionId;
+                delete el._renderSessionId;
             });
 
             if (isRenderSessionActive(renderSessionId)) {

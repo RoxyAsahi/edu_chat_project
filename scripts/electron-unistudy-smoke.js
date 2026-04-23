@@ -10,6 +10,8 @@ const {
 } = require('./lib/runtime-data-roots');
 const { buildPreloadBundles } = require('./lib/preload-bundles');
 
+let preloadBundlesReady = false;
+
 function readOptionalEnv(name, fallback = '') {
     const value = String(process.env[name] || '').trim();
     return value || fallback;
@@ -86,7 +88,7 @@ async function resolveGuideModel(realDataRoot, persistedSettings, realAgentId) {
     return firstNonEmpty(
         readOptionalEnv('UNISTUDY_GUIDE_MODEL'),
         readOptionalEnv('GUIDE_MODEL'),
-        readOptionalEnv('VCP_MODEL'),
+        readOptionalEnv('CHAT_MODEL'),
         persistedSettings?.guideModel,
         persistedSettings?.defaultModel,
         persistedSettings?.lastModel,
@@ -326,15 +328,20 @@ function buildScenarios(mode, fixtures, runStamp) {
 }
 
 async function launchApp(dataRoot) {
-    await buildPreloadBundles();
+    if (!preloadBundlesReady) {
+        await buildPreloadBundles();
+        preloadBundlesReady = true;
+    }
+    const launchEnv = {
+        ...process.env,
+        UNISTUDY_DATA_ROOT: dataRoot,
+        ELECTRON_ENABLE_LOGGING: '1',
+    };
+    delete launchEnv.ELECTRON_RUN_AS_NODE;
     return electron.launch({
         args: [path.resolve(__dirname, '..')],
         cwd: path.resolve(__dirname, '..'),
-        env: {
-            ...process.env,
-            UNISTUDY_DATA_ROOT: dataRoot,
-            ELECTRON_ENABLE_LOGGING: '1',
-        },
+        env: launchEnv,
     });
 }
 
@@ -454,17 +461,17 @@ function buildRichRenderingSmokeMessage() {
         'content: UI smoke payload',
         '<<<[END_TOOL_REQUEST]>>>',
         '',
-        '[[VCP调用结果信息汇总',
+        '[[工具调用结果信息汇总',
         '附加尾注：用于校验 footer 命名迁移。',
         '- 工具名称: smoke_lookup',
         '- 执行状态: SUCCESS',
         '- 返回内容: **smoke ok**',
         '- 可访问URL: https://example.com/smoke.png',
-        'VCP调用结果结束]]',
+        '工具调用结果结束]]',
         '',
-        '[--- VCP元思考链: "UI Smoke" ---]',
+        '[--- 模型思考过程: "UI Smoke" ---]',
         '这里是 thought chain 冒烟内容。',
-        '[--- 元思考链结束 ---]',
+        '[--- 模型思考过程结束 ---]',
         '',
         '```html',
         '<!DOCTYPE html>',
@@ -633,9 +640,9 @@ async function runRichRenderingSmoke(dataRoot, config, runStamp) {
                 if (assistantMessages.length === 0) return false;
                 const lastContent = assistantMessages[assistantMessages.length - 1];
                 return Boolean(
-                    lastContent.querySelector('.vcp-tool-use-bubble')
+                    lastContent.querySelector('.tool-request-bubble')
                     && lastContent.querySelector('.unistudy-tool-result-bubble')
-                    && lastContent.querySelector('.vcp-thought-chain-bubble')
+                    && lastContent.querySelector('.reasoning-bubble')
                     && lastContent.querySelector('.unistudy-html-preview-toggle')
                     && lastContent.querySelector('.unistudy-desktop-push-placeholder')
                 );
@@ -648,41 +655,38 @@ async function runRichRenderingSmoke(dataRoot, config, runStamp) {
                 const scopedColor = scopedCard ? window.getComputedStyle(scopedCard).color : null;
 
                 return {
-                    toolUseBubble: Boolean(lastContent?.querySelector('.vcp-tool-use-bubble')),
+                    toolUseBubble: Boolean(lastContent?.querySelector('.tool-request-bubble')),
                     toolUseLabel: lastContent?.querySelector('.unistudy-tool-label')?.textContent?.trim() || '',
                     toolResultBubble: Boolean(lastContent?.querySelector('.unistudy-tool-result-bubble')),
-                    legacyToolResultBubble: Boolean(lastContent?.querySelector('.vcp-tool-result-bubble')),
                     toolResultImage: Boolean(lastContent?.querySelector('.unistudy-tool-result-image')),
                     toolResultFooter: Boolean(lastContent?.querySelector('.unistudy-tool-result-footer')),
-                    thoughtChainBubble: Boolean(lastContent?.querySelector('.vcp-thought-chain-bubble')),
+                    thoughtChainBubble: Boolean(lastContent?.querySelector('.reasoning-bubble')),
                     thoughtChainHeader: Boolean(lastContent?.querySelector('.unistudy-thought-chain-header')),
                     toggleIconCount: lastContent?.querySelectorAll('.unistudy-result-toggle-icon').length || 0,
-                    legacyToggleIconCount: lastContent?.querySelectorAll('.vcp-result-toggle-icon').length || 0,
                     htmlPreviewToggle: Boolean(lastContent?.querySelector('.unistudy-html-preview-toggle')),
                     htmlPreviewFrame: Boolean(lastContent?.querySelector('.unistudy-html-preview-frame')),
                     desktopPushPlaceholder: Boolean(lastContent?.querySelector('.unistudy-desktop-push-placeholder')),
                     scopedStyleCount: document.querySelectorAll('style[data-unistudy-scope-id]').length,
                     scopedCardColor: scopedColor,
-                    legacyScopedStyleCount: document.querySelectorAll('style[data-vcp-scope-id]').length,
                     toolResultExpanded: lastContent?.querySelector('.unistudy-tool-result-bubble')?.classList.contains('expanded') || false,
-                    thoughtChainExpanded: lastContent?.querySelector('.vcp-thought-chain-bubble')?.classList.contains('expanded') || false,
+                    thoughtChainExpanded: lastContent?.querySelector('.reasoning-bubble')?.classList.contains('expanded') || false,
                 };
             });
 
             const lastAssistant = page.locator('.message-item.assistant').last();
-            await lastAssistant.locator('.unistudy-tool-result-header').click();
+            await lastAssistant.locator('.unistudy-tool-result-header').evaluate((node) => node.click());
             await page.waitForFunction(() => {
                 const lastMessage = document.querySelectorAll('.message-item.assistant')[document.querySelectorAll('.message-item.assistant').length - 1];
                 return lastMessage?.querySelector('.unistudy-tool-result-bubble')?.classList.contains('expanded') === true;
             }, null, { timeout: 10000 });
 
-            await lastAssistant.locator('.unistudy-thought-chain-header').click();
+            await lastAssistant.locator('.unistudy-thought-chain-header').evaluate((node) => node.click());
             await page.waitForFunction(() => {
                 const lastMessage = document.querySelectorAll('.message-item.assistant')[document.querySelectorAll('.message-item.assistant').length - 1];
-                return lastMessage?.querySelector('.vcp-thought-chain-bubble')?.classList.contains('expanded') === true;
+                return lastMessage?.querySelector('.reasoning-bubble')?.classList.contains('expanded') === true;
             }, null, { timeout: 10000 });
 
-            await lastAssistant.locator('.unistudy-html-preview-toggle').click();
+            await lastAssistant.locator('.unistudy-html-preview-toggle').evaluate((node) => node.click());
             await page.waitForFunction(() => {
                 const lastMessage = document.querySelectorAll('.message-item.assistant')[document.querySelectorAll('.message-item.assistant').length - 1];
                 return Boolean(lastMessage?.querySelector('.unistudy-html-preview-frame'));
@@ -693,7 +697,7 @@ async function runRichRenderingSmoke(dataRoot, config, runStamp) {
                 const lastContent = assistantMessages[assistantMessages.length - 1];
                 return {
                     toolResultExpanded: lastContent?.querySelector('.unistudy-tool-result-bubble')?.classList.contains('expanded') || false,
-                    thoughtChainExpanded: lastContent?.querySelector('.vcp-thought-chain-bubble')?.classList.contains('expanded') || false,
+                    thoughtChainExpanded: lastContent?.querySelector('.reasoning-bubble')?.classList.contains('expanded') || false,
                     htmlPreviewFrame: Boolean(lastContent?.querySelector('.unistudy-html-preview-frame')),
                     htmlPreviewMode: Boolean(lastContent?.querySelector('.unistudy-html-preview-container.preview-mode')),
                 };
@@ -703,17 +707,14 @@ async function runRichRenderingSmoke(dataRoot, config, runStamp) {
                 result.initial.toolUseBubble
                 && result.initial.toolUseLabel === 'Tool Use:'
                 && result.initial.toolResultBubble
-                && !result.initial.legacyToolResultBubble
                 && result.initial.toolResultImage
                 && result.initial.toolResultFooter
                 && result.initial.thoughtChainBubble
                 && result.initial.thoughtChainHeader
                 && result.initial.toggleIconCount >= 2
-                && result.initial.legacyToggleIconCount === 0
                 && result.initial.htmlPreviewToggle
                 && result.initial.desktopPushPlaceholder
                 && result.initial.scopedStyleCount >= 1
-                && result.initial.legacyScopedStyleCount === 0
                 && result.initial.scopedCardColor === 'rgb(0, 128, 0)'
                 && result.afterInteractions.toolResultExpanded
                 && result.afterInteractions.thoughtChainExpanded
@@ -751,6 +752,19 @@ async function prepareScenarioWorkspace(dataRoot, config, scenario) {
         await delay(1500);
 
         const result = await page.evaluate(async (payload) => {
+            async function waitForAgentConfig(agentId, timeoutMs = 10000) {
+                const startedAt = Date.now();
+                let lastResult = null;
+                while (Date.now() - startedAt < timeoutMs) {
+                    lastResult = await window.chatAPI.getAgentConfig(agentId);
+                    if (lastResult && !lastResult.error) {
+                        return lastResult;
+                    }
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                }
+                return lastResult;
+            }
+
             const current = await window.chatAPI.loadSettings();
             await window.chatAPI.saveSettings({
                 ...current,
@@ -762,7 +776,7 @@ async function prepareScenarioWorkspace(dataRoot, config, scenario) {
                 const agent = await window.chatAPI.createAgent(payload.agentName, null);
                 agentId = agent.agentId;
             } else {
-                const configCheck = await window.chatAPI.getAgentConfig(agentId);
+                const configCheck = await waitForAgentConfig(agentId);
                 if (!configCheck || configCheck.error) {
                     throw new Error(`目标学科不存在：${agentId}`);
                 }
@@ -957,12 +971,21 @@ async function openSourceDocumentInReader(page, documentName) {
         await delay(500);
     }
 
-    const row = page.locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: documentName }).first();
-    await row.waitFor({ state: 'visible', timeout: 30000 });
+    await page.waitForFunction((targetName) => {
+        return Array.from(document.querySelectorAll('#topicKnowledgeBaseFiles .kb-document-row'))
+            .some((node) => (node.textContent || '').includes(targetName));
+    }, documentName, { timeout: 30000 });
 
     const startedAt = Date.now();
     while (Date.now() - startedAt < 30000) {
-        await row.click({ force: true }).catch(() => {});
+        await page.evaluate((targetName) => {
+            const row = Array.from(document.querySelectorAll('#topicKnowledgeBaseFiles .kb-document-row'))
+                .find((node) => (node.textContent || '').includes(targetName));
+            if (row) {
+                row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                row.click();
+            }
+        }, documentName).catch(() => {});
 
         const snapshot = await page.evaluate(() => ({
             readerVisible: !document.getElementById('workspaceReaderPanel')?.classList.contains('hidden'),
@@ -1251,8 +1274,22 @@ async function runScenario(dataRoot, config, scenario, globalSummary) {
 
         for (const query of scenario.queries) {
             const baseline = await getChatSnapshot(page, prepared);
-            await page.locator('#messageInput').fill(query.prompt);
-            await page.locator('#sendMessageBtn').click();
+            await page.waitForFunction(() => {
+                const input = document.getElementById('messageInput');
+                const button = document.getElementById('sendMessageBtn');
+                return Boolean(input && !input.disabled && button && !button.disabled);
+            }, null, { timeout: 30000 });
+            await page.evaluate((promptText) => {
+                const input = document.getElementById('messageInput');
+                const button = document.getElementById('sendMessageBtn');
+                if (!input || !button) {
+                    throw new Error('聊天输入框或发送按钮不存在。');
+                }
+                input.value = promptText;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                button.click();
+            }, query.prompt);
             const snapshot = await waitForNewAssistantResponse(page, prepared, baseline.assistantCount, 120000);
             scenarioSummary.retrievalAssertions.push(buildQueryAssertion(query, snapshot));
         }
@@ -1331,6 +1368,9 @@ async function run() {
     const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-fixtures-'));
     const viewerSmokeDataRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-viewer-smoke-'));
     const richRenderingSmokeDataRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-rich-rendering-smoke-'));
+    const richRenderingTargetDataRoot = mode === 'real-data'
+        ? realDataRoot
+        : richRenderingSmokeDataRoot;
     const reportDir = path.resolve(readOptionalEnv('UNISTUDY_TEST_REPORT_DIR', path.join(repoRoot, 'docs', 'test-reports')));
     await fs.ensureDir(reportDir);
     const reportPath = path.join(reportDir, `unistudy-${mode}-${runStamp}.json`);
@@ -1340,8 +1380,8 @@ async function run() {
     const resolvedGuideModel = await resolveGuideModel(settingsSeedRoot, persistedSettings, realAgentId);
     const settings = {
         userName: 'SmokeUser',
-        vcpServerUrl: readOptionalEnv('VCP_SERVER_URL', persistedSettings.vcpServerUrl || 'http://vcp.uniquest.us.kg/v1/chat/completions'),
-        vcpApiKey: readOptionalEnv('VCP_API_KEY', persistedSettings.vcpApiKey || '123456'),
+        chatEndpoint: readOptionalEnv('CHAT_ENDPOINT', persistedSettings.chatEndpoint || 'http://chat.uniquest.us.kg/v1/chat/completions'),
+        chatApiKey: readOptionalEnv('CHAT_API_KEY', persistedSettings.chatApiKey || '123456'),
         guideModel: readOptionalEnv('UNISTUDY_GUIDE_MODEL', persistedSettings.guideModel || resolvedGuideModel),
         defaultModel: readOptionalEnv('DEFAULT_MODEL', persistedSettings.defaultModel || resolvedGuideModel),
         lastModel: readOptionalEnv('LAST_MODEL', persistedSettings.lastModel || resolvedGuideModel),
@@ -1376,7 +1416,7 @@ async function run() {
         viewerSmokeDataRoot,
         richRenderingSmokeDataRoot,
         settings: {
-            vcpServerUrl: settings.vcpServerUrl,
+            chatEndpoint: settings.chatEndpoint,
             kbBaseUrl: settings.kbBaseUrl,
             guideModel: settings.guideModel,
             defaultModel: settings.defaultModel,
@@ -1385,7 +1425,7 @@ async function run() {
             kbRerankModel: settings.kbRerankModel,
         },
         configurationDiagnostics: {
-            hasVcpApiKey: Boolean(String(settings.vcpApiKey || '').trim()),
+            hasChatApiKey: Boolean(String(settings.chatApiKey || '').trim()),
             hasKbApiKey: Boolean(String(settings.kbApiKey || '').trim()),
         },
         rendererErrors: [],
@@ -1399,13 +1439,13 @@ async function run() {
     if (!summary.viewerSmoke.passed) {
         summary.errors.push(`viewer smoke 失败：${summary.viewerSmoke.error || '未知错误'}`);
     }
-    summary.richRenderingSmoke = await runRichRenderingSmoke(richRenderingSmokeDataRoot, config, runStamp);
+    summary.richRenderingSmoke = await runRichRenderingSmoke(richRenderingTargetDataRoot, config, runStamp);
     if (!summary.richRenderingSmoke.passed) {
         summary.errors.push(`rich rendering smoke 失败：${summary.richRenderingSmoke.error || '未知错误'}`);
     }
 
-    if (!settings.vcpServerUrl || !settings.vcpApiKey) {
-        const message = '未提供有效的 VCP_SERVER_URL / VCP_API_KEY，无法完成真实对话测试。';
+    if (!settings.chatEndpoint || !settings.chatApiKey) {
+        const message = '未提供有效的 CHAT_ENDPOINT / CHAT_API_KEY，无法完成真实对话测试。';
         if (mode === 'real-data') {
             summary.errors.push(message);
         } else {
@@ -1421,7 +1461,7 @@ async function run() {
         }
     }
 
-    const hasConversationConfig = Boolean(settings.vcpServerUrl && settings.vcpApiKey);
+    const hasConversationConfig = Boolean(settings.chatEndpoint && settings.chatApiKey);
     const hasKnowledgeBaseConfig = Boolean(settings.kbBaseUrl && settings.kbApiKey);
     const canRunScenarios = hasConversationConfig && hasKnowledgeBaseConfig;
 

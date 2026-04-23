@@ -130,7 +130,7 @@ function ensureSeparatorBetweenImgAndCode(text) {
 
 
 /**
- * Removes leading whitespace from special VCP blocks like Tool Requests.
+ * Removes leading whitespace from special tool-protocol blocks like tool requests.
  * This prevents the markdown parser from misinterpreting the entire indented
  * block as a single code block before it can be transformed into a bubble.
  * @param {string} text The input string.
@@ -174,7 +174,7 @@ function deIndentToolRequestBlocks(text) {
 
 
 /**
- * Parses VCP tool_name from content.
+ * Parses tool_name from a tool request block.
  * @param {string} toolContent - The raw string content of the tool request.
  * @returns {string|null} The extracted tool name or null.
  */
@@ -190,13 +190,13 @@ function extractToolFieldFromRequest(toolContent, fieldName) {
 }
 
 /**
- * Prettifies a single <pre> code block for DailyNote or VCP ToolUse.
+ * Prettifies a single <pre> code block for DailyNote or tool use.
  * @param {HTMLElement} preElement - The <pre> element to prettify.
- * @param {'dailynote' | 'vcptool'} type - The type of block.
+ * @param {'dailynote' | 'toolrequest'} type - The type of block.
  * @param {string} relevantContent - The relevant text content for the block.
  */
 function prettifySinglePreElement(preElement, type, relevantContent) {
-    if (!preElement || preElement.dataset.vcpPrettified === "true" || preElement.dataset.learningDiaryPrettified === "true") {
+    if (!preElement || preElement.dataset.toolRequestPrettified === "true" || preElement.dataset.learningDiaryPrettified === "true") {
         return;
     }
 
@@ -213,7 +213,7 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
         preElement.innerHTML = '';
     }
 
-    if (type === 'vcptool') {
+    if (type === 'toolrequest') {
         const toolName = extractToolNameFromRequest(relevantContent);
         const command = extractToolFieldFromRequest(relevantContent, 'command').toLowerCase();
 
@@ -259,7 +259,7 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
             return;
         }
 
-        preElement.classList.add('vcp-tool-use-bubble');
+        preElement.classList.add('tool-request-bubble');
 
         let newInnerHtml = `<span class="unistudy-tool-label">Tool Use:</span>`;
         if (toolName) {
@@ -269,7 +269,7 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
         }
 
         preElement.innerHTML = newInnerHtml;
-        preElement.dataset.vcpPrettified = "true";
+        preElement.dataset.toolRequestPrettified = "true";
 
     } else if (type === 'dailynote') {
         preElement.classList.add('learning-diary-bubble');
@@ -431,18 +431,18 @@ function processAllPreBlocksInContentDiv(contentDiv) {
         // 在嵌套的 pre 场景下，外层 pre 的处理可能会导致内层 pre 被移出 DOM
         if (!preElement || !preElement.parentElement) return;
 
-        if (preElement.dataset.vcpPrettified === "true" ||
+        if (preElement.dataset.toolRequestPrettified === "true" ||
             preElement.dataset.learningDiaryPrettified === "true" ||
-            preElement.dataset.vcpHtmlPreview === "true" ||
-            preElement.dataset.vcpHtmlPreview === "blocked") {
+            preElement.dataset.richHtmlPreview === "true" ||
+            preElement.dataset.richHtmlPreview === "blocked") {
             return; // Already processed or blocked
         }
 
-        // 🟢 首先检查是否在 VCP 气泡内
-        const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble');
+        // 🟢 首先检查是否在工具协议气泡内
+        const isInsideRichBubble = preElement.closest('.tool-request-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble');
         if (isInsideRichBubble) {
             // 在气泡内的 pre 不应该被处理为可预览的 HTML
-            preElement.dataset.vcpHtmlPreview = "blocked";
+            preElement.dataset.richHtmlPreview = "blocked";
             return;
         }
 
@@ -452,11 +452,11 @@ function processAllPreBlocksInContentDiv(contentDiv) {
         // 这是为了在后续的上下文净化过程中，能够恢复原始内容，避免特殊字符被转义
         preElement.setAttribute('data-raw-content', blockText);
 
-        // Check for VCP Tool Request
+        // Check for tool request blocks
         if (blockText.includes('<<<[TOOL_REQUEST]>>>') && blockText.includes('<<<[END_TOOL_REQUEST]>>>')) {
-            const vcpContentMatch = blockText.match(/<<<\[TOOL_REQUEST\]>>>([\s\S]*?)<<<\[END_TOOL_REQUEST\]>>>/);
-            const actualVcpText = vcpContentMatch ? vcpContentMatch[1].trim() : "";
-            prettifySinglePreElement(preElement, 'vcptool', actualVcpText);
+            const toolRequestContentMatch = blockText.match(/<<<\[TOOL_REQUEST\]>>>([\s\S]*?)<<<\[END_TOOL_REQUEST\]>>>/);
+            const actualToolRequestText = toolRequestContentMatch ? toolRequestContentMatch[1].trim() : "";
+            prettifySinglePreElement(preElement, 'toolrequest', actualToolRequestText);
         }
         // Check for DailyNote
         else if (blockText.includes('<<<DailyNoteStart>>>') && blockText.includes('<<<DailyNoteEnd>>>')) {
@@ -477,25 +477,25 @@ function processAllPreBlocksInContentDiv(contentDiv) {
  * @param {string} htmlContent - The raw HTML content.
  */
 function setupHtmlPreview(preElement, htmlContent) {
-    if (preElement.dataset.vcpHtmlPreview === "true" ||
-        preElement.dataset.vcpHtmlPreview === "blocked") return;
+    if (preElement.dataset.richHtmlPreview === "true" ||
+        preElement.dataset.richHtmlPreview === "blocked") return;
 
-    // 🟢 核心修复：检查是否在 VCP 气泡内
-    const isInsideRichBubble = preElement.closest('.vcp-tool-use-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble');
+    // 🟢 核心修复：检查是否在工具协议气泡内
+    const isInsideRichBubble = preElement.closest('.tool-request-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble');
     if (isInsideRichBubble) {
         console.log('[ContentProcessor] Skipping HTML preview: inside rich-render bubble');
-        preElement.dataset.vcpHtmlPreview = "blocked";
+        preElement.dataset.richHtmlPreview = "blocked";
         return;
     }
     
     // 🟢 额外检查：内容是否包含「始」「末」标记
     if (htmlContent.includes('「始」') || htmlContent.includes('「末」')) {
         console.log('[ContentProcessor] Skipping HTML preview: contains tool markers');
-        preElement.dataset.vcpHtmlPreview = "blocked";
+        preElement.dataset.richHtmlPreview = "blocked";
         return;
     }
 
-    preElement.dataset.vcpHtmlPreview = "true";
+    preElement.dataset.richHtmlPreview = "true";
 
     // Create container for the whole block to manage positioning
     const container = document.createElement('div');
@@ -508,7 +508,7 @@ function setupHtmlPreview(preElement, htmlContent) {
     actionBtn.className = 'unistudy-html-preview-toggle';
     actionBtn.innerHTML = '<span>▶️ 播放</span>';
     actionBtn.title = '在气泡内预览 HTML';
-    actionBtn.dataset.vcpInteractive = 'true';
+    actionBtn.dataset.interactivePreview = 'true';
     actionBtn.type = 'button';
     container.appendChild(actionBtn);
 
@@ -534,7 +534,7 @@ function setupHtmlPreview(preElement, htmlContent) {
     };
 
     // 将清理函数绑定到容器，以便外部（如 messageRenderer）调用
-    container._vcpCleanup = destroyPreview;
+    container._previewCleanup = destroyPreview;
 
     actionBtn.addEventListener('click', (e) => {
         // 🔴 彻底阻止事件传播，防止触发任何父级监听器
@@ -661,10 +661,10 @@ function processInteractiveButtons(contentDiv, settings = {}) {
 
     buttons.forEach(button => {
         // Skip if already processed
-        if (button.dataset.vcpInteractive === 'true') return;
+        if (button.dataset.interactivePreview === 'true') return;
 
         // Mark as processed
-        button.dataset.vcpInteractive = 'true';
+        button.dataset.interactivePreview = 'true';
 
         // Set up button styling
         setupButtonStyle(button);
@@ -868,7 +868,7 @@ function processRenderedContent(contentDiv, settings = {}) {
         });
     }
 
-    // Special block formatting (VCP/Diary)
+    // Special block formatting (tool protocol / diary)
     processAllPreBlocksInContentDiv(contentDiv);
 
     // Process interactive buttons, passing settings
@@ -880,8 +880,8 @@ function processRenderedContent(contentDiv, settings = {}) {
             // 🟢 增加防御性检查：确保 block 及其父元素存在
             // 在嵌套的 code block 场景下，外层 block 的高亮可能会导致内层 block 被移出 DOM
             if (block && block.parentElement) {
-                // Only highlight if the block hasn't been specially prettified (e.g., DailyNote or VCP ToolUse)
-                if (!block.parentElement.dataset.vcpPrettified && !block.parentElement.dataset.learningDiaryPrettified) {
+                // Only highlight if the block hasn't been specially prettified (for example DailyNote or tool use)
+                if (!block.parentElement.dataset.toolRequestPrettified && !block.parentElement.dataset.learningDiaryPrettified) {
                     window.hljs.highlightElement(block);
                 }
             }
@@ -989,13 +989,13 @@ function cleanupPreviewsInContent(contentDiv) {
     if (!contentDiv) return;
     const containers = contentDiv.querySelectorAll('.unistudy-html-preview-container');
     containers.forEach(container => {
-        if (typeof container._vcpCleanup === 'function') {
+        if (typeof container._previewCleanup === 'function') {
             try {
-                container._vcpCleanup();
+                container._previewCleanup();
             } catch (e) {
                 console.error('[ContentProcessor] Error during preview cleanup:', e);
             }
-            delete container._vcpCleanup;
+            delete container._previewCleanup;
         }
     });
 }

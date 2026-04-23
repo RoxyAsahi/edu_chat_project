@@ -588,8 +588,8 @@
 
         /* --- Start: Ported Styles from messageRenderer.css --- */
 
-        /* VCP ToolUse Bubble */
-        .vcp-tool-use-bubble {
+        /* Tool Use Bubble */
+        .tool-request-bubble {
             background: linear-gradient(145deg, #3a7bd5 0%, #00d2ff 100%) !important;
             background-size: 200% 200% !important;
             animation: unistudy-bubble-background-flow-kf 20s ease-in-out infinite;
@@ -608,7 +608,7 @@
             white-space: pre-wrap;
             word-break: break-all;
         }
-        .vcp-tool-use-bubble::before {
+        .tool-request-bubble::before {
             content: "鈿欙笍";
             position: absolute;
             top: 8px;
@@ -619,12 +619,12 @@
             animation: unistudy-icon-rotate 4s linear infinite;
             transform-origin: center center;
         }
-        .vcp-tool-use-bubble .unistudy-tool-label {
+        .tool-request-bubble .unistudy-tool-label {
             font-weight: bold;
             color: #f1c40f;
             margin-right: 6px;
         }
-        .vcp-tool-use-bubble .unistudy-tool-name-highlight {
+        .tool-request-bubble .unistudy-tool-name-highlight {
             background: linear-gradient(90deg, #f1c40f, #ffffff, #00d2ff, #f1c40f) !important;
             background-size: 300% 100% !important;
             -webkit-background-clip: text !important;
@@ -756,7 +756,7 @@
         }
         /* --- End: Ported Styles --- */
 
-        /* --- VCP Tool Result Bubble --- */
+        /* --- Tool Result Bubble --- */
         .unistudy-tool-result-bubble {
             display: block !important;
             background: var(--tool-result-bg, linear-gradient(145deg, #f4f6f8, #e8eaf0)) !important;

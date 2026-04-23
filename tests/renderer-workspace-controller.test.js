@@ -251,7 +251,8 @@ test('renderSubjectOverview starts a single clock timer and clears it when leavi
 
     assert.equal(intervalCalls, 1);
     assert.equal(document.getElementById('overviewClockTime').textContent, '09:05');
-    assert.equal(document.querySelector('.overview-clock-panel')?.nextElementSibling?.className, 'workspace-overview-page__island-row');
+    assert.equal(document.querySelector('.overview-clock-panel')?.nextElementSibling?.className, 'overview-stats-row');
+    assert.ok(document.querySelector('.workspace-overview-page__island-row'));
 
     controller.showSubjectWorkspace();
 

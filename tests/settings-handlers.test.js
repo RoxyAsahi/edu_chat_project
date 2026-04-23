@@ -59,13 +59,13 @@ test('save-settings reports raw persistence checks for agent bubble theme fields
     const saveSettings = handleHandlers.get('save-settings');
     const result = await saveSettings({}, {
         enableAgentBubbleTheme: true,
-        agentBubbleThemePrompt: 'Custom prompt {{VarDivRender}}',
+        agentBubbleThemePrompt: 'Custom prompt {{RenderingGuide}}',
     });
 
     const rawSettings = await fs.readJson(settingsPath);
     assert.equal(result.success, true);
     assert.equal(rawSettings.enableAgentBubbleTheme, true);
-    assert.equal(rawSettings.agentBubbleThemePrompt, 'Custom prompt {{VarDivRender}}');
+    assert.equal(rawSettings.agentBubbleThemePrompt, 'Custom prompt {{RenderingGuide}}');
     assert.equal(result.persistenceCheck.rawHasAgentBubbleThemePromptField, true);
     assert.equal(result.persistenceCheck.agentBubbleThemePromptMatched, true);
     assert.equal(result.persistenceCheck.enableAgentBubbleThemeMatched, true);
@@ -217,7 +217,7 @@ test('preview-agent-bubble-theme-prompt resolves the effective injected text', a
     const previewPrompt = handleHandlers.get('preview-agent-bubble-theme-prompt');
     const preview = await previewPrompt({}, {
         enabled: true,
-        prompt: 'Hello {{UserName}} :: {{VarDivRender}}',
+        prompt: 'Hello {{UserName}} :: {{RenderingGuide}}',
         settings: {
             userName: 'PreviewUser',
         },
@@ -226,7 +226,7 @@ test('preview-agent-bubble-theme-prompt resolves the effective injected text', a
     assert.equal(preview.enabled, true);
     assert.equal(preview.willInject, true);
     assert.match(preview.resolvedPrompt, /Hello PreviewUser ::/);
-    assert.equal(preview.resolvedPrompt.includes('{{VarDivRender}}'), false);
+    assert.equal(preview.resolvedPrompt.includes('{{RenderingGuide}}'), false);
     assert.deepEqual(preview.unresolvedTokens, []);
 });
 
@@ -268,12 +268,12 @@ test('preview-final-system-prompt reports segment states and final prompt', asyn
 
     const previewPrompt = handleHandlers.get('preview-final-system-prompt');
     const result = await previewPrompt({}, {
-        systemPrompt: 'Hello {{UserName}}\n{{VarDivRender}}\n{{VarEmoticonPrompt}}\n{{DailyNoteTool}}',
+        systemPrompt: 'Hello {{UserName}}\n{{RenderingGuide}}\n{{EmoticonGuide}}\n{{DailyNoteGuide}}',
         settings: {
             userName: 'PreviewUser',
             emoticonPrompt: 'Path {{GeneralEmoticonPath}}\nList {{GeneralEmoticonList}}',
             enableAgentBubbleTheme: true,
-            agentBubbleThemePrompt: 'Bubble {{VarDivRender}}',
+            agentBubbleThemePrompt: 'Bubble {{RenderingGuide}}',
         },
         context: {
             agentName: 'Nova',

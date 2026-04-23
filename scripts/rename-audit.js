@@ -4,24 +4,35 @@ const { execFileSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_TARGET_ROOTS = [
+    path.join(REPO_ROOT, 'src'),
     path.join(REPO_ROOT, 'tests'),
     path.join(REPO_ROOT, 'scripts'),
-    path.join(REPO_ROOT, 'src', 'preloads', 'runtime'),
 ];
 const SKIPPED_RELATIVE_PATHS = new Set([
     path.join('scripts', 'rename-audit.js'),
 ]);
 
 const BLOCKED_PATTERNS = [
+    // Internal implementation residues should be fully removed in Phase 2.
+    { id: 'legacy-chat-client-call', regex: /sendToVCP/g },
+    { id: 'legacy-chat-client-name', regex: /\bVCPClient\b/g },
+    { id: 'legacy-chat-client-file', regex: /\bvcpClient\b/g },
+    { id: 'legacy-vcp-class-name', regex: /\.vcp-[A-Za-z0-9_-]*/g },
+    { id: 'legacy-vcp-data-attr', regex: /data-vcp[A-Za-z0-9_-]*/g },
+    { id: 'legacy-vcp-private-marker', regex: /_vcp_[A-Za-z0-9_]*/g },
+    { id: 'legacy-vcp-internal-marker', regex: /__VCP_[A-Za-z0-9_]*/g },
+    { id: 'legacy-vcp-tool-payload-marker', regex: /VCP_TOOL_PAYLOAD/g },
+    { id: 'legacy-vcp-tool-protocol', regex: /protocol:\s*['"]vcp-tool['"]/g },
     { id: 'brand-name-spaced', regex: /VCPChat Lite/g },
     { id: 'brand-name-camel', regex: /VCPChatLite/g },
     { id: 'brand-name-kebab', regex: /vcpchat-lite/g },
     { id: 'legacy-data-root-env', regex: /VCPCHAT_DATA_ROOT/g },
-    { id: 'legacy-timeout-env', regex: /VCPCHAT_VCP_TIMEOUT_MS/g },
+    { id: 'legacy-timeout-env', regex: /(?:UNISTUDY_VCP_TIMEOUT_MS|VCPCHAT_VCP_TIMEOUT_MS)/g },
     { id: 'legacy-debug-bridge', regex: /__liteDebugState/g },
 ];
 
 const WHITELIST_RULES = [
+    // Historical reports and explicit deprecation hints may keep old names as evidence.
     {
         id: 'tracked-test-report-evidence',
         matches(relativePath) {
@@ -38,8 +49,8 @@ const WHITELIST_RULES = [
     {
         id: 'workspace-path-trace',
         matches(_relativePath, line) {
-            return line.includes('C:\\VCP\\Eric\\VCPChatLite')
-                || line.includes('/C:/VCP/Eric/VCPChatLite');
+            return line.includes('C:\\VCP\\Eric\\UniStudy')
+                || line.includes('/C:/VCP/Eric/UniStudy');
         },
     },
     {
@@ -60,6 +71,13 @@ const WHITELIST_RULES = [
         id: 'historical-plan-material',
         matches(relativePath) {
             return relativePath.startsWith(`.kilo${path.sep}plans${path.sep}`);
+        },
+    },
+    {
+        id: 'explicit-settings-deprecation-hint',
+        matches(relativePath, line) {
+            return relativePath === path.join('src', 'modules', 'main', 'utils', 'settingsSchema.js')
+                && /旧字段 vcp(?:ServerUrl|ApiKey|LogUrl|LogKey|Lite) 已废弃/.test(line);
         },
     },
 ];

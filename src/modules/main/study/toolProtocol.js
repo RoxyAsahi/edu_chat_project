@@ -1,6 +1,6 @@
 const TOOL_REQUEST_START = '<<<[TOOL_REQUEST]>>>';
 const TOOL_REQUEST_END = '<<<[END_TOOL_REQUEST]>>>';
-const TOOL_PAYLOAD_MARKER = '<!-- VCP_TOOL_PAYLOAD -->';
+const TOOL_PAYLOAD_MARKER = '<!-- TOOL_PAYLOAD -->';
 const LEGACY_DAILY_NOTE_REGEX = /<<<DailyNoteStart>>>([\s\S]*?)<<<DailyNoteEnd>>>/g;
 const THINK_BLOCK_REGEX = /<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/gi;
 const TOOL_BLOCK_REGEX = /<<<\[TOOL_REQUEST\]>>>([\s\S]*?)<<<\[END_TOOL_REQUEST\]>>>/g;
@@ -85,13 +85,13 @@ function resolvePreferredDailyNoteMaid(options = {}) {
     const context = options.context && typeof options.context === 'object'
         ? options.context
         : {};
-    const configuredMaid = sanitizeText(agentConfig.vcpMaid || context.vcpMaid);
+    const configuredMaid = sanitizeText(agentConfig.toolSignature || context.toolSignature);
     if (configuredMaid) {
         return configuredMaid;
     }
 
     const preferredAlias = sanitizeText(
-        Array.isArray(agentConfig.vcpAliases) ? agentConfig.vcpAliases[0] : '',
+        Array.isArray(agentConfig.promptAliases) ? agentConfig.promptAliases[0] : '',
         sanitizeText(context.agentName || agentConfig.name || context.agentId, 'UniStudy')
     );
     return `[${preferredAlias}]${preferredAlias}`;
@@ -200,7 +200,7 @@ function parseDelimitedBlock(blockContent = '') {
     const normalizedCommand = normalizeToolCommand(command, requestedToolName);
 
     return {
-        protocol: 'vcp-tool',
+        protocol: 'tool-request',
         requestedToolName,
         toolName,
         requestedCommand: command || '',
@@ -289,7 +289,7 @@ function rewriteLegacyStudyLogPromptText(content = '') {
 }
 
 function buildToolPayloadMessage(results = []) {
-    const lines = [TOOL_PAYLOAD_MARKER, 'Local DailyNote execution summary:'];
+    const lines = [TOOL_PAYLOAD_MARKER, 'Local tool execution summary:'];
 
     results.forEach((result, index) => {
         lines.push(
@@ -334,7 +334,7 @@ function injectResponseContent(response = {}, content = '') {
     };
 }
 
-function resolveDailyNoteToolInstruction(customGuide = '', options = {}) {
+function resolveDailyNoteGuideInstruction(customGuide = '', options = {}) {
     const preferredMaid = resolvePreferredDailyNoteMaid(options);
     const baseInstruction = sanitizeText(customGuide, DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION);
     const normalizedInstruction = baseInstruction
@@ -348,12 +348,8 @@ function resolveDailyNoteToolInstruction(customGuide = '', options = {}) {
     return `${normalizedInstruction}\n\n${preferredMaidLine}`.trim();
 }
 
-function buildDailyNoteToolInstruction(customGuide = '', options = {}) {
-    return resolveDailyNoteToolInstruction(customGuide, options);
-}
-
-function buildStudyLogToolInstruction(customGuide = '', options = {}) {
-    return resolveDailyNoteToolInstruction(customGuide, options);
+function buildDailyNoteGuideInstruction(customGuide = '', options = {}) {
+    return resolveDailyNoteGuideInstruction(customGuide, options);
 }
 
 module.exports = {
@@ -364,8 +360,7 @@ module.exports = {
     TOOL_PAYLOAD_MARKER,
     TOOL_REQUEST_END,
     TOOL_REQUEST_START,
-    buildDailyNoteToolInstruction,
-    buildStudyLogToolInstruction,
+    buildDailyNoteGuideInstruction,
     buildToolPayloadMessage,
     extractResponseContent,
     injectResponseContent,
@@ -373,7 +368,7 @@ module.exports = {
     normalizeToolName,
     parseToolRequests,
     resolvePreferredDailyNoteMaid,
-    resolveDailyNoteToolInstruction,
+    resolveDailyNoteGuideInstruction,
     rewriteLegacyStudyLogPromptText,
     stripToolArtifacts,
     toArray,

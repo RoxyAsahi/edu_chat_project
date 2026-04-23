@@ -346,8 +346,8 @@ test('composerController only triggers topic title generation for the first succ
         },
         settings: {
             settings: {
-                vcpServerUrl: 'http://example.com/v1/chat/completions',
-                vcpApiKey: 'secret',
+                chatEndpoint: 'http://example.com/v1/chat/completions',
+                chatApiKey: 'secret',
                 enableTopicTitleGeneration: true,
             },
         },
@@ -378,7 +378,7 @@ test('composerController only triggers topic title generation for the first succ
             async getActiveSystemPrompt() {
                 return { success: false, systemPrompt: '' };
             },
-            async sendToVCP() {
+            async sendChatRequest() {
                 responseCount += 1;
                 return {
                     response: {

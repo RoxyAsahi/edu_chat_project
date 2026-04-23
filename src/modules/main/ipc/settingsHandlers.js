@@ -14,7 +14,7 @@ const {
 } = require('../utils/settingsSchema');
 const { loadBundledEmoticonPromptData } = require('../emoticons/bundledCatalog');
 const {
-    resolveDailyNoteToolInstruction,
+    resolveDailyNoteGuideInstruction,
     rewriteLegacyStudyLogPromptText,
 } = require('../study/toolProtocol');
 let initialized = false;
@@ -26,6 +26,35 @@ function isPlainObject(value) {
 function sanitizeText(value, fallback = '') {
     const normalized = typeof value === 'string' ? value.trim() : '';
     return normalized || fallback;
+}
+
+function createEmptyPromptResolution() {
+    return {
+        resolvedPrompt: '',
+        unresolvedTokens: [],
+        substitutions: {},
+        variableSources: {},
+        legacyTokenSuggestions: {},
+    };
+}
+
+function toPromptResolutionPayload(result = {}) {
+    return {
+        resolvedPrompt: typeof result?.resolvedPrompt === 'string' ? result.resolvedPrompt : '',
+        unresolvedTokens: Array.isArray(result?.unresolvedTokens) ? result.unresolvedTokens : [],
+        substitutions: isPlainObject(result?.substitutions) ? result.substitutions : {},
+        variableSources: isPlainObject(result?.variableSources) ? result.variableSources : {},
+        legacyTokenSuggestions: isPlainObject(result?.legacyTokenSuggestions) ? result.legacyTokenSuggestions : {},
+    };
+}
+
+function mergeLegacyTokenSuggestions(...maps) {
+    return maps.reduce((acc, map) => {
+        if (isPlainObject(map)) {
+            Object.assign(acc, map);
+        }
+        return acc;
+    }, {});
 }
 
 function readOwnPathValue(source, pathSegments = []) {
@@ -296,7 +325,7 @@ function applyEmoticonPrompt(messages, settings = {}, promptResolutionOptions = 
 
     const systemMessage = nextMessages[systemMessageIndex];
     const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
-    const skippedByToken = /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(currentContent);
+    const skippedByToken = /{{\s*EmoticonGuide\s*}}/.test(currentContent);
     const skippedByDuplicate = currentContent.includes(normalizedPrompt)
         || (resolvedPrompt ? currentContent.includes(resolvedPrompt) : false);
     if (skippedByToken || skippedByDuplicate) {
@@ -332,7 +361,7 @@ function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions
         return { messages, appended: false, skippedByToken: false };
     }
 
-    const dailyNotePrompt = resolveDailyNoteToolInstruction(settings?.dailyNoteGuide, {
+    const dailyNotePrompt = resolveDailyNoteGuideInstruction(settings?.dailyNoteGuide, {
         agentConfig: promptResolutionOptions.agentConfig,
         context: promptResolutionOptions.context,
     });
@@ -352,7 +381,7 @@ function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions
     const systemMessage = nextMessages[systemMessageIndex];
     const currentContent = typeof systemMessage.content === 'string' ? systemMessage.content : '';
     const skippedByToken = currentContent.includes('—— 日记 (DailyNote) ——')
-        || /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(currentContent);
+        || /{{\s*DailyNoteGuide\s*}}/.test(currentContent);
     if (skippedByToken) {
         return { messages: nextMessages, appended: false, skippedByToken: true };
     }
@@ -400,6 +429,12 @@ function initialize(paths) {
             } else {
                 settings.userAvatarUrl = null; // Or a default path
             }
+
+            settings.settingsIssues = settings?.__validationIssues || {
+                hasIssues: false,
+                legacyFieldWarnings: [],
+                unknownKeys: [],
+            };
             
             return settings;
         } catch (error) {
@@ -409,6 +444,11 @@ function initialize(paths) {
                 sidebarWidth: 260,
                 notificationsSidebarWidth: 300,
                 userAvatarUrl: null,
+                settingsIssues: {
+                    hasIssues: false,
+                    legacyFieldWarnings: [],
+                    unknownKeys: [],
+                },
             };
         }
     });
@@ -473,6 +513,11 @@ function initialize(paths) {
             return {
                 ...result,
                 settings: persistedSettings,
+                settingsIssues: persistedSettings?.__validationIssues || {
+                    hasIssues: false,
+                    legacyFieldWarnings: [],
+                    unknownKeys: [],
+                },
                 persistenceCheck: {
                     rawSettingsAvailable: Boolean(rawPersistedSettings),
                     repairedMissingFields,
@@ -510,44 +555,37 @@ function initialize(paths) {
 
             if (!enabled || !trimmedPrompt) {
                 return {
-                    enabled,
-                    willInject: false,
-                    rawPrompt: prompt,
-                    resolvedPrompt: '',
-                    unresolvedTokens: [],
-                    substitutions: {},
-                    variableSources: {},
-                };
-            }
+                enabled,
+                willInject: false,
+                rawPrompt: prompt,
+                resolvedPrompt: '',
+                unresolvedTokens: [],
+                substitutions: {},
+                variableSources: {},
+                legacyTokenSuggestions: {},
+            };
+        }
 
             const previewSettings = isPlainObject(previewPayload.settings)
                 ? { ...persistedSettings, ...previewPayload.settings }
                 : persistedSettings;
             const previewContext = isPlainObject(previewPayload.context) ? previewPayload.context : {};
             const previewModelConfig = isPlainObject(previewPayload.modelConfig) ? previewPayload.modelConfig : {};
-            const localResult = resolvePromptVariables(trimmedPrompt, {
+            const localResult = toPromptResolutionPayload(resolvePromptVariables(trimmedPrompt, {
                 settings: previewSettings,
                 context: previewContext,
                 modelConfig: previewModelConfig,
-            });
-            const previewResult = {
-                resolvedPrompt: localResult.resolvedPrompt,
-                unresolvedTokens: localResult.unresolvedTokens,
-                substitutions: localResult.substitutions,
-                variableSources: localResult.variableSources,
-            };
+            }));
 
             return {
                 enabled,
                 willInject: true,
                 rawPrompt: prompt,
-                resolvedPrompt: previewResult.resolvedPrompt,
-                unresolvedTokens: previewResult.unresolvedTokens,
-                substitutions: previewResult.substitutions,
-                variableSources: previewResult.variableSources,
-                available: previewResult.available !== false,
-                unavailable: previewResult.unavailable === true,
-                errorCode: previewResult.errorCode || '',
+                resolvedPrompt: localResult.resolvedPrompt,
+                unresolvedTokens: localResult.unresolvedTokens,
+                substitutions: localResult.substitutions,
+                variableSources: localResult.variableSources,
+                legacyTokenSuggestions: localResult.legacyTokenSuggestions,
             };
         } catch (error) {
             console.error('[SettingsHandlers] Failed to preview agent bubble theme prompt:', error);
@@ -559,8 +597,7 @@ function initialize(paths) {
                 unresolvedTokens: [],
                 substitutions: {},
                 variableSources: {},
-                available: false,
-                unavailable: true,
+                legacyTokenSuggestions: {},
                 error: error.message,
                 errorCode: error.code || '',
             };
@@ -660,7 +697,7 @@ function initialize(paths) {
                 && previewSettings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false;
             const dailyNoteRaw = !dailyNoteVariablesEnabled && !dailyNoteAutoInjectEnabled
                 ? ''
-                : resolveDailyNoteToolInstruction(previewSettings.dailyNoteGuide, {
+                : resolveDailyNoteGuideInstruction(previewSettings.dailyNoteGuide, {
                     agentConfig,
                     context: previewContext,
                 });
@@ -686,28 +723,29 @@ function initialize(paths) {
             const finalSystemPrompt = resolution.messages.find((message) => message?.role === 'system')?.content || '';
 
             const renderingResolved = renderingRaw
-                ? resolvePromptVariables(renderingRaw, promptResolutionOptions)
-                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+                ? toPromptResolutionPayload(resolvePromptVariables(renderingRaw, promptResolutionOptions))
+                : createEmptyPromptResolution();
             const emoticonResolved = emoticonRaw
-                ? resolvePromptVariables(emoticonRaw, promptResolutionOptions)
-                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+                ? toPromptResolutionPayload(resolvePromptVariables(emoticonRaw, promptResolutionOptions))
+                : createEmptyPromptResolution();
             const adaptiveBubbleResolved = adaptiveBubbleRaw
-                ? resolvePromptVariables(adaptiveBubbleRaw, promptResolutionOptions)
-                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+                ? toPromptResolutionPayload(resolvePromptVariables(adaptiveBubbleRaw, promptResolutionOptions))
+                : createEmptyPromptResolution();
             const dailyNoteResolved = dailyNoteRaw
-                ? resolvePromptVariables(dailyNoteRaw, promptResolutionOptions)
-                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+                ? toPromptResolutionPayload(resolvePromptVariables(dailyNoteRaw, promptResolutionOptions))
+                : createEmptyPromptResolution();
             const bubbleThemeResolved = bubbleThemeRaw
-                ? resolvePromptVariables(bubbleThemeRaw, promptResolutionOptions)
-                : { resolvedPrompt: '', unresolvedTokens: [], substitutions: {}, variableSources: {} };
+                ? toPromptResolutionPayload(resolvePromptVariables(bubbleThemeRaw, promptResolutionOptions))
+                : createEmptyPromptResolution();
 
             const normalizedBasePrompt = rewriteLegacyStudyLogPromptText(basePrompt || '');
             const references = {
-                renderingInBasePrompt: /{{\s*(VarDivRender|VarRendering)\s*}}/.test(normalizedBasePrompt),
-                emoticonInBasePrompt: /{{\s*(VarEmoticonPrompt|VarEmojiPrompt)\s*}}/.test(normalizedBasePrompt),
-                adaptiveInBasePrompt: /{{\s*VarAdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
-                dailyNoteInBasePrompt: /{{\s*(StudyLogTool|DailyNoteTool|VarDailyNoteGuide)\s*}}/.test(normalizedBasePrompt),
+                renderingInBasePrompt: /{{\s*RenderingGuide\s*}}/.test(normalizedBasePrompt),
+                emoticonInBasePrompt: /{{\s*EmoticonGuide\s*}}/.test(normalizedBasePrompt),
+                adaptiveInBasePrompt: /{{\s*AdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
+                dailyNoteInBasePrompt: /{{\s*DailyNoteGuide\s*}}/.test(normalizedBasePrompt),
             };
+            const finalResolution = toPromptResolutionPayload(resolution);
 
             return {
                 success: true,
@@ -717,9 +755,17 @@ function initialize(paths) {
                     hasBasePrompt: Boolean(basePrompt),
                     basePrompt: normalizedBasePrompt,
                     finalSystemPrompt,
-                    unresolvedTokens: resolution.unresolvedTokens,
-                    substitutions: resolution.substitutions,
-                    variableSources: resolution.variableSources,
+                    unresolvedTokens: finalResolution.unresolvedTokens,
+                    substitutions: finalResolution.substitutions,
+                    variableSources: finalResolution.variableSources,
+                    legacyTokenSuggestions: mergeLegacyTokenSuggestions(
+                        finalResolution.legacyTokenSuggestions,
+                        renderingResolved.legacyTokenSuggestions,
+                        emoticonResolved.legacyTokenSuggestions,
+                        adaptiveBubbleResolved.legacyTokenSuggestions,
+                        dailyNoteResolved.legacyTokenSuggestions,
+                        bubbleThemeResolved.legacyTokenSuggestions
+                    ),
                     segments: {
                         rendering: {
                             enabled: previewSettings.enableRenderingPrompt !== false,
@@ -727,6 +773,8 @@ function initialize(paths) {
                             referencedInBasePrompt: references.renderingInBasePrompt,
                             rawPrompt: renderingRaw,
                             resolvedPrompt: renderingResolved.resolvedPrompt || '',
+                            unresolvedTokens: renderingResolved.unresolvedTokens,
+                            legacyTokenSuggestions: renderingResolved.legacyTokenSuggestions,
                         },
                         emoticonPrompt: {
                             enabled: previewSettings.enableEmoticonPrompt !== false,
@@ -739,6 +787,8 @@ function initialize(paths) {
                             skippedBecausePromptAlreadyContainsSameContent: emoticonApplied.skippedByDuplicate === true,
                             rawPrompt: emoticonRaw,
                             resolvedPrompt: emoticonResolved.resolvedPrompt || '',
+                            unresolvedTokens: emoticonResolved.unresolvedTokens,
+                            legacyTokenSuggestions: emoticonResolved.legacyTokenSuggestions,
                         },
                         adaptiveBubbleTip: {
                             enabled: previewSettings.enableAdaptiveBubbleTip !== false,
@@ -746,6 +796,8 @@ function initialize(paths) {
                             referencedInBasePrompt: references.adaptiveInBasePrompt,
                             rawPrompt: adaptiveBubbleRaw,
                             resolvedPrompt: adaptiveBubbleResolved.resolvedPrompt || '',
+                            unresolvedTokens: adaptiveBubbleResolved.unresolvedTokens,
+                            legacyTokenSuggestions: adaptiveBubbleResolved.legacyTokenSuggestions,
                         },
                         dailyNoteVariable: {
                             enabled: dailyNoteVariablesEnabled,
@@ -753,6 +805,8 @@ function initialize(paths) {
                             referencedInBasePrompt: references.dailyNoteInBasePrompt,
                             rawPrompt: dailyNoteRaw,
                             resolvedPrompt: dailyNoteResolved.resolvedPrompt || '',
+                            unresolvedTokens: dailyNoteResolved.unresolvedTokens,
+                            legacyTokenSuggestions: dailyNoteResolved.legacyTokenSuggestions,
                         },
                         dailyNoteAutoInject: {
                             enabled: dailyNoteAutoInjectEnabled,
@@ -761,6 +815,8 @@ function initialize(paths) {
                             skippedBecausePromptAlreadyContainsProtocol: dailyNoteApplied.skippedByToken === true,
                             rawPrompt: dailyNoteRaw,
                             resolvedPrompt: dailyNoteResolved.resolvedPrompt || '',
+                            unresolvedTokens: dailyNoteResolved.unresolvedTokens,
+                            legacyTokenSuggestions: dailyNoteResolved.legacyTokenSuggestions,
                         },
                         bubbleTheme: {
                             enabled: previewSettings.enableAgentBubbleTheme === true,
@@ -768,6 +824,8 @@ function initialize(paths) {
                             appended: bubbleThemeApplied.appended === true,
                             rawPrompt: bubbleThemeRaw,
                             resolvedPrompt: bubbleThemeResolved.resolvedPrompt || '',
+                            unresolvedTokens: bubbleThemeResolved.unresolvedTokens,
+                            legacyTokenSuggestions: bubbleThemeResolved.legacyTokenSuggestions,
                         },
                     },
                 },
