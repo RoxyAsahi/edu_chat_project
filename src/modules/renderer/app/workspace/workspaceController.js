@@ -412,6 +412,7 @@ function createWorkspaceController(deps = {}) {
 
     function handleHomeAction(action, payload = {}) {
         switch (action) {
+        case 'create-subject':
         case 'create-agent':
             void createAgent();
             break;

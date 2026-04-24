@@ -319,124 +319,55 @@ function buildSubjectOverviewMarkup({
 } = {}) {
     const hasAgents = agents.length > 0;
     const totalTopics = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.topicCount || 0), 0);
+    const totalUnread = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.unreadCount || 0), 0);
     const currentAgentLabel = selectedAgentName || '还没有创建学科';
     const currentTopicLabel = currentTopicName || '还没有选中话题';
     const recentItems = buildRecentItems({ agents, statsByAgent, selectedAgentId });
     const streakDays = Math.max(0, Number(learningMetrics?.streakDays || 0));
     const score = Math.max(0, Number(learningMetrics?.score || 0));
+    const activeDaysLast7 = Math.max(0, Number(learningMetrics?.activeDaysLast7 || 0));
+    const totalLearningDays = Math.max(0, Number(learningMetrics?.totalLearningDays || 0));
 
     const hour = new Date().getHours();
     const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
+    const primaryAction = hasAgents ? 'continue-learning' : 'create-subject';
+    const primaryActionText = hasAgents ? '继续学习' : '新建学科';
+    const heroTitle = '个人 AI 学习终端';
+    const heroSubtitle = hasAgents
+        ? '把资料、对话、笔记和复盘放在同一个学习空间里，围绕当前话题持续推进。'
+        : '先创建一个学科工作台，把课件、论文、题目、图片和对话都收进同一个学习空间。';
 
-    // ── Welcome Card ──
-    const welcomeCard = hasAgents
-        ? `
-        <div class="bento-welcome">
-            <div class="bento-welcome__main">
-                <div class="bento-welcome__brand">
-                    <img class="bento-welcome__logo" src="../../logo_flat_vector.svg" alt="" />
-                    <div>
-                        <h2>学习工作台</h2>
-                        <span>${greeting}，今天也要加油学习</span>
-                    </div>
-                </div>
-                <div class="bento-welcome__context">
-                    <div class="bento-welcome__chip">
-                        <span class="material-symbols-outlined">school</span>
-                        <span>${escapeHtml(currentAgentLabel)}</span>
-                    </div>
-                    <div class="bento-welcome__chip">
-                        <span class="material-symbols-outlined">chat_bubble</span>
-                        <span>${escapeHtml(currentTopicLabel)}</span>
-                    </div>
-                </div>
-
-            </div>
-            <div class="bento-welcome__side">
-                ${score > 0 ? `
-                <div class="bento-welcome__stat">
-                    <span>学习力</span>
-                    <strong>${escapeHtml(score)}</strong>
-                </div>` : ''}
-                ${streakDays > 0 ? `
-                <div class="bento-welcome__stat">
-                    <span>连续学习</span>
-                    <strong>${escapeHtml(streakDays)}<small>天</small></strong>
-                </div>` : ''}
-                ${totalTopics > 0 ? `
-                <div class="bento-welcome__stat">
-                    <span>话题数</span>
-                    <strong>${escapeHtml(totalTopics)}</strong>
-                </div>` : ''}
-            </div>
-        </div>
-        `
-        : `
-        <div class="bento-welcome bento-welcome--empty">
-            <div class="bento-welcome__main">
-                <div class="bento-welcome__brand">
-                    <img class="bento-welcome__logo" src="../../logo_flat_vector.svg" alt="" />
-                    <div>
-                        <h2>学习工作台</h2>
-                        <span>准备好开始你的学习之旅了吗？</span>
-                    </div>
-                </div>
-                <p class="bento-welcome__hint">创建第一个学科，把资料、对话和笔记组织起来。</p>
-            </div>
-        </div>
-        `;
-
-    // ── Quick Action Cards ──
-    const quickActions = [
-        { title: '学科辅导', desc: 'AI 对话学习', icon: 'forum', action: 'open-subject', key: 'subject', tone: 'blue' },
-        { title: '知识沉淀', desc: '笔记与来源', icon: 'library_books', action: 'open-notes', key: 'notes', tone: 'green' },
-        { title: '训练转化', desc: '练习与闪卡', icon: 'task_alt', action: 'continue-learning', key: 'training', tone: 'yellow' },
-        { title: '成长复盘', desc: 'DailyNote', icon: 'auto_stories', action: 'open-diary', key: 'diary', tone: 'rose' },
-    ].map((c) => `
-        <button type="button" class="bento-quick bento-quick--${c.key} bento-quick--${c.tone}" data-home-action="${c.action}">
-            <span class="bento-quick__icon material-symbols-outlined" aria-hidden="true">${c.icon}</span>
-            <div class="bento-quick__text">
-                <strong>${c.title}</strong>
-                <span>${c.desc}</span>
-            </div>
+    const workflowCards = [
+        { title: '放入资料', desc: 'PDF、DOCX、图片和文本会归入当前话题的 Source。', icon: 'upload_file', action: 'open-subject', step: '01' },
+        { title: '提问理解', desc: '围绕资料追问概念、推导、例题和作业思路。', icon: 'forum', action: 'open-subject', step: '02' },
+        { title: '整理笔记', desc: '把关键结论、错因和可复用模板沉淀下来。', icon: 'edit_note', action: 'open-notes', step: '03' },
+        { title: '复盘巩固', desc: '用学习日志和闪卡检查今天真正掌握了什么。', icon: 'task_alt', action: 'open-diary', step: '04' },
+    ].map((item) => `
+        <button type="button" class="home-flow-card" data-home-action="${item.action}">
+            <span class="home-flow-card__step">${item.step}</span>
+            <span class="home-flow-card__icon material-symbols-outlined" aria-hidden="true">${item.icon}</span>
+            <strong>${item.title}</strong>
+            <span>${item.desc}</span>
         </button>
     `).join('');
-    const quickActionsWrapper = `<div class="bento-quick-wrapper">${quickActions}</div>`;
 
-    // ── Activity Cards ──
     const activityCards = recentItems.map((item) => `
-        <article class="bento-activity__card bento-activity__card--${escapeHtml(item.accent)}">
-            <div class="bento-activity__top">
-                <span class="bento-activity__dot" aria-hidden="true"></span>
-                <strong>${escapeHtml(item.title)}</strong>
-            </div>
-            <span class="bento-activity__meta">${escapeHtml(item.meta)}</span>
+        <article class="home-activity-card home-activity-card--${escapeHtml(item.accent)}">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.meta)}</span>
         </article>
     `).join('');
 
-    // ── Calendar ──
     const calendarMarkup = buildCalendarMarkup(learningMetrics?.activeDates || []);
-
-    // ── Stats ──
-    const statsMarkup = buildStatsMarkup({
-        weekHours: learningMetrics?.weekHours || 0,
-        weekChange: learningMetrics?.weekChange || 0,
-        streakDays,
-        noteCount: learningMetrics?.noteCount || 0,
-        chatCount: totalTopics,
-        aiAskCount: learningMetrics?.aiAskCount || 0,
-    });
-
-    // ── Subject Section ──
     const subjectSection = hasAgents
         ? `
-        <div class="bento-subjects">
-            <div class="bento-subjects__bar">
-                <div class="bento-subjects__title">
-                    <h3>全部学科</h3>
-                    <span class="bento-subjects__count">${agents.length}</span>
+        <section class="home-subjects">
+            <div class="home-section-header">
+                <div>
+                    <span>学习空间</span>
+                    <h3>选择一个学科继续</h3>
                 </div>
-                <div class="bento-subjects__actions">
+                <div class="home-subjects__actions">
                     <div class="overview-subject-browser__view-toggle" role="tablist" aria-label="学科视图切换">
                         <button type="button" class="overview-subject-browser__toggle-btn is-active" data-subject-view="grid" aria-pressed="true">
                             <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>
@@ -451,7 +382,7 @@ function buildSubjectOverviewMarkup({
                     </button>
                 </div>
             </div>
-            <div class="bento-subjects__scroll" id="subjectOverviewCollectionHost">
+            <div class="home-subjects__scroll bento-subjects__scroll" id="subjectOverviewCollectionHost">
                 ${buildSubjectCollectionMarkup({
                     agents,
                     statsByAgent,
@@ -459,16 +390,16 @@ function buildSubjectOverviewMarkup({
                     viewMode: 'grid',
                 })}
             </div>
-        </div>
+        </section>
         `
         : `
-        <div class="bento-subjects bento-subjects--empty">
-            <button id="subjectOverviewCreateCard" type="button" class="bento-subjects__empty">
+        <section class="home-subjects home-subjects--empty">
+            <button id="subjectOverviewCreateCard" type="button" class="home-empty-subject">
                 <span class="material-symbols-outlined" aria-hidden="true">school</span>
-                <strong>创建你的第一个学科工作台</strong>
-                <p>把资料、对话、笔记和复盘收进同一个学习入口，后面首页就会自动帮你继续追踪。</p>
+                <strong>创建第一个学科工作台</strong>
+                <p>例如：数学、英语、论文阅读、考研复习。每个学科下面可以继续拆话题、放资料、做笔记。</p>
             </button>
-        </div>
+        </section>
         `;
 
     return {
@@ -477,29 +408,78 @@ function buildSubjectOverviewMarkup({
         highlightsMarkup: '',
         heroMarkup: '',
         gridMarkup: `
-            <div class="app-home">
-                <div class="bento-grid">
-                    <div class="bento-left">
-                        ${welcomeCard}
-                        ${quickActionsWrapper}
-                        <div class="bento-activity">
-                            <div class="bento-activity__header">
-                                <h3>学习动态</h3>
+            <div class="app-home app-home--learning">
+                <div class="home-grid home-grid--bento">
+                    <div class="home-left">
+                        <section class="home-hero">
+                            <div class="home-hero__visual" aria-hidden="true">
+                                <img src="../assets/写作业.svg" alt="" />
+                            </div>
+                            <div class="home-hero__copy">
+                                <h2>${escapeHtml(heroTitle)}</h2>
+                                <p class="home-hero__tagline">资料理解 · 对话辅导 · 笔记复盘</p>
+                                <p>${escapeHtml(heroSubtitle)}</p>
+                                <div class="home-hero__actions">
+                                    <button type="button" class="home-primary-action" data-home-action="${primaryAction}">
+                                        <span class="material-symbols-outlined" aria-hidden="true">${hasAgents ? 'play_arrow' : 'add'}</span>
+                                        <span>${primaryActionText}</span>
+                                    </button>
+                                    <button type="button" class="home-secondary-action" data-home-action="open-notes">
+                                        <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                                        <span>看笔记</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="home-flow">
+                            <div class="home-section-header">
+                                <div>
+                                    <span>功能怎么用</span>
+                                    <h3>一条完整学习链路</h3>
+                                </div>
+                            </div>
+                            <div class="home-flow__grid">${workflowCards}</div>
+                        </section>
+                    </div>
+
+                    ${subjectSection}
+
+                    <aside class="home-side home-right">
+                        <section class="home-status">
+                            <div class="home-section-header">
+                                <div>
+                                    <span>学习状态</span>
+                                    <h3>今天的概览</h3>
+                                </div>
+                            </div>
+                            <div class="home-status__grid">
+                                <div><span>学科</span><strong>${agents.length}</strong></div>
+                                <div><span>话题</span><strong>${totalTopics}</strong></div>
+                                <div><span>待整理</span><strong>${totalUnread}</strong></div>
+                                <div><span>连续</span><strong>${streakDays}<small>天</small></strong></div>
+                            </div>
+                            <div class="home-status__score">
+                                <span>学习力</span>
+                                <strong>${escapeHtml(String(score || 0))}</strong>
+                                <p>近 7 天活跃 ${activeDaysLast7} 天，总学习 ${totalLearningDays} 天</p>
+                            </div>
+                        </section>
+                        ${calendarMarkup}
+                        <section class="home-activity">
+                            <div class="home-section-header">
+                                <div>
+                                    <span>接下来</span>
+                                    <h3>可继续的事项</h3>
+                                </div>
                                 <button type="button" class="ghost-button" data-home-action="open-diary">
                                     查看全部
                                     <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
                                 </button>
                             </div>
-                            <div class="bento-activity__grid">
-                                ${activityCards}
-                            </div>
-                        </div>
-                    </div>
-                    ${subjectSection}
-                    <div class="bento-right">
-                        ${calendarMarkup}
-                        ${statsMarkup}
-                    </div>
+                            <div class="home-activity__list">${activityCards}</div>
+                        </section>
+                    </aside>
                 </div>
             </div>
         `,
