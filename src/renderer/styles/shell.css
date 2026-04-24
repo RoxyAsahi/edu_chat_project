@@ -53,7 +53,9 @@ textarea:focus, input:focus, select:focus {
 }
 
 body.workspace-view-overview .titlebar {
-  background: #ffffff;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
 }
 
 .titlebar button { -webkit-app-region: no-drag; }

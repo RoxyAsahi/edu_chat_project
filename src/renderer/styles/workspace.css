@@ -14,7 +14,9 @@
   min-height: 0;
   overflow: hidden;
   padding: 0;
-  background: var(--paper);
+  background:
+    radial-gradient(circle at top center, color-mix(in srgb, var(--accent-soft) 24%, transparent), transparent 30%),
+    var(--paper);
 }
 
 .workspace-overview-page__inner {
@@ -315,7 +317,7 @@
 /* ── Bento Grid Home ─────────────────────────────────────────── */
 
 .app-home {
-  padding: 24px clamp(16px, 2vw, 24px) 16px;
+  padding: 0 20px 20px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
