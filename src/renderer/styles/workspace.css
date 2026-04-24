@@ -1991,19 +1991,18 @@
   text-align: left;
   color: #1f2b44;
   box-shadow: none;
-  transition: transform 180ms ease, background-color 180ms ease;
+  transition: background-color 180ms ease;
 }
 
 .subject-overview-card:hover,
 .subject-overview-card:focus-visible {
   background: #eef1f7;
-  transform: translateY(-2px);
   outline: none;
   box-shadow: none;
 }
 
 .subject-overview-card:active {
-  transform: translateY(0);
+  transform: none;
 }
 
 .subject-overview-card__delete {
@@ -2181,7 +2180,7 @@
   border-color: var(--accent);
   background: var(--md-sys-color-primary-container);
   box-shadow: none;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .subject-overview-card__create-body {
@@ -2332,14 +2331,14 @@
   padding: 12px;
   position: relative;
   background: var(--panel);
-  border: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
+  border: none;
   border-radius: 12px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   text-align: left;
-  transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  transition: background-color 140ms ease;
   color: var(--ink);
 }
 
@@ -2377,9 +2376,6 @@
 
 .subject-overview-card:hover,
 .subject-overview-card:focus-visible {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent-soft) 14%, transparent);
   outline: none;
 }
 
@@ -2408,27 +2404,22 @@
 
 .subject-overview-card--violet {
   background: color-mix(in srgb, #e9edff 60%, var(--panel));
-  border-color: color-mix(in srgb, #cdd3ff 50%, var(--line));
 }
 
 .subject-overview-card--green {
   background: color-mix(in srgb, #e7f5ea 60%, var(--panel));
-  border-color: color-mix(in srgb, #cdeedc 50%, var(--line));
 }
 
 .subject-overview-card--warm {
   background: color-mix(in srgb, #f6f0df 60%, var(--panel));
-  border-color: color-mix(in srgb, #f6deba 50%, var(--line));
 }
 
 .subject-overview-card--rose {
   background: color-mix(in srgb, #f8ebea 60%, var(--panel));
-  border-color: color-mix(in srgb, #f3d4e5 50%, var(--line));
 }
 
 .subject-overview-card--slate {
   background: color-mix(in srgb, #edf1f7 60%, var(--panel));
-  border-color: color-mix(in srgb, #d3dbeb 50%, var(--line));
 }
 
 .subject-overview-card--violet .subject-overview-card__badge,
@@ -2462,13 +2453,20 @@
 }
 
 .subject-overview-card--current {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 4px 14px color-mix(in srgb, var(--accent-soft) 20%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 40%, var(--panel));
 }
 
 .subject-overview-card--current .subject-overview-card__badge {
   background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
   color: var(--accent-strong);
+}
+
+.subject-overview-card--create {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
 }
 
 .subject-overview-card__current-dot {
@@ -3825,5 +3823,4 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .source-file-action-menu__item .material-symbols-outlined {
   font-size: 18px;
 }
-
 

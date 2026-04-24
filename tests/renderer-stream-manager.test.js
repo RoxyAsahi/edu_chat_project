@@ -464,3 +464,129 @@ test('streamManager preserves fallbackMeta on the finalized assistant history en
     assert.ok(finalizedMessage);
     assert.deepEqual(finalizedMessage.fallbackMeta, fallbackMeta);
 });
+
+test('streamManager renders native reasoning deltas before stream finalization', async (t) => {
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatMessages">
+            <article class="message-item thinking" data-message-id="assistant-reasoning-live">
+              <div class="name-time-block"></div>
+              <div class="md-content"><div class="thinking-indicator"></div></div>
+            </article>
+          </div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalPerformance = global.performance;
+
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = () => 1;
+    global.performance = { now: () => Date.now() };
+
+    t.after(() => {
+        global.window = originalWindow;
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.performance = originalPerformance;
+    });
+
+    const { initStreamManager, startStreamingMessage, appendStreamChunk } = await loadStreamManagerModule();
+
+    let currentHistory = cloneHistory([{
+        id: 'user-1',
+        role: 'user',
+        content: 'question',
+        timestamp: 1,
+    }]);
+
+    initStreamManager({
+        currentSelectedItemRef: {
+            get: () => ({ id: 'agent-1' }),
+        },
+        currentTopicIdRef: {
+            get: () => 'topic-1',
+        },
+        currentChatHistoryRef: {
+            get: () => currentHistory,
+            set: (value) => {
+                currentHistory = cloneHistory(value);
+            },
+        },
+        globalSettingsRef: {
+            get: () => ({ enableSmoothStreaming: false }),
+        },
+        chatMessagesDiv: dom.window.document.getElementById('chatMessages'),
+        electronAPI: {
+            async getChatHistory() {
+                return cloneHistory(currentHistory);
+            },
+            async saveChatHistory() {
+                return { success: true };
+            },
+        },
+        uiHelper: {
+            scrollToBottom() {},
+        },
+        markedInstance: {
+            parse: (text) => `<p>${text}</p>`,
+        },
+        preprocessFullContent: (text) => text,
+        setContentAndProcessImages(contentDiv, rawHtml) {
+            contentDiv.innerHTML = rawHtml;
+        },
+        processRenderedContent() {},
+        runTextHighlights() {},
+        processAnimationsInContent() {},
+        prependNativeReasoningBubble: (rawHtml) => rawHtml,
+        renderMessage() {
+            throw new Error('existing DOM node should be reused');
+        },
+    });
+
+    const messageItem = dom.window.document.querySelector('.message-item[data-message-id="assistant-reasoning-live"]');
+    await startStreamingMessage({
+        id: 'assistant-reasoning-live',
+        role: 'assistant',
+        name: 'Agent One',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        content: 'Thinking',
+        isThinking: true,
+        timestamp: 2,
+    }, messageItem);
+
+    appendStreamChunk('assistant-reasoning-live', {
+        reasoningDelta: 'live reasoning ',
+        chunk: { choices: [{ delta: { reasoning_content: 'live reasoning ' } }] },
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-reasoning-live"] .md-content');
+    assert.match(contentDiv.innerHTML, /native-reasoning-bubble/);
+    assert.match(contentDiv.textContent, /live reasoning/);
+
+    const bubble = contentDiv.querySelector('.native-reasoning-bubble');
+    const header = contentDiv.querySelector('.unistudy-live-reasoning-header');
+    assert.ok(header);
+    header.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    assert.ok(contentDiv.querySelector('.native-reasoning-bubble.expanded'));
+
+    appendStreamChunk('assistant-reasoning-live', {
+        reasoningDelta: 'keeps expanding ',
+        chunk: { choices: [{ delta: { reasoning_content: 'keeps expanding ' } }] },
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.ok(contentDiv.querySelector('.native-reasoning-bubble.expanded'));
+    assert.equal(contentDiv.querySelector('.unistudy-live-reasoning-header'), header);
+    assert.match(contentDiv.textContent, /keeps expanding/);
+});

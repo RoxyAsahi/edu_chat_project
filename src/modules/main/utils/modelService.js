@@ -17,7 +17,51 @@ const MODEL_CAPABILITY_KEYS = Object.freeze([
     'reasoning',
 ]);
 
+const AIP_TEST_PROVIDER_PRESET_ID = 'aip-innovation-practice-test';
+const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
+const AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
+const AIP_TEST_CHAT_ENDPOINT = `${AIP_TEST_API_BASE_URL}/v1/chat/completions`;
+const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
+const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B';
+const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
+    {
+        id: 'Qwen/Qwen3.6-35B-A3B',
+        name: 'Qwen/Qwen3.6-35B-A3B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Qwen/Qwen3.6-27B',
+        name: 'Qwen/Qwen3.6-27B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Pro/moonshotai/Kimi-K2.6',
+        name: 'Pro/moonshotai/Kimi-K2.6',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Qwen/Qwen3-VL-Embedding-8B',
+        name: 'Qwen/Qwen3-VL-Embedding-8B',
+        group: 'embedding',
+        capabilities: { chat: false, embedding: true, rerank: false, vision: true, reasoning: false },
+    },
+    {
+        id: 'Qwen/Qwen3-VL-Reranker-8B',
+        name: 'Qwen/Qwen3-VL-Reranker-8B',
+        group: 'rerank',
+        capabilities: { chat: false, embedding: false, rerank: true, vision: true, reasoning: false },
+    },
+]);
+
 const PROVIDER_PRESETS = Object.freeze([
+    {
+        presetId: AIP_TEST_PROVIDER_PRESET_ID,
+        name: AIP_TEST_PROVIDER_NAME,
+        apiBaseUrl: AIP_TEST_API_BASE_URL,
+    },
     {
         presetId: 'openai',
         name: 'OpenAI',
@@ -243,6 +287,17 @@ function normalizeApiKeys(value) {
     return [];
 }
 
+function resolveBuiltInProviderPresetMeta({ apiBaseUrl = '', apiKeys = [] } = {}) {
+    if (
+        normalizeApiBaseUrl(apiBaseUrl) === normalizeApiBaseUrl(AIP_TEST_API_BASE_URL)
+        && normalizeApiKeys(apiKeys).includes(AIP_TEST_API_KEY)
+    ) {
+        return PROVIDER_PRESETS.find((preset) => preset.presetId === AIP_TEST_PROVIDER_PRESET_ID) || null;
+    }
+
+    return null;
+}
+
 function normalizeExtraHeaders(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return {};
@@ -459,6 +514,71 @@ function normalizeModelService(service = DEFAULT_MODEL_SERVICE) {
     };
 }
 
+function createBuiltInTestProvider() {
+    return normalizeProviderConfig({
+        id: 'aip-test-provider',
+        presetId: AIP_TEST_PROVIDER_PRESET_ID,
+        name: AIP_TEST_PROVIDER_NAME,
+        protocol: 'openai-compatible',
+        enabled: true,
+        apiBaseUrl: AIP_TEST_API_BASE_URL,
+        apiKeys: [AIP_TEST_API_KEY],
+        extraHeaders: {},
+        models: AIP_TEST_BUILT_IN_MODELS.map((model) => ({
+            ...model,
+            enabled: true,
+            source: 'manual',
+        })),
+    });
+}
+
+function ensureBuiltInTestProvider(service = DEFAULT_MODEL_SERVICE) {
+    const normalizedService = normalizeModelService(service);
+    if (!Array.isArray(normalizedService.providers) || normalizedService.providers.length === 0) {
+        return normalizedService;
+    }
+
+    const existingIndex = normalizedService.providers.findIndex((provider) => (
+        provider.presetId === AIP_TEST_PROVIDER_PRESET_ID
+        || (
+            normalizeApiBaseUrl(provider.apiBaseUrl) === normalizeApiBaseUrl(AIP_TEST_API_BASE_URL)
+            && normalizeApiKeys(provider.apiKeys).includes(AIP_TEST_API_KEY)
+        )
+    ));
+
+    const builtInProvider = createBuiltInTestProvider();
+    if (existingIndex === -1) {
+        return normalizeModelService({
+            ...normalizedService,
+            providers: [
+                ...normalizedService.providers,
+                builtInProvider,
+            ],
+        });
+    }
+
+    const providers = [...normalizedService.providers];
+    providers[existingIndex] = normalizeProviderConfig({
+        ...providers[existingIndex],
+        id: providers[existingIndex].id || builtInProvider.id,
+        presetId: AIP_TEST_PROVIDER_PRESET_ID,
+        name: AIP_TEST_PROVIDER_NAME,
+        apiBaseUrl: AIP_TEST_API_BASE_URL,
+        apiKeys: providers[existingIndex].apiKeys?.length > 0
+            ? providers[existingIndex].apiKeys
+            : builtInProvider.apiKeys,
+        models: mergeProviderModels([
+            ...builtInProvider.models,
+            ...(providers[existingIndex].models || []),
+        ]),
+    });
+
+    return normalizeModelService({
+        ...normalizedService,
+        providers,
+    });
+}
+
 function collectLegacyModels(settings = {}, fieldEntries = [], defaults = {}) {
     return fieldEntries
         .map(([value, group, capabilities, source = 'manual']) => {
@@ -486,10 +606,12 @@ function createMigratedProvider({
     apiKeys,
     models,
 }) {
+    const preset = resolveBuiltInProviderPresetMeta({ apiBaseUrl, apiKeys });
+
     return normalizeProviderConfig({
         id,
-        presetId: 'custom-openai-compatible',
-        name,
+        presetId: preset?.presetId || 'custom-openai-compatible',
+        name: preset?.name || name,
         protocol: 'openai-compatible',
         enabled: true,
         apiBaseUrl,
@@ -974,6 +1096,12 @@ function createFetchedModelEntry(modelId = '') {
 }
 
 module.exports = {
+    AIP_TEST_API_BASE_URL,
+    AIP_TEST_API_KEY,
+    AIP_TEST_CHAT_ENDPOINT,
+    AIP_TEST_DEFAULT_MODEL,
+    AIP_TEST_PROVIDER_NAME,
+    AIP_TEST_PROVIDER_PRESET_ID,
     DEFAULT_MODEL_SERVICE,
     MODEL_CAPABILITY_KEYS,
     MODEL_SERVICE_DEFAULT_KEYS,
@@ -988,8 +1116,10 @@ module.exports = {
     buildRerankEndpoint,
     cloneModelService,
     createDefaultModelService,
+    createBuiltInTestProvider,
     createFetchedModelEntry,
     detectRemoteModelCapabilities,
+    ensureBuiltInTestProvider,
     findModelById,
     findProviderById,
     listEnabledModels,

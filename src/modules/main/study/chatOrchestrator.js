@@ -2,8 +2,13 @@ const {
     buildToolPayloadMessage,
     extractResponseContent,
     injectResponseContent,
+    LEGACY_DAILY_NOTE_REGEX,
     parseToolRequests,
+    stripToolArtifacts,
     THINK_BLOCK_REGEX,
+    TOOL_BLOCK_REGEX,
+    TOOL_REQUEST_END,
+    TOOL_REQUEST_START,
 } = require('./toolProtocol');
 const {
     logFinalAssistantReply,
@@ -14,6 +19,7 @@ const {
 
 const DEFAULT_SYNTHETIC_STREAM_INTERVAL_MS = 18;
 const DEFAULT_MAX_TOOL_ROUNDS = 3;
+const STREAM_PROTOCOL_HOLDBACK_CHARS = 96;
 const syntheticRequestState = new Map();
 
 function cloneMessages(messages = []) {
@@ -42,29 +48,38 @@ function getLastUserMessageText(messages = []) {
     return '';
 }
 
-function insertTemporarySystemMessages(messages = [], temporaryMessages = []) {
-    if (!Array.isArray(temporaryMessages) || temporaryMessages.length === 0) {
-        return cloneMessages(messages);
-    }
-
+function mergeTemporarySystemMessages(messages = [], temporaryMessages = []) {
     const clonedMessages = cloneMessages(messages);
-    let insertIndex = -1;
+    const mergedTemporaryContent = (Array.isArray(temporaryMessages) ? temporaryMessages : [])
+        .map((message) => (typeof message?.content === 'string' ? message.content.trim() : ''))
+        .filter(Boolean)
+        .join('\n\n')
+        .trim();
 
-    for (let index = clonedMessages.length - 1; index >= 0; index -= 1) {
-        if (clonedMessages[index]?.role === 'system') {
-            insertIndex = index;
-            break;
-        }
+    if (!mergedTemporaryContent) {
+        return clonedMessages;
     }
 
-    if (insertIndex === -1) {
-        return [...temporaryMessages, ...clonedMessages];
-    }
+    const firstNonSystemIndex = clonedMessages.findIndex((message) => message?.role !== 'system');
+    const leadingSystemMessages = firstNonSystemIndex === -1
+        ? clonedMessages
+        : clonedMessages.slice(0, firstNonSystemIndex);
+    const remainingMessages = firstNonSystemIndex === -1
+        ? []
+        : clonedMessages.slice(firstNonSystemIndex);
+    const mergedLeadingSystemContent = leadingSystemMessages
+        .map((message) => (typeof message?.content === 'string' ? message.content.trim() : ''))
+        .filter(Boolean)
+        .join('\n\n')
+        .trim();
+    const nextSystemContent = [mergedLeadingSystemContent, mergedTemporaryContent]
+        .filter(Boolean)
+        .join('\n\n')
+        .trim();
 
     return [
-        ...clonedMessages.slice(0, insertIndex + 1),
-        ...temporaryMessages,
-        ...clonedMessages.slice(insertIndex + 1),
+        ...(nextSystemContent ? [{ role: 'system', content: nextSystemContent }] : []),
+        ...remainingMessages,
     ];
 }
 
@@ -123,10 +138,25 @@ function makeSyntheticEndEvent(requestId, context, payload = {}) {
         requestId,
         context,
         fullResponse: payload.fullResponse || '',
+        reasoning_content: payload.reasoning_content || '',
         finishReason: payload.finishReason || 'completed',
         interrupted: payload.interrupted === true,
         timedOut: payload.timedOut === true,
         error: payload.error || '',
+        fallbackMeta: payload.fallbackMeta || null,
+    };
+}
+
+function makeSyntheticErrorEvent(requestId, context, payload = {}) {
+    return {
+        type: 'error',
+        requestId,
+        context,
+        error: payload.error || 'Streaming request failed.',
+        partialResponse: payload.partialResponse || '',
+        reasoning_content: payload.reasoning_content || '',
+        interrupted: payload.interrupted === true,
+        timedOut: payload.timedOut === true,
         fallbackMeta: payload.fallbackMeta || null,
     };
 }
@@ -219,10 +249,483 @@ function abortSyntheticRequest(requestId) {
     return true;
 }
 
+function stripStreamingToolArtifacts(content = '') {
+    return String(content || '')
+        .replace(THINK_BLOCK_REGEX, '')
+        .replace(TOOL_BLOCK_REGEX, '')
+        .replace(LEGACY_DAILY_NOTE_REGEX, '')
+        .replace(/\n{3,}/g, '\n\n');
+}
+
+function findUnclosedMarkerStart(text = '') {
+    const normalized = String(text || '');
+    const markerPairs = [
+        { start: TOOL_REQUEST_START, end: TOOL_REQUEST_END },
+        { start: '<<<DailyNoteStart>>>', end: '<<<DailyNoteEnd>>>' },
+        { start: '<thinking>', end: '</thinking>' },
+        { start: '<think>', end: '</think>' },
+    ];
+
+    let earliestUnsafeIndex = -1;
+    markerPairs.forEach(({ start, end }) => {
+        const startIndex = normalized.lastIndexOf(start);
+        if (startIndex === -1) {
+            return;
+        }
+
+        const endIndex = normalized.indexOf(end, startIndex + start.length);
+        if (endIndex !== -1) {
+            return;
+        }
+
+        earliestUnsafeIndex = earliestUnsafeIndex === -1
+            ? startIndex
+            : Math.min(earliestUnsafeIndex, startIndex);
+    });
+
+    return earliestUnsafeIndex;
+}
+
+function computeVisibleRoundText(content = '', finalized = false) {
+    const normalized = String(content || '');
+    if (!normalized) {
+        return '';
+    }
+
+    let safePrefix = finalized
+        ? normalized
+        : normalized.slice(0, Math.max(0, normalized.length - STREAM_PROTOCOL_HOLDBACK_CHARS));
+    const unsafeIndex = findUnclosedMarkerStart(safePrefix);
+    if (unsafeIndex >= 0) {
+        safePrefix = safePrefix.slice(0, unsafeIndex);
+    }
+
+    return stripStreamingToolArtifacts(safePrefix).replace(/\s+$/u, '');
+}
+
+function buildRoundDisplayText(visibleText = '', completedSegmentCount = 0) {
+    const normalized = String(visibleText || '');
+    if (!normalized) {
+        return '';
+    }
+
+    return completedSegmentCount > 0
+        ? `\n\n${normalized}`
+        : normalized;
+}
+
 function createChatOrchestrator(options = {}) {
     const chatClient = options.chatClient;
     const studyToolRuntime = options.studyToolRuntime;
     const studyMemoryService = options.studyMemoryService;
+
+    async function prepareRequestMessages(request = {}) {
+        const {
+            messages,
+            context,
+            settings = {},
+        } = request;
+        const baseMessages = cloneMessages(messages);
+        const query = getLastUserMessageText(baseMessages);
+        const studyMemory = await studyMemoryService.searchStudyMemory({
+            agentId: context?.agentId,
+            topicId: context?.topicId,
+            query,
+            topK: Number(settings?.studyLogPolicy?.memoryTopK || 4),
+            fallbackTopK: Number(settings?.studyLogPolicy?.memoryFallbackTopK || 2),
+        }).catch(() => ({
+            refs: [],
+            contextText: '',
+            itemCount: 0,
+        }));
+
+        const preparedMessages = studyMemory.contextText
+            ? mergeTemporarySystemMessages(baseMessages, [{ role: 'system', content: studyMemory.contextText }])
+            : baseMessages;
+
+        return {
+            messages: preparedMessages,
+            studyMemoryRefs: studyMemory.refs,
+        };
+    }
+
+    async function runDirectRequest(request = {}) {
+        const prepared = await prepareRequestMessages(request);
+        const directResult = await chatClient.send({
+            requestId: request.requestId,
+            endpoint: request.endpoint,
+            apiKey: request.apiKey,
+            extraHeaders: request.extraHeaders || {},
+            messages: prepared.messages,
+            round: 1,
+            modelConfig: request.modelConfig || {},
+            context: request.context,
+            timeoutMs: request.timeoutMs,
+            fallbackExecution: request.fallbackExecution || null,
+            webContents: request.webContents,
+            streamChannel: request.streamChannel,
+        });
+
+        if (directResult?.error) {
+            return {
+                error: directResult.error,
+                studyMemoryRefs: prepared.studyMemoryRefs,
+                toolEvents: [],
+                fallbackMeta: directResult?.fallbackMeta || null,
+            };
+        }
+
+        return {
+            ...(directResult || {}),
+            toolEvents: [],
+            studyMemoryRefs: prepared.studyMemoryRefs,
+            fallbackMeta: directResult?.fallbackMeta || null,
+        };
+    }
+
+    async function runStreamedToolLoop(request = {}) {
+        const {
+            requestId,
+            endpoint,
+            apiKey,
+            extraHeaders = {},
+            modelConfig = {},
+            context,
+            settings = {},
+            webContents,
+            streamChannel = 'chat-stream-event',
+        } = request;
+        const maxRounds = Math.max(
+            1,
+            Number(settings?.studyLogPolicy?.maxToolRounds || DEFAULT_MAX_TOOL_ROUNDS)
+        );
+        const prepared = await prepareRequestMessages(request);
+        let currentMessages = prepared.messages;
+        const toolEvents = [];
+        const visibleAssistantSegments = [];
+        let finalResponse = null;
+        let finishReason = 'completed';
+        let fallbackMeta = null;
+        let accumulatedReasoning = '';
+        let terminalEventSent = false;
+
+        const emitChunkDelta = (nextDisplayText = '', state) => {
+            const normalizedNextText = String(nextDisplayText || '');
+            const previousDisplayText = state.emittedDisplayText || '';
+            if (!normalizedNextText || normalizedNextText === previousDisplayText) {
+                return;
+            }
+
+             if (previousDisplayText && previousDisplayText.startsWith(normalizedNextText)) {
+                state.emittedDisplayText = normalizedNextText;
+                return;
+            }
+
+            if (!normalizedNextText.startsWith(previousDisplayText)) {
+                console.warn('[ChatOrchestrator] Stream display text diverged; suppressing non-prefix delta.', {
+                    requestId,
+                });
+                return;
+            }
+
+            const delta = normalizedNextText.slice(previousDisplayText.length);
+            if (!delta) {
+                return;
+            }
+
+            state.emittedDisplayText = normalizedNextText;
+            if (!webContents || typeof webContents.send !== 'function') {
+                return;
+            }
+            if (typeof webContents.isDestroyed === 'function' && webContents.isDestroyed()) {
+                return;
+            }
+
+            webContents.send(streamChannel, makeSyntheticChunkEvent(requestId, context, delta));
+        };
+
+        const emitTerminal = (type, payload = {}) => {
+            if (terminalEventSent) {
+                return;
+            }
+            terminalEventSent = true;
+
+            if (!webContents || typeof webContents.send !== 'function') {
+                return;
+            }
+            if (typeof webContents.isDestroyed === 'function' && webContents.isDestroyed()) {
+                return;
+            }
+
+            if (type === 'error') {
+                webContents.send(streamChannel, makeSyntheticErrorEvent(requestId, context, payload));
+                return;
+            }
+
+            webContents.send(streamChannel, makeSyntheticEndEvent(requestId, context, payload));
+        };
+
+        for (let round = 0; round < maxRounds; round += 1) {
+            const roundState = {
+                rawContent: '',
+                emittedDisplayText: '',
+                reasoningContent: '',
+                completedSegmentCountAtStart: visibleAssistantSegments.length,
+            };
+
+            const streamEndResult = await new Promise(async (resolve) => {
+                let resolved = false;
+                let fallbackMetaFromSend = null;
+                const safeResolve = (value) => {
+                    if (!resolved) {
+                        resolved = true;
+                        resolve(value);
+                    }
+                };
+
+                const sendResult = await chatClient.send({
+                    requestId,
+                    endpoint,
+                    apiKey,
+                    extraHeaders,
+                    messages: currentMessages,
+                    round: round + 1,
+                    modelConfig: {
+                        ...modelConfig,
+                        stream: true,
+                    },
+                    context,
+                    timeoutMs: request.timeoutMs,
+                    fallbackExecution: request.fallbackExecution || null,
+                    webContents,
+                    streamChannel,
+                    emitStreamEvents: false,
+                    onStreamChunk: (payload) => {
+                        if (payload?.chunk?.error === 'json_parse_error') {
+                            return;
+                        }
+
+                        if (payload?.textDelta) {
+                            roundState.rawContent += payload.textDelta;
+                        }
+                        if (payload?.reasoningDelta) {
+                            roundState.reasoningContent += payload.reasoningDelta;
+                        }
+
+                        const visibleRoundText = computeVisibleRoundText(roundState.rawContent, false);
+                        emitChunkDelta(
+                            buildRoundDisplayText(visibleRoundText, roundState.completedSegmentCountAtStart),
+                            roundState
+                        );
+                    },
+                    onStreamEnd: (endResult = {}) => safeResolve({
+                        ...endResult,
+                        success: endResult.success !== false && endResult.type !== 'error',
+                        content: typeof endResult.content === 'string'
+                            ? endResult.content
+                            : (endResult.fullResponse || endResult.partialResponse || ''),
+                        reasoningContent: typeof endResult.reasoningContent === 'string'
+                            ? endResult.reasoningContent
+                            : (endResult.reasoning_content || ''),
+                        fallbackMeta: fallbackMetaFromSend || endResult?.fallbackMeta || null,
+                    }),
+                });
+
+                fallbackMetaFromSend = sendResult?.fallbackMeta || null;
+
+                if (sendResult?.error) {
+                    safeResolve({
+                        success: false,
+                        error: sendResult.error,
+                        fallbackMeta: sendResult?.fallbackMeta || null,
+                    });
+                    return;
+                }
+
+                if (!sendResult?.streamingStarted) {
+                    safeResolve({
+                        success: false,
+                        error: 'Streaming did not start.',
+                        fallbackMeta: sendResult?.fallbackMeta || null,
+                    });
+                }
+            });
+
+            fallbackMeta = mergeFallbackMeta(fallbackMeta, streamEndResult?.fallbackMeta, round + 1);
+
+            const rawContent = typeof streamEndResult?.content === 'string'
+                ? streamEndResult.content
+                : roundState.rawContent;
+            const roundVisibleText = computeVisibleRoundText(rawContent, true).trim();
+            emitChunkDelta(
+                buildRoundDisplayText(roundVisibleText, roundState.completedSegmentCountAtStart),
+                roundState
+            );
+
+            if (streamEndResult?.reasoningContent) {
+                accumulatedReasoning += streamEndResult.reasoningContent;
+            }
+
+            if (streamEndResult?.success !== true) {
+                const partialVisibleTranscript = buildVisibleAssistantTranscript([
+                    ...visibleAssistantSegments,
+                    ...(roundVisibleText ? [roundVisibleText] : []),
+                ]);
+
+                if (!partialVisibleTranscript && round === 0) {
+                    return {
+                        error: streamEndResult?.error || 'Streaming request failed.',
+                        toolEvents,
+                        studyMemoryRefs: prepared.studyMemoryRefs,
+                        fallbackMeta,
+                    };
+                }
+
+                emitTerminal('error', {
+                    error: streamEndResult?.error || 'Streaming request failed.',
+                    partialResponse: partialVisibleTranscript,
+                    reasoning_content: accumulatedReasoning,
+                    interrupted: streamEndResult?.interrupted === true,
+                    timedOut: streamEndResult?.timedOut === true,
+                    fallbackMeta,
+                });
+
+                return {
+                    streamingStarted: true,
+                    requestId,
+                    context,
+                    toolEvents,
+                    studyMemoryRefs: prepared.studyMemoryRefs,
+                    fallbackMeta,
+                };
+            }
+
+            const parsedResponse = {
+                choices: [{
+                    message: {
+                        content: rawContent,
+                        ...(streamEndResult?.reasoningContent
+                            ? { reasoning_content: streamEndResult.reasoningContent }
+                            : {}),
+                    },
+                }],
+            };
+            finalResponse = parsedResponse;
+            finishReason = streamEndResult?.finishReason || finishReason || 'completed';
+            const toolRequests = parseToolRequests(rawContent);
+            logParsedToolRequests({
+                requestId,
+                round: round + 1,
+                toolRequests,
+            });
+
+            if (toolRequests.length === 0 || finishReason === 'cancelled_by_user' || finishReason === 'timed_out') {
+                if (roundVisibleText) {
+                    visibleAssistantSegments.push(roundVisibleText);
+                }
+
+                const finalVisibleText = buildVisibleAssistantTranscript(visibleAssistantSegments)
+                    || stripToolArtifacts(rawContent);
+                logVisibleAssistantReply({
+                    requestId,
+                    round: round + 1,
+                    content: roundVisibleText,
+                });
+                logFinalAssistantReply({
+                    requestId,
+                    content: finalVisibleText,
+                });
+                injectResponseContent(finalResponse, finalVisibleText);
+
+                emitTerminal('end', {
+                    fullResponse: finalVisibleText,
+                    reasoning_content: accumulatedReasoning,
+                    finishReason,
+                    interrupted: streamEndResult?.interrupted === true,
+                    timedOut: streamEndResult?.timedOut === true,
+                    fallbackMeta,
+                });
+
+                return {
+                    streamingStarted: true,
+                    requestId,
+                    context,
+                    response: finalResponse,
+                    fullResponse: finalVisibleText,
+                    finishReason,
+                    toolEvents,
+                    studyMemoryRefs: prepared.studyMemoryRefs,
+                    fallbackMeta,
+                };
+            }
+
+            if (roundVisibleText) {
+                visibleAssistantSegments.push(roundVisibleText);
+            }
+            logVisibleAssistantReply({
+                requestId,
+                round: round + 1,
+                content: roundVisibleText,
+            });
+
+            const roundResults = [];
+            for (const toolRequest of toolRequests) {
+                const result = await studyToolRuntime.executeToolRequest(toolRequest, {
+                    agentId: context?.agentId,
+                    agentName: context?.agentName,
+                    topicId: context?.topicId,
+                    topicName: context?.topicName,
+                    studentName: context?.studentName,
+                    studyWorkspace: context?.studyWorkspace,
+                    workEnvironment: context?.workEnvironment,
+                    dateKey: context?.currentDate,
+                    sourceMessageIds: [
+                        context?.lastUserMessageId,
+                        context?.assistantMessageId || requestId,
+                    ].filter(Boolean),
+                });
+                roundResults.push(result);
+                toolEvents.push({
+                    ...result,
+                    requestedToolName: toolRequest.requestedToolName,
+                    requestedCommand: toolRequest.requestedCommand,
+                    protocol: toolRequest.protocol,
+                    timestamp: Date.now(),
+                });
+            }
+            logToolExecutionResults({
+                requestId,
+                round: round + 1,
+                results: roundResults,
+            });
+
+            currentMessages = [
+                ...currentMessages,
+                { role: 'assistant', content: rawContent },
+                { role: 'user', content: buildToolPayloadMessage(roundResults) },
+            ];
+        }
+
+        const fallbackVisibleText = buildVisibleAssistantTranscript(visibleAssistantSegments);
+        emitTerminal('end', {
+            fullResponse: fallbackVisibleText,
+            reasoning_content: accumulatedReasoning,
+            finishReason,
+            fallbackMeta,
+        });
+
+        return {
+            streamingStarted: true,
+            requestId,
+            context,
+            response: finalResponse,
+            fullResponse: fallbackVisibleText,
+            finishReason,
+            toolEvents,
+            studyMemoryRefs: prepared.studyMemoryRefs,
+            fallbackMeta,
+        };
+    }
 
     async function runLocalLoop(request = {}) {
         const {
@@ -239,23 +742,8 @@ function createChatOrchestrator(options = {}) {
             1,
             Number(settings?.studyLogPolicy?.maxToolRounds || DEFAULT_MAX_TOOL_ROUNDS)
         );
-        const baseMessages = cloneMessages(messages);
-        const query = getLastUserMessageText(baseMessages);
-        const studyMemory = await studyMemoryService.searchStudyMemory({
-            agentId: context?.agentId,
-            topicId: context?.topicId,
-            query,
-            topK: Number(settings?.studyLogPolicy?.memoryTopK || 4),
-            fallbackTopK: Number(settings?.studyLogPolicy?.memoryFallbackTopK || 2),
-        }).catch(() => ({
-            refs: [],
-            contextText: '',
-            itemCount: 0,
-        }));
-
-        let currentMessages = studyMemory.contextText
-            ? insertTemporarySystemMessages(baseMessages, [{ role: 'system', content: studyMemory.contextText }])
-            : baseMessages;
+        const prepared = await prepareRequestMessages(request);
+        let currentMessages = prepared.messages;
 
         const toolEvents = [];
         let finalText = '';
@@ -379,13 +867,25 @@ function createChatOrchestrator(options = {}) {
             fullResponse: finalText,
             finishReason,
             rawResult,
-            studyMemoryRefs: studyMemory.refs,
+            studyMemoryRefs: prepared.studyMemoryRefs,
             toolEvents,
             fallbackMeta,
         };
     }
 
     async function runRequest(request = {}) {
+        const executionMode = request.executionMode === 'tool-orchestrated'
+            ? 'tool-orchestrated'
+            : 'direct-stream';
+
+        if (executionMode === 'direct-stream') {
+            return runDirectRequest(request);
+        }
+
+        if (request.modelConfig?.stream === true) {
+            return runStreamedToolLoop(request);
+        }
+
         const result = await runLocalLoop(request);
         if (result?.error) {
             return result;

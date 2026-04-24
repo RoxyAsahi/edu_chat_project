@@ -56,6 +56,13 @@ const FOLLOW_UP_CODE_FENCE_REGEX = /```[\s\S]*?```/g;
 const FOLLOW_UP_HTML_BLOCK_REGEX = /<(style|script|svg|canvas|iframe)\b[^>]*>[\s\S]*?<\/\1>/gi;
 const FOLLOW_UP_BUTTON_REGEX = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
 const FOLLOW_UP_BLOCK_TAG_REGEX = /<\/?(address|article|aside|blockquote|br|caption|dd|details|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)\b[^>]*>/gi;
+const TOOL_PROTOCOL_SIGNAL_PATTERNS = [
+    /{{\s*DailyNoteGuide\s*}}/i,
+    /——\s*日记\s*\(DailyNote\)\s*——/i,
+    /<<<\[TOOL_REQUEST\]>>>/i,
+    /<<<DailyNoteStart>>>/i,
+    /\b(?:DailyNote|StudyLog)\.(?:create|update|write)\b/i,
+];
 
 function decodeFollowUpEntities(text = '') {
     return String(text || '')
@@ -332,6 +339,49 @@ function normalizeLegacyStudyLogPromptMessages(messages = []) {
             content: rewriteLegacyStudyLogPromptText(message.content),
         };
     });
+}
+
+function messageContentHasToolProtocolSignals(content) {
+    if (typeof content === 'string') {
+        return TOOL_PROTOCOL_SIGNAL_PATTERNS.some((pattern) => pattern.test(content));
+    }
+
+    if (Array.isArray(content)) {
+        return content.some((part) => {
+            if (part?.type === 'text' && typeof part.text === 'string') {
+                return messageContentHasToolProtocolSignals(part.text);
+            }
+            return typeof part?.text === 'string' && messageContentHasToolProtocolSignals(part.text);
+        });
+    }
+
+    if (content && typeof content === 'object' && typeof content.text === 'string') {
+        return messageContentHasToolProtocolSignals(content.text);
+    }
+
+    return false;
+}
+
+function hasToolProtocolMessages(messages = []) {
+    return (Array.isArray(messages) ? messages : []).some((message) => (
+        message && messageContentHasToolProtocolSignals(message.content)
+    ));
+}
+
+function resolveChatExecutionMode(options = {}) {
+    const explicitExecutionMode = typeof options.requestExecutionMode === 'string'
+        ? options.requestExecutionMode.trim()
+        : (typeof options.context?.executionMode === 'string' ? options.context.executionMode.trim() : '');
+
+    if (explicitExecutionMode === 'tool-orchestrated' || explicitExecutionMode === 'direct-stream') {
+        return explicitExecutionMode;
+    }
+
+    if (hasToolProtocolMessages(options.messages)) {
+        return 'tool-orchestrated';
+    }
+
+    return 'direct-stream';
 }
 
 function applyContextSanitizer(messages, settings) {
@@ -1268,6 +1318,7 @@ function initialize(mainWindow, context) {
             messages,
             modelConfig = {},
             context = null,
+            executionMode: requestExecutionMode = '',
         } = request || {};
 
         if (!request || typeof request !== 'object' || Array.isArray(request)) {
@@ -1342,13 +1393,25 @@ function initialize(mainWindow, context) {
 
             processedMessages = normalizeLegacyStudyLogPromptMessages(processedMessages);
             processedMessages = applyEmoticonPrompt(processedMessages, settings, promptResolutionOptions);
-            processedMessages = applyDailyNoteProtocol(processedMessages, settings, promptResolutionOptions);
+            const executionMode = resolveChatExecutionMode({
+                requestExecutionMode,
+                context,
+                messages: processedMessages,
+            });
+
+            if (executionMode === 'tool-orchestrated') {
+                processedMessages = applyDailyNoteProtocol(processedMessages, settings, promptResolutionOptions);
+            }
 
             if (settings.enableThoughtChainInjection !== true) {
                 processedMessages = stripThoughtChains(processedMessages);
             }
 
             processedMessages = applyContextSanitizer(processedMessages, settings);
+            promptResolutionOptions.context = {
+                ...(promptResolutionOptions.context || {}),
+                executionMode,
+            };
         } catch (error) {
             console.error('[Main - sendChatRequest] Message preprocessing failed:', error);
             return { error: `Message preprocessing failed: ${error.message}` };
@@ -1388,6 +1451,11 @@ function initialize(mainWindow, context) {
             || new Date().toISOString().slice(0, 10);
         const enrichedContext = {
             ...(context || {}),
+            executionMode: promptResolutionOptions.context?.executionMode || resolveChatExecutionMode({
+                requestExecutionMode,
+                context,
+                messages: processedMessages,
+            }),
             model: finalModelConfig?.model || context?.model || '',
             topicName: promptVariableResolution.substitutions.TopicName || context?.topicName || '',
             agentName: promptVariableResolution.substitutions.AgentName || context?.agentName || '',
@@ -1409,6 +1477,7 @@ function initialize(mainWindow, context) {
             settings,
             webContents: event.sender,
             streamChannel: 'chat-stream-event',
+            executionMode: enrichedContext.executionMode,
         });
 
         if (orchestrationResult?.error) {
@@ -1869,6 +1938,7 @@ module.exports = {
         sanitizeFollowUpText,
         selectVisibleFollowUpMessages,
         requestFollowUpsOnce,
-    },
+        resolveChatExecutionMode,
+        },
     initialize
 };

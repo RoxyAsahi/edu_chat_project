@@ -437,13 +437,19 @@ function createComposerController(deps = {}) {
         const livePrompt = await resolveLivePrompt();
         const systemPrompt = livePrompt || (activePrompt?.success ? activePrompt.systemPrompt : '');
         const messages = [];
+        const mergedTemporarySystemContent = temporarySystemMessages
+            .map((item) => (typeof item?.content === 'string' ? item.content.trim() : ''))
+            .filter(Boolean)
+            .join('\n\n')
+            .trim();
+        const mergedSystemContent = [systemPrompt, mergedTemporarySystemContent]
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+            .join('\n\n')
+            .trim();
 
-        if (systemPrompt) {
-            messages.push({ role: 'system', content: systemPrompt });
-        }
-
-        for (const temporaryMessage of temporarySystemMessages) {
-            messages.push(temporaryMessage);
+        if (mergedSystemContent) {
+            messages.push({ role: 'system', content: mergedSystemContent });
         }
 
         for (const message of history.filter((item) => !item.isThinking)) {
@@ -606,6 +612,8 @@ function createComposerController(deps = {}) {
             avatarUrl: snapshot?.selectedItem?.avatarUrl || '',
             avatarColor: snapshot?.selectedItem?.config?.avatarCalculatedColor || null,
             isGroupMessage: false,
+            source: 'main-chat',
+            executionMode: 'direct-stream',
             ...extra,
         };
     }
@@ -802,6 +810,7 @@ function createComposerController(deps = {}) {
             requestId: assistantMessage.id,
             endpoint: requestContext.settings.chatEndpoint,
             apiKey: requestContext.settings.chatApiKey,
+            executionMode: 'direct-stream',
             messages: await buildApiMessages({
                 agentIdOverride: requestContext.selectedItem.id,
                 historyOverride: historyForRequest,

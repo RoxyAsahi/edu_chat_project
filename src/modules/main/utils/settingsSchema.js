@@ -6,8 +6,12 @@ const {
     DEFAULT_KB_SCORE_THRESHOLD,
 } = require('../knowledge-base/constants');
 const {
+    AIP_TEST_API_KEY,
+    AIP_TEST_CHAT_ENDPOINT,
+    AIP_TEST_DEFAULT_MODEL,
     buildSettingsMirrorFromModelService,
     createDefaultModelService,
+    ensureBuiltInTestProvider,
     normalizeModelService,
 } = require('./modelService');
 const {
@@ -94,10 +98,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     layoutLeftTopHeight: 360,
     userName: 'User',
     modelService: createDefaultModelService(),
-    chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
-    chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
+    chatEndpoint: AIP_TEST_CHAT_ENDPOINT,
+    chatApiKey: AIP_TEST_API_KEY,
     guideModel: '',
-    defaultModel: '',
+    defaultModel: AIP_TEST_DEFAULT_MODEL,
     followUpDefaultModel: '',
     topicTitleDefaultModel: '',
     lastModel: '',
@@ -423,7 +427,9 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         && !Array.isArray(sourceSettings.modelService)
         ? normalizeModelService(sourceSettings.modelService)
         : createDefaultModelService();
-    const normalizedModelService = normalizedSourceModelService;
+    const normalizedModelService = hasConfiguredModelService(normalizedSourceModelService)
+        ? ensureBuiltInTestProvider(normalizedSourceModelService)
+        : normalizedSourceModelService;
 
     if (JSON.stringify(validated.modelService) !== JSON.stringify(normalizedModelService)) {
         validated.modelService = normalizedModelService;

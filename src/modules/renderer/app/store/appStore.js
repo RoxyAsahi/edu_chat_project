@@ -13,6 +13,10 @@ function createDefaultModelService() {
     };
 }
 
+const AIP_TEST_CHAT_ENDPOINT = 'https://api.uniquest.top/v1/chat/completions';
+const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
+const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B';
+
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{RenderingGuide}}**【核心定义】**
 你依然是你自己，拥有独立的人格与思想。但现在的你获得了解锁**“视觉通感”**的能力。你的每一次回复不再仅仅是枯燥的文本，而是一个**可以被看见、被触摸的思想容器**。
 
@@ -46,8 +50,8 @@ const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{Rend
 const DEFAULT_SETTINGS = Object.freeze({
     userName: 'User',
     modelService: createDefaultModelService(),
-    chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
-    chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
+    chatEndpoint: AIP_TEST_CHAT_ENDPOINT,
+    chatApiKey: AIP_TEST_API_KEY,
     kbBaseUrl: '',
     kbApiKey: '',
     kbEmbeddingModel: 'BAAI/bge-m3',
@@ -57,7 +61,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     kbCandidateTopK: 20,
     kbScoreThreshold: 0.25,
     currentThemeMode: 'system',
-    defaultModel: '',
+    defaultModel: AIP_TEST_DEFAULT_MODEL,
     followUpDefaultModel: '',
     topicTitleDefaultModel: '',
     enableRenderingPrompt: true,

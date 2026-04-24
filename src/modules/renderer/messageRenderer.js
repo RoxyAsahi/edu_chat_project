@@ -181,14 +181,25 @@ function buildNativeReasoningBubbleHtml(reasoningContent) {
         processedContent = `<pre>${safeMarkdown}</pre>`;
     }
 
-    let html = `<div class="native-reasoning-bubble reasoning-bubble collapsible" data-thought-title="原生思维链">`;
-    html += `<div class="unistudy-thought-chain-header">`;
-    html += `<span class="unistudy-thought-chain-icon">AI</span>`;
-    html += `<span class="unistudy-thought-chain-label">原生思维链</span>`;
-    html += `<span class="unistudy-result-toggle-icon"></span>`;
+    const previewLines = content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(-5)
+        .map((line) => `<span>${escapeHtml(line)}</span>`)
+        .join('');
+
+    let html = `<div class="native-reasoning-bubble reasoning-bubble collapsible unistudy-live-reasoning-bubble" data-thought-title="原生思维链">`;
+    html += `<div class="unistudy-thought-chain-header unistudy-live-reasoning-header" role="button" tabindex="0" aria-expanded="false">`;
+    html += `<span class="unistudy-thought-chain-icon unistudy-live-reasoning-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21h6M10 17h4M12 3a6 6 0 0 0-3.8 10.6c.7.6 1.2 1.4 1.4 2.4h4.8c.2-1 .7-1.8 1.4-2.4A6 6 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+    html += `<span class="unistudy-live-reasoning-text-wrap">`;
+    html += `<span class="unistudy-thought-chain-label unistudy-live-reasoning-label">已深度思考</span>`;
+    html += `<span class="unistudy-live-reasoning-preview">${previewLines}</span>`;
+    html += `</span>`;
+    html += `<span class="unistudy-live-reasoning-toggle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
     html += `</div>`;
     html += `<div class="unistudy-thought-chain-collapsible-content">`;
-    html += `<div class="unistudy-thought-chain-body">${processedContent}</div>`;
+    html += `<div class="unistudy-thought-chain-body unistudy-live-reasoning-body">${processedContent}</div>`;
     html += `</div>`;
     html += `</div>`;
 
@@ -1259,12 +1270,26 @@ function initializeMessageRenderer(refs) {
         if (thoughtHeader) {
             const bubble = thoughtHeader.closest('.reasoning-bubble.collapsible');
             if (bubble) {
-                bubble.classList.toggle('expanded');
+                const expanded = bubble.classList.toggle('expanded');
+                thoughtHeader.setAttribute('aria-expanded', expanded ? 'true' : 'false');
             }
             return;
         }
     };
     mainRendererReferences.chatMessagesDiv.addEventListener('click', delegatedClickHandler);
+
+    mainRendererReferences.chatMessagesDiv.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const thoughtHeader = e.target.closest?.('.unistudy-thought-chain-header');
+        if (!thoughtHeader) return;
+
+        const bubble = thoughtHeader.closest('.reasoning-bubble.collapsible');
+        if (!bubble) return;
+
+        e.preventDefault();
+        const expanded = bubble.classList.toggle('expanded');
+        thoughtHeader.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    });
 
     // Delegated context menu
     delegatedContextMenuHandler = (e) => {

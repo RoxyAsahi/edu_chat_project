@@ -370,6 +370,7 @@ test('send-chat-request skips bubble theme injection when the configured prompt 
         apiKey: 'demo-key',
         messages: [{ role: 'system', content: '原始系统提示词' }],
         modelConfig: { stream: false },
+        executionMode: 'tool-orchestrated',
         context: {},
     });
 
@@ -417,6 +418,7 @@ test('send-chat-request skips bubble theme injection when the feature is disable
         apiKey: 'demo-key',
         messages: [{ role: 'system', content: '原始系统提示词' }],
         modelConfig: { stream: false },
+        executionMode: 'tool-orchestrated',
         context: {},
     });
 
@@ -598,6 +600,131 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
     assert.match(storedLogs[0].contentMarkdown, /导数复习/);
     assert.equal(storedLogs[0].notebookName, 'Nova');
     assert.equal(storedLogs[0].requestedToolName, 'DailyNote');
+});
+
+test('send-chat-request uses direct-stream mode for main chat requests without tool protocol signals', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-direct-stream-'));
+    t.after(() => fs.remove(tempRoot));
+
+    let capturedRequest = null;
+    const chatClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequest = request;
+            return {
+                streamingStarted: true,
+                requestId: request.requestId,
+                context: request.context,
+                fallbackMeta: null,
+            };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    ...DEFAULT_SETTINGS,
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendChatRequest = handlers.get('send-chat-request');
+    const result = await sendChatRequest({ sender: {} }, {
+        requestId: 'req_direct_stream_mode',
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        executionMode: 'direct-stream',
+        messages: [
+            { role: 'system', content: '你是普通聊天助手。' },
+            { role: 'user', content: '给我解释一下导数的几何意义。' },
+        ],
+        modelConfig: { stream: true, model: 'demo-model' },
+        context: {
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+            source: 'main-chat',
+        },
+    });
+
+    assert.ok(capturedRequest);
+    assert.equal(capturedRequest.modelConfig.stream, true);
+    assert.equal(capturedRequest.context.executionMode, 'direct-stream');
+    assert.equal(
+        capturedRequest.messages.some((message) => typeof message.content === 'string' && message.content.includes('—— 日记 (DailyNote) ——')),
+        false
+    );
+    assert.equal(result.streamingStarted, true);
+    assert.deepEqual(result.toolEvents, []);
+});
+
+test('send-chat-request keeps temporary context merged into the leading system message so fallback providers see a valid message order', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-system-order-'));
+    t.after(() => fs.remove(tempRoot));
+
+    let capturedRequest = null;
+    const chatClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequest = request;
+            return {
+                response: {
+                    choices: [{ message: { content: 'ok' } }],
+                },
+                requestId: request.requestId,
+                context: request.context,
+            };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    ...DEFAULT_SETTINGS,
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendChatRequest = handlers.get('send-chat-request');
+    await sendChatRequest({ sender: {} }, {
+        requestId: 'req_system_order',
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        executionMode: 'direct-stream',
+        messages: [
+            { role: 'system', content: 'base system prompt' },
+            { role: 'user', content: 'hello' },
+        ],
+        modelConfig: { stream: false, model: 'demo-model' },
+        context: {
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+        },
+    });
+
+    assert.ok(capturedRequest);
+    assert.deepEqual(
+        capturedRequest.messages.map((message) => message.role),
+        ['system', 'user']
+    );
+    assert.match(capturedRequest.messages[0].content, /base system prompt/);
 });
 
 test('follow-up helpers parse object, array, fenced, and invalid JSON responses safely', async () => {
