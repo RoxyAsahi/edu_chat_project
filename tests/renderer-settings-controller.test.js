@@ -796,6 +796,116 @@ test('settingsController shows the default follow-up template in the UI but save
     assert.equal(savedPatch.topicTitlePromptTemplate, '');
 });
 
+test('settingsController bootstraps the built-in AI&P test preset into model service UI from legacy chat fields', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+    const store = createStore({
+        currentThemeMode: 'system',
+    });
+
+    const controller = createSettingsController({
+        store,
+        el,
+        chatAPI: {
+            async loadSettings() {
+                return {
+                    chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
+                    chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
+                    defaultModel: 'Qwen/Qwen3.6-35B-A3B',
+                    kbUseRerank: true,
+                    kbTopK: 6,
+                    kbCandidateTopK: 20,
+                    kbScoreThreshold: 0.25,
+                    chatFontPreset: 'system',
+                    chatCodeFontPreset: 'consolas',
+                    chatBubbleMaxWidthWideDefault: 92,
+                    enableSmoothStreaming: false,
+                    enableEmoticonPrompt: true,
+                    enableTopicTitleGeneration: true,
+                    enableAgentBubbleTheme: false,
+                    currentThemeMode: 'system',
+                };
+            },
+            async previewAgentBubbleThemePrompt() {
+                return {
+                    enabled: false,
+                    willInject: false,
+                    resolvedPrompt: '',
+                    unresolvedTokens: [],
+                    substitutions: {},
+                    variableSources: {},
+                };
+            },
+            async previewFinalSystemPrompt() {
+                return {
+                    success: true,
+                    preview: {
+                        agentName: '',
+                        topicName: '',
+                        hasBasePrompt: false,
+                        basePrompt: '',
+                        finalSystemPrompt: '',
+                        unresolvedTokens: [],
+                        substitutions: {},
+                        variableSources: {},
+                        segments: {
+                            rendering: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
+                            emoticonPrompt: { enabled: true, available: true, packCount: 1, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
+                            adaptiveBubbleTip: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
+                            dailyNoteVariable: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
+                            dailyNoteAutoInject: { enabled: true, source: 'default', appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
+                            bubbleTheme: { enabled: false, source: 'default', appended: false, rawPrompt: '', resolvedPrompt: '' },
+                        },
+                    },
+                };
+            },
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+        messageRendererApi: {
+            setUserAvatar() {},
+            setUserAvatarColor() {},
+        },
+        syncLayoutSettings() {},
+    });
+
+    await controller.loadSettings();
+    await flushAsyncWork();
+
+    assert.equal(el.defaultModelInput.value, 'Qwen/Qwen3.6-35B-A3B');
+    assert.match(el.modelServiceProviderList.textContent, /AI&P创新实践项目测试专用预设/);
+    assert.match(el.modelServiceProviderList.textContent, /竞赛测试专用/);
+    assert.match(el.modelServiceProviderDetail.textContent, /AI&P创新实践项目测试专用预设/);
+    assert.match(el.modelServiceProviderDetail.textContent, /用于评委快速验证项目聊天与检索能力/);
+    assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3\.6-27B/);
+    assert.match(el.modelServiceModelsPanel.textContent, /Pro\/moonshotai\/Kimi-K2\.6/);
+    assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3-VL-Embedding-8B/);
+    assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3-VL-Reranker-8B/);
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chat"]')?.value || '',
+        /::Qwen\/Qwen3\.6-35B-A3B$/
+    );
+});
+
 test('settingsController lets the global settings navigation switch into the current agent section', async (t) => {
     const { createSettingsController } = await loadSettingsControllerModule();
     const dom = createDom();

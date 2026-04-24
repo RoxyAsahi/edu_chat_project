@@ -140,7 +140,10 @@ test('validateSettings mirrors explicit modelService back into native settings f
         kbBaseUrl: 'https://legacy-kb.example.com/ignored',
     });
 
-    assert.equal(validated.modelService.providers.length, 2);
+    assert.equal(validated.modelService.providers.length, 3);
+    assert.ok(validated.modelService.providers.some((provider) => provider.id === 'chat-provider'));
+    assert.ok(validated.modelService.providers.some((provider) => provider.id === 'kb-provider'));
+    assert.ok(validated.modelService.providers.some((provider) => provider.presetId === 'aip-innovation-practice-test'));
     assert.equal(validated.chatEndpoint, 'https://chat.example.com/proxy/v1/chat/completions');
     assert.equal(validated.chatApiKey, 'chat-key-1');
     assert.equal(validated.defaultModel, 'gpt-4o');
@@ -157,6 +160,53 @@ test('validateSettings mirrors explicit modelService back into native settings f
     assert.equal('chatFallback' in validated, false);
 });
 
+test('validateSettings appends the built-in AI&P test preset for existing modelService configs without overriding defaults', () => {
+    const { validated } = validateSettings({
+        ...DEFAULT_SETTINGS,
+        modelService: {
+            version: 1,
+            providers: [
+                {
+                    id: 'chat-provider',
+                    presetId: 'custom-openai-compatible',
+                    name: 'Chat Provider',
+                    protocol: 'openai-compatible',
+                    enabled: true,
+                    apiBaseUrl: 'https://chat.example.com/proxy',
+                    apiKeys: ['chat-key-1'],
+                    extraHeaders: {},
+                    models: [
+                        {
+                            id: 'gpt-4o',
+                            name: 'gpt-4o',
+                            group: 'chat',
+                            capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
+                            enabled: true,
+                            source: 'manual',
+                        },
+                    ],
+                },
+            ],
+            defaults: {
+                chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
+                chatFallback: null,
+                followUp: null,
+                topicTitle: null,
+                embedding: null,
+                rerank: null,
+            },
+        },
+    });
+
+    assert.equal(validated.defaultModel, 'gpt-4o');
+    assert.equal(validated.chatEndpoint, 'https://chat.example.com/proxy/v1/chat/completions');
+    assert.ok(validated.modelService.providers.some((provider) => provider.presetId === 'aip-innovation-practice-test'));
+    assert.deepEqual(validated.modelService.defaults.chat, {
+        providerId: 'chat-provider',
+        modelId: 'gpt-4o',
+    });
+});
+
 test('readSettings falls back to defaults when the file is missing', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
@@ -165,6 +215,9 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
 
     const settings = await manager.readSettings();
     assert.equal(settings.userName, DEFAULT_SETTINGS.userName);
+    assert.equal(settings.chatEndpoint, DEFAULT_SETTINGS.chatEndpoint);
+    assert.equal(settings.chatApiKey, DEFAULT_SETTINGS.chatApiKey);
+    assert.equal(settings.defaultModel, DEFAULT_SETTINGS.defaultModel);
     assert.equal(settings.kbEmbeddingModel, DEFAULT_SETTINGS.kbEmbeddingModel);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
     assert.equal(settings.enableEmoticonPrompt, DEFAULT_SETTINGS.enableEmoticonPrompt);

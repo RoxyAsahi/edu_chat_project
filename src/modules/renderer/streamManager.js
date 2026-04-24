@@ -6,6 +6,9 @@ import { createContentPipeline, PIPELINE_MODES } from './contentPipeline.js';
 const streamingChunkQueues = new Map(); // messageId -> array of original chunk strings
 const streamingTimers = new Map();      // messageId -> intervalId
 const accumulatedStreamText = new Map(); // messageId -> string
+const accumulatedStreamReasoning = new Map(); // messageId -> native reasoning string
+const reasoningExpandedState = new Map(); // messageId -> boolean
+const reasoningStartTimes = new Map(); // messageId -> performance timestamp
 const streamSegmentStates = new Map(); // messageId -> { stableCutoff, stableHtml, lastTailText }
 let activeStreamingMessageId = null; // Track the currently active streaming message
 const elementContentLengthCache = new Map(); // Track previous DOM content lengths per message.
@@ -286,20 +289,226 @@ function applyStreamingPreprocessors(text) {
 }
 
 function ensureStreamingRoots(contentDiv) {
+    let reasoningRoot = contentDiv.querySelector('.unistudy-stream-reasoning-root');
     let stableRoot = contentDiv.querySelector('.unistudy-stream-stable-root');
     let tailRoot = contentDiv.querySelector('.unistudy-stream-tail-root');
 
-    if (!stableRoot || !tailRoot) {
+    if (!reasoningRoot || !stableRoot || !tailRoot) {
         contentDiv.innerHTML = '';
+        reasoningRoot = document.createElement('div');
+        reasoningRoot.className = 'unistudy-stream-reasoning-root';
         stableRoot = document.createElement('div');
         stableRoot.className = 'unistudy-stream-stable-root';
         tailRoot = document.createElement('div');
         tailRoot.className = 'unistudy-stream-tail-root';
+        contentDiv.appendChild(reasoningRoot);
         contentDiv.appendChild(stableRoot);
         contentDiv.appendChild(tailRoot);
     }
 
-    return { stableRoot, tailRoot };
+    return { reasoningRoot, stableRoot, tailRoot };
+}
+
+function extractTextFromCandidate(candidate) {
+    if (typeof candidate === 'string') {
+        return candidate;
+    }
+
+    if (Array.isArray(candidate)) {
+        return candidate
+            .map((item) => extractTextFromCandidate(item))
+            .filter(Boolean)
+            .join('');
+    }
+
+    if (candidate && typeof candidate === 'object') {
+        if (typeof candidate.text === 'string') {
+            return candidate.text;
+        }
+        if (typeof candidate.content === 'string') {
+            return candidate.content;
+        }
+        if (Array.isArray(candidate.content)) {
+            return extractTextFromCandidate(candidate.content);
+        }
+    }
+
+    return '';
+}
+
+function extractTextDeltaFromChunk(chunkData) {
+    const candidates = [
+        chunkData?.textDelta,
+        chunkData?.choices?.[0]?.delta?.content,
+        chunkData?.choices?.[0]?.message?.content,
+        chunkData?.delta?.content,
+        chunkData?.content,
+        chunkData?.message?.content,
+    ];
+
+    for (const candidate of candidates) {
+        const text = extractTextFromCandidate(candidate);
+        if (text) return text;
+    }
+
+    return typeof chunkData === 'string' ? chunkData : '';
+}
+
+function extractReasoningDeltaFromChunk(chunkData) {
+    const candidates = [
+        chunkData?.reasoningDelta,
+        chunkData?.choices?.[0]?.delta?.reasoning_content,
+        chunkData?.choices?.[0]?.delta?.reasoning,
+        chunkData?.choices?.[0]?.message?.reasoning_content,
+        chunkData?.choices?.[0]?.message?.reasoning,
+        chunkData?.delta?.reasoning_content,
+        chunkData?.delta?.reasoning,
+        chunkData?.message?.reasoning_content,
+        chunkData?.message?.reasoning,
+        chunkData?.reasoning_content,
+        chunkData?.reasoning,
+    ];
+
+    for (const candidate of candidates) {
+        const text = extractTextFromCandidate(candidate);
+        if (text) return text;
+    }
+
+    return '';
+}
+
+function escapeHtml(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getReasoningPreviewLines(reasoningContent) {
+    return String(reasoningContent || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(-5);
+}
+
+function formatReasoningElapsed(messageId) {
+    const startedAt = reasoningStartTimes.get(messageId);
+    if (!startedAt || typeof performance?.now !== 'function') {
+        return '0.1s';
+    }
+    const elapsedMs = Math.max(100, performance.now() - startedAt);
+    return `${(elapsedMs / 1000).toFixed(1)}s`;
+}
+
+function createStableReasoningBubble(messageId) {
+    const bubble = document.createElement('div');
+    bubble.className = 'native-reasoning-bubble reasoning-bubble collapsible unistudy-live-reasoning-bubble';
+    bubble.dataset.thoughtTitle = '原生思维链';
+
+    const header = document.createElement('div');
+    header.className = 'unistudy-thought-chain-header unistudy-live-reasoning-header';
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+    header.setAttribute('aria-expanded', 'false');
+
+    const icon = document.createElement('span');
+    icon.className = 'unistudy-thought-chain-icon unistudy-live-reasoning-icon';
+    icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21h6M10 17h4M12 3a6 6 0 0 0-3.8 10.6c.7.6 1.2 1.4 1.4 2.4h4.8c.2-1 .7-1.8 1.4-2.4A6 6 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    const textWrap = document.createElement('span');
+    textWrap.className = 'unistudy-live-reasoning-text-wrap';
+
+    const label = document.createElement('span');
+    label.className = 'unistudy-thought-chain-label unistudy-live-reasoning-label';
+    label.textContent = 'AI 正在思考';
+
+    const preview = document.createElement('span');
+    preview.className = 'unistudy-live-reasoning-preview';
+
+    const toggleIcon = document.createElement('span');
+    toggleIcon.className = 'unistudy-live-reasoning-toggle';
+    toggleIcon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    const content = document.createElement('div');
+    content.className = 'unistudy-thought-chain-collapsible-content';
+
+    const body = document.createElement('div');
+    body.className = 'unistudy-thought-chain-body unistudy-live-reasoning-body';
+
+    textWrap.appendChild(label);
+    textWrap.appendChild(preview);
+    header.appendChild(icon);
+    header.appendChild(textWrap);
+    header.appendChild(toggleIcon);
+    content.appendChild(body);
+    bubble.appendChild(header);
+    bubble.appendChild(content);
+
+    const applyExpandedState = (expanded) => {
+        reasoningExpandedState.set(messageId, expanded);
+        bubble.classList.toggle('expanded', expanded);
+        header.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+
+    const toggleExpanded = (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        applyExpandedState(!bubble.classList.contains('expanded'));
+    };
+
+    header.addEventListener('click', toggleExpanded);
+    header.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            toggleExpanded(event);
+        }
+    });
+
+    applyExpandedState(reasoningExpandedState.get(messageId) === true);
+    return bubble;
+}
+
+function getOrCreateStableReasoningBubble(reasoningRoot, messageId) {
+    let bubble = reasoningRoot.querySelector('.unistudy-live-reasoning-bubble');
+    if (!bubble) {
+        reasoningRoot.textContent = '';
+        bubble = createStableReasoningBubble(messageId);
+        reasoningRoot.appendChild(bubble);
+    }
+    return bubble;
+}
+
+function renderStreamingReasoning(reasoningRoot, messageId) {
+    const reasoningContent = accumulatedStreamReasoning.get(messageId) || '';
+    if (!reasoningContent.trim()) {
+        reasoningRoot.innerHTML = '';
+        return;
+    }
+
+    const bubble = getOrCreateStableReasoningBubble(reasoningRoot, messageId);
+    const isExpanded = reasoningExpandedState.get(messageId) === true;
+    bubble.classList.toggle('expanded', isExpanded);
+    bubble.querySelector('.unistudy-live-reasoning-header')?.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+
+    const label = bubble.querySelector('.unistudy-live-reasoning-label');
+    if (label) {
+        label.textContent = `正在思考... ${formatReasoningElapsed(messageId)}`;
+    }
+
+    const preview = bubble.querySelector('.unistudy-live-reasoning-preview');
+    if (preview) {
+        const lines = getReasoningPreviewLines(reasoningContent);
+        preview.innerHTML = lines.map((line) => `<span>${escapeHtml(line)}</span>`).join('');
+        preview.style.setProperty('--reasoning-preview-lines', String(Math.max(1, Math.min(lines.length, 5))));
+    }
+
+    const body = bubble.querySelector('.unistudy-live-reasoning-body');
+    if (body) {
+        const safeMarkdown = escapeHtml(reasoningContent.trim());
+        body.innerHTML = refs.markedInstance.parse(safeMarkdown);
+    }
 }
 
 function getOrCreateStreamSegmentState(messageId) {
@@ -497,11 +706,13 @@ function renderStreamFrame(messageId) {
     if (!cachedDom) return;
     
     const { contentDiv } = cachedDom;
-    const { stableRoot, tailRoot } = ensureStreamingRoots(contentDiv);
+    const { reasoningRoot, stableRoot, tailRoot } = ensureStreamingRoots(contentDiv);
     const segmentState = getOrCreateStreamSegmentState(messageId);
 
     const textForRendering = accumulatedStreamText.get(messageId) || "";
     const nextStableCutoff = findExplicitStablePrefix(textForRendering, segmentState.stableCutoff);
+
+    renderStreamingReasoning(reasoningRoot, messageId);
 
     // Remove the temporary thinking indicator before painting streamed content.
     const streamingIndicator = contentDiv.querySelector('.streaming-indicator, .thinking-indicator');
@@ -964,6 +1175,9 @@ function cleanupDesktopPushState(_messageId) {}
 function cleanupFinalizedMessageState(messageId) {
     streamingChunkQueues.delete(messageId);
     accumulatedStreamText.delete(messageId);
+    accumulatedStreamReasoning.delete(messageId);
+    reasoningExpandedState.delete(messageId);
+    reasoningStartTimes.delete(messageId);
     streamSegmentStates.delete(messageId);
     cleanupDesktopPushState(messageId);
 
@@ -1009,32 +1223,34 @@ export function appendStreamChunk(messageId, chunkData, context) {
         return;
     }
     
-    let textToAppend = "";
-    if (chunkData?.choices?.[0]?.delta?.content) {
-        textToAppend = chunkData.choices[0].delta.content;
-    } else if (chunkData?.delta?.content) {
-        textToAppend = chunkData.delta.content;
-    } else if (typeof chunkData?.content === 'string') {
-        textToAppend = chunkData.content;
-    } else if (typeof chunkData?.message?.content === 'string') {
-        textToAppend = chunkData.message.content;
-    } else if (typeof chunkData === 'string') {
-        textToAppend = chunkData;
-    } else if (chunkData?.raw && !chunkData?.error) {
+    let textToAppend = extractTextDeltaFromChunk(chunkData);
+    const reasoningToAppend = extractReasoningDeltaFromChunk(chunkData);
+
+    if (!textToAppend && chunkData?.raw && !chunkData?.error) {
         // Surface raw payloads only when the chunk is not already flagged as an error.
         textToAppend = chunkData.raw;
     }
-    
-    if (!textToAppend) return;
+
+    if (!textToAppend && !reasoningToAppend) return;
 
     // Intercept desktop-push markers before they are appended to accumulated text.
     // The returned value only contains normal message text.
-    const normalText = processDesktopPushToken(messageId, textToAppend);
+    const normalText = textToAppend ? processDesktopPushToken(messageId, textToAppend) : '';
     
     // Keep the raw accumulated text intact so final transforms can still see the full marker stream.
-    let currentAccumulated = accumulatedStreamText.get(messageId) || "";
-    currentAccumulated += textToAppend; // Preserve full text for final rendering.
-    accumulatedStreamText.set(messageId, currentAccumulated);
+    if (textToAppend) {
+        let currentAccumulated = accumulatedStreamText.get(messageId) || "";
+        currentAccumulated += textToAppend; // Preserve full text for final rendering.
+        accumulatedStreamText.set(messageId, currentAccumulated);
+    }
+
+    if (reasoningToAppend) {
+        if (!reasoningStartTimes.has(messageId)) {
+            reasoningStartTimes.set(messageId, typeof performance?.now === 'function' ? performance.now() : Date.now());
+        }
+        const currentReasoning = accumulatedStreamReasoning.get(messageId) || "";
+        accumulatedStreamReasoning.set(messageId, currentReasoning + reasoningToAppend);
+    }
     
     // Update context if provided
     if (context) {
@@ -1050,12 +1266,12 @@ export function appendStreamChunk(messageId, chunkData, context) {
         const queue = streamingChunkQueues.get(messageId);
         if (queue) {
             // Use semantic chunk splitting for smoother streaming.
-            const semanticChunks = intelligentChunkSplit(textToAppend);
+            const semanticChunks = intelligentChunkSplit(textToAppend || reasoningToAppend);
             for (const chunk of semanticChunks) {
                 queue.push(chunk);
             }
         } else {
-            renderChunkDirectlyToDOM(messageId, textToAppend);
+            renderChunkDirectlyToDOM(messageId, textToAppend || reasoningToAppend);
             return;
         }
         
@@ -1065,7 +1281,7 @@ export function appendStreamChunk(messageId, chunkData, context) {
             startGlobalRenderLoop(); // Start or keep the shared render loop alive.
         }
     } else {
-        renderChunkDirectlyToDOM(messageId, textToAppend);
+        renderChunkDirectlyToDOM(messageId, textToAppend || reasoningToAppend);
     }
 }
 
@@ -1116,6 +1332,10 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
         const payloadReasoningContent = typeof finalPayload?.reasoningContent === 'string'
             ? finalPayload.reasoningContent
             : (typeof finalPayload?.reasoning_content === 'string' ? finalPayload.reasoning_content : "");
+        const accumulatedReasoningContent = accumulatedStreamReasoning.get(messageId) || "";
+        const finalReasoningContent = payloadReasoningContent.trim()
+            ? payloadReasoningContent
+            : accumulatedReasoningContent;
         const payloadFallbackMeta = finalPayload?.fallbackMeta && typeof finalPayload.fallbackMeta === 'object'
             ? finalPayload.fallbackMeta
             : null;
@@ -1161,8 +1381,8 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
         message.content = finalFullText;
         message.finishReason = finishReason;
         message.isThinking = false;
-        if (payloadReasoningContent.trim()) {
-            message.reasoning_content = payloadReasoningContent;
+        if (finalReasoningContent.trim()) {
+            message.reasoning_content = finalReasoningContent;
         }
         if (payloadFallbackMeta) {
             message.fallbackMeta = payloadFallbackMeta;
@@ -1179,7 +1399,7 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
 
                 const contentDiv = messageItem.querySelector('.md-content');
                 if (contentDiv) {
-                    contentDiv.querySelectorAll('.unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
+                    contentDiv.querySelectorAll('.unistudy-stream-reasoning-root, .unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
 
                     const globalSettings = refs.globalSettingsRef.get();
                     // Use the more thorough preprocessFullContent for the final render

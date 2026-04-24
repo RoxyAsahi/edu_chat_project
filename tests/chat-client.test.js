@@ -101,6 +101,58 @@ test('chatClient accumulates reasoning_content from streaming chunks and emits i
     assert.equal(chatClient.getActiveRequestCount(), 0);
 });
 
+test('chatClient can suppress raw stream IPC events while still forwarding parsed chunks to callbacks', async () => {
+    const streamedChunks = [];
+    let endResult = null;
+    let sentEventCount = 0;
+
+    global.fetch = async () => {
+        const encoder = new TextEncoder();
+        return {
+            ok: true,
+            body: new ReadableStream({
+                start(controller) {
+                    controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"hello "}}]}\n\n'));
+                    controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"world"}}]}\n\n'));
+                    controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                    controller.close();
+                },
+            }),
+        };
+    };
+
+    const result = await chatClient.send({
+        requestId: 'req_custom_stream_consumer',
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        messages: [{ role: 'user', content: 'hi' }],
+        modelConfig: { stream: true },
+        context: { agentId: 'agent-1', topicId: 'topic-1' },
+        emitStreamEvents: false,
+        onStreamChunk(payload) {
+            streamedChunks.push(payload.textDelta);
+        },
+        onStreamEnd(payload) {
+            endResult = payload;
+        },
+        webContents: {
+            isDestroyed() {
+                return false;
+            },
+            send() {
+                sentEventCount += 1;
+            },
+        },
+    });
+
+    assert.equal(result.streamingStarted, true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(streamedChunks, ['hello ', 'world']);
+    assert.equal(sentEventCount, 0);
+    assert.equal(endResult?.success, true);
+    assert.equal(endResult?.content, 'hello world');
+});
+
 test('chatClient retries once with the configured fallback on retryable upstream HTTP errors', async () => {
     let fetchCount = 0;
     global.fetch = async (url, options = {}) => {

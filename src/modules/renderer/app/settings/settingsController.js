@@ -113,7 +113,45 @@ const MODEL_SERVICE_CAPABILITY_LABELS = Object.freeze({
     vision: 'Vision',
     reasoning: 'Reasoning',
 });
+const AIP_TEST_PROVIDER_PRESET_ID = 'aip-innovation-practice-test';
+const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
+const AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
+const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
+const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B';
+const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
+    {
+        id: 'Qwen/Qwen3.6-35B-A3B',
+        name: 'Qwen/Qwen3.6-35B-A3B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Qwen/Qwen3.6-27B',
+        name: 'Qwen/Qwen3.6-27B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Pro/moonshotai/Kimi-K2.6',
+        name: 'Pro/moonshotai/Kimi-K2.6',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Qwen/Qwen3-VL-Embedding-8B',
+        name: 'Qwen/Qwen3-VL-Embedding-8B',
+        group: 'embedding',
+        capabilities: { chat: false, embedding: true, rerank: false, vision: true, reasoning: false },
+    },
+    {
+        id: 'Qwen/Qwen3-VL-Reranker-8B',
+        name: 'Qwen/Qwen3-VL-Reranker-8B',
+        group: 'rerank',
+        capabilities: { chat: false, embedding: false, rerank: true, vision: true, reasoning: false },
+    },
+]);
 const MODEL_SERVICE_PRESETS = Object.freeze([
+    { presetId: AIP_TEST_PROVIDER_PRESET_ID, name: AIP_TEST_PROVIDER_NAME, apiBaseUrl: AIP_TEST_API_BASE_URL },
     { presetId: 'openai', name: 'OpenAI', apiBaseUrl: 'https://api.openai.com' },
     { presetId: 'openrouter', name: 'OpenRouter', apiBaseUrl: 'https://openrouter.ai/api' },
     { presetId: 'deepseek', name: 'DeepSeek', apiBaseUrl: 'https://api.deepseek.com' },
@@ -229,6 +267,17 @@ function stringifyModelServiceApiKeys(apiKeys = []) {
         .map((item) => String(item || '').trim())
         .filter(Boolean)
         .join('\n');
+}
+
+function resolveBuiltInModelServicePreset({ apiBaseUrl = '', apiKeys = [] } = {}) {
+    if (
+        normalizeModelServiceBaseUrl(apiBaseUrl) === normalizeModelServiceBaseUrl(AIP_TEST_API_BASE_URL)
+        && parseModelServiceApiKeysInput(apiKeys).includes(AIP_TEST_API_KEY)
+    ) {
+        return MODEL_SERVICE_PRESETS.find((preset) => preset.presetId === AIP_TEST_PROVIDER_PRESET_ID) || null;
+    }
+
+    return null;
 }
 
 function parseModelServiceHeadersInput(value) {
@@ -463,6 +512,71 @@ function normalizeModelService(service = {}) {
     };
 }
 
+function createBuiltInTestModelServiceProvider() {
+    return normalizeModelServiceProvider({
+        id: 'aip-test-provider',
+        presetId: AIP_TEST_PROVIDER_PRESET_ID,
+        name: AIP_TEST_PROVIDER_NAME,
+        protocol: 'openai-compatible',
+        enabled: true,
+        apiBaseUrl: AIP_TEST_API_BASE_URL,
+        apiKeys: [AIP_TEST_API_KEY],
+        extraHeaders: {},
+        models: AIP_TEST_BUILT_IN_MODELS.map((model) => ({
+            ...model,
+            enabled: true,
+            source: 'manual',
+        })),
+    });
+}
+
+function ensureBuiltInTestProvider(service = {}) {
+    const normalizedService = normalizeModelService(service);
+    if (!Array.isArray(normalizedService.providers) || normalizedService.providers.length === 0) {
+        return normalizedService;
+    }
+
+    const existingIndex = normalizedService.providers.findIndex((provider) => (
+        provider.presetId === AIP_TEST_PROVIDER_PRESET_ID
+        || (
+            normalizeModelServiceBaseUrl(provider.apiBaseUrl) === normalizeModelServiceBaseUrl(AIP_TEST_API_BASE_URL)
+            && parseModelServiceApiKeysInput(provider.apiKeys).includes(AIP_TEST_API_KEY)
+        )
+    ));
+    const builtInProvider = createBuiltInTestModelServiceProvider();
+
+    if (existingIndex === -1) {
+        return normalizeModelService({
+            ...normalizedService,
+            providers: [
+                ...normalizedService.providers,
+                builtInProvider,
+            ],
+        });
+    }
+
+    const providers = [...normalizedService.providers];
+    providers[existingIndex] = normalizeModelServiceProvider({
+        ...providers[existingIndex],
+        id: providers[existingIndex].id || builtInProvider.id,
+        presetId: AIP_TEST_PROVIDER_PRESET_ID,
+        name: AIP_TEST_PROVIDER_NAME,
+        apiBaseUrl: AIP_TEST_API_BASE_URL,
+        apiKeys: Array.isArray(providers[existingIndex].apiKeys) && providers[existingIndex].apiKeys.length > 0
+            ? providers[existingIndex].apiKeys
+            : builtInProvider.apiKeys,
+        models: mergeModelServiceModels([
+            ...builtInProvider.models,
+            ...(providers[existingIndex].models || []),
+        ]),
+    });
+
+    return normalizeModelService({
+        ...normalizedService,
+        providers,
+    });
+}
+
 function findModelServiceProvider(service = {}, providerId = '') {
     return (service.providers || []).find((provider) => provider.id === providerId) || null;
 }
@@ -608,14 +722,17 @@ function hasConfiguredLocalModelService(service = {}) {
 function createBootstrapProvider({
     id,
     name,
+    presetId,
     apiBaseUrl,
     apiKeys,
     models,
 }) {
+    const preset = resolveBuiltInModelServicePreset({ apiBaseUrl, apiKeys });
+
     return normalizeModelServiceProvider({
         id,
-        presetId: 'custom-openai-compatible',
-        name,
+        presetId: presetId || preset?.presetId || 'custom-openai-compatible',
+        name: preset?.name || name,
         protocol: 'openai-compatible',
         enabled: true,
         apiBaseUrl,
@@ -645,16 +762,17 @@ function buildBootstrapModelService(settings = {}) {
         settings.kbEmbeddingModel,
         settings.kbRerankModel,
     ].filter((value) => normalizeModelServiceText(value));
+    const builtInChatPreset = resolveBuiltInModelServicePreset({
+        apiBaseUrl: settings.chatEndpoint,
+        apiKeys: settings.chatApiKey,
+    });
 
     const chatProvider = createBootstrapProvider({
-        id: 'custom-provider',
-        presetId: 'custom-openai-compatible',
-        name: 'Custom Provider',
-        protocol: 'openai-compatible',
-        enabled: true,
+        id: builtInChatPreset ? 'aip-test-provider' : 'custom-provider',
+        presetId: builtInChatPreset?.presetId || 'custom-openai-compatible',
+        name: builtInChatPreset?.name || 'Custom Provider',
         apiBaseUrl: settings.chatEndpoint,
         apiKeys: parseModelServiceApiKeysInput(settings.chatApiKey),
-        extraHeaders: {},
         models: chatModels.map((modelId) => ({
             id: modelId,
             name: modelId,
@@ -689,11 +807,8 @@ function buildBootstrapModelService(settings = {}) {
                 id: 'knowledge-base-provider',
                 presetId: 'custom-openai-compatible',
                 name: 'Knowledge Base Provider',
-                protocol: 'openai-compatible',
-                enabled: true,
                 apiBaseUrl: settings.kbBaseUrl || settings.chatEndpoint || '',
                 apiKeys: parseModelServiceApiKeysInput(settings.kbApiKey || settings.chatApiKey || ''),
-                extraHeaders: {},
                 models: [
                     settings.kbEmbeddingModel ? {
                         id: settings.kbEmbeddingModel,
@@ -764,7 +879,7 @@ function buildBootstrapModelService(settings = {}) {
 }
 
 function composeSettingsWithModelService(settings = {}) {
-    const modelService = buildBootstrapModelService(settings);
+    const modelService = ensureBuiltInTestProvider(buildBootstrapModelService(settings));
     return {
         ...settings,
         modelService,
@@ -1725,7 +1840,7 @@ function createSettingsController(deps = {}) {
             .join('');
     }
 
-    function renderModelServicePresetActions(service = getNormalizedModelService()) {
+function renderModelServicePresetActions(service = getNormalizedModelService()) {
         if (el.modelServiceAddProviderBtn) {
             el.modelServiceAddProviderBtn.classList.remove('model-service-add-button--active');
             el.modelServiceAddProviderBtn.setAttribute('aria-expanded', 'false');
@@ -1737,10 +1852,22 @@ function createSettingsController(deps = {}) {
 
         if (el.modelServicePresetActions) {
             el.modelServicePresetActions.innerHTML = '';
-        }
+    }
+}
+
+function getModelServiceProviderCallout(provider = {}) {
+    if (provider.presetId === AIP_TEST_PROVIDER_PRESET_ID) {
+        return {
+            tone: 'info',
+            title: '竞赛测试专用',
+            message: '用于评委快速验证项目聊天与检索能力，打开即可直接测试，无需手动填写服务地址或模型清单。',
+        };
     }
 
-    function renderModelServiceProviderList(service = getNormalizedModelService()) {
+    return null;
+}
+
+function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (!el.modelServiceProviderList) {
             return;
         }
@@ -1784,6 +1911,11 @@ function createSettingsController(deps = {}) {
                     ${renderModelServiceAvatar(provider.name || provider.presetId, 'P')}
                     <span class="model-service-provider-row__content">
                       <strong class="model-service-provider-row__name">${escapeHtml(provider.name)}</strong>
+                      <span class="model-service-provider-row__subline">${escapeHtml(
+                          provider.presetId === AIP_TEST_PROVIDER_PRESET_ID
+                              ? '竞赛测试专用 · 评委可直接使用'
+                              : (provider.apiBaseUrl || provider.presetId || '')
+                      )}</span>
                     </span>
                   </button>
                   <button
@@ -1838,6 +1970,7 @@ function createSettingsController(deps = {}) {
         const hasChatModel = (provider.models || []).some((model) => model.enabled !== false && model.capabilities?.chat === true);
         const apiPreview = buildModelServiceEndpoint(provider.apiBaseUrl, '/v1/chat/completions');
         const apiKeysValue = (Array.isArray(provider.apiKeys) ? provider.apiKeys : []).join(', ');
+        const callout = getModelServiceProviderCallout(provider);
 
         el.modelServiceProviderDetail.innerHTML = `
             <div class="model-service-detail">
@@ -1853,6 +1986,13 @@ function createSettingsController(deps = {}) {
                 </label>
               </div>
               <div class="model-service-divider"></div>
+
+              ${callout ? `
+                <div class="model-service-status model-service-status--${escapeHtml(callout.tone || 'info')}">
+                  <strong>${escapeHtml(callout.title || '说明')}</strong>
+                  <span>${escapeHtml(callout.message || '')}</span>
+                </div>
+              ` : ''}
 
               ${status ? `
                 <div class="model-service-status model-service-status--${escapeHtml(status.tone || 'info')}">

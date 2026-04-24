@@ -379,7 +379,9 @@ function createRequestState({
     webContents,
     streamChannel,
     onStreamEnd,
+    onStreamChunk,
     timeoutMs,
+    emitStreamEvents = true,
     fallbackMeta = null,
 }) {
     const requestState = {
@@ -392,6 +394,8 @@ function createRequestState({
         webContents,
         streamChannel,
         onStreamEnd,
+        onStreamChunk,
+        emitStreamEvents: emitStreamEvents !== false,
         accumulatedResponse: '',
         accumulatedReasoning: '',
         finishReason: null,
@@ -472,7 +476,9 @@ function emitTerminalEvent(requestState, payload) {
     }
 
     requestState.terminalSent = true;
-    emitStreamEvent(requestState.webContents, payload, requestState.streamChannel);
+    if (requestState.emitStreamEvents !== false) {
+        emitStreamEvent(requestState.webContents, payload, requestState.streamChannel);
+    }
     invokeFinalizeCallback(requestState, payload);
 }
 
@@ -561,7 +567,7 @@ async function processStreamResponse(response, requestState) {
                         requestState.finishReason = finishReason;
                     }
 
-                    emitStreamEvent(requestState.webContents, {
+                    const streamPayload = {
                         type: 'data',
                         requestId: requestState.requestId,
                         context: requestState.context,
@@ -570,9 +576,17 @@ async function processStreamResponse(response, requestState) {
                         reasoningDelta,
                         hasRenderableText: Boolean(textDelta),
                         hasRenderableReasoning: Boolean(reasoningDelta),
-                    }, requestState.streamChannel);
+                    };
+
+                    if (typeof requestState.onStreamChunk === 'function') {
+                        requestState.onStreamChunk(streamPayload);
+                    }
+
+                    if (requestState.emitStreamEvents !== false) {
+                        emitStreamEvent(requestState.webContents, streamPayload, requestState.streamChannel);
+                    }
                 } catch (_error) {
-                    emitStreamEvent(requestState.webContents, {
+                    const parseErrorPayload = {
                         type: 'data',
                         requestId: requestState.requestId,
                         context: requestState.context,
@@ -581,7 +595,15 @@ async function processStreamResponse(response, requestState) {
                         reasoningDelta: '',
                         hasRenderableText: false,
                         hasRenderableReasoning: false,
-                    }, requestState.streamChannel);
+                    };
+
+                    if (typeof requestState.onStreamChunk === 'function') {
+                        requestState.onStreamChunk(parseErrorPayload);
+                    }
+
+                    if (requestState.emitStreamEvents !== false) {
+                        emitStreamEvent(requestState.webContents, parseErrorPayload, requestState.streamChannel);
+                    }
                 }
             }
 
@@ -648,8 +670,10 @@ async function executeRequestAttempt({
     webContents = null,
     streamChannel = STREAM_CHANNEL,
     onStreamEnd = null,
+    onStreamChunk = null,
     timeoutMs = moduleConfig.defaultTimeoutMs,
     round = 1,
+    emitStreamEvents = true,
     fallbackMeta = null,
 }) {
     let serializedBody;
@@ -677,7 +701,9 @@ async function executeRequestAttempt({
         webContents,
         streamChannel,
         onStreamEnd,
+        onStreamChunk,
         timeoutMs,
+        emitStreamEvents,
         fallbackMeta,
     });
 
@@ -779,9 +805,11 @@ async function send(request) {
         webContents = null,
         streamChannel = STREAM_CHANNEL,
         onStreamEnd = null,
+        onStreamChunk = null,
         timeoutMs = moduleConfig.defaultTimeoutMs,
         fallbackExecution = null,
         requiredCapability = '',
+        emitStreamEvents = true,
     } = request || {};
 
     if (!requestId || typeof requestId !== 'string') {
@@ -840,8 +868,10 @@ async function send(request) {
         webContents,
         streamChannel,
         onStreamEnd,
+        onStreamChunk,
         timeoutMs,
         round: request.round || 1,
+        emitStreamEvents,
         fallbackMeta,
     });
 
@@ -894,8 +924,10 @@ async function send(request) {
         webContents,
         streamChannel,
         onStreamEnd,
+        onStreamChunk,
         timeoutMs,
         round: request.round || 1,
+        emitStreamEvents,
         fallbackMeta,
     });
 

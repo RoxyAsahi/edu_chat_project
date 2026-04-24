@@ -628,6 +628,8 @@ async function handleRegenerateResponse(originalAssistantMessage) {
         avatarUrl: currentSelectedItemVal.avatarUrl,
         avatarColor: currentSelectedItemVal.config?.avatarCalculatedColor || null,
         isGroupMessage: false,
+        source: 'message-regeneration',
+        executionMode: 'direct-stream',
     };
 
     currentChatHistoryArray.splice(originalMessageIndex);
@@ -691,6 +693,7 @@ async function handleRegenerateResponse(originalAssistantMessage) {
             requestId: regenerationThinkingMessage.id,
             endpoint: globalSettingsVal.chatEndpoint,
             apiKey: globalSettingsVal.chatApiKey,
+            executionMode: 'direct-stream',
             messages: messagesForChat,
             modelConfig: modelConfigForChat,
             context,

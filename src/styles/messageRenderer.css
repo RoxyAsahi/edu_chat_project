@@ -1440,6 +1440,166 @@ body.light-theme .reasoning-bubble {
     margin-left: 10px;
 }
 
+.unistudy-live-reasoning-bubble {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    overflow: hidden;
+    background: rgba(120, 120, 128, 0.045) !important;
+    border: 0.5px solid rgba(120, 120, 128, 0.24);
+    border-radius: 10px !important;
+    font-style: normal;
+    box-sizing: border-box;
+}
+
+body.light-theme .unistudy-live-reasoning-bubble {
+    background: rgba(0, 0, 0, 0.025) !important;
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.unistudy-live-reasoning-bubble.expanded {
+    border-radius: 10px !important;
+}
+
+.unistudy-live-reasoning-header {
+    height: 48px;
+    min-height: 48px;
+    padding: 0 10px 0 0;
+    gap: 0;
+    opacity: 1;
+    box-sizing: border-box;
+}
+
+.unistudy-live-reasoning-icon {
+    width: 50px;
+    height: 48px;
+    flex: 0 0 50px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-3, var(--secondary-text));
+    font-size: 0.85em;
+    font-weight: 700;
+    filter: none;
+}
+
+.unistudy-live-reasoning-icon svg {
+    width: 20px;
+    height: 20px;
+    animation: unistudy-live-reasoning-pulse 1.6s ease-in-out infinite;
+}
+
+.unistudy-live-reasoning-bubble.expanded .unistudy-live-reasoning-icon svg,
+.message-item:not(.streaming) .unistudy-live-reasoning-icon svg {
+    animation: none;
+}
+
+.unistudy-live-reasoning-text-wrap {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 0;
+    overflow: hidden;
+}
+
+.unistudy-live-reasoning-label {
+    line-height: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-text);
+}
+
+.unistudy-live-reasoning-preview {
+    display: block;
+    max-width: 100%;
+    height: calc(var(--reasoning-preview-lines, 1) * 14px);
+    min-height: 14px;
+    line-height: 14px;
+    color: var(--secondary-text);
+    font-size: 11px;
+    overflow: hidden;
+    opacity: 0.82;
+    position: relative;
+    mask: linear-gradient(
+        to bottom,
+        rgb(0 0 0 / 0%) 0%,
+        rgb(0 0 0 / 38%) 20%,
+        rgb(0 0 0 / 100%) 62%,
+        rgb(0 0 0 / 100%) 100%
+    );
+}
+
+.unistudy-live-reasoning-preview span {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.unistudy-live-reasoning-bubble.expanded .unistudy-live-reasoning-preview {
+    display: none;
+}
+
+.unistudy-live-reasoning-toggle {
+    flex: 0 0 34px;
+    width: 34px;
+    height: 48px;
+    margin-left: 6px !important;
+    transition: transform 150ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--secondary-text);
+}
+
+.unistudy-live-reasoning-toggle svg {
+    width: 20px;
+    height: 20px;
+}
+
+.unistudy-live-reasoning-bubble.expanded .unistudy-live-reasoning-toggle {
+    transform: rotate(90deg);
+}
+
+.unistudy-live-reasoning-bubble .unistudy-thought-chain-collapsible-content {
+    padding: 0 16px;
+}
+
+.unistudy-live-reasoning-bubble.expanded .unistudy-thought-chain-collapsible-content {
+    max-height: 45vh;
+    overflow-y: auto;
+    margin-top: 0;
+    padding: 12px 16px 14px 16px;
+    border-top: 0.5px solid rgba(120, 120, 128, 0.22);
+}
+
+.unistudy-live-reasoning-body {
+    font-style: normal;
+    color: var(--secondary-text);
+}
+
+.unistudy-live-reasoning-body p:first-child {
+    margin-top: 0;
+}
+
+.unistudy-live-reasoning-body p:last-child {
+    margin-bottom: 0;
+}
+
+@keyframes unistudy-live-reasoning-pulse {
+    0%, 100% {
+        opacity: 0.62;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.08);
+    }
+}
+
 /* --- Role Divider --- */
 .unistudy-role-divider {
     display: flex;
