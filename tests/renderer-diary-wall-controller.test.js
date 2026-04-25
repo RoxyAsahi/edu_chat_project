@@ -242,34 +242,40 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     assert.equal(documentObj.getElementById('diaryWallModal').classList.contains('hidden'), false);
-    assert.match(documentObj.getElementById('diaryWallSummary').textContent, /全局所有日记/);
-    assert.match(documentObj.getElementById('diaryWallSummary').textContent, /Agent 分组/);
+    assert.match(documentObj.getElementById('diaryWallSummary').textContent, /3 张日记/);
     assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /全部/);
     assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /Nova/);
     assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /Hornet/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Nova\s*2 张日记/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Hornet\s*1 张日记/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /\[Nova\]/);
-    assert.match(documentObj.getElementById('diaryWallDetail').textContent, /原始 DailyNote 请求/);
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Nova/);
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Hornet/);
+    assert.match(documentObj.getElementById('diaryWallDetail').textContent, /选择一张日记卡/);
     assert.equal(listPayloads[0].scope, 'global');
-    assert.equal(detailPayloads[0].diaryId, 'study_diary_nova_2026-04-14');
-    assert.equal(detailPayloads[0].agentId, '');
-    assert.equal(detailPayloads[0].topicId, '');
+    assert.equal(detailPayloads.length, 0);
 
     const hornetTab = documentObj.querySelector('[data-diary-wall-agent-filter="Hornet"]');
     assert.ok(hornetTab);
     hornetTab.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 30));
 
-    assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /Nova\s*2 张日记/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Hornet\s*1 张日记/);
-    assert.match(documentObj.getElementById('diaryWallSummary').textContent, /当前 Agent：Hornet/);
-    assert.match(documentObj.getElementById('diaryWallDetail').textContent, /Hornet/);
+    assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /Nova/);
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Hornet/);
+    assert.match(documentObj.getElementById('diaryWallSummary').textContent, /1 张日记/);
+    assert.match(documentObj.getElementById('diaryWallDetail').textContent, /选择一张日记卡/);
 
     const novaTab = documentObj.querySelector('[data-diary-wall-agent-filter="Nova"]');
     assert.ok(novaTab);
     novaTab.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 30));
+
+    const novaCard = documentObj.querySelector('[data-diary-wall-card*="study_diary_nova_2026-04-14"]');
+    assert.ok(novaCard);
+    novaCard.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assert.equal(detailPayloads[0].diaryId, 'study_diary_nova_2026-04-14');
+    assert.equal(detailPayloads[0].agentId, '');
+    assert.equal(detailPayloads[0].topicId, '');
+    assert.doesNotMatch(documentObj.getElementById('diaryWallDetail').textContent, /原始 DailyNote 请求/);
 
     const tagButton = documentObj.querySelector('[data-diary-wall-tag="二次函数"]');
     assert.ok(tagButton);
@@ -285,8 +291,6 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     assert.equal(listPayloads.at(-1).scope, 'topic');
-    assert.equal(detailPayloads.at(-1).agentId, 'nova_acceptance');
-    assert.equal(detailPayloads.at(-1).topicId, 'junior_math_quadratic');
 });
 
 test('diaryWallController can jump back to source messages without handing off to a logs panel', async (t) => {
@@ -387,6 +391,11 @@ test('diaryWallController can jump back to source messages without handing off t
 
     controller.bindEvents();
     controller.open();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    const cardButton = documentObj.querySelector('[data-diary-wall-card]');
+    assert.ok(cardButton);
+    cardButton.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     const jumpButton = documentObj.querySelector('[data-diary-wall-jump="msg-1"]');

@@ -7,6 +7,36 @@ function escapeHtml(text) {
         .replace(/'/g, '&#39;');
 }
 
+function formatRelativeTimeShort(value) {
+    const timestamp = Number(value || 0);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+        return '';
+    }
+
+    const diff = Math.max(0, Date.now() - timestamp);
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    if (diff < minute) {
+        return '刚刚';
+    }
+    if (diff < hour) {
+        return `${Math.max(1, Math.floor(diff / minute))} 分钟前`;
+    }
+    if (diff < day) {
+        return `${Math.max(1, Math.floor(diff / hour))} 小时前`;
+    }
+    if (diff < 7 * day) {
+        return `${Math.max(1, Math.floor(diff / day))} 天前`;
+    }
+
+    return new Date(timestamp).toLocaleDateString('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+    });
+}
+
 function buildRecentItems({ agents = [], statsByAgent = {}, selectedAgentId = null } = {}) {
     const items = [];
     const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) || null;
@@ -75,6 +105,51 @@ function buildRecentItems({ agents = [], statsByAgent = {}, selectedAgentId = nu
     }
 
     return items.slice(0, 3);
+}
+
+function buildRecentLearningItems({ agents = [], statsByAgent = {}, selectedAgentId = null } = {}) {
+    const tones = [
+        { tone: 'blue', icon: 'auto_stories' },
+        { tone: 'orange', icon: 'article' },
+        { tone: 'green', icon: 'local_library' },
+    ];
+
+    const rankedAgents = agents
+        .map((agent, index) => {
+            const stats = statsByAgent[agent.id] || {};
+            const topicCount = Math.max(0, Number(stats.topicCount || 0));
+            const timestamp = Number(stats.lastTopicCreatedAt || 0);
+            const isCurrent = agent.id === selectedAgentId;
+            const title = stats.lastTopicName || `${agent.name || agent.id || '学科'} 新对话`;
+            const relativeTime = formatRelativeTimeShort(timestamp);
+            const fallbackMeta = topicCount > 0 ? `${topicCount} 个话题` : '准备开始';
+
+            return {
+                agentId: agent.id,
+                title,
+                meta: `${agent.name || agent.id || '未命名学科'} · ${relativeTime || fallbackMeta}`,
+                rank: (isCurrent ? 2_000_000_000 : 0) + (timestamp || (topicCount * 1000)) - index,
+            };
+        })
+        .sort((left, right) => right.rank - left.rank)
+        .slice(0, 3);
+
+    if (rankedAgents.length === 0) {
+        return [
+            {
+                title: '创建第一个学科',
+                meta: '开始一段新的学习对话',
+                action: 'create-subject',
+            },
+        ];
+    }
+
+    return rankedAgents.map((item, index) => ({
+        ...item,
+        action: item.agentId ? 'open-agent' : 'create-subject',
+        tone: tones[index % tones.length].tone,
+        icon: tones[index % tones.length].icon,
+    }));
 }
 
 function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'violet' } = {}) {
@@ -323,6 +398,7 @@ function buildSubjectOverviewMarkup({
     const currentAgentLabel = selectedAgentName || '还没有创建学科';
     const currentTopicLabel = currentTopicName || '还没有选中话题';
     const recentItems = buildRecentItems({ agents, statsByAgent, selectedAgentId });
+    const recentLearningItems = buildRecentLearningItems({ agents, statsByAgent, selectedAgentId });
     const streakDays = Math.max(0, Number(learningMetrics?.streakDays || 0));
     const score = Math.max(0, Number(learningMetrics?.score || 0));
     const activeDaysLast7 = Math.max(0, Number(learningMetrics?.activeDaysLast7 || 0));
@@ -357,6 +433,68 @@ function buildSubjectOverviewMarkup({
             <span>${escapeHtml(item.meta)}</span>
         </article>
     `).join('');
+    const recentLearningRows = recentLearningItems.map((item) => `
+        <button
+            type="button"
+            class="home-recent-learning__item home-recent-learning__item--${escapeHtml(item.tone || 'blue')}"
+            data-home-action="${escapeHtml(item.action || 'open-agent')}"
+            ${item.agentId ? `data-agent-id="${escapeHtml(item.agentId)}"` : ''}
+        >
+            <span class="home-recent-learning__icon material-symbols-outlined" aria-hidden="true">${escapeHtml(item.icon || 'auto_stories')}</span>
+            <span class="home-recent-learning__copy">
+                <strong>${escapeHtml(item.title)}</strong>
+                <small>${escapeHtml(item.meta)}</small>
+            </span>
+        </button>
+    `).join('');
+
+    const workflowSection = `
+        <section class="home-flow">
+            <div class="home-section-header">
+                <div>
+                    <span>功能怎么用</span>
+                    <h3>一条完整学习链路</h3>
+                </div>
+            </div>
+            <div class="home-flow__grid">${workflowCards}</div>
+        </section>
+    `;
+    const statusSection = `
+        <section class="home-status">
+            <div class="home-section-header">
+                <div>
+                    <span>学习状态</span>
+                    <h3>今天的概览</h3>
+                </div>
+            </div>
+            <div class="home-status__grid">
+                <div><span>学科</span><strong>${agents.length}</strong></div>
+                <div><span>话题</span><strong>${totalTopics}</strong></div>
+                <div><span>待整理</span><strong>${totalUnread}</strong></div>
+                <div><span>连续</span><strong>${streakDays}<small>天</small></strong></div>
+            </div>
+            <div class="home-status__score">
+                <span>学习力</span>
+                <strong>${escapeHtml(String(score || 0))}</strong>
+                <p>近 7 天活跃 ${activeDaysLast7} 天，总学习 ${totalLearningDays} 天</p>
+            </div>
+        </section>
+    `;
+    const recentLearningSection = `
+        <section class="home-recent-learning">
+            <div class="home-section-header">
+                <div>
+                    <span>最近学习</span>
+                    <h3>继续之前的对话</h3>
+                </div>
+                <button type="button" class="ghost-button" data-home-action="continue-learning">
+                    查看更多
+                    <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                </button>
+            </div>
+            <div class="home-recent-learning__list">${recentLearningRows}</div>
+        </section>
+    `;
 
     const calendarMarkup = buildCalendarMarkup(learningMetrics?.activeDates || []);
     const subjectSection = hasAgents
@@ -381,6 +519,13 @@ function buildSubjectOverviewMarkup({
                         <span>新建</span>
                     </button>
                 </div>
+            </div>
+            <div class="home-subjects__intro">
+                <div class="home-subjects__intro-visual" aria-hidden="true">
+                    <img src="../assets/写作业.svg" alt="" />
+                </div>
+                <strong>把每个学科当作一个长期学习空间</strong>
+                <p>资料、对话、笔记和复盘都会沉淀在这里。选择下方卡片，继续进入对应学科。</p>
             </div>
             <div class="home-subjects__scroll bento-subjects__scroll" id="subjectOverviewCollectionHost">
                 ${buildSubjectCollectionMarkup({
@@ -432,39 +577,14 @@ function buildSubjectOverviewMarkup({
                             </div>
                         </section>
 
-                        <section class="home-flow">
-                            <div class="home-section-header">
-                                <div>
-                                    <span>功能怎么用</span>
-                                    <h3>一条完整学习链路</h3>
-                                </div>
-                            </div>
-                            <div class="home-flow__grid">${workflowCards}</div>
-                        </section>
+                        ${statusSection}
+                        ${recentLearningSection}
                     </div>
 
                     ${subjectSection}
 
                     <aside class="home-side home-right">
-                        <section class="home-status">
-                            <div class="home-section-header">
-                                <div>
-                                    <span>学习状态</span>
-                                    <h3>今天的概览</h3>
-                                </div>
-                            </div>
-                            <div class="home-status__grid">
-                                <div><span>学科</span><strong>${agents.length}</strong></div>
-                                <div><span>话题</span><strong>${totalTopics}</strong></div>
-                                <div><span>待整理</span><strong>${totalUnread}</strong></div>
-                                <div><span>连续</span><strong>${streakDays}<small>天</small></strong></div>
-                            </div>
-                            <div class="home-status__score">
-                                <span>学习力</span>
-                                <strong>${escapeHtml(String(score || 0))}</strong>
-                                <p>近 7 天活跃 ${activeDaysLast7} 天，总学习 ${totalLearningDays} 天</p>
-                            </div>
-                        </section>
+                        ${workflowSection}
                         ${calendarMarkup}
                         <section class="home-activity">
                             <div class="home-section-header">

@@ -295,8 +295,15 @@ diaryWallController = createDiaryWallController({
     getCurrentTopicId: () => getSessionSlice().currentTopicId,
     getCurrentTopicName: () => workspaceController?.getCurrentTopicDisplayName?.() || '',
     selectTopic: (...args) => workspaceController?.selectTopic?.(...args),
+    showSubjectWorkspace: () => workspaceController?.showSubjectWorkspace?.(),
     openLogsPanel: async () => {
         setSidePanelTab('notes');
+    },
+    onOpen: () => {
+        setManualNotesLibraryPanel('diary', { skipDiaryOpen: true });
+    },
+    onClose: () => {
+        setManualNotesLibraryPanel('notes', { skipDiaryClose: true });
     },
 });
 dynamicIslandController = createDynamicIslandController({
@@ -587,6 +594,56 @@ function setSidePanelTab(tab) {
     el.sidePanelNotesTabBtn?.classList.toggle('side-panel-tab--active', nextTab === 'notes');
 }
 
+function setNotesStudioPanel(panel, options = {}) {
+    const nextPanel = panel === 'diary' ? 'diary' : 'notes';
+    const showDiary = nextPanel === 'diary';
+
+    setSidePanelTab('notes');
+    if (isNarrowWorkspaceLayout()) {
+        setMobileWorkspaceTab('studio');
+    }
+
+    el.notesWorkspaceCard?.classList.toggle('notes-studio--diary-wall', showDiary);
+    el.notesStudioNotesPanel?.classList.toggle('hidden', showDiary);
+    el.notesStudioNotesPanel?.classList.toggle('notes-studio__pane--active', !showDiary);
+    el.diaryWallModal?.classList.toggle('hidden', !showDiary);
+    el.diaryWallModal?.setAttribute('aria-hidden', showDiary ? 'false' : 'true');
+    el.notesStudioNotesTabBtn?.classList.toggle('notes-studio-panel-switch__btn--active', !showDiary);
+    el.notesStudioDiaryTabBtn?.classList.toggle('notes-studio-panel-switch__btn--active', showDiary);
+    el.notesStudioNotesTabBtn?.setAttribute('aria-selected', showDiary ? 'false' : 'true');
+    el.notesStudioDiaryTabBtn?.setAttribute('aria-selected', showDiary ? 'true' : 'false');
+
+    if (showDiary && options.skipDiaryOpen !== true) {
+        diaryWallController?.open?.();
+    }
+    if (!showDiary && options.skipDiaryClose !== true) {
+        diaryWallController?.close?.();
+    }
+}
+
+function setManualNotesLibraryPanel(panel, options = {}) {
+    const nextPanel = panel === 'diary' ? 'diary' : 'notes';
+    const showDiary = nextPanel === 'diary';
+
+    workspaceController?.showManualNotesLibrary?.();
+    el.manualNotesLibraryNotesPanel?.classList.toggle('hidden', showDiary);
+    el.manualNotesLibraryNotesPanel?.classList.toggle('manual-notes-library-page__panel--active', !showDiary);
+    el.diaryWallModal?.classList.toggle('hidden', !showDiary);
+    el.diaryWallModal?.setAttribute('aria-hidden', showDiary ? 'false' : 'true');
+    el.manualNotesLibraryFilters?.classList.toggle('hidden', showDiary);
+    el.manualNotesLibraryNotesTabBtn?.classList.toggle('notes-studio-panel-switch__btn--active', !showDiary);
+    el.manualNotesLibraryDiaryTabBtn?.classList.toggle('notes-studio-panel-switch__btn--active', showDiary);
+    el.manualNotesLibraryNotesTabBtn?.setAttribute('aria-selected', showDiary ? 'false' : 'true');
+    el.manualNotesLibraryDiaryTabBtn?.setAttribute('aria-selected', showDiary ? 'true' : 'false');
+
+    if (showDiary && options.skipDiaryOpen !== true) {
+        diaryWallController?.open?.();
+    }
+    if (!showDiary && options.skipDiaryClose !== true) {
+        diaryWallController?.close?.();
+    }
+}
+
 function setRightPanelMode(mode) {
     const nextMode = mode === 'flashcards' ? 'flashcards' : 'notes';
 
@@ -856,6 +913,18 @@ function bindShellEvents() {
 
     el.sidePanelNotesTabBtn?.addEventListener('click', () => {
         setSidePanelTab('notes');
+    });
+
+    el.manualNotesLibraryBtn?.addEventListener('click', () => {
+        setManualNotesLibraryPanel('notes');
+    });
+
+    el.manualNotesLibraryNotesTabBtn?.addEventListener('click', () => {
+        setManualNotesLibraryPanel('notes');
+    });
+
+    el.manualNotesLibraryDiaryTabBtn?.addEventListener('click', () => {
+        setManualNotesLibraryPanel('diary');
     });
 
     el.minimizeBtn?.addEventListener('click', () => chatAPI.minimizeWindow());

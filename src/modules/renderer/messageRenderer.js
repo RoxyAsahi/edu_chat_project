@@ -1136,6 +1136,11 @@ let mainRendererReferences = {
 let contentPipeline = null;
 
 let activeRenderSessionId = 0;
+let historyWindowState = null;
+
+const DEFAULT_HISTORY_WINDOW_SIZE = 50;
+const DEFAULT_HISTORY_PREPEND_BATCH_SIZE = 40;
+const HISTORY_LOAD_SCROLL_THRESHOLD_PX = 96;
 
 function invalidateRenderSession() {
     activeRenderSessionId += 1;
@@ -1148,6 +1153,216 @@ function getActiveRenderSessionId() {
 
 function isRenderSessionActive(sessionId) {
     return sessionId === activeRenderSessionId;
+}
+
+function normalizePositiveInteger(value, fallback, { min = 1, max = 500 } = {}) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+        return fallback;
+    }
+    return Math.max(min, Math.min(max, Math.trunc(number)));
+}
+
+function resolveHistoryWindowOptions(options = {}) {
+    const normalizedOptions = options && typeof options === 'object' ? options : {};
+    const windowSize = normalizePositiveInteger(
+        normalizedOptions.windowSize ?? normalizedOptions.initialBatch,
+        DEFAULT_HISTORY_WINDOW_SIZE,
+        { min: 10, max: 200 },
+    );
+    const prependBatchSize = normalizePositiveInteger(
+        normalizedOptions.prependBatchSize ?? normalizedOptions.batchSize,
+        DEFAULT_HISTORY_PREPEND_BATCH_SIZE,
+        { min: 5, max: 200 },
+    );
+
+    return {
+        autoLoadOnScroll: normalizedOptions.autoLoadOnScroll !== false,
+        prependBatchSize,
+        windowSize,
+    };
+}
+
+function getHistoryScrollContainer() {
+    return mainRendererReferences.chatMessagesDiv?.closest?.('.chat-messages-container')
+        || mainRendererReferences.chatMessagesDiv
+        || null;
+}
+
+function detachHistoryWindowScrollLoader(state) {
+    if (state?.scrollContainer && state.scrollHandler) {
+        state.scrollContainer.removeEventListener('scroll', state.scrollHandler);
+        state.scrollHandler = null;
+    }
+}
+
+function disposeHistoryWindowState() {
+    if (!historyWindowState) {
+        return;
+    }
+
+    detachHistoryWindowScrollLoader(historyWindowState);
+    historyWindowState.loaderElement?.remove?.();
+    historyWindowState = null;
+}
+
+function getHistoryWindowRemainingCount(state) {
+    return Math.max(0, Number(state?.renderedStartIndex) || 0);
+}
+
+function updateHistoryWindowLoader(state) {
+    if (!state?.loaderElement || !state.loaderButton) {
+        return;
+    }
+
+    const remaining = getHistoryWindowRemainingCount(state);
+    if (remaining <= 0) {
+        detachHistoryWindowScrollLoader(state);
+        state.loaderElement.remove();
+        state.loaderElement = null;
+        state.loaderButton = null;
+        return;
+    }
+
+    state.loaderButton.disabled = state.isLoading === true;
+    state.loaderButton.textContent = state.isLoading
+        ? '正在加载更早消息...'
+        : `加载更早消息（${remaining}）`;
+}
+
+function createHistoryWindowLoader(state) {
+    const loader = document.createElement('div');
+    loader.className = 'history-window-loader';
+    loader.dataset.historyWindowLoader = 'true';
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'history-window-loader__button';
+    button.addEventListener('click', () => {
+        void loadOlderHistoryWindowBatch(state);
+    });
+
+    loader.appendChild(button);
+    state.loaderElement = loader;
+    state.loaderButton = button;
+    updateHistoryWindowLoader(state);
+    return loader;
+}
+
+function findHistoryWindowInsertPoint(state) {
+    const chatMessagesDiv = mainRendererReferences.chatMessagesDiv;
+    if (!chatMessagesDiv) {
+        return null;
+    }
+
+    if (state?.loaderElement?.isConnected) {
+        return state.loaderElement.nextSibling;
+    }
+
+    return chatMessagesDiv.firstChild;
+}
+
+async function buildHistoryMessageFragment(messages, renderSessionId) {
+    const fragment = document.createDocumentFragment();
+    const messageElements = [];
+
+    for (const msg of messages) {
+        if (!isRenderSessionActive(renderSessionId)) {
+            return { fragment, messageElements: [] };
+        }
+
+        const messageElement = await renderMessage(msg, true, false, renderSessionId);
+        if (messageElement) {
+            fragment.appendChild(messageElement);
+            messageElements.push(messageElement);
+        }
+    }
+
+    return { fragment, messageElements };
+}
+
+function processAttachedHistoryElements(messageElements, renderSessionId) {
+    messageElements.forEach((el) => {
+        if (!isRenderSessionActive(renderSessionId) || !el.isConnected) {
+            if (typeof el._renderProcess === 'function') {
+                delete el._renderProcess;
+            }
+            delete el._renderSessionId;
+            return;
+        }
+
+        visibilityOptimizer.observeMessage(el);
+
+        if (typeof el._renderProcess === 'function') {
+            el._renderProcess();
+            delete el._renderProcess;
+        }
+        delete el._renderSessionId;
+    });
+}
+
+async function loadOlderHistoryWindowBatch(state = historyWindowState) {
+    if (!state || state.isLoading || !isRenderSessionActive(state.renderSessionId)) {
+        return;
+    }
+
+    const remaining = getHistoryWindowRemainingCount(state);
+    if (remaining <= 0) {
+        updateHistoryWindowLoader(state);
+        return;
+    }
+
+    state.isLoading = true;
+    updateHistoryWindowLoader(state);
+
+    const batchStart = Math.max(0, state.renderedStartIndex - state.prependBatchSize);
+    const batchEnd = state.renderedStartIndex;
+    const batch = state.history.slice(batchStart, batchEnd);
+    const scrollContainer = state.scrollContainer || getHistoryScrollContainer();
+    const previousScrollHeight = scrollContainer?.scrollHeight || 0;
+    const previousScrollTop = scrollContainer?.scrollTop || 0;
+    const { fragment, messageElements } = await buildHistoryMessageFragment(batch, state.renderSessionId);
+
+    await new Promise((resolve) => {
+        requestAnimationFrame(() => {
+            if (!isRenderSessionActive(state.renderSessionId)) {
+                return;
+            }
+
+            const chatMessagesDiv = mainRendererReferences.chatMessagesDiv;
+            const insertPoint = findHistoryWindowInsertPoint(state);
+            if (insertPoint) {
+                chatMessagesDiv.insertBefore(fragment, insertPoint);
+            } else {
+                chatMessagesDiv.appendChild(fragment);
+            }
+
+            processAttachedHistoryElements(messageElements, state.renderSessionId);
+            state.renderedStartIndex = batchStart;
+            state.isLoading = false;
+            updateHistoryWindowLoader(state);
+
+            if (scrollContainer) {
+                const scrollDelta = scrollContainer.scrollHeight - previousScrollHeight;
+                scrollContainer.scrollTop = previousScrollTop + scrollDelta;
+            }
+
+            resolve();
+        });
+    });
+}
+
+function attachHistoryWindowScrollLoader(state) {
+    if (!state.autoLoadOnScroll || !state.scrollContainer) {
+        return;
+    }
+
+    state.scrollHandler = () => {
+        if (state.scrollContainer.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD_PX) {
+            void loadOlderHistoryWindowBatch(state);
+        }
+    };
+    state.scrollContainer.addEventListener('scroll', state.scrollHandler, { passive: true });
 }
 
 function removeMessageById(messageId, saveHistory = false) {
@@ -1192,6 +1407,7 @@ function removeMessageById(messageId, saveHistory = false) {
 function clearChat(options = {}) {
     const { preserveHistory = false } = options;
     invalidateRenderSession();
+    disposeHistoryWindowState();
     citationPopoverController?.hide?.();
 
     if (mainRendererReferences.chatMessagesDiv) {
@@ -2249,56 +2465,60 @@ function prepareUserMessageText(text) {
 
 // Expose methods to renderer.js
 /**
- * Renders a complete chat history with progressive loading for better UX.
- * First shows the latest 5 messages, then loads older messages in batches of 10.
+ * Renders chat history with a bounded DOM window for long conversations.
+ * Full history stays in currentChatHistory; only the visible tail is mounted.
  * @param {Array<Message>} history The chat history to render.
- * @param {Object} options Rendering options
- * @param {number} options.initialBatch - Number of latest messages to show first (default: 5)
- * @param {number} options.batchSize - Size of subsequent batches (default: 10)
- * @param {number} options.batchDelay - Delay between batches in ms (default: 100)
+ * @param {Object|boolean} options Rendering options or legacy truthy flag.
+ * @param {number} options.windowSize Number of latest messages to mount first.
+ * @param {number} options.prependBatchSize Number of older messages to prepend per load.
+ * @param {boolean} options.autoLoadOnScroll Whether top scroll loads older messages.
  */
 async function renderHistory(history, options = {}) {
+    disposeHistoryWindowState();
     const renderSessionId = invalidateRenderSession();
 
     const {
-        initialBatch = 5,
-        batchSize = 10,
-        batchDelay = 100
-    } = options;
+        autoLoadOnScroll,
+        prependBatchSize,
+        windowSize,
+    } = resolveHistoryWindowOptions(options);
 
-    // Initialize shared dependencies once before progressive batch rendering starts.
+    // Initialize shared dependencies once before history rendering starts.
     await emoticonUrlFixer.initialize(mainRendererReferences.electronAPI);
 
     if (!history || history.length === 0) {
         return Promise.resolve();
     }
 
-    // For short histories, use the legacy rendering path directly.
-    if (history.length <= initialBatch) {
+    // For short histories, use the full rendering path directly.
+    if (history.length <= windowSize) {
         return renderHistoryLegacy(history, renderSessionId);
     }
 
-    console.debug(`[MessageRenderer] Progressive render start: total=${history.length}, initialBatch=${initialBatch}, batchSize=${batchSize}`);
+    console.debug(`[MessageRenderer] Windowed render start: total=${history.length}, windowSize=${windowSize}, prependBatchSize=${prependBatchSize}`);
 
-    // Split newest messages from older history.
-    const latestMessages = history.slice(-initialBatch);
-    const olderMessages = history.slice(0, -initialBatch);
+    const renderedStartIndex = Math.max(0, history.length - windowSize);
+    const latestMessages = history.slice(renderedStartIndex);
+    const state = {
+        autoLoadOnScroll,
+        history,
+        isLoading: false,
+        loaderButton: null,
+        loaderElement: null,
+        prependBatchSize,
+        renderedStartIndex,
+        renderSessionId,
+        scrollContainer: getHistoryScrollContainer(),
+        scrollHandler: null,
+    };
+    historyWindowState = state;
 
-    // Stage 1: render the newest messages immediately.
+    mainRendererReferences.chatMessagesDiv.appendChild(createHistoryWindowLoader(state));
     await renderMessageBatch(latestMessages, true, renderSessionId);
     if (!isRenderSessionActive(renderSessionId)) return;
-    console.debug(`[MessageRenderer] Initial batch of ${latestMessages.length} newest messages rendered.`);
 
-    // Stage 2: render the older history in batches from old to new.
-    if (olderMessages.length > 0) {
-        await renderOlderMessagesInBatches(olderMessages, batchSize, batchDelay, renderSessionId);
-    }
-
-    if (!isRenderSessionActive(renderSessionId)) return;
-
-    // Scroll to the bottom after all batches finish.
-    mainRendererReferences.uiHelper.scrollToBottom();
-    console.debug(`[MessageRenderer] Progressive render completed: total=${history.length}`);
+    attachHistoryWindowScrollLoader(state);
+    console.debug(`[MessageRenderer] Windowed render mounted ${latestMessages.length}/${history.length} messages.`);
 }
 
 /**
@@ -2366,99 +2586,6 @@ async function renderMessageBatch(messages, scrollToBottom = false, renderSessio
             resolve();
         });
     });
-}
-
-/**
- * Render older messages in batches.
- * @param {Array<Message>} olderMessages Older history messages.
- * @param {number} batchSize Number of messages per batch.
- * @param {number} batchDelay Delay between batches in milliseconds.
- */
-/**
- * Use requestIdleCallback when available so older history renders during idle time.
- */
-async function renderOlderMessagesInBatches(olderMessages, batchSize, batchDelay, renderSessionId = getActiveRenderSessionId()) {
-    const totalBatches = Math.ceil(olderMessages.length / batchSize);
-
-    for (let i = totalBatches - 1; i >= 0; i--) {
-        if (!isRenderSessionActive(renderSessionId)) return;
-
-        const startIndex = i * batchSize;
-        const endIndex = Math.min(startIndex + batchSize, olderMessages.length);
-        const batch = olderMessages.slice(startIndex, endIndex);
-
-        // Build the fragment for the current batch.
-        const batchFragment = document.createDocumentFragment();
-        const elementsForProcessing = [];
-
-        for (const msg of batch) {
-            if (!isRenderSessionActive(renderSessionId)) return;
-
-            const messageElement = await renderMessage(msg, true, false, renderSessionId);
-            if (messageElement) {
-                batchFragment.appendChild(messageElement);
-                elementsForProcessing.push(messageElement);
-            }
-        }
-
-        // Prefer requestIdleCallback for batch insertion and fall back to requestAnimationFrame.
-        await new Promise(resolve => {
-            const insertBatch = () => {
-                if (!isRenderSessionActive(renderSessionId)) {
-                    resolve();
-                    return;
-                }
-
-                const chatMessagesDiv = mainRendererReferences.chatMessagesDiv;
-                let insertPoint = chatMessagesDiv.firstChild;
-                while (insertPoint?.classList?.contains('topic-timestamp-bubble')) {
-                    insertPoint = insertPoint.nextSibling;
-                }
-
-                if (insertPoint) {
-                    chatMessagesDiv.insertBefore(batchFragment, insertPoint);
-                } else {
-                    chatMessagesDiv.appendChild(batchFragment);
-                }
-
-                elementsForProcessing.forEach(el => {
-                    if (!isRenderSessionActive(renderSessionId) || !el.isConnected) {
-                        if (typeof el._renderProcess === 'function') {
-                            delete el._renderProcess;
-                        }
-                        delete el._renderSessionId;
-                        return;
-                    }
-
-                    // Observe each history message after it is appended to the DOM.
-                    visibilityOptimizer.observeMessage(el);
-
-                    if (typeof el._renderProcess === 'function') {
-                        el._renderProcess();
-                        delete el._renderProcess;
-                    }
-                    delete el._renderSessionId;
-                });
-
-                resolve();
-            };            // Prefer requestIdleCallback for batch insertion and fall back to rAF.
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(insertBatch, { timeout: 1000 });
-            } else {
-                requestAnimationFrame(insertBatch);
-            }
-        });
-
-        // Shorter batches can use a smaller delay to keep the UI feeling responsive.
-
-        if (!isRenderSessionActive(renderSessionId)) return;
-
-        // Use a slightly shorter delay for smaller batches to keep the UI responsive.
-        if (i > 0 && batchDelay > 0) {
-            const actualDelay = batch.length < batchSize / 2 ? batchDelay / 2 : batchDelay;
-            await new Promise(resolve => setTimeout(resolve, actualDelay));
-        }
-    }
 }
 
 /**

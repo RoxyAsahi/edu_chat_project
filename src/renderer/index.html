@@ -74,7 +74,7 @@
         </div>
       </div>
       <div class="titlebar__meta">
-        <button id="openDiaryWallBtn" class="ghost-button icon-btn" title="日记墙"><span class="material-symbols-outlined">auto_stories</span></button>
+        <button id="openDiaryWallBtn" class="ghost-button icon-btn hidden" title="日记墙" aria-hidden="true" tabindex="-1"><span class="material-symbols-outlined">auto_stories</span></button>
         <button id="globalSettingsBtn" class="ghost-button icon-btn" title="设置"><span class="material-symbols-outlined">settings</span></button>
         <button id="themeToggleBtn" class="ghost-button icon-btn hidden" title="切换主题" aria-hidden="true" tabindex="-1"><span class="material-symbols-outlined">dark_mode</span></button>
         <button id="minimize-btn" class="window-button"><span class="material-symbols-outlined" style="font-size: 16px;">remove</span></button>
@@ -100,7 +100,11 @@
                 <p id="manualNotesLibrarySubtitle" class="manual-notes-library-page__subtitle">这里会收纳当前学科下的所有手写笔记。</p>
               </div>
             </div>
-            <div class="manual-notes-library-page__filters" aria-label="笔记筛选">
+            <div id="manualNotesLibraryPanelSwitch" class="notes-studio-panel-switch manual-notes-library-page__switch" role="tablist" aria-label="笔记页面面板">
+              <button id="manualNotesLibraryNotesTabBtn" class="notes-studio-panel-switch__btn notes-studio-panel-switch__btn--active" type="button" role="tab" aria-selected="true" aria-controls="manualNotesLibraryNotesPanel">笔记</button>
+              <button id="manualNotesLibraryDiaryTabBtn" class="notes-studio-panel-switch__btn" type="button" role="tab" aria-selected="false" aria-controls="diaryWallModal">日记墙</button>
+            </div>
+            <div id="manualNotesLibraryFilters" class="manual-notes-library-page__filters" aria-label="笔记筛选">
               <button
                 id="manualNotesLibraryFilterAllBtn"
                 class="ghost-button manual-notes-library-page__filter manual-notes-library-page__filter--active"
@@ -122,7 +126,60 @@
             </div>
           </header>
           <div class="manual-notes-library-page__body">
-            <section id="manualNotesLibraryGrid" class="manual-notes-library-grid" aria-live="polite"></section>
+            <section id="manualNotesLibraryNotesPanel" class="manual-notes-library-page__panel manual-notes-library-page__panel--active" role="tabpanel" aria-labelledby="manualNotesLibraryNotesTabBtn">
+              <section id="manualNotesLibraryGrid" class="manual-notes-library-grid" aria-live="polite"></section>
+            </section>
+            <section id="diaryWallModal" class="diary-wall-modal diary-wall-panel manual-notes-library-page__panel hidden" aria-hidden="true" role="tabpanel" aria-labelledby="manualNotesLibraryDiaryTabBtn">
+              <div id="diaryWallModalBackdrop" class="diary-wall-modal__backdrop"></div>
+              <div class="diary-wall-modal__dialog" role="region" aria-label="日记墙">
+                <button id="diaryWallCloseBtn" class="ghost-button icon-btn hidden" type="button" aria-label="关闭日记墙">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+                <div class="diary-wall-modal__body">
+                  <section class="diary-wall-canvas">
+                    <div class="diary-wall-canvas__toolbar">
+                      <div id="diaryWallAgentNav" class="diary-wall-agent-nav" aria-label="日记墙 Agent 导航">
+                        <button type="button" class="diary-wall-agent-tab diary-wall-agent-tab--active" data-diary-wall-agent-filter="all">全部</button>
+                      </div>
+                      <div class="diary-wall-canvas__toolbar-meta">
+                        <div id="diaryWallSummary" class="diary-wall-summary">
+                          <span>等待加载</span>
+                        </div>
+                        <button id="diaryWallRefreshBtn" class="ghost-button icon-btn" type="button" aria-label="刷新日记墙">
+                          <span class="material-symbols-outlined">refresh</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div id="diaryWallCards" class="diary-wall-grid">
+                      <div class="empty-list-state">
+                        <strong>还没有日记卡</strong>
+                        <span>首次触发 DailyNote.create 后，这里会按 Agent 展示不同日记本的聚合日记。</span>
+                      </div>
+                    </div>
+                  </section>
+                  <aside class="diary-wall-detail">
+                    <div id="diaryWallDetail" class="diary-wall-detail__content">
+                      <div class="empty-list-state">
+                        <strong>选择一张日记卡</strong>
+                        <span>点击卡片后，会展示完整聚合日记、条目列表和来源消息。</span>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+                <div id="diaryWallNoteModal" class="diary-wall-note-modal hidden" aria-hidden="true">
+                  <div id="diaryWallNoteModalBackdrop" class="diary-wall-note-modal__backdrop"></div>
+                  <section class="diary-wall-note-modal__dialog" role="dialog" aria-modal="true" aria-label="笔记详情">
+                    <header class="diary-wall-note-modal__header">
+                      <strong>笔记详情</strong>
+                      <button id="diaryWallNoteCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭笔记详情">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </header>
+                    <div id="diaryWallNoteContent" class="diary-wall-note-modal__content"></div>
+                  </section>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </section>
@@ -375,94 +432,97 @@
           <div id="notesPanelTab" class="side-panel-pane side-panel-pane--active">
             <section id="notesWorkspaceCard" class="panel notes-studio notes-studio--panel">
               <header class="chat-stage__header notes-studio__header">
-                <div>
+                <div class="notes-studio__titleblock">
                   <h1 class="chat-stage__title">功能区</h1>
                 </div>
               </header>
 
-              <div class="notes-studio__section notes-studio__section--tools">
-                <div class="notes-tool-grid">
-                  <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
-                    <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
-                    <span class="notes-tool-tile__body">
-                      <strong>新建笔记</strong>
-                    </span>
-                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
-                  </button>
-                  <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
-                    <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
-                    <span class="notes-tool-tile__body">
-                      <strong>深度分析</strong>
-                    </span>
-                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
-                  </button>
-                  <button id="generateQuizBtn" class="notes-tool-tile notes-tool-tile--quiz" type="button">
-                    <span class="notes-tool-tile__icon material-symbols-outlined">quiz</span>
-                    <span class="notes-tool-tile__body">
-                      <strong>生成选择题</strong>
-                    </span>
-                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
-                  </button>
-                  <button id="generateFlashcardsBtn" class="notes-tool-tile notes-tool-tile--flashcards" type="button">
-                    <span class="notes-tool-tile__icon material-symbols-outlined">style</span>
-                    <span class="notes-tool-tile__body">
-                      <strong>生成闪卡</strong>
-                    </span>
-                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
-                  </button>
-                  <button id="openPomodoroBtn" class="notes-tool-tile notes-tool-tile--pomodoro" type="button">
-                    <span class="notes-tool-tile__icon material-symbols-outlined">timer</span>
-                    <span class="notes-tool-tile__body">
-                      <strong>番茄钟</strong>
-                    </span>
-                    <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+              <div id="notesStudioNotesPanel" class="notes-studio__pane notes-studio__pane--active" role="tabpanel" aria-labelledby="notesStudioNotesTabBtn">
+                <div class="notes-studio__section notes-studio__section--tools">
+                  <div class="notes-tool-grid">
+                    <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
+                      <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
+                      <span class="notes-tool-tile__body">
+                        <strong>新建笔记</strong>
+                      </span>
+                      <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                    </button>
+                    <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
+                      <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
+                      <span class="notes-tool-tile__body">
+                        <strong>深度分析</strong>
+                      </span>
+                      <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                    </button>
+                    <button id="generateQuizBtn" class="notes-tool-tile notes-tool-tile--quiz" type="button">
+                      <span class="notes-tool-tile__icon material-symbols-outlined">quiz</span>
+                      <span class="notes-tool-tile__body">
+                        <strong>生成选择题</strong>
+                      </span>
+                      <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                    </button>
+                    <button id="generateFlashcardsBtn" class="notes-tool-tile notes-tool-tile--flashcards" type="button">
+                      <span class="notes-tool-tile__icon material-symbols-outlined">style</span>
+                      <span class="notes-tool-tile__body">
+                        <strong>生成闪卡</strong>
+                      </span>
+                      <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                    </button>
+                    <button id="openPomodoroBtn" class="notes-tool-tile notes-tool-tile--pomodoro" type="button">
+                      <span class="notes-tool-tile__icon material-symbols-outlined">timer</span>
+                      <span class="notes-tool-tile__body">
+                        <strong>番茄钟</strong>
+                      </span>
+                      <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="notes-stream">
+                  <div class="notes-stream__divider" aria-hidden="true"></div>
+                  <div id="notesList" class="notes-list notes-list--studio"></div>
+                  <section id="studioPomodoroPanel" class="notes-pomodoro-panel hidden" aria-label="番茄钟面板">
+                    <button id="studioPomodoroToggleBtn" class="notes-pomodoro-panel__summary" type="button" aria-expanded="true" aria-controls="studioPomodoroBody">
+                      <span class="notes-pomodoro-panel__summary-main">
+                        <span class="material-symbols-outlined notes-pomodoro-panel__summary-icon" aria-hidden="true">timer</span>
+                        <span class="notes-pomodoro-panel__summary-copy">
+                          <strong>番茄钟</strong>
+                          <span id="studioPomodoroSummaryText">25:00</span>
+                        </span>
+                      </span>
+                      <span class="material-symbols-outlined notes-pomodoro-panel__summary-arrow" aria-hidden="true">expand_more</span>
+                    </button>
+                    <div id="studioPomodoroBody" class="notes-pomodoro-panel__body">
+                      <div class="notes-pomodoro-panel__header">
+                        <div class="notes-pomodoro-panel__copy">
+                          <input
+                            id="studioPomodoroDisplayInput"
+                            class="notes-pomodoro-panel__display-input"
+                            type="text"
+                            value="25:00"
+                            inputmode="numeric"
+                            aria-label="番茄钟时间"
+                          />
+                        </div>
+                      </div>
+                      <div class="dynamic-island__panel-actions notes-pomodoro-panel__actions">
+                        <button id="studioPomodoroStartBtn" class="accent-button dynamic-island__action" type="button">开始</button>
+                        <button id="studioPomodoroPauseBtn" class="ghost-button dynamic-island__action hidden" type="button">暂停</button>
+                        <button id="studioPomodoroResumeBtn" class="accent-button dynamic-island__action hidden" type="button">继续</button>
+                        <button id="studioPomodoroResetBtn" class="ghost-button dynamic-island__action" type="button">重置</button>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <div class="notes-studio__footer">
+                  <button id="newNoteFabBtn" class="accent-button notes-fab" type="button">
+                    <span class="material-symbols-outlined">note_add</span>
+                    <span>添加笔记</span>
                   </button>
                 </div>
               </div>
 
-              <div class="notes-stream">
-                <div class="notes-stream__divider" aria-hidden="true"></div>
-                <div id="notesList" class="notes-list notes-list--studio"></div>
-                <section id="studioPomodoroPanel" class="notes-pomodoro-panel hidden" aria-label="番茄钟面板">
-                  <button id="studioPomodoroToggleBtn" class="notes-pomodoro-panel__summary" type="button" aria-expanded="true" aria-controls="studioPomodoroBody">
-                    <span class="notes-pomodoro-panel__summary-main">
-                      <span class="material-symbols-outlined notes-pomodoro-panel__summary-icon" aria-hidden="true">timer</span>
-                      <span class="notes-pomodoro-panel__summary-copy">
-                        <strong>番茄钟</strong>
-                        <span id="studioPomodoroSummaryText">25:00</span>
-                      </span>
-                    </span>
-                    <span class="material-symbols-outlined notes-pomodoro-panel__summary-arrow" aria-hidden="true">expand_more</span>
-                  </button>
-                  <div id="studioPomodoroBody" class="notes-pomodoro-panel__body">
-                    <div class="notes-pomodoro-panel__header">
-                      <div class="notes-pomodoro-panel__copy">
-                        <input
-                          id="studioPomodoroDisplayInput"
-                          class="notes-pomodoro-panel__display-input"
-                          type="text"
-                          value="25:00"
-                          inputmode="numeric"
-                          aria-label="番茄钟时间"
-                        />
-                      </div>
-                    </div>
-                    <div class="dynamic-island__panel-actions notes-pomodoro-panel__actions">
-                      <button id="studioPomodoroStartBtn" class="accent-button dynamic-island__action" type="button">开始</button>
-                      <button id="studioPomodoroPauseBtn" class="ghost-button dynamic-island__action hidden" type="button">暂停</button>
-                      <button id="studioPomodoroResumeBtn" class="accent-button dynamic-island__action hidden" type="button">继续</button>
-                      <button id="studioPomodoroResetBtn" class="ghost-button dynamic-island__action" type="button">重置</button>
-                    </div>
-                  </div>
-                </section>
-              </div>
-
-              <div class="notes-studio__footer">
-                <button id="newNoteFabBtn" class="accent-button notes-fab" type="button">
-                  <span class="material-symbols-outlined">note_add</span>
-                  <span>添加笔记</span>
-                </button>
-              </div>
             </section>
           </div>
         </aside>
@@ -1185,98 +1245,6 @@
           <p id="settingsAutoSaveStatus" class="settings-caption hidden">修改后会自动保存。</p>
           <button id="saveGlobalSettingsBtn" class="accent-button hidden" type="button" aria-hidden="true" tabindex="-1">保存全局与来源设置</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="diaryWallModal" class="diary-wall-modal hidden" aria-hidden="true">
-    <div id="diaryWallModalBackdrop" class="diary-wall-modal__backdrop"></div>
-    <div class="diary-wall-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="diaryWallTitle">
-      <div class="diary-wall-modal__header">
-        <div>
-          <p class="eyebrow">DailyNote Wall</p>
-          <h2 id="diaryWallTitle">日记墙</h2>
-          <p id="diaryWallSubtitle" class="settings-caption">通过 agent 导航切换当前视图，再按“日记本 + 日期”浏览 DailyNote；支持筛选、细节查看和回忆来源追踪。</p>
-        </div>
-        <button id="diaryWallCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭日记墙">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      </div>
-      <div class="diary-wall-modal__body">
-        <aside class="diary-wall-sidebar">
-          <div class="diary-wall-sidebar__group">
-            <label class="diary-wall-field">
-              <span>范围</span>
-              <select id="diaryWallScopeSelect">
-                <option value="global">全局所有日记</option>
-                <option value="agent">当前学科</option>
-                <option value="topic">当前话题</option>
-                <option value="public">[公共] 日记本</option>
-              </select>
-            </label>
-            <label class="diary-wall-field">
-              <span>关键词</span>
-              <input id="diaryWallSearchInput" type="text" placeholder="搜索正文、标签、署名或话题" />
-            </label>
-            <label class="diary-wall-field">
-              <span>日记本</span>
-              <input id="diaryWallNotebookInput" type="text" placeholder="例如 Nova / 公共 / Nova的知识" />
-            </label>
-            <label class="diary-wall-field">
-              <span>标签</span>
-              <input id="diaryWallTagInput" type="text" placeholder="例如 二次函数 / 错题复盘" />
-            </label>
-            <label class="diary-wall-field">
-              <span>日期</span>
-              <input id="diaryWallDateInput" type="date" />
-            </label>
-            <div class="diary-wall-actions">
-              <button id="diaryWallRefreshBtn" class="accent-button icon-text-btn" type="button">
-                <span class="material-symbols-outlined">refresh</span> 刷新日记墙
-              </button>
-            </div>
-          </div>
-          <div class="diary-wall-sidebar__group">
-            <strong>摘要</strong>
-            <div id="diaryWallSummary" class="settings-record-detail">
-              <div class="empty-list-state">
-                <strong>等待加载</strong>
-                <span>打开日记墙后，这里会显示当前筛选范围的卡片数量、日记本分布和最近更新时间。</span>
-              </div>
-            </div>
-          </div>
-        </aside>
-        <section class="diary-wall-canvas">
-          <div id="diaryWallAgentNav" class="diary-wall-agent-nav" aria-label="日记墙 Agent 导航">
-            <button type="button" class="diary-wall-agent-tab diary-wall-agent-tab--active" data-diary-wall-agent-filter="all">全部</button>
-          </div>
-          <div id="diaryWallCards" class="diary-wall-grid">
-            <div class="empty-list-state">
-              <strong>还没有日记卡</strong>
-              <span>首次触发 DailyNote.create 后，这里会按瀑布流展示不同日记本的聚合日记。</span>
-            </div>
-          </div>
-        </section>
-        <aside class="diary-wall-detail">
-          <div id="diaryWallDetail" class="diary-wall-detail__content">
-            <div class="empty-list-state">
-              <strong>选择一张日记卡</strong>
-              <span>右侧会展示完整聚合日记、条目列表、原始 DailyNote 请求和来源消息。</span>
-            </div>
-          </div>
-        </aside>
-      </div>
-      <div id="diaryWallNoteModal" class="diary-wall-note-modal hidden" aria-hidden="true">
-        <div id="diaryWallNoteModalBackdrop" class="diary-wall-note-modal__backdrop"></div>
-        <section class="diary-wall-note-modal__dialog" role="dialog" aria-modal="true" aria-label="笔记详情">
-          <header class="diary-wall-note-modal__header">
-            <strong>笔记详情</strong>
-            <button id="diaryWallNoteCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭笔记详情">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-          </header>
-          <div id="diaryWallNoteContent" class="diary-wall-note-modal__content"></div>
-        </section>
       </div>
     </div>
   </div>
