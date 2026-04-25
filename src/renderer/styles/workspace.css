@@ -1229,7 +1229,7 @@
   justify-content: flex-start;
   align-self: stretch;
   min-width: 0;
-  min-height: 150px;
+  min-height: 196px;
   border-radius: 18px;
   background: transparent;
   overflow: hidden;
@@ -1524,7 +1524,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .home-recent-learning .ghost-button {
@@ -1542,21 +1542,21 @@
 .home-recent-learning__list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
   min-height: 0;
 }
 
 .home-recent-learning__item {
   width: 100%;
-  min-height: 54px;
+  min-height: 46px;
   padding: 0;
   border: 0;
   border-radius: 12px;
   background: transparent;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   text-align: left;
   cursor: pointer;
 }
@@ -1568,15 +1568,15 @@
 }
 
 .home-recent-learning__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #3f8fc8;
   background: #e5f5ff;
-  font-size: 25px;
+  font-size: 22px;
   font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
 }
 
@@ -1724,6 +1724,184 @@
   line-height: 1.45;
 }
 
+/* ── AI Learning Diary (replaces calendar + activity) ───────── */
+
+.home-diary {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.home-diary__list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.home-diary__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.home-diary__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.home-diary__list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--line) 60%, transparent);
+  border-radius: 999px;
+}
+
+.home-diary-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 96px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 16px;
+  background: #fdfaf6;
+  color: #5d4037;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.home-diary-card:hover {
+  background: #faf5ee;
+  box-shadow: 0 4px 14px rgba(93, 64, 55, 0.08);
+}
+
+/* Decorative quill icon at bottom-right, like home-flow-card__icon */
+.home-diary-card__quill {
+  position: absolute;
+  right: -12px;
+  bottom: -18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 0;
+  background: transparent;
+  font-size: 56px;
+  opacity: 0.18;
+  pointer-events: none;
+  transform: translate3d(4px, 4px, 0) rotate(-10deg) scale(0.96);
+  transform-origin: center;
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 220ms ease;
+}
+
+.home-diary-card:hover .home-diary-card__quill {
+  transform: translate3d(-6px, -3px, 0) rotate(4deg) scale(1.1);
+  opacity: 0.28;
+}
+
+.home-diary-card__title {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding-right: 20px;
+  color: #6d4c41;
+  font-family: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.home-diary-card__preview {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding-right: 20px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #8d6e63;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Empty state */
+.home-diary__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.home-diary__empty-icon {
+  font-size: 28px;
+  opacity: 0.4;
+}
+
+.home-diary__empty strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5d4037;
+}
+
+.home-diary__empty p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #8d6e63;
+  max-width: 240px;
+}
+
+/* Dark theme overrides for diary cards */
+body:not(.light-theme) .home-diary-card {
+  background: #2c2a3a;
+  color: #d8d2c9;
+}
+
+body:not(.light-theme) .home-diary-card:hover {
+  background: #35334a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+body:not(.light-theme) .home-diary-card__eyebrow {
+  color: #a0a0b0;
+}
+
+body:not(.light-theme) .home-diary-card__title {
+  color: #ffb74d;
+}
+
+body:not(.light-theme) .home-diary-card__preview {
+  color: #c5c8c6;
+}
+
+body:not(.light-theme) .home-diary__empty strong {
+  color: #d8d2c9;
+}
+
+body:not(.light-theme) .home-diary__empty p {
+  color: #a0a0b0;
+}
+
 @media (max-width: 1920px), (max-height: 1100px) {
   .home-grid {
     grid-template-columns: minmax(248px, 0.78fr) minmax(0, 1.44fr) minmax(258px, 0.72fr);
@@ -1753,7 +1931,7 @@
   }
 
   .home-hero__visual {
-    min-height: 116px;
+    min-height: 146px;
     border-radius: 14px;
   }
 
@@ -1779,7 +1957,8 @@
   .home-status,
   .home-recent-learning,
   .home-subjects,
-  .home-activity {
+  .home-activity,
+  .home-diary {
     padding: 12px;
     border-radius: 18px;
   }
@@ -1829,20 +2008,20 @@
   }
 
   .home-recent-learning__list {
-    gap: 9px;
+    gap: 7px;
   }
 
   .home-recent-learning__item {
-    min-height: 45px;
-    grid-template-columns: 36px minmax(0, 1fr);
-    gap: 10px;
+    min-height: 40px;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 8px;
   }
 
   .home-recent-learning__icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    font-size: 21px;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    font-size: 19px;
   }
 
   .home-recent-learning__copy strong {
@@ -1968,6 +2147,51 @@
   .home-activity-card span {
     font-size: 11px;
   }
+
+  .home-diary__list {
+    gap: 8px;
+  }
+
+  .home-diary-card {
+    min-height: 80px;
+    padding: 11px 13px;
+    border-radius: 14px;
+    gap: 5px;
+  }
+
+  .home-diary-card__quill {
+    width: 68px;
+    height: 68px;
+    font-size: 46px;
+    right: -10px;
+    bottom: -14px;
+  }
+
+  .home-diary-card__title {
+    font-size: 14px;
+  }
+
+  .home-diary-card__preview {
+    font-size: 11px;
+    -webkit-line-clamp: 2;
+  }
+
+  .home-diary__empty {
+    padding: 18px 12px;
+    gap: 8px;
+  }
+
+  .home-diary__empty-icon {
+    font-size: 24px;
+  }
+
+  .home-diary__empty strong {
+    font-size: 13px;
+  }
+
+  .home-diary__empty p {
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 1500px), (max-height: 900px) {
@@ -1990,7 +2214,7 @@
   }
 
   .home-hero__visual {
-    min-height: 98px;
+    min-height: 106px;
   }
 
   .home-hero__visual img {
@@ -2002,16 +2226,17 @@
   .home-status,
   .home-recent-learning,
   .home-subjects,
-  .home-activity {
+  .home-activity,
+  .home-diary {
     padding: 10px;
   }
 
   .home-recent-learning__list {
-    gap: 7px;
+    gap: 6px;
   }
 
   .home-recent-learning__item {
-    min-height: 40px;
+    min-height: 36px;
   }
 
   .home-recent-learning__copy strong {
@@ -2086,10 +2311,9 @@
 
   .home-side {
     display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(260px, 0.6fr);
-    grid-template-areas:
-      "flow calendar"
-      "activity activity";
+    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr);
+    grid-template-areas: "flow diary";
+    gap: 14px;
     overflow: visible;
   }
 
@@ -2097,12 +2321,8 @@
     grid-area: flow;
   }
 
-  .home-side .bento-calendar {
-    grid-area: calendar;
-  }
-
-  .home-activity {
-    grid-area: activity;
+  .home-diary {
+    grid-area: diary;
   }
 }
 
@@ -2122,11 +2342,10 @@
   }
 
   .home-side {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "flow"
-      "calendar"
-      "activity";
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+    grid-template-areas: none;
   }
 }
 

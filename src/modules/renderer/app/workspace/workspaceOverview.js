@@ -37,74 +37,76 @@ function formatRelativeTimeShort(value) {
     });
 }
 
-function buildRecentItems({ agents = [], statsByAgent = {}, selectedAgentId = null } = {}) {
-    const items = [];
-    const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) || null;
-    const selectedStats = selectedAgent ? (statsByAgent[selectedAgent.id] || {}) : null;
+function stripMarkdownForPreview(value, maxChars = 120) {
+    let source = String(value || '')
+        // 移除 DailyNote 特殊标记和工具块
+        .replace(/<<<DailyNoteStart>>>/g, '')
+        .replace(/<<<DailyNoteEnd>>>/g, '')
+        .replace(/<<<\[TOOL_REQUEST\]>>>[\s\S]*?<<<\[END_TOOL_REQUEST\]>>>/g, '')
+        // 移除主标题和引用行
+        .replace(/^#\s*DailyNote\s+\d{4}-\d{2}-\d{2}\s*$/gim, '')
+        .replace(/^>\s*日记本：\s*\[?[^\]]*\]?\s*$/gim, '')
+        // 移除子标题行（时间 · 署名）
+        .replace(/^#{1,6}\s*\d{2}:\d{2}(:\d{2})?\s*[·•]\s*.+$/gim, '')
+        // 移除话题二级标题
+        .replace(/^#{2}\s+.+$/gim, '')
+        // 移除 Maid / Tags 行
+        .replace(/^Maid:\s*.+$/gim, '')
+        .replace(/^Tags:\s*(#[^\s]+\s*)*$/gim, '')
+        // 移除普通 Markdown
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+        .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^[>\-*+]\s+/gm, '')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/[*_~]/g, '')
+        // 移除独立的时间戳 [HH:MM] 或 [HH:MM:SS]
+        .replace(/\[\d{2}:\d{2}(:\d{2})?\]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-    if (selectedAgent) {
-        items.push({
-            title: selectedStats?.lastTopicName
-                ? `继续：${selectedStats.lastTopicName}`
-                : `进入：${selectedAgent.name || selectedAgent.id}`,
-            meta: `${selectedAgent.name || selectedAgent.id} · 当前学习空间`,
-            accent: 'primary',
-        });
+    if (!source) {
+        return '';
     }
 
-    const unreadAgent = agents
-        .map((agent) => ({
-            agent,
-            stats: statsByAgent[agent.id] || {},
-        }))
-        .filter((item) => item.agent.id !== selectedAgentId && Number(item.stats.unreadCount || 0) > 0)
-        .sort((left, right) => Number(right.stats.unreadCount || 0) - Number(left.stats.unreadCount || 0))[0];
+    return source.length > maxChars ? `${source.slice(0, maxChars).trim()}…` : source;
+}
 
-    if (unreadAgent) {
-        items.push({
-            title: `待处理：${unreadAgent.agent.name || unreadAgent.agent.id}`,
-            meta: `${unreadAgent.stats.unreadCount || 0} 项内容等待整理`,
-            accent: 'success',
-        });
+function buildDiaryCardsMarkup({ diaryCards = [] } = {}) {
+    const cards = Array.isArray(diaryCards) ? diaryCards : [];
+
+    if (cards.length === 0) {
+        return `
+            <div class="home-diary__empty">
+                <span class="home-diary__empty-icon" aria-hidden="true">✒️</span>
+                <strong>还没有学习日记</strong>
+                <p>和 AI 助手对话学习时，系统会自动把学习结晶整理成日记。开始一段对话，这里就会展示你的学习足迹。</p>
+            </div>
+        `;
     }
 
-    const topicAgent = agents
-        .map((agent) => ({
-            agent,
-            stats: statsByAgent[agent.id] || {},
-        }))
-        .filter((item) => item.stats.lastTopicName && item.agent.id !== selectedAgentId)
-        .sort((left, right) => Number(right.stats.topicCount || 0) - Number(left.stats.topicCount || 0))[0];
+    return cards.slice(0, 4).map((card) => {
+        const preview = stripMarkdownForPreview(card.previewMarkdown || card.contentMarkdown || '', 140);
+        const agentNames = Array.isArray(card.agentNames) && card.agentNames.length > 0
+            ? card.agentNames
+            : (Array.isArray(card.maidSignatures) && card.maidSignatures.length > 0 ? card.maidSignatures : []);
+        const agentLabel = agentNames[0] || 'AI 助手';
+        const topicNames = Object.values(card.topics || {})
+            .map((t) => String(t?.topicName || '').trim())
+            .filter(Boolean);
+        const topicLabel = topicNames[0] || '';
 
-    if (topicAgent) {
-        items.push({
-            title: `归档：${topicAgent.stats.lastTopicName}`,
-            meta: `${topicAgent.agent.name || topicAgent.agent.id} · 已整理 ${topicAgent.stats.topicCount || 0} 个话题`,
-            accent: 'muted',
-        });
-    }
-
-    if (items.length === 0) {
-        return [
-            {
-                title: '创建第一个学科',
-                meta: '从一个学习入口开始，把资料、对话和笔记组织起来',
-                accent: 'primary',
-            },
-            {
-                title: '沉淀你的学习过程',
-                meta: '后续这里会自动汇总最近的话题、笔记和成长记录',
-                accent: 'success',
-            },
-            {
-                title: '继续完成当天任务',
-                meta: '通过首页快速回到当前学习空间',
-                accent: 'muted',
-            },
-        ];
-    }
-
-    return items.slice(0, 3);
+        return `
+            <article class="home-diary-card" data-home-action="open-diary">
+                <span class="home-diary-card__quill" aria-hidden="true">✒️</span>
+                <strong class="home-diary-card__title">${escapeHtml(topicLabel || agentLabel || '学习日记')}</strong>
+                <p class="home-diary-card__preview">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
+            </article>
+        `;
+    }).join('');
 }
 
 function buildRecentLearningItems({ agents = [], statsByAgent = {}, selectedAgentId = null } = {}) {
@@ -277,51 +279,7 @@ function buildSubjectCollectionMarkup({
         : `<div class="overview-subject-wall" data-subject-collection data-view-mode="grid">${itemsMarkup}</div>`;
 }
 
-function buildCalendarMarkup(activeDates = []) {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startOffset = firstDay.getDay();
-    const daysInMonth = lastDay.getDate();
-
-    const today = now.getDate();
-    const activeSet = new Set(activeDates.map((d) => Number(d)));
-
-    let daysHtml = '';
-    for (let i = 0; i < startOffset; i++) {
-        daysHtml += '<span class="bento-calendar__day bento-calendar__day--pad"></span>';
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-        const isToday = d === today;
-        const isActive = activeSet.has(d);
-        const cls = [
-            'bento-calendar__day',
-            isToday ? 'bento-calendar__day--today' : '',
-            isActive ? 'bento-calendar__day--active' : '',
-        ].filter(Boolean).join(' ');
-        daysHtml += `<span class="${cls}">${d}</span>`;
-    }
-
-    return `
-        <div class="bento-calendar">
-            <div class="bento-calendar__header">
-                <strong>学习日历</strong>
-                <span class="bento-calendar__month">${year}年${monthNames[month]}</span>
-            </div>
-            <div class="bento-calendar__weekdays">
-                ${weekDays.map((w) => `<span>${w}</span>`).join('')}
-            </div>
-            <div class="bento-calendar__days">
-                ${daysHtml}
-            </div>
-        </div>
-    `;
-}
 
 function buildStatsMarkup({
     weekHours = 0,
@@ -391,13 +349,13 @@ function buildSubjectOverviewMarkup({
     selectedAgentName = '',
     currentTopicName = '',
     learningMetrics = {},
+    diaryCards = [],
 } = {}) {
     const hasAgents = agents.length > 0;
     const totalTopics = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.topicCount || 0), 0);
     const totalUnread = agents.reduce((sum, agent) => sum + Number(statsByAgent[agent.id]?.unreadCount || 0), 0);
     const currentAgentLabel = selectedAgentName || '还没有创建学科';
     const currentTopicLabel = currentTopicName || '还没有选中话题';
-    const recentItems = buildRecentItems({ agents, statsByAgent, selectedAgentId });
     const recentLearningItems = buildRecentLearningItems({ agents, statsByAgent, selectedAgentId });
     const streakDays = Math.max(0, Number(learningMetrics?.streakDays || 0));
     const score = Math.max(0, Number(learningMetrics?.score || 0));
@@ -427,12 +385,6 @@ function buildSubjectOverviewMarkup({
         </button>
     `).join('');
 
-    const activityCards = recentItems.map((item) => `
-        <article class="home-activity-card home-activity-card--${escapeHtml(item.accent)}">
-            <strong>${escapeHtml(item.title)}</strong>
-            <span>${escapeHtml(item.meta)}</span>
-        </article>
-    `).join('');
     const recentLearningRows = recentLearningItems.map((item) => `
         <button
             type="button"
@@ -496,7 +448,22 @@ function buildSubjectOverviewMarkup({
         </section>
     `;
 
-    const calendarMarkup = buildCalendarMarkup(learningMetrics?.activeDates || []);
+    const diarySection = `
+        <section class="home-diary">
+            <div class="home-section-header">
+                <div>
+                    <span>学习结晶</span>
+                    <h3>AI 学习日记</h3>
+                </div>
+                <button type="button" class="ghost-button" data-home-action="open-diary">
+                    查看全部
+                    <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                </button>
+            </div>
+            <div class="home-diary__list">${buildDiaryCardsMarkup({ diaryCards })}</div>
+        </section>
+    `;
+
     const subjectSection = hasAgents
         ? `
         <section class="home-subjects">
@@ -585,20 +552,7 @@ function buildSubjectOverviewMarkup({
 
                     <aside class="home-side home-right">
                         ${workflowSection}
-                        ${calendarMarkup}
-                        <section class="home-activity">
-                            <div class="home-section-header">
-                                <div>
-                                    <span>接下来</span>
-                                    <h3>可继续的事项</h3>
-                                </div>
-                                <button type="button" class="ghost-button" data-home-action="open-diary">
-                                    查看全部
-                                    <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-                                </button>
-                            </div>
-                            <div class="home-activity__list">${activityCards}</div>
-                        </section>
+                        ${diarySection}
                     </aside>
                 </div>
             </div>

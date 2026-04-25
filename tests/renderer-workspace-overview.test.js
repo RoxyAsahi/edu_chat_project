@@ -47,12 +47,11 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
     assert.match(result.gridMarkup, /函数复习/);
     assert.match(result.gridMarkup, /data-agent-id="math"/);
     assert.match(result.gridMarkup, /data-agent-id="english"/);
-    assert.match(result.gridMarkup, /当前学习空间/);
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
-    assert.match(result.gridMarkup, /学习日历/);
-    assert.match(result.gridMarkup, /bento-calendar/);
+    assert.match(result.gridMarkup, /AI 学习日记/);
+    assert.match(result.gridMarkup, /学习结晶/);
+    assert.match(result.gridMarkup, /home-diary/);
     assert.match(result.gridMarkup, /学习力/);
-    assert.match(result.gridMarkup, /可继续的事项/);
 });
 
 test('buildSubjectOverviewMarkup keeps the current subject visible when it is the only subject card', async () => {
