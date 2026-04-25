@@ -246,8 +246,8 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /全部/);
     assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /Nova/);
     assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /Hornet/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Nova/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Hornet/);
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /初中数学_二次函数/);
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /高中英语_定语从句/);
     assert.match(documentObj.getElementById('diaryWallDetail').textContent, /选择一张日记卡/);
     assert.equal(listPayloads[0].scope, 'global');
     assert.equal(detailPayloads.length, 0);
@@ -257,8 +257,8 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     hornetTab.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 30));
 
-    assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /Nova/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /Hornet/);
+    assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /初中数学_二次函数/);
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /高中英语_定语从句/);
     assert.match(documentObj.getElementById('diaryWallSummary').textContent, /1 张日记/);
     assert.match(documentObj.getElementById('diaryWallDetail').textContent, /选择一张日记卡/);
 

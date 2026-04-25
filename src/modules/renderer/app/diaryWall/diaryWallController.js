@@ -108,7 +108,22 @@ function buildMarkdownPreview(value, maxChars = 420) {
 }
 
 function buildPlainPreview(value, maxChars = 150) {
-    const source = stripLeadingDiaryHeadings(value || '')
+    let source = stripLeadingDiaryHeadings(value || '')
+        // 移除 DailyNote 特殊标记和工具块
+        .replace(/<<<DailyNoteStart>>>/g, '')
+        .replace(/<<<DailyNoteEnd>>>/g, '')
+        .replace(/<<<\[TOOL_REQUEST\]>>>[\s\S]*?<<<\[END_TOOL_REQUEST\]>>>/g, '')
+        // 移除主标题和引用行
+        .replace(/^#\s*DailyNote\s+\d{4}-\d{2}-\d{2}\s*$/gim, '')
+        .replace(/^>\s*日记本：\s*\[?[^\]]*\]?\s*$/gim, '')
+        // 移除子标题行（时间 · 署名）
+        .replace(/^#{1,6}\s*\d{2}:\d{2}(:\d{2})?\s*[·•]\s*.+$/gim, '')
+        // 移除话题二级标题
+        .replace(/^#{2}\s+.+$/gim, '')
+        // 移除 Maid / Tags 行
+        .replace(/^Maid:\s*.+$/gim, '')
+        .replace(/^Tags:\s*(#[^\s]+\s*)*$/gim, '')
+        // 移除普通 Markdown
         .replace(/```[\s\S]*?```/g, ' ')
         .replace(/`([^`]+)`/g, '$1')
         .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
@@ -118,6 +133,8 @@ function buildPlainPreview(value, maxChars = 150) {
         .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/__([^_]+)__/g, '$1')
         .replace(/[*_~]/g, '')
+        // 移除独立的时间戳 [HH:MM] 或 [HH:MM:SS]
+        .replace(/\[\d{2}:\d{2}(:\d{2})?\]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -393,23 +410,14 @@ function createDiaryWallController(deps = {}) {
         el.diaryWallCards.innerHTML = `
               <div class="diary-wall-group__grid diary-wall-group__grid--flat">
                 ${sortedCards.map((card) => {
-                    const groupLabel = deriveAgentGroupLabel(card);
-                    const preview = buildPlainPreview(card.previewMarkdown || card.contentMarkdown || '', 150);
+                    const preview = buildPlainPreview(card.previewMarkdown || card.contentMarkdown || '', 180);
                     return `
                     <button type="button" class="diary-wall-card ${buildCardSelectionKey(card) === state.selectedCardKey ? 'diary-wall-card--active' : ''}" data-diary-wall-card="${escapeHtml(buildCardSelectionKey(card))}">
-                      <div class="diary-wall-card__header">
-                        <div class="diary-wall-card__header-main">
-                          <span class="diary-wall-card__eyebrow">${escapeHtml(card.dateKey || '未记录日期')}</span>
-                          <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
-                        </div>
-                        <span class="diary-wall-card__agent">${escapeHtml(groupLabel || '日记')}</span>
+                      <div class="diary-wall-card__body">
+                        <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
+                        <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
                       </div>
-                      <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
-                      <div class="diary-wall-card__stats">${escapeHtml([
-                          card.notebookName || '默认日记本',
-                          formatTimeOnly(card.updatedAt),
-                      ].filter(Boolean).join(' · '))}</div>
-                      <div class="diary-wall-card__tags">${(card.tags || []).slice(0, 3).map((tag) => `<span class="diary-wall-chip">#${escapeHtml(tag)}</span>`).join('')}</div>
+                      <span class="diary-wall-card__eyebrow">${escapeHtml(card.dateKey || '未记录日期')}</span>
                     </button>
                 `;
                 }).join('')}

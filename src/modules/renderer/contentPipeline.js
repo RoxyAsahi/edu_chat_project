@@ -91,7 +91,7 @@ function createContentPipeline(deps = {}) {
 
         ctx.state.toolResultMap = new Map();
         const result = text.replace(toolResultRegex, (match) => {
-            const placeholder = `__TOOL_RESULT_PLACEHOLDER_${ctx.state.toolResultPlaceholderId}__`;
+            const placeholder = `<!--UNISTUDY_TOOL_RESULT_${ctx.state.toolResultPlaceholderId}-->`;
             ctx.state.toolResultMap.set(placeholder, match);
             ctx.state.toolResultPlaceholderId += 1;
             return placeholder;
@@ -111,10 +111,6 @@ function createContentPipeline(deps = {}) {
             ctx.state.codeBlockPlaceholderId += 1;
             return placeholder;
         });
-    }
-
-    function restoreToolResults(text, ctx) {
-        return createMapPlaceholderReplacer(ctx.state.toolResultMap)(text);
     }
 
     function restoreCodeBlocks(text, ctx) {
@@ -167,12 +163,15 @@ function createContentPipeline(deps = {}) {
         const ctx = createContext(inputText, { ...options, mode: PIPELINE_MODES.FULL_RENDER });
 
         step(ctx, 'normalize-emoticon-urls', (text) => fixEmoticonUrlsInMarkdown(text));
+
+        // 顺序协议：
+        // ToolResult 可能包含代码围栏、工具请求、HTML、表格和「始」/「末」标记。
+        // 先保护并让占位符贯穿外层 Markdown 解析，避免内部语法污染整条消息。
+        step(ctx, 'protect-tool-results', protectToolResults);
         step(ctx, 'escape-start-end-markers', (text) => processStartEndMarkers(text));
         step(ctx, 'transform-mermaid-placeholders', (text) => transformMermaidPlaceholders(text));
 
-        // 顺序协议：
-        // 1. 先做结构保护
-        step(ctx, 'protect-tool-results', protectToolResults);
+        // 1. 继续保护代码块
         step(ctx, 'protect-code-blocks', protectCodeBlocks);
 
         // 2. 再做会改变行首语义/结构边界的修正
@@ -183,10 +182,8 @@ function createContentPipeline(deps = {}) {
         // 3. 再做结构转换
         step(ctx, 'transform-desktop-push', transformDesktopPush);
 
-        // 4. 恢复一部分被保护的结构，以便特殊块转换能够识别
-        step(ctx, 'restore-tool-results', restoreToolResults);
-
-        // 5. 特殊块转换、HTML 文档 fenced、通用处理
+        // 4. 特殊块转换、HTML 文档 fenced、通用处理。
+        // ToolResult 仍保持占位符，等 marked.parse 后再独立渲染恢复。
         step(ctx, 'transform-special-blocks', (text) => transformSpecialBlocks(text, ctx.state.codeBlockMap));
         step(ctx, 'ensure-html-fenced', (text) => ensureHtmlFenced(text));
         step(ctx, 'apply-common-content-processors', (text) => applyContentProcessors(text));

@@ -425,7 +425,8 @@ function toggleEditMode(messageItem, message) {
         if (contextMenuDependencies.updateMessageContent) {
             contextMenuDependencies.updateMessageContent(message.id, textToDisplay);
         } else {
-            const rawHtml = markedInstance.parse(contextMenuDependencies.preprocessFullContent(textToDisplay));
+            const ppResult = contextMenuDependencies.preprocessFullContent(textToDisplay);
+            const rawHtml = markedInstance.parse(ppResult.text || ppResult);
             contextMenuDependencies.setContentAndProcessImages(contentDiv, rawHtml, message.id);
             contextMenuDependencies.processRenderedContent(contentDiv);
             setTimeout(() => {
