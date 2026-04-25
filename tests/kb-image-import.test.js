@@ -126,6 +126,80 @@ test('documentProcessor transcribes image documents and persists extracted conte
     assert.equal(document.contentType, 'markdown');
 });
 
+test('documentProcessor writes chunk records in bulk when the repository supports it', async () => {
+    const operations = [];
+    const document = {
+        id: 'doc-text',
+        kbId: 'kb-1',
+        name: 'notes.txt',
+        mimeType: 'text/plain',
+        status: 'pending',
+        contentType: null,
+        attemptCount: 0,
+    };
+
+    const repository = {
+        async getDocumentById(documentId) {
+            assert.equal(documentId, 'doc-text');
+            return { ...document };
+        },
+        async updateDocumentState(documentId, patch) {
+            operations.push(['updateDocumentState', documentId, patch]);
+            Object.assign(document, patch);
+            return { ...document };
+        },
+        async updateDocumentGuideState(documentId, patch) {
+            operations.push(['updateDocumentGuideState', documentId, patch]);
+        },
+        async updateDocumentDerivedContent() {
+            throw new Error('text documents should not persist OCR-derived content');
+        },
+        async deleteDocumentChunks(documentId) {
+            operations.push(['deleteDocumentChunks', documentId]);
+        },
+        async insertDocumentChunk() {
+            throw new Error('single chunk insert should not be used when bulk insert is available');
+        },
+        async insertDocumentChunks(records) {
+            operations.push(['insertDocumentChunks', records]);
+        },
+        async updateDocumentMimeType(documentId, mimeType) {
+            operations.push(['updateDocumentMimeType', documentId, mimeType]);
+        },
+    };
+
+    const processor = createDocumentProcessor({
+        runtime: {
+            async readSettings() {
+                return {};
+            },
+        },
+        repository,
+        parseKnowledgeBaseDocument: async () => ({
+            mimeType: 'text/plain',
+            contentType: 'plain',
+            text: 'alpha beta gamma delta',
+            structure: null,
+        }),
+        inferMimeType: (inputDocument) => inputDocument.mimeType,
+        isImageMimeType: () => false,
+        chunkText: () => [
+            { content: 'alpha beta', contentType: 'plain', charLength: 10 },
+            { content: 'gamma delta', contentType: 'plain', charLength: 11 },
+        ],
+        requestEmbeddings: async () => [[1, 0], [0, 1]],
+        KB_UNSUPPORTED_OCR_ERROR: 'unsupported',
+    });
+
+    await processor.processDocument('doc-text');
+
+    const bulkInsert = operations.find(([name]) => name === 'insertDocumentChunks');
+    assert.ok(bulkInsert);
+    assert.equal(bulkInsert[1].length, 2);
+    assert.deepEqual(bulkInsert[1].map((record) => record.chunkIndex), [0, 1]);
+    assert.equal(document.status, 'done');
+});
+
 test('documentStore requeues failed duplicate imports instead of keeping stale failed records', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-kb-image-import-'));
     t.after(() => fs.remove(tempRoot));

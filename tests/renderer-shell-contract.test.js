@@ -39,6 +39,13 @@ test('renderer shell html no longer references legacy style.css runtime entry', 
     assert.equal(html.includes('href="style.css"'), false);
 });
 
+test('renderer shell leaves Mermaid on the lazy-load path', async () => {
+    const { document } = await loadRendererShell();
+    const srcs = [...document.querySelectorAll('script[src]')].map((element) => element.getAttribute('src'));
+
+    assert.equal(srcs.includes('../../vendor/mermaid.min.js'), false);
+});
+
 test('renderer shell keeps the critical DOM anchors for controller wiring', async () => {
     const { document } = await loadRendererShell();
 

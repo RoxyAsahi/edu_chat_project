@@ -78,20 +78,26 @@ function createDocumentProcessor(deps = {}) {
             await repository.deleteDocumentChunks(documentId);
 
             const createdAt = Date.now();
-            for (let index = 0; index < chunks.length; index += 1) {
-                await repository.insertDocumentChunk({
-                    kbId: document.kbId,
-                    documentId,
-                    chunkIndex: index,
-                    content: chunks[index].content,
-                    embedding: embeddings[index],
-                    createdAt,
-                    contentType: chunks[index].contentType || contentType,
-                    charLength: toNumber(chunks[index].charLength, chunks[index].content.length),
-                    sectionTitle: chunks[index].sectionTitle,
-                    pageNumber: toOptionalNumber(chunks[index].pageNumber, null),
-                    paragraphIndex: toOptionalNumber(chunks[index].paragraphIndex, null),
-                });
+            const chunkRecords = chunks.map((chunk, index) => ({
+                kbId: document.kbId,
+                documentId,
+                chunkIndex: index,
+                content: chunk.content,
+                embedding: embeddings[index],
+                createdAt,
+                contentType: chunk.contentType || contentType,
+                charLength: toNumber(chunk.charLength, chunk.content.length),
+                sectionTitle: chunk.sectionTitle,
+                pageNumber: toOptionalNumber(chunk.pageNumber, null),
+                paragraphIndex: toOptionalNumber(chunk.paragraphIndex, null),
+            }));
+
+            if (typeof repository.insertDocumentChunks === 'function') {
+                await repository.insertDocumentChunks(chunkRecords);
+            } else {
+                for (const chunkRecord of chunkRecords) {
+                    await repository.insertDocumentChunk(chunkRecord);
+                }
             }
 
             const completedAt = Date.now();

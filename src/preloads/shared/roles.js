@@ -47,6 +47,7 @@ const SESSION_KEYS = [
     'toggleTopicLock',
     'setTopicUnread',
     'getChatHistory',
+    'getChatHistoryPage',
     'saveChatHistory',
     'getOriginalMessageContent',
     'handleFilePaste',

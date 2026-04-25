@@ -630,6 +630,9 @@ app.on('before-quit', () => {
     fileWatcher.stopWatching();
     settingsManager?.dispose?.();
     agentConfigManager?.dispose?.();
+    void chatHandlers.shutdown?.().catch((error) => {
+        console.warn('[UniStudyBootstrap] Failed to shutdown chat history cleanly:', error?.message || error);
+    });
     void knowledgeBase.shutdownKnowledgeBase().catch((error) => {
         console.warn('[UniStudyBootstrap] Failed to shutdown knowledge base cleanly:', error?.message || error);
     });
