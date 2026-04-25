@@ -13,6 +13,7 @@ import { createMessageSkeleton, formatMessageTimestamp } from './domBuilder.js';
 import * as streamManager from './streamManager.js';
 import * as emoticonUrlFixer from './emoticonUrlFixer.js';
 import { createContentPipeline, PIPELINE_MODES } from './contentPipeline.js';
+import { sanitizeHtml } from './safeHtml.js';
 import { positionFloatingElement } from './app/dom/positionFloatingElement.js';
 import {
     createCitationPopoverController,
@@ -1034,20 +1035,166 @@ function calculateDepthByTurns(messageId, history) {
 /**
  * A helper function to preprocess the full message content string before parsing.
  * @param {string} text The raw text content.
- * @returns {string} The processed text.
+ * @returns {{text: string, toolResultMap: Map<string, string>|null}} The processed text and protected ToolResult map.
  */
 function preprocessFullContent(text, settings = {}, messageRole = 'assistant', depth = 0) {
     if (!contentPipeline) {
         console.warn('[MessageRenderer] contentPipeline not initialized, falling back to raw text');
-        return text;
+        return { text, toolResultMap: null };
     }
 
-    return contentPipeline.process(text, {
+    const result = contentPipeline.process(text, {
         mode: PIPELINE_MODES.FULL_RENDER,
         settings,
         messageRole,
         depth
-    }).text;
+    });
+
+    return { text: result.text, toolResultMap: result.state.toolResultMap || null };
+}
+
+function renderToolResultMarkdown(value) {
+    const rawValue = String(value || '');
+    if (!mainRendererReferences.markedInstance) {
+        return `<pre class="unistudy-tool-result-raw-content">${escapeHtml(rawValue)}</pre>`;
+    }
+
+    try {
+        return `<div class="unistudy-tool-result-markdown-content">${sanitizeHtml(mainRendererReferences.markedInstance.parse(rawValue))}</div>`;
+    } catch (e) {
+        console.error('Failed to parse markdown in tool result', e);
+        return `<pre class="unistudy-tool-result-raw-content">${escapeHtml(rawValue)}</pre>`;
+    }
+}
+
+function renderToolResultBlock(fullMatch) {
+    const startMarkerRegex = /^\[\[(?:工具调用结果信息汇总):?/u;
+    const endMarkerRegex = /(?:工具调用结果结束)\]\]$/u;
+    const content = String(fullMatch || '')
+        .replace(startMarkerRegex, '')
+        .replace(endMarkerRegex, '')
+        .trim();
+
+    const lines = content.split('\n');
+    const TOOL_NAME_KEYS = new Set(['tool_name', 'tool name', 'name']);
+    const STATUS_KEYS = new Set(['status']);
+    const MARKDOWN_VALUE_KEYS = new Set(['result', 'output', 'content']);
+    const IMAGE_VALUE_KEYS = new Set(['url', 'image']);
+
+    const normalizeToolResultKey = (key) => {
+        const normalized = String(key || '').trim();
+        const lower = normalized.toLowerCase();
+        const toolNameAliases = ['宸ュ叿'];
+        const statusAliases = ['鐘舵€'];
+        const contentAliases = ['鏉╂柨娲'];
+        const urlAliases = ['閸欘垵'];
+
+        if (normalized === '工具名称' || TOOL_NAME_KEYS.has(lower) || toolNameAliases.some(alias => normalized.includes(alias))) {
+            return '工具名称';
+        }
+        if (normalized === '执行状态' || STATUS_KEYS.has(lower) || lower.startsWith('status') || statusAliases.some(alias => normalized.includes(alias))) {
+            return '执行状态';
+        }
+        if (normalized === '返回内容' || normalized === '返回结果' || normalized === '内容' || MARKDOWN_VALUE_KEYS.has(lower) || contentAliases.some(alias => normalized.includes(alias))) {
+            return '返回内容';
+        }
+        if (normalized === '可访问URL' || IMAGE_VALUE_KEYS.has(lower) || urlAliases.some(alias => normalized.includes(alias))) {
+            return '可访问URL';
+        }
+        return normalized;
+    };
+
+    let toolName = '未知工具';
+    let status = '未知状态';
+    const details = [];
+    const otherContent = [];
+    let currentKey = null;
+    let currentValue = [];
+
+    const commitField = () => {
+        if (!currentKey) return;
+        const value = currentValue.join('\n').trim();
+        const normalizedKey = normalizeToolResultKey(currentKey);
+
+        if (normalizedKey === '工具名称') {
+            toolName = value || toolName;
+        } else if (normalizedKey === '执行状态') {
+            status = value || status;
+        } else {
+            details.push({ key: normalizedKey, value });
+        }
+    };
+
+    lines.forEach((line) => {
+        const kvMatch = line.match(/^-\s*([^:]+):\s*(.*)/);
+        if (kvMatch) {
+            commitField();
+            currentKey = kvMatch[1].trim();
+            currentValue = [kvMatch[2].trim()];
+        } else if (currentKey) {
+            currentValue.push(line);
+        } else if (line.trim() !== '') {
+            otherContent.push(line);
+        }
+    });
+    commitField();
+
+    let html = `<div class="unistudy-tool-result-bubble collapsible">`;
+    html += `<div class="unistudy-tool-result-header">`;
+    html += `<span class="unistudy-tool-result-label">Tool Result</span>`;
+    html += `<span class="unistudy-tool-result-name">${escapeHtml(toolName)}</span>`;
+    html += `<span class="unistudy-tool-result-status">${escapeHtml(status)}</span>`;
+    html += `<span class="unistudy-result-toggle-icon"></span>`;
+    html += `</div>`;
+
+    html += `<div class="unistudy-tool-result-collapsible-content">`;
+    html += `<div class="unistudy-tool-result-details">`;
+
+    details.forEach(({ key, value }) => {
+        const isMarkdownField = key === '返回内容';
+        const isImageUrl = typeof value === 'string' && /^https?:\/\/[^\s]+\.(jpeg|jpg|png|gif|webp)([?&#].*)?$/i.test(value);
+        const isPreviewField = key === '可访问URL' || key === '返回内容';
+        let processedValue;
+
+        if (isImageUrl && isPreviewField) {
+            const safeUrl = escapeHtml(value);
+            processedValue = `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" title="打开预览"><img src="${safeUrl}" class="unistudy-tool-result-image" alt="生成图片"></a>`;
+        } else if (isMarkdownField) {
+            processedValue = renderToolResultMarkdown(value);
+        } else {
+            processedValue = escapeHtml(value);
+            processedValue = processedValue.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+        }
+
+        html += `<div class="unistudy-tool-result-item">`;
+        html += `<span class="unistudy-tool-result-item-key">${escapeHtml(key)}:</span> `;
+        const valueTag = (isMarkdownField && !isImageUrl) ? 'div' : 'span';
+        html += `<${valueTag} class="unistudy-tool-result-item-value">${processedValue}</${valueTag}>`;
+        html += `</div>`;
+    });
+
+    html += `</div>`;
+
+    if (otherContent.length > 0) {
+        const footerText = otherContent.join('\n');
+        html += `<div class="unistudy-tool-result-footer"><pre class="unistudy-tool-result-raw-content">${escapeHtml(footerText)}</pre></div>`;
+    }
+
+    html += `</div>`;
+    html += `</div>`;
+    return html;
+}
+
+function restoreRenderedToolResults(html, toolResultMap) {
+    if (!toolResultMap || toolResultMap.size === 0) return html;
+
+    let result = html;
+    for (const [placeholder, rawMatch] of toolResultMap.entries()) {
+        const renderedHtml = renderToolResultBlock(rawMatch);
+        result = result.split(`<p>${placeholder}</p>`).join(renderedHtml);
+        result = result.split(placeholder).join(renderedHtml);
+    }
+    return result;
 }
 
 /**
@@ -1619,12 +1766,13 @@ function initializeMessageRenderer(refs) {
         ...mainRendererReferences.markedInstance,
         parse: (text) => {
             const globalSettings = mainRendererReferences.globalSettingsRef.get();
-            const processedText = preprocessFullContent(text, globalSettings);
+            const { text: processedText, toolResultMap } = preprocessFullContent(text, globalSettings);
             // Protect LaTeX before parsing Markdown.
             const { text: protectedText, map: latexMap } = protectLatexBlocks(processedText);
             let html = originalMarkedParse(protectedText);
             // Restore protected LaTeX after parsing.
             html = restoreLatexBlocks(html, latexMap);
+            html = restoreRenderedToolResults(html, toolResultMap);
             return html;
         }
     };
@@ -1985,12 +2133,13 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
         }
         // End frontend regex rule application.
 
-        const processedContent = preprocessFullContent(textToRender, globalSettings, message.role, depth);
+        const { text: processedContent, toolResultMap } = preprocessFullContent(textToRender, globalSettings, message.role, depth);
         // Protect LaTeX before parsing Markdown.
         const { text: protectedContent, map: latexMap } = protectLatexBlocks(processedContent);
         let rawHtml = markedInstance.parse(protectedContent);
         // Restore protected LaTeX after parsing.
         rawHtml = restoreLatexBlocks(rawHtml, latexMap);
+        rawHtml = restoreRenderedToolResults(rawHtml, toolResultMap);
         rawHtml = prependNativeReasoningBubble(rawHtml, message);
         // Fix malformed SVG viewBox attributes generated by Markdown parsing.
         // "Unexpected end of attribute" usually means the generated viewBox value was truncated.
@@ -2322,12 +2471,13 @@ async function renderFullMessage(messageId, fullContent, agentName, agentId) {
         fullContent = applyFrontendRegexRules(fullContent, agentConfigForRegex.stripRegexes, messageFromHistoryForRegex.role, depth);
     }
     // End frontend regex rule application.
-    const processedFinalText = preprocessFullContent(fullContent, globalSettings, 'assistant');
+    const { text: processedFinalText, toolResultMap: toolResultMapFinal } = preprocessFullContent(fullContent, globalSettings, 'assistant');
     // Protect LaTeX before parsing Markdown.
     const { text: protectedFinalText, map: latexMapFinal } = protectLatexBlocks(processedFinalText);
     let rawHtml = markedInstance.parse(protectedFinalText);
     // Restore protected LaTeX after parsing.
     rawHtml = restoreLatexBlocks(rawHtml, latexMapFinal);
+    rawHtml = restoreRenderedToolResults(rawHtml, toolResultMapFinal);
     rawHtml = prependNativeReasoningBubble(rawHtml, messageFromHistoryForRegex);
 
     setContentAndProcessImages(contentDiv, rawHtml, messageId);
@@ -2398,12 +2548,13 @@ function updateMessageContent(messageId, newContent) {
         textToRender = applyFrontendRegexRules(textToRender, agentConfigForRegex.stripRegexes, messageInHistory.role, depthForUpdate);
     }
     // End frontend regex reapplication.
-    const processedContent = preprocessFullContent(textToRender, globalSettings, messageInHistory?.role || 'assistant', depthForUpdate);
+    const { text: processedContent, toolResultMap: toolResultMapUpdate } = preprocessFullContent(textToRender, globalSettings, messageInHistory?.role || 'assistant', depthForUpdate);
     // Protect LaTeX before parsing Markdown.
     const { text: protectedContentUpdate, map: latexMapUpdate } = protectLatexBlocks(processedContent);
     let rawHtml = markedInstance.parse(protectedContentUpdate);
     // Restore protected LaTeX after parsing.
     rawHtml = restoreLatexBlocks(rawHtml, latexMapUpdate);
+    rawHtml = restoreRenderedToolResults(rawHtml, toolResultMapUpdate);
     rawHtml = prependNativeReasoningBubble(rawHtml, messageInHistory);
 
     // --- Post-Render Processing (aligned with renderMessage logic) ---

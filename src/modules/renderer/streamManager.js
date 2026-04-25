@@ -1401,10 +1401,9 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
                 if (contentDiv) {
                     contentDiv.querySelectorAll('.unistudy-stream-reasoning-root, .unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
 
-                    const globalSettings = refs.globalSettingsRef.get();
-                    // Use the more thorough preprocessFullContent for the final render
-                    const processedFinalText = refs.preprocessFullContent(finalFullText, globalSettings);
-                    let rawHtml = markedInstance.parse(processedFinalText);
+                    // markedInstance is the renderer wrapper; it owns full preprocessing,
+                    // LaTeX protection, and ToolResult restoration for the final render.
+                    let rawHtml = markedInstance.parse(finalFullText);
                     if (typeof refs.prependNativeReasoningBubble === 'function') {
                         rawHtml = refs.prependNativeReasoningBubble(rawHtml, message);
                     }
