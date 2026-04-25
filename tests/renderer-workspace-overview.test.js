@@ -38,7 +38,10 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
     assert.match(result.gridMarkup, /整理笔记/);
     assert.match(result.gridMarkup, /复盘巩固/);
     assert.match(result.gridMarkup, /今天的概览/);
+    assert.match(result.gridMarkup, /最近学习/);
+    assert.match(result.gridMarkup, /继续之前的对话/);
     assert.match(result.gridMarkup, /选择一个学科继续/);
+    assert.match(result.gridMarkup, /把每个学科当作一个长期学习空间/);
     assert.match(result.gridMarkup, /home-subjects/);
     assert.match(result.gridMarkup, /subject-overview-card--current/);
     assert.match(result.gridMarkup, /函数复习/);
@@ -75,7 +78,7 @@ test('buildSubjectOverviewMarkup keeps the current subject visible when it is th
     assert.match(result.gridMarkup, /subject-overview-card--current/);
     assert.match(result.gridMarkup, /单学科/);
     assert.match(result.gridMarkup, /data-agent-id="solo"/);
-    assert.equal((result.gridMarkup.match(/data-agent-id="solo"/g) || []).length, 1);
+    assert.equal((result.gridMarkup.match(/\bdata-subject-card\b/g) || []).length, 1);
     assert.doesNotMatch(result.gridMarkup, /subject-overview-browser-empty/);
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
 });
@@ -91,7 +94,7 @@ test('buildSubjectOverviewMarkup renders the onboarding empty state when there a
 
     assert.equal(result.headline, '学习工作台');
     assert.match(result.gridMarkup, /app-home--learning/);
-    assert.match(result.gridMarkup, /个人 AI 学习终端/);
+    assert.match(result.gridMarkup, /个人 AI 学习中心/);
     assert.match(result.gridMarkup, /写作业\.svg/);
     assert.match(result.gridMarkup, /data-home-action="create-subject"/);
     assert.match(result.gridMarkup, /新建学科/);

@@ -618,6 +618,7 @@ function createWorkspaceController(deps = {}) {
                     topicCount: normalizedTopics.length,
                     unreadCount: Number(unreadCounts[agent.id] || 0),
                     lastTopicName: normalizedTopics[0]?.name || '',
+                    lastTopicCreatedAt: Number(normalizedTopics[0]?.createdAt || 0),
                 },
             ];
         }));

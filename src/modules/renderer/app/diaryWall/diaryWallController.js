@@ -107,6 +107,27 @@ function buildMarkdownPreview(value, maxChars = 420) {
     };
 }
 
+function buildPlainPreview(value, maxChars = 150) {
+    const source = stripLeadingDiaryHeadings(value || '')
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+        .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^[>\-*+]\s+/gm, '')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/[*_~]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!source) {
+        return '';
+    }
+
+    return source.length > maxChars ? `${source.slice(0, maxChars).trim()}...` : source;
+}
+
 function getCardTopicNames(card = {}) {
     return Object.values(card.topics || {})
         .map((topic) => String(topic?.topicName || '').trim())
@@ -202,6 +223,9 @@ function createDiaryWallController(deps = {}) {
     const getCurrentTopicName = deps.getCurrentTopicName || (() => '');
     const openLogsPanel = deps.openLogsPanel || (async () => {});
     const selectTopic = deps.selectTopic || (async () => {});
+    const showSubjectWorkspace = deps.showSubjectWorkspace || (() => {});
+    const onOpen = deps.onOpen || (() => {});
+    const onClose = deps.onClose || (() => {});
 
     const state = {
         open: false,
@@ -212,7 +236,13 @@ function createDiaryWallController(deps = {}) {
         detail: null,
         detailExpanded: false,
         noteModalOpen: false,
+        lastLoadedAt: 0,
+        loadingPromise: null,
     };
+
+    function isEmbeddedPanel() {
+        return el.diaryWallModal?.classList.contains('diary-wall-panel') === true;
+    }
 
     function openNoteModal() {
         state.noteModalOpen = true;
@@ -253,7 +283,7 @@ function createDiaryWallController(deps = {}) {
     function syncSelectedDiary() {
         const visibleCards = getVisibleCards();
         if (!state.selectedCardKey || !visibleCards.some((item) => buildCardSelectionKey(item) === state.selectedCardKey)) {
-            state.selectedCardKey = visibleCards[0] ? buildCardSelectionKey(visibleCards[0]) : '';
+            state.selectedCardKey = '';
         }
     }
 
@@ -295,7 +325,7 @@ function createDiaryWallController(deps = {}) {
                 agentId: currentSelectedItem.id || '',
                 topicId: currentTopicId,
                 ...filters,
-                limit: 120,
+                limit: 60,
             };
         }
 
@@ -305,7 +335,7 @@ function createDiaryWallController(deps = {}) {
                 agentId: currentSelectedItem.id || '',
                 topicId: '',
                 ...filters,
-                limit: 120,
+                limit: 60,
             };
         }
 
@@ -316,7 +346,7 @@ function createDiaryWallController(deps = {}) {
                 topicId: '',
                 ...filters,
                 notebookName: '公共',
-                limit: 120,
+                limit: 60,
             };
         }
 
@@ -325,7 +355,7 @@ function createDiaryWallController(deps = {}) {
             agentId: '',
             topicId: '',
             ...filters,
-            limit: 120,
+            limit: 60,
         };
     }
 
@@ -335,30 +365,11 @@ function createDiaryWallController(deps = {}) {
         }
 
         const visibleCards = getVisibleCards();
-        const uniqueNotebooks = [...new Set(visibleCards.map((item) => item.notebookName).filter(Boolean))];
-        const uniqueAgents = [...new Set(visibleCards.flatMap((item) => getCardAgentNames(item)))];
         const latest = [...visibleCards].sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))[0];
-        const currentSelectedItem = getCurrentSelectedItem() || {};
-        const currentTopicName = getCurrentTopicName() || getCurrentTopicId() || '当前话题';
-        const scopeLabel = state.scope === 'topic'
-            ? `当前话题 · ${currentSelectedItem.name || '未选择学科'} / ${currentTopicName}`
-            : state.scope === 'agent'
-                ? `当前学科 · ${currentSelectedItem.name || '未选择学科'}`
-                : state.scope === 'public'
-                    ? '[公共] 日记本'
-                    : '全局所有日记';
-        const filterLabel = state.activeAgentFilter === 'all' ? '全部' : state.activeAgentFilter;
 
         el.diaryWallSummary.innerHTML = `
-            <div class="diary-wall-summary">
-              <strong>${escapeHtml(scopeLabel)}</strong>
-              <span>当前 Agent：${escapeHtml(filterLabel)}</span>
-              <span>卡片数：${escapeHtml(String(visibleCards.length))}</span>
-              <span>Agent 分组：${escapeHtml(String(uniqueAgents.length || groupCardsByAgent(state.cards).length))}</span>
-              <span>日记本：${escapeHtml(String(uniqueNotebooks.length))}</span>
-              <span>最近更新：${escapeHtml(latest ? formatTimestamp(latest.updatedAt) : '未记录')}</span>
-              <span>最近日记本：${escapeHtml(latest?.notebookName || '未记录')}</span>
-            </div>
+            <strong>${escapeHtml(`${visibleCards.length} 张日记`)}</strong>
+            <span>${escapeHtml(latest ? `最近 ${latest.dateKey || formatTimeOnly(latest.updatedAt)}` : '暂无更新')}</span>
         `;
     }
 
@@ -378,37 +389,32 @@ function createDiaryWallController(deps = {}) {
             return;
         }
 
-        const groups = groupCardsByAgent(visibleCards);
-        el.diaryWallCards.innerHTML = groups.map((group) => `
-            <section class="diary-wall-group" data-diary-wall-group="${escapeHtml(group.label)}">
-              <div class="diary-wall-group__header">
-                <strong>${escapeHtml(group.label)}</strong>
-                <span>${escapeHtml(`${group.items.length} 张日记`)}</span>
-              </div>
-              <div class="diary-wall-group__grid">
-                ${group.items.map((card) => `
+        const sortedCards = [...visibleCards].sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0));
+        el.diaryWallCards.innerHTML = `
+              <div class="diary-wall-group__grid diary-wall-group__grid--flat">
+                ${sortedCards.map((card) => {
+                    const groupLabel = deriveAgentGroupLabel(card);
+                    const preview = buildPlainPreview(card.previewMarkdown || card.contentMarkdown || '', 150);
+                    return `
                     <button type="button" class="diary-wall-card ${buildCardSelectionKey(card) === state.selectedCardKey ? 'diary-wall-card--active' : ''}" data-diary-wall-card="${escapeHtml(buildCardSelectionKey(card))}">
-                      <div class="diary-wall-card__meta diary-wall-card__meta--top">
-                        <span>${escapeHtml(card.dateKey || '未记录日期')}</span>
-                        <span>[${escapeHtml(group.label || '未归类')}]</span>
+                      <div class="diary-wall-card__header">
+                        <div class="diary-wall-card__header-main">
+                          <span class="diary-wall-card__eyebrow">${escapeHtml(card.dateKey || '未记录日期')}</span>
+                          <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
+                        </div>
+                        <span class="diary-wall-card__agent">${escapeHtml(groupLabel || '日记')}</span>
                       </div>
-                      <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
-                      <div class="diary-wall-card__topic">日记本：${escapeHtml(card.notebookName || '默认')}</div>
-                      <div class="diary-wall-card__source">来源对话：${escapeHtml(getCardTopicNames(card)[0] || '未记录')}</div>
-                      <div class="diary-wall-card__summary diary-wall-markdown-preview">${renderMarkdownFragment(
-                          buildMarkdownPreview(card.previewMarkdown || card.contentMarkdown || '', 280).markdown || '查看这张日记卡的聚合摘要。'
-                      )}</div>
+                      <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
                       <div class="diary-wall-card__stats">${escapeHtml([
-                          `${formatTimeOnly(card.updatedAt)} · ${group.label || '未归类'}`,
-                          `${Number(card.entryCount || 0)} 条`,
-                          `召回 ${Number(card.recallCount || 0)} 次`,
+                          card.notebookName || '默认日记本',
+                          formatTimeOnly(card.updatedAt),
                       ].filter(Boolean).join(' · '))}</div>
-                      <div class="diary-wall-card__tags">${(card.tags || []).slice(0, 6).map((tag) => `<span class="diary-wall-chip">#${escapeHtml(tag)}</span>`).join('')}</div>
+                      <div class="diary-wall-card__tags">${(card.tags || []).slice(0, 3).map((tag) => `<span class="diary-wall-chip">#${escapeHtml(tag)}</span>`).join('')}</div>
                     </button>
-                `).join('')}
+                `;
+                }).join('')}
               </div>
-            </section>
-        `).join('');
+        `;
     }
 
     function bindDetailActions(container) {
@@ -444,7 +450,7 @@ function createDiaryWallController(deps = {}) {
         const emptyMarkup = `
             <div class="empty-list-state">
               <strong>选择一张日记卡</strong>
-              <span>点击中间卡片后，会弹窗展示完整聚合日记、来源条目和原始 DailyNote 请求。</span>
+              <span>点击卡片后查看简洁详情。</span>
             </div>
         `;
         if (!state.detail) {
@@ -475,10 +481,6 @@ function createDiaryWallController(deps = {}) {
                   ].join(' · '))}</div>
                   <div class="diary-wall-entry__body">${renderMarkdownFragment(entry.contentMarkdown || '')}</div>
                   <div class="diary-wall-entry__tags">${(entry.tags || []).map((tag) => `<button type="button" class="diary-wall-chip diary-wall-chip--button" data-diary-wall-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`).join('')}</div>
-                  <details class="diary-wall-entry__tool">
-                    <summary>原始 DailyNote 请求</summary>
-                    <pre>${escapeHtml(JSON.stringify(entry.toolRequest || {}, null, 2))}</pre>
-                  </details>
                   <div class="diary-wall-entry__sources">${Array.isArray(entry.sourceMessageIds) && entry.sourceMessageIds.length
                         ? entry.sourceMessageIds.map((messageId) => `<button type="button" class="ghost-button icon-text-btn" data-diary-wall-jump="${escapeHtml(messageId)}" data-diary-wall-topic="${escapeHtml(entry.topicId || '')}">
                             <span class="material-symbols-outlined">forum</span> 跳到 ${escapeHtml(messageId)}
@@ -586,7 +588,17 @@ function createDiaryWallController(deps = {}) {
             return;
         }
 
-        const result = await chatAPI.listStudyDiaryWallCards(buildRequest());
+        if (state.loadingPromise) {
+            return state.loadingPromise;
+        }
+
+        state.loadingPromise = chatAPI.listStudyDiaryWallCards(buildRequest());
+        let result;
+        try {
+            result = await state.loadingPromise;
+        } finally {
+            state.loadingPromise = null;
+        }
         if (!result?.success) {
             ui.showToastNotification(`加载日记墙失败：${result?.error || '未知错误'}`, 'error');
             state.cards = [];
@@ -599,6 +611,7 @@ function createDiaryWallController(deps = {}) {
         }
 
         state.cards = Array.isArray(result.items) ? result.items : [];
+        state.lastLoadedAt = Date.now();
         const tabs = getAgentTabs();
         if (!tabs.some((tab) => tab.id === state.activeAgentFilter)) {
             state.activeAgentFilter = 'all';
@@ -608,26 +621,42 @@ function createDiaryWallController(deps = {}) {
         renderAgentNav();
         renderSummary();
         renderCards();
-        await loadDetail();
+        state.detail = null;
+        renderDetail();
     }
 
-    function open() {
+    function open(options = {}) {
         state.open = true;
+        onOpen();
         el.diaryWallModal?.classList.remove('hidden');
         el.diaryWallModal?.setAttribute('aria-hidden', 'false');
-        documentObj.body.classList.add('diary-wall-open');
+        if (!isEmbeddedPanel()) {
+            documentObj.body.classList.add('diary-wall-open');
+        }
         if (el.diaryWallScopeSelect) {
             el.diaryWallScopeSelect.value = state.scope;
+        }
+        if (state.cards.length > 0 && options.forceRefresh !== true) {
+            syncSelectedDiary();
+            renderAgentNav();
+            renderSummary();
+            renderCards();
+            return;
         }
         void refresh();
     }
 
-    function close() {
+    function close(options = {}) {
         state.open = false;
         closeNoteModal();
         el.diaryWallModal?.classList.add('hidden');
         el.diaryWallModal?.setAttribute('aria-hidden', 'true');
-        documentObj.body.classList.remove('diary-wall-open');
+        if (!isEmbeddedPanel()) {
+            documentObj.body.classList.remove('diary-wall-open');
+        }
+        if (options.skipCallback !== true) {
+            onClose();
+        }
     }
 
     async function jumpToMessage(messageId, topicId = '') {
@@ -639,6 +668,7 @@ function createDiaryWallController(deps = {}) {
             await selectTopic(topicId);
         }
 
+        showSubjectWorkspace();
         const selector = `.message-item[data-message-id="${escapeSelectorValue(messageId)}"]`;
         const locate = () => documentObj.querySelector(selector);
         let node = locate();
@@ -652,7 +682,7 @@ function createDiaryWallController(deps = {}) {
             return;
         }
 
-        close();
+        close({ skipCallback: true });
         node.scrollIntoView({ behavior: 'smooth', block: 'center' });
         node.classList.add('message-item--logs-highlight');
         setTimeout(() => node.classList.remove('message-item--logs-highlight'), 1600);
@@ -712,7 +742,7 @@ function createDiaryWallController(deps = {}) {
                 closeNoteModal();
                 return;
             }
-            if (event.key === 'Escape' && state.open) {
+            if (event.key === 'Escape' && state.open && !isEmbeddedPanel()) {
                 close();
             }
         });
