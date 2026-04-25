@@ -332,7 +332,7 @@ function buildSubjectOverviewMarkup({
     const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
     const primaryAction = hasAgents ? 'continue-learning' : 'create-subject';
     const primaryActionText = hasAgents ? '继续学习' : '新建学科';
-    const heroTitle = '个人 AI 学习终端';
+    const heroTitle = '个人 AI 学习中心';
     const heroSubtitle = hasAgents
         ? '把资料、对话、笔记和复盘放在同一个学习空间里，围绕当前话题持续推进。'
         : '先创建一个学科工作台，把课件、论文、题目、图片和对话都收进同一个学习空间。';
