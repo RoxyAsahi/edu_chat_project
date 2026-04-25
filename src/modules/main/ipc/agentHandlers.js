@@ -14,7 +14,23 @@ let cachedAgents = null; // Memory cache for full agent list
 let cachedMetadata = null; // Memory cache for lightweight metadata list
 let initialized = false;
 
-const DEPRECATED_AGENT_CSS_FIELDS = ['cardCss', 'chatCss', 'customCss'];
+const DEPRECATED_AGENT_CONFIG_FIELDS = [
+    'cardCss',
+    'chatCss',
+    'customCss',
+    'promptAliases',
+    'toolSignature',
+    'vcpAliases',
+    'vcpMaid',
+    'temperature',
+    'contextTokenLimit',
+    'maxOutputTokens',
+    'thinkingBudget',
+    'top_p',
+    'top_k',
+    'enableThinkingRequest',
+    'includeUsageInStream',
+];
 
 function invalidateCaches() {
     console.log('[agentHandlers] Invalidating agent caches.');
@@ -22,13 +38,13 @@ function invalidateCaches() {
     cachedMetadata = null;
 }
 
-function stripDeprecatedAgentCssFields(config) {
+function stripDeprecatedAgentConfigFields(config) {
     if (!config || typeof config !== 'object') {
         return config;
     }
 
     const sanitizedConfig = { ...config };
-    for (const field of DEPRECATED_AGENT_CSS_FIELDS) {
+    for (const field of DEPRECATED_AGENT_CONFIG_FIELDS) {
         delete sanitizedConfig[field];
     }
     return sanitizedConfig;
@@ -73,7 +89,7 @@ async function loadAgents(settingsManager) {
                     }
                 }
 
-                config = stripDeprecatedAgentCssFields(config);
+                config = stripDeprecatedAgentConfigFields(config);
                 agentData.name = config.name || folderName;
                 agentData.config = config;
                 agentData.topics = (config.topics && Array.isArray(config.topics) && config.topics.length > 0)
@@ -89,11 +105,7 @@ async function loadAgents(settingsManager) {
                     topics: agentData.topics,
                     systemPrompt: `你是 ${folderName}。`,
                     model: '',
-                    temperature: 0.7,
-                    contextTokenLimit: 4000,
-                    maxOutputTokens: 1000,
-                    disableCustomColors: true,
-                    useThemeColorsInChat: true
+
                 };
             }
 
@@ -193,7 +205,7 @@ async function getAgentConfigById(agentId) {
             }
         }
 
-        config = stripDeprecatedAgentCssFields(config);
+        config = stripDeprecatedAgentConfigFields(config);
 
         const avatarPathPng = path.join(agentDir, 'avatar.png');
         const avatarPathJpg = path.join(agentDir, 'avatar.jpg');
@@ -321,13 +333,13 @@ function initialize(context) {
             }
 
             // CRITICAL: Always remove stripRegexes from the object to be saved to config.json
-            const configToSave = stripDeprecatedAgentCssFields({ ...config });
+            const configToSave = stripDeprecatedAgentConfigFields({ ...config });
             delete configToSave.stripRegexes;
 
             if (agentConfigManager) {
                 // 使用AgentConfigManager进行安全的配置更新
                 const result = await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
-                    ...stripDeprecatedAgentCssFields(existingConfig),
+                    ...stripDeprecatedAgentConfigFields(existingConfig),
                     ...configToSave
                 }));
                 invalidateCaches();
@@ -348,8 +360,8 @@ function initialize(context) {
         try {
             if (agentConfigManager) {
                 const result = await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
-                    ...stripDeprecatedAgentCssFields(existingConfig),
-                    ...stripDeprecatedAgentCssFields(updates)
+                    ...stripDeprecatedAgentConfigFields(existingConfig),
+                    ...stripDeprecatedAgentConfigFields(updates)
                 }));
                 invalidateCaches();
                 return { success: true, message: `Agent ${agentId} 配置已更新。` };
@@ -468,18 +480,14 @@ function initialize(context) {
 
             let configToSave;
             if (initialConfig) {
-                configToSave = stripDeprecatedAgentCssFields({ ...initialConfig, name: agentName });
+                configToSave = stripDeprecatedAgentConfigFields({ ...initialConfig, name: agentName });
             } else {
                 configToSave = {
                     name: agentName,
                     systemPrompt: `你是 ${agentName}。`,
                     model: 'gemini-3.1-flash-lite-preview',
-                    temperature: 0.7,
-                    contextTokenLimit: 1000000,
-                    maxOutputTokens: 60000,
                     topics: [buildDefaultPlaceholderTopic()],
-                    disableCustomColors: true,  // 默认启用：禁用自定义颜色（使用主题默认颜色）
-                    useThemeColorsInChat: true  // 默认启用：会话中使用主题颜色
+
                 };
             }
             if (!configToSave.topics || !Array.isArray(configToSave.topics) || configToSave.topics.length === 0) {

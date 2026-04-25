@@ -93,22 +93,6 @@ function extractReasoningContentFromResponseMessage(message = {}) {
     return '';
 }
 
-function getThinkingRequestOptions(agentConfig, useStreaming) {
-    const enableThinking = agentConfig?.enableThinkingRequest === true;
-    const parsedBudget = Number.parseInt(agentConfig?.thinkingBudget, 10);
-    const includeUsageInStream = agentConfig?.includeUsageInStream !== false;
-
-    return {
-        ...(enableThinking && { enable_thinking: true }),
-        ...(enableThinking && Number.isInteger(parsedBudget) && parsedBudget > 0
-            ? { thinking_budget: parsedBudget }
-            : {}),
-        ...(enableThinking && useStreaming && includeUsageInStream
-            ? { stream_options: { include_usage: true } }
-            : {}),
-    };
-}
-
 function getReasoningContentForRequest(message = {}) {
     return typeof message?.reasoning_content === 'string' && message.reasoning_content.trim()
         ? message.reasoning_content
@@ -785,15 +769,9 @@ function createComposerController(deps = {}) {
         messageRendererApi.startStreamingMessage(assistantMessage);
         decorateChatMessages();
 
-        const useStreaming = requestContext.selectedItem.config?.streamOutput !== false;
         const modelConfig = {
             model: requestContext.selectedItem.config?.model || 'gemini-3.1-flash-lite-preview',
-            temperature: Number(requestContext.selectedItem.config?.temperature ?? 0.7),
-            max_tokens: Number(requestContext.selectedItem.config?.maxOutputTokens ?? 1000),
-            top_p: requestContext.selectedItem.config?.top_p,
-            top_k: requestContext.selectedItem.config?.top_k,
-            ...getThinkingRequestOptions(requestContext.selectedItem.config, useStreaming),
-            stream: useStreaming,
+            stream: requestContext.selectedItem.config?.streamOutput !== false,
         };
 
         state.activeRequestId = assistantMessage.id;

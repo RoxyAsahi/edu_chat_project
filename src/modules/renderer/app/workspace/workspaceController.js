@@ -1346,7 +1346,7 @@ function createWorkspaceController(deps = {}) {
         renderReaderPanel();
 
         if (el.agentSettingsContainerTitle) {
-            el.agentSettingsContainerTitle.textContent = '智能体设置';
+            el.agentSettingsContainerTitle.textContent = '学科设置';
         }
         if (el.selectedAgentNameForSettings) {
             el.selectedAgentNameForSettings.textContent = config.name || agentId;
