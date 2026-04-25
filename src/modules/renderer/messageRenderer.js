@@ -1793,6 +1793,7 @@ function initializeMessageRenderer(refs) {
         processRenderedContent: wrappedProcessRenderedContent,
         runTextHighlights: contentProcessor.highlightAllPatternsInMessage,
         preprocessFullContent: preprocessFullContent,
+        restoreRenderedToolResults: restoreRenderedToolResults,
         renderAttachments: renderAttachments,
         interruptHandler: mainRendererReferences.interruptHandler,
         setActiveRequestId: mainRendererReferences.setActiveRequestId,

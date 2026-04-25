@@ -426,7 +426,10 @@ function toggleEditMode(messageItem, message) {
             contextMenuDependencies.updateMessageContent(message.id, textToDisplay);
         } else {
             const ppResult = contextMenuDependencies.preprocessFullContent(textToDisplay);
-            const rawHtml = markedInstance.parse(ppResult.text || ppResult);
+            let rawHtml = markedInstance.parse(ppResult.text || ppResult);
+            if (ppResult.toolResultMap && contextMenuDependencies.restoreRenderedToolResults) {
+                rawHtml = contextMenuDependencies.restoreRenderedToolResults(rawHtml, ppResult.toolResultMap);
+            }
             contextMenuDependencies.setContentAndProcessImages(contentDiv, rawHtml, message.id);
             contextMenuDependencies.processRenderedContent(contentDiv);
             setTimeout(() => {
