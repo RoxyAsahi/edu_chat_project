@@ -28,6 +28,7 @@ let citationDocumentClickHandler = null;
 let citationKeydownHandler = null;
 let citationScrollHandler = null;
 let citationScrollTarget = null;
+let mermaidLoadPromise = null;
 
 async function getDominantAvatarColorCached(url) {
     if (!colorExtractionPromises.has(url)) {
@@ -226,6 +227,52 @@ function generateUniqueId() {
     return `unistudy-bubble-${timestampPart}${randomPart}`;
 }
 
+function loadRendererScriptOnce(src, globalName) {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+        return Promise.resolve(null);
+    }
+
+    if (globalName && window[globalName]) {
+        return Promise.resolve(window[globalName]);
+    }
+
+    const existingScript = document.querySelector(`script[data-unistudy-lazy-script="${globalName}"], script[src="${src}"]`);
+    if (existingScript) {
+        return new Promise((resolve, reject) => {
+            existingScript.addEventListener('load', () => resolve(globalName ? window[globalName] : true), { once: true });
+            existingScript.addEventListener('error', reject, { once: true });
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        if (globalName) {
+            script.dataset.unistudyLazyScript = globalName;
+        }
+        script.onload = () => resolve(globalName ? window[globalName] : true);
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+async function ensureMermaidLoaded() {
+    if (typeof window !== 'undefined' && window.mermaid) {
+        return window.mermaid;
+    }
+
+    if (!mermaidLoadPromise) {
+        mermaidLoadPromise = loadRendererScriptOnce('../../vendor/mermaid.min.js', 'mermaid')
+            .catch((error) => {
+                mermaidLoadPromise = null;
+                throw error;
+            });
+    }
+
+    return mermaidLoadPromise;
+}
+
 /**
  * Renders Mermaid diagrams found within a given container.
  * Finds placeholders, replaces them with the actual Mermaid code,
@@ -257,14 +304,29 @@ async function renderMermaidDiagrams(container) {
     // Get the list of actual .mermaid elements to render
     const elementsToRender = placeholders.filter(el => el.classList.contains('mermaid'));
 
-    if (elementsToRender.length > 0 && typeof mermaid !== 'undefined') {
+    if (elementsToRender.length > 0) {
+        let mermaidApi = null;
+        try {
+            mermaidApi = await ensureMermaidLoaded();
+        } catch (error) {
+            console.error('Failed to load Mermaid renderer:', error);
+        }
+
+        if (!mermaidApi) {
+            elementsToRender.forEach((el) => {
+                const originalCode = el.textContent;
+                el.innerHTML = `<div class="mermaid-error">Mermaid renderer unavailable.</div><pre>${escapeHtml(originalCode)}</pre>`;
+            });
+            return;
+        }
+
         // Initialize mermaid if it hasn't been already
-        mermaid.initialize({ startOnLoad: false });
+        mermaidApi.initialize({ startOnLoad: false });
 
         // Render diagrams one by one so one failure does not break the whole batch.
         for (const el of elementsToRender) {
             try {
-                await mermaid.run({ nodes: [el] });
+                await mermaidApi.run({ nodes: [el] });
             } catch (error) {
                 console.error("Error rendering Mermaid diagram:", error);
                 const originalCode = el.textContent;                el.innerHTML = `<div class="mermaid-error">Mermaid ????: ${error.message}</div><pre>${escapeHtml(originalCode)}</pre>`;

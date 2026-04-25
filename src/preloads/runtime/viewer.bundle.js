@@ -167,6 +167,7 @@ function createSessionCatalog(ops) {
         toggleTopicLock: query((agentId, topicId) => ops.invoke('toggle-topic-lock', agentId, topicId)),
         setTopicUnread: query((agentId, topicId, unread) => ops.invoke('set-topic-unread', agentId, topicId, unread)),
         getChatHistory: query((agentId, topicId) => ops.invoke('get-chat-history', agentId, topicId)),
+        getChatHistoryPage: query((agentId, topicId, pageOptions) => ops.invoke('get-chat-history-page', agentId, topicId, pageOptions)),
         saveChatHistory: query((agentId, topicId, history) => ops.invoke('save-chat-history', agentId, topicId, history)),
         getOriginalMessageContent: query((itemId, itemType, topicId, messageId) => ops.invoke('get-original-message-content', itemId, itemType, topicId, messageId)),
         handleFilePaste: query((agentId, topicId, fileData) => ops.invoke('handle-file-paste', agentId, topicId, fileData)),

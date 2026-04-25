@@ -1097,6 +1097,71 @@ function createWorkspaceController(deps = {}) {
         }
     }
 
+    function isActiveTopicSelection(agentId, topicId) {
+        return state.currentSelectedItem?.id === agentId && state.currentTopicId === topicId;
+    }
+
+    function runTopicBackgroundTask(label, task) {
+        Promise.resolve()
+            .then(task)
+            .catch((error) => {
+                console.warn(`[UniStudyRenderer] ${label} failed:`, error);
+            });
+    }
+
+    async function refreshTopicSecondaryPanels(agentId, topicId) {
+        if (!isActiveTopicSelection(agentId, topicId)) {
+            return;
+        }
+
+        await ensureTopicSource({ silent: true });
+        if (!isActiveTopicSelection(agentId, topicId)) {
+            return;
+        }
+
+        syncCurrentTopicKnowledgeBaseControls();
+        await Promise.all([
+            loadCurrentTopicKnowledgeBaseDocuments({ silent: true }),
+            loadTopicNotes(),
+            refreshLogs(),
+        ]);
+    }
+
+    async function persistTopicSelectionSideEffects(agentId, topicId) {
+        if (!isActiveTopicSelection(agentId, topicId)) {
+            return;
+        }
+
+        const sideEffects = [];
+        if (typeof chatAPI.setTopicUnread === 'function') {
+            sideEffects.push(chatAPI.setTopicUnread(agentId, topicId, false));
+        }
+        if (typeof chatAPI.saveSettings === 'function') {
+            sideEffects.push(chatAPI.saveSettings({
+                lastOpenItemId: agentId,
+                lastOpenItemType: 'agent',
+                lastOpenTopicId: topicId,
+            }));
+        }
+
+        await Promise.allSettled(sideEffects);
+
+        if (isActiveTopicSelection(agentId, topicId)) {
+            await loadAgents();
+        }
+    }
+
+    async function refreshAgentSecondaryPanels(agentId) {
+        if (state.currentSelectedItem?.id !== agentId) {
+            return;
+        }
+
+        await Promise.all([
+            loadAgentNotes(),
+            loadAgents(),
+        ]);
+    }
+
     async function clearCurrentConversationView() {
         closeTopicActionMenu();
         await stopHistoryWatcher();
@@ -1167,6 +1232,7 @@ function createWorkspaceController(deps = {}) {
 
         closeTopicActionMenu();
         await stopHistoryWatcher();
+        const selectedAgentId = state.currentSelectedItem.id;
         state.currentTopicId = topicId;
         clearTopicKnowledgeBaseDocuments();
         resetNotesState({
@@ -1189,33 +1255,27 @@ function createWorkspaceController(deps = {}) {
         syncCurrentTopicKnowledgeBaseControls();
         messageRendererApi?.setCurrentTopicId?.(topicId);
 
-        const history = await chatAPI.getChatHistory(state.currentSelectedItem.id, topicId);
+        const history = await chatAPI.getChatHistory(selectedAgentId, topicId);
+        if (!isActiveTopicSelection(selectedAgentId, topicId)) {
+            return;
+        }
         state.currentChatHistory = normalizeHistory(history);
         renderTopics();
         syncCurrentTopicKnowledgeBaseControls();
-        await ensureTopicSource({ silent: true });
-        syncCurrentTopicKnowledgeBaseControls();
-        await loadCurrentTopicKnowledgeBaseDocuments({ silent: true });
-        await loadTopicNotes();
         await renderCurrentHistory();
-        await refreshLogs();
 
         const historyPath = buildHistoryFilePath();
         if (historyPath) {
-            await chatAPI.watcherStart(historyPath, state.currentSelectedItem.id, topicId);
+            await chatAPI.watcherStart(historyPath, selectedAgentId, topicId);
         }
+
+        runTopicBackgroundTask('topic secondary refresh', () => refreshTopicSecondaryPanels(selectedAgentId, topicId));
 
         if (!shouldPersistTopicSelection(options)) {
             return;
         }
 
-        await chatAPI.setTopicUnread(state.currentSelectedItem.id, topicId, false).catch(() => {});
-        await chatAPI.saveSettings({
-            lastOpenItemId: state.currentSelectedItem.id,
-            lastOpenItemType: 'agent',
-            lastOpenTopicId: topicId,
-        }).catch(() => {});
-        await loadAgents();
+        runTopicBackgroundTask('topic selection persistence', () => persistTopicSelectionSideEffects(selectedAgentId, topicId));
     }
 
     async function selectAgent(agentId, options = {}) {
@@ -1265,9 +1325,7 @@ function createWorkspaceController(deps = {}) {
 
         await populateAgentForm(config);
         await loadTopics({ preferredTopicId: options.preferredTopicId || null });
-        await loadAgentNotes();
-        await loadAgents();
-        await refreshLogs();
+        runTopicBackgroundTask('agent secondary refresh', () => refreshAgentSecondaryPanels(agentId));
         if (options.showSubjectWorkspace !== false) {
             showSubjectWorkspace();
         }
@@ -1289,6 +1347,11 @@ function createWorkspaceController(deps = {}) {
         await renderCurrentHistory();
         syncComposerAvailability();
         renderSubjectOverview();
+        runTopicBackgroundTask('empty agent logs refresh', async () => {
+            if (state.currentSelectedItem?.id === agentId && !state.currentTopicId) {
+                await refreshLogs();
+            }
+        });
     }
 
     function buildMarkdownExport() {

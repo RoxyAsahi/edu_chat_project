@@ -334,9 +334,8 @@ function createKnowledgeBaseRepository(deps = {}) {
         });
     }
 
-    async function insertDocumentChunk(payload = {}) {
-        const db = getDbImpl();
-        await db.execute({
+    function buildInsertDocumentChunkStatement(payload = {}) {
+        return {
             sql: `INSERT INTO kb_chunk
                 (id, kb_id, document_id, chunk_index, content, embedding, created_at, content_type, char_length, section_title, page_number, paragraph_index)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -354,7 +353,33 @@ function createKnowledgeBaseRepository(deps = {}) {
                 payload.pageNumber,
                 payload.paragraphIndex,
             ],
-        });
+        };
+    }
+
+    async function insertDocumentChunk(payload = {}) {
+        const db = getDbImpl();
+        await db.execute(buildInsertDocumentChunkStatement(payload));
+    }
+
+    async function insertDocumentChunks(payloads = []) {
+        const chunks = Array.isArray(payloads) ? payloads.filter(Boolean) : [];
+        if (chunks.length === 0) {
+            return;
+        }
+
+        const db = getDbImpl();
+        const statements = chunks.map(buildInsertDocumentChunkStatement);
+        if (typeof db.batch === 'function') {
+            const batchSize = 250;
+            for (let start = 0; start < statements.length; start += batchSize) {
+                await db.batch(statements.slice(start, start + batchSize), 'write');
+            }
+            return;
+        }
+
+        for (const statement of statements) {
+            await db.execute(statement);
+        }
     }
 
     async function listRecoverableDocuments() {
@@ -436,6 +461,7 @@ function createKnowledgeBaseRepository(deps = {}) {
         updateDocumentMimeType,
         deleteDocumentChunks,
         insertDocumentChunk,
+        insertDocumentChunks,
         listRecoverableDocuments,
         markDocumentPendingAfterRecovery,
         listChunkRowsByKnowledgeBase,

@@ -29,6 +29,7 @@ const {
     resolveDailyNoteGuideInstruction,
     rewriteLegacyStudyLogPromptText,
 } = require('../study/toolProtocol');
+const { createChatHistoryStore } = require('../chat-history/store');
 
 /**
  * Initializes chat and topic related IPC handlers.
@@ -43,6 +44,7 @@ const {
  */
 let ipcHandlersRegistered = false;
 let studyServices = null;
+let chatHistoryStore = null;
 const DEFAULT_CHAT_MODEL = 'gemini-3.1-flash-lite-preview';
 const FOLLOW_UP_HISTORY_LIMIT = 6;
 const FOLLOW_UP_RESULT_LIMIT = 5;
@@ -63,6 +65,16 @@ const TOOL_PROTOCOL_SIGNAL_PATTERNS = [
     /<<<DailyNoteStart>>>/i,
     /\b(?:DailyNote|StudyLog)\.(?:create|update|write)\b/i,
 ];
+
+function buildLegacyHistoryFilePath(userDataDir, agentId, topicId) {
+    return path.join(userDataDir, agentId, 'topics', topicId, 'history.json');
+}
+
+async function ensureLegacyHistoryDirectory(userDataDir, agentId, topicId) {
+    const historyFilePath = buildLegacyHistoryFilePath(userDataDir, agentId, topicId);
+    await fs.ensureDir(path.dirname(historyFilePath));
+    return historyFilePath;
+}
 
 function decodeFollowUpEntities(text = '') {
     return String(text || '')
@@ -810,6 +822,20 @@ function initialize(mainWindow, context) {
         settingsManager,
         chatClient,
     });
+    chatHistoryStore = context.chatHistoryStore || chatHistoryStore || createChatHistoryStore({
+        dataRoot: DATA_ROOT || path.dirname(USER_DATA_DIR || ''),
+    });
+
+    const getLegacyHistoryPath = (agentId, topicId) => buildLegacyHistoryFilePath(USER_DATA_DIR, agentId, topicId);
+    const ensureTopicHistoryDir = (agentId, topicId) => ensureLegacyHistoryDirectory(USER_DATA_DIR, agentId, topicId);
+    const readChatHistory = async (agentId, topicId) => {
+        const legacyHistoryPath = await ensureTopicHistoryDir(agentId, topicId);
+        return chatHistoryStore.getHistory(agentId, topicId, { legacyHistoryPath });
+    };
+    const saveChatHistory = async (agentId, topicId, history) => {
+        await ensureTopicHistoryDir(agentId, topicId);
+        return chatHistoryStore.replaceHistory(agentId, topicId, Array.isArray(history) ? history : []);
+    };
 
     // Ensure the watcher is in a clean state on initialization
     if (fileWatcher) {
@@ -855,9 +881,6 @@ function initialize(mainWindow, context) {
         if (!itemId || itemType !== 'agent' || typeof searchTerm !== 'string' || searchTerm.trim() === '') {
             return { success: false, error: 'Invalid arguments for topic content search.', matchedTopicIds: [] };
         }
-        const searchTermLower = searchTerm.toLowerCase();
-        const matchedTopicIds = [];
-
         try {
             const configPath = path.join(AGENT_DIR, itemId, 'config.json');
             if (!await fs.pathExists(configPath)) {
@@ -869,22 +892,12 @@ function initialize(mainWindow, context) {
                 return { success: true, matchedTopicIds: [] };
             }
 
-            for (const topic of itemConfig.topics) {
-                const historyFilePath = path.join(USER_DATA_DIR, itemId, 'topics', topic.id, 'history.json');
-                if (!await fs.pathExists(historyFilePath)) {
-                    continue;
-                }
-                try {
-                    const history = await fs.readJson(historyFilePath);
-                    if (Array.isArray(history) && history.some(message => typeof message.content === 'string' && message.content.toLowerCase().includes(searchTermLower))) {
-                        matchedTopicIds.push(topic.id);
-                    }
-                } catch (e) {
-                    console.error(`Error reading history for agent ${itemId}, topic ${topic.id}:`, e);
-                }
-            }
+            const topicIds = itemConfig.topics.map((topic) => topic.id).filter(Boolean);
+            const matchedTopicIds = await chatHistoryStore.findTopicIdsByContent(itemId, topicIds, searchTerm, {
+                legacyHistoryPathForTopic: (topicId) => getLegacyHistoryPath(itemId, topicId),
+            });
 
-            return { success: true, matchedTopicIds: [...new Set(matchedTopicIds)] };
+            return { success: true, matchedTopicIds };
         } catch (error) {
             console.error(`Error searching topic content for agent ${itemId}:`, error);
             return { success: false, error: error.message, matchedTopicIds: [] };
@@ -921,17 +934,21 @@ function initialize(mainWindow, context) {
     ipcMain.handle('get-chat-history', async (event, agentId, topicId) => {
         if (!topicId) return { error: `Missing topicId for agent ${agentId}.` };
         try {
-            const historyFile = path.join(USER_DATA_DIR, agentId, 'topics', topicId, 'history.json');
-            await fs.ensureDir(path.dirname(historyFile));
-
-
-            if (await fs.pathExists(historyFile)) {
-                return await fs.readJson(historyFile);
-            }
-            return [];
+            return await readChatHistory(agentId, topicId);
         } catch (error) {
             console.error(`Failed to load chat history for agent ${agentId}, topic ${topicId}:`, error);
             return { error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-chat-history-page', async (event, agentId, topicId, pageOptions = {}) => {
+        if (!topicId) return { success: false, error: `Missing topicId for agent ${agentId}.`, messages: [] };
+        try {
+            const legacyHistoryPath = await ensureTopicHistoryDir(agentId, topicId);
+            return await chatHistoryStore.getHistoryPage(agentId, topicId, pageOptions, { legacyHistoryPath });
+        } catch (error) {
+            console.error(`Failed to load chat history page for agent ${agentId}, topic ${topicId}:`, error);
+            return { success: false, error: error.message, messages: [] };
         }
     });
 
@@ -941,10 +958,7 @@ function initialize(mainWindow, context) {
             if (fileWatcher) {
                 fileWatcher.signalInternalSave();
             }
-            const historyDir = path.join(USER_DATA_DIR, agentId, 'topics', topicId);
-            await fs.ensureDir(historyDir);
-            const historyFile = path.join(historyDir, 'history.json');
-            await fs.writeJson(historyFile, history, { spaces: 2 });
+            await saveChatHistory(agentId, topicId, history);
             return { success: true };
         } catch (error) {
             console.error(`Failed to save chat history for agent ${agentId}, topic ${topicId}:`, error);
@@ -1022,9 +1036,8 @@ function initialize(mainWindow, context) {
                 }));
                 const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
 
-                const topicHistoryDir = path.join(USER_DATA_DIR, agentId, 'topics', newTopicId);
-                await fs.ensureDir(topicHistoryDir);
-                await fs.writeJson(path.join(topicHistoryDir, 'history.json'), [], { spaces: 2 });
+                await ensureTopicHistoryDir(agentId, newTopicId);
+                await chatHistoryStore.replaceHistory(agentId, newTopicId, []);
 
                 return { success: true, topicId: newTopicId, topicName: newTopic.name, topics: updatedConfig.topics };
             } else {
@@ -1061,14 +1074,10 @@ function initialize(mainWindow, context) {
                     return { ...existingConfig, topics: filtered };
                 });
 
-                // Recreate the default history file when the last topic is deleted.
+                // Recreate the default topic history state when the last topic is deleted.
                 if (remainingTopics.length === 1 && remainingTopics[0].id === 'default') {
-                    const defaultTopicHistoryDir = path.join(USER_DATA_DIR, agentId, 'topics', 'default');
-                    await fs.ensureDir(defaultTopicHistoryDir);
-                    const historyPath = path.join(defaultTopicHistoryDir, 'history.json');
-                    if (!await fs.pathExists(historyPath)) {
-                        await fs.writeJson(historyPath, [], { spaces: 2 });
-                    }
+                    await ensureTopicHistoryDir(agentId, 'default');
+                    await chatHistoryStore.replaceHistory(agentId, 'default', []);
                 }
 
                 const topicDataDir = path.join(USER_DATA_DIR, agentId, 'topics', topicIdToDelete);
@@ -1081,6 +1090,12 @@ function initialize(mainWindow, context) {
                     } catch (error) {
                         cleanupErrors.push(`history cleanup failed: ${error.message}`);
                     }
+                }
+
+                try {
+                    await chatHistoryStore.deleteTopic(agentId, topicIdToDelete);
+                } catch (error) {
+                    cleanupErrors.push(`history database cleanup failed: ${error.message}`);
                 }
 
                 if (await fs.pathExists(topicNotesDir)) {
@@ -1291,19 +1306,12 @@ function initialize(mainWindow, context) {
                 return { success: false, error: 'Unsupported item type.' };
             }
 
-            const historyFile = path.join(USER_DATA_DIR, itemId, 'topics', topicId, 'history.json');
-
-            if (await fs.pathExists(historyFile)) {
-                const history = await fs.readJson(historyFile);
-                const message = history.find(m => m.id === messageId);
-                if (message) {
-                    return { success: true, content: message.content };
-                } else {
-                    return { success: false, error: 'Message not found in history.' };
-                }
-            } else {
-                return { success: false, error: 'History file not found.' };
+            const legacyHistoryPath = await ensureTopicHistoryDir(itemId, topicId);
+            const message = await chatHistoryStore.getMessageById(itemId, topicId, messageId, { legacyHistoryPath });
+            if (message) {
+                return { success: true, content: message.content };
             }
+            return { success: false, error: 'Message not found in history.' };
         } catch (error) {
             console.error(`Failed to load original message content (itemId: ${itemId}, topicId: ${topicId}, messageId: ${messageId}):`, error);
             return { success: false, error: error.message };
@@ -1771,20 +1779,23 @@ function initialize(mainWindow, context) {
                         const config = await fs.readJson(configPath);
                         if (config.topics && Array.isArray(config.topics)) {
                             for (const topic of config.topics) {
-                                const historyPath = path.join(USER_DATA_DIR, agentId, 'topics', topic.id, 'history.json');
-                                if (await fs.pathExists(historyPath)) {
-                                    try {
-                                        const history = await fs.readJson(historyPath);
-                                        const topicCount = calculateTopicUnreadCount(topic, history);
-                                        if (topicCount > 0) {
-                                            totalCount += topicCount;
-                                        } else if (topicCount === -1) {
-                                            // 鏈夋湭璇绘爣璁颁絾鏃犺鏁帮紝璁板綍杩欎釜鐘讹拷?
-                                            hasUnreadMarker = true;
-                                        }
-                                    } catch (readJsonError) {
-                                        console.error(`Failed to read history.json: ${historyPath}`, readJsonError);
+                                if (!topic?.id) {
+                                    continue;
+                                }
+                                try {
+                                    const historyPath = getLegacyHistoryPath(agentId, topic.id);
+                                    const summary = await chatHistoryStore.getUnreadSummary(agentId, topic.id, { legacyHistoryPath: historyPath });
+                                    const topicCount = summary.shouldActivateCount
+                                        ? 1
+                                        : (topic.unread === true ? -1 : 0);
+                                    if (topicCount > 0) {
+                                        totalCount += topicCount;
+                                    } else if (topicCount === -1) {
+                                        // 鏈夋湭璇绘爣璁颁絾鏃犺鏁帮紝璁板綍杩欎釜鐘讹拷?
+                                        hasUnreadMarker = true;
                                     }
+                                } catch (historyError) {
+                                    console.error(`Failed to read chat history summary for ${agentId}/${topic.id}:`, historyError);
                                 }
                             }
                         }
@@ -1925,6 +1936,15 @@ function initialize(mainWindow, context) {
     ipcHandlersRegistered = true;
 }
 
+async function shutdown() {
+    if (!chatHistoryStore || typeof chatHistoryStore.close !== 'function') {
+        return;
+    }
+
+    await chatHistoryStore.close();
+    chatHistoryStore = null;
+}
+
 module.exports = {
     __testUtils: {
         buildFollowUpPrompt,
@@ -1939,6 +1959,7 @@ module.exports = {
         selectVisibleFollowUpMessages,
         requestFollowUpsOnce,
         resolveChatExecutionMode,
-        },
-    initialize
+    },
+    initialize,
+    shutdown,
 };
