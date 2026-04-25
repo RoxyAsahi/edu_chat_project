@@ -85,16 +85,8 @@ function resolvePreferredDailyNoteMaid(options = {}) {
     const context = options.context && typeof options.context === 'object'
         ? options.context
         : {};
-    const configuredMaid = sanitizeText(agentConfig.toolSignature || context.toolSignature);
-    if (configuredMaid) {
-        return configuredMaid;
-    }
-
-    const preferredAlias = sanitizeText(
-        Array.isArray(agentConfig.promptAliases) ? agentConfig.promptAliases[0] : '',
-        sanitizeText(context.agentName || agentConfig.name || context.agentId, 'UniStudy')
-    );
-    return `[${preferredAlias}]${preferredAlias}`;
+    const agentName = sanitizeText(context.agentName || agentConfig.name || context.agentId, 'UniStudy');
+    return `[${agentName}]${agentName}`;
 }
 
 function stripThinkBlocks(content = '') {

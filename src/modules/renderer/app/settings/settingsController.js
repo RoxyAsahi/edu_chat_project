@@ -24,8 +24,8 @@ const SETTINGS_MODAL_META = Object.freeze({
         subtitle: '管理全局连接、检索模型和来源服务参数。',
     },
     agent: {
-        title: '智能体设置',
-        subtitle: '调整当前学科入口的模型、提示词、输出参数与聊天样式。',
+        title: '学科设置',
+        subtitle: '调整当前学科的头像、名称、模型和系统提示词。',
     },
     'knowledge-base': {
         title: '来源管理',
@@ -987,13 +987,6 @@ function parsePromptVariablesInput(value) {
     } catch (_error) {
         return null;
     }
-}
-
-function parseLineListInput(value) {
-    return String(value || '')
-        .split(/[,\n]/)
-        .map((item) => item.trim())
-        .filter(Boolean);
 }
 
 function extractPromptTextFromAgentConfig(config = {}) {
@@ -2190,7 +2183,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         });
 
         el.modelServiceDefaultSelectors.innerHTML = `
-            <div class="model-service-default-list">
+            <div class="settings-list model-service-default-list">
               ${optionsByTask.map(({ taskKey, meta, currentRef, chatDefaultRef, availableModels }) => {
                     const sameAsPrimary = taskKey === 'chatFallback'
                         && currentRef
@@ -2200,14 +2193,15 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                     const helperText = availableModels.length > 0
                         ? `${availableModels.length} 个可选模型 · ${meta.capability}${sameAsPrimary ? ' · 当前与默认聊天模型相同，运行时会视为未配置回退' : ''}`
                         : `暂无可用 ${meta.capability} 模型`;
+                    const description = `${meta.description} ${helperText}`;
                     return `
-                  <article class="model-service-default-row">
-                    <div class="model-service-default-row__meta">
+                  <article class="settings-row model-service-default-row">
+                    <div class="settings-row__main model-service-default-row__meta">
                       <strong>${escapeHtml(meta.label)}</strong>
-                      <span>${escapeHtml(meta.description)}</span>
+                      <span>${escapeHtml(description)}</span>
                     </div>
-                    <label class="model-service-default-row__control">
-                      <select data-model-service-default="${escapeHtml(taskKey)}" ${availableModels.length === 0 ? 'disabled' : ''}>
+                    <label class="settings-row__control model-service-default-row__control">
+                      <select data-model-service-default="${escapeHtml(taskKey)}" aria-label="${escapeHtml(meta.label)}" ${availableModels.length === 0 ? 'disabled' : ''}>
                         <option value="">未设置</option>
                         ${availableModels.map((item) => {
                             const optionValue = `${item.ref.providerId}::${item.ref.modelId}`;
@@ -2221,7 +2215,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                             `;
                         }).join('')}
                       </select>
-                      <span>${escapeHtml(helperText)}</span>
                     </label>
                   </article>
               `;
@@ -3357,9 +3350,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (el.settingsModalTitle) {
             el.settingsModalTitle.textContent = meta.title;
         }
-        if (el.settingsModalTitleDisplay) {
-            el.settingsModalTitleDisplay.textContent = meta.title;
-        }
+
         if (el.settingsModalSubtitle) {
             el.settingsModalSubtitle.textContent = meta.subtitle;
         }
@@ -3438,27 +3429,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         const patch = {
             name: el.agentNameInput.value.trim(),
             model: el.agentModel.value.trim(),
-            promptAliases: parseLineListInput(el.agentPromptAliasesInput?.value),
-            toolSignature: el.agentToolSignatureInput?.value.trim() || '',
-            temperature: Number(el.agentTemperature.value || 0.7),
-            contextTokenLimit: Number(el.agentContextTokenLimit.value || 4000),
-            maxOutputTokens: Number(el.agentMaxOutputTokens.value || 1000),
-            ...(el.agentThinkingBudget
-                ? { thinkingBudget: el.agentThinkingBudget.value === '' ? undefined : Number(el.agentThinkingBudget.value) }
-                : {}),
-            top_p: el.agentTopP.value === '' ? undefined : Number(el.agentTopP.value),
-            top_k: el.agentTopK.value === '' ? undefined : Number(el.agentTopK.value),
-            streamOutput: el.agentStreamOutputTrue.checked,
-            ...(el.agentEnableThinkingRequest
-                ? { enableThinkingRequest: el.agentEnableThinkingRequest.checked }
-                : {}),
-            ...(el.agentIncludeUsageInStream
-                ? { includeUsageInStream: el.agentIncludeUsageInStream.checked }
-                : {}),
-            avatarBorderColor: el.agentAvatarBorderColor.value,
-            nameTextColor: el.agentNameTextColor.value,
-            disableCustomColors: el.disableCustomColors.checked,
-            useThemeColorsInChat: el.useThemeColorsInChat.checked,
             promptMode: 'original',
             originalSystemPrompt: promptText,
             systemPrompt: promptText,
@@ -3481,7 +3451,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             el.agentAvatarInput.value = '';
         }
 
-        ui.showToastNotification('智能体设置已保存。', 'success');
+        ui.showToastNotification('学科设置已保存。', 'success');
         await reloadSelectedAgent(currentSelectedItem.id);
     }
 

@@ -151,15 +151,6 @@ function collectExplicitPromptVariables(agentConfig = {}) {
         }
     }
 
-    if (Array.isArray(normalizedAgentConfig.promptAliases)) {
-        for (const alias of normalizedAgentConfig.promptAliases) {
-            if (typeof alias !== 'string') {
-                continue;
-            }
-            mergeVariable(variableMap, alias, alias, 'agent-config-alias', true);
-        }
-    }
-
     return variableMap;
 }
 
@@ -303,7 +294,6 @@ function buildPromptVariableMap(options = {}) {
     }
 
     addDerivedAliasVariables(variableMap, [
-        ...(Array.isArray(agentConfig.promptAliases) ? agentConfig.promptAliases : []),
         agentConfig.name,
         context.agentName,
         agentConfig.id,

@@ -760,36 +760,7 @@ async function populateAgentForm(config) {
     el.agentNameInput.value = config.name || '';
     el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';
     el.agentModel.value = config.model || '';
-    if (el.agentPromptAliasesInput) {
-        el.agentPromptAliasesInput.value = Array.isArray(config.promptAliases)
-            ? config.promptAliases.join('\n')
-            : (typeof config.promptAliases === 'string' ? config.promptAliases : '');
-    }
-    if (el.agentToolSignatureInput) {
-        el.agentToolSignatureInput.value = config.toolSignature || '';
-    }
-    el.agentTemperature.value = config.temperature ?? 0.7;
-    el.agentContextTokenLimit.value = config.contextTokenLimit ?? 4000;
-    el.agentMaxOutputTokens.value = config.maxOutputTokens ?? 1000;
-    if (el.agentThinkingBudget) {
-        el.agentThinkingBudget.value = config.thinkingBudget ?? '';
-    }
-    el.agentTopP.value = config.top_p ?? '';
-    el.agentTopK.value = config.top_k ?? '';
-    el.agentStreamOutputTrue.checked = config.streamOutput !== false;
-    el.agentStreamOutputFalse.checked = config.streamOutput === false;
-    if (el.agentEnableThinkingRequest) {
-        el.agentEnableThinkingRequest.checked = config.enableThinkingRequest === true;
-    }
-    if (el.agentIncludeUsageInStream) {
-        el.agentIncludeUsageInStream.checked = config.includeUsageInStream !== false;
-    }
-    el.agentAvatarBorderColor.value = config.avatarBorderColor || '#3d5a80';
-    el.agentAvatarBorderColorText.value = config.avatarBorderColor || '#3d5a80';
-    el.agentNameTextColor.value = config.nameTextColor || '#ffffff';
-    el.agentNameTextColorText.value = config.nameTextColor || '#ffffff';
-    el.disableCustomColors.checked = config.disableCustomColors === true;
-    el.useThemeColorsInChat.checked = config.useThemeColorsInChat === true;
+
     await syncPromptModule(session.currentSelectedItem.id, config);
 }
 

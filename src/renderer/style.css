@@ -366,12 +366,10 @@ body.layout-resizing-vertical * {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 32px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--panel) 96%, white 4%), color-mix(in srgb, var(--panel-strong) 94%, transparent)),
-    var(--panel);
-  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.18);
+  border-radius: 0;
+  background: var(--panel);
+  border: none;
+  box-shadow: none;
 }
 
 .settings-modal__header {
@@ -425,7 +423,7 @@ body.layout-resizing-vertical * {
   color: var(--muted);
   font-weight: 600;
   text-align: left;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .settings-modal__nav-button:hover {
@@ -436,7 +434,7 @@ body.layout-resizing-vertical * {
 .settings-modal__nav-button--active {
   background: color-mix(in srgb, var(--accent-soft) 78%, var(--panel) 22%);
   color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: none;
 }
 
 .settings-modal__content {
@@ -457,8 +455,8 @@ body.layout-resizing-vertical * {
 
 .settings-card--modal {
   box-shadow: none;
-  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  background: color-mix(in srgb, var(--panel) 97%, transparent);
+  border: none;
+  background: var(--paper);
 }
 
 .settings-modal__agent-header {
@@ -2036,13 +2034,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 /* Studio / Bento Grid */
-.settings-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; background: var(--panel); border-radius: 24px; padding: 20px; box-shadow: var(--shadow-elevation-1); }
+.settings-panel__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; background: transparent; border-radius: 0; padding: 0; box-shadow: none; }
 .settings-stack { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .settings-card {
   padding: 20px;
   border-radius: 24px;
-  background: var(--panel);
-  box-shadow: var(--shadow-elevation-1);
+  background: var(--paper);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2060,8 +2058,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .radio-row, .checkbox-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 14px; }
 .radio-row label, .checkbox-row label { flex-direction: row; align-items: center; gap: 6px; font-weight: normal; }
 .settings-card input[type='checkbox'], .settings-card input[type='radio'] { width: auto; accent-color: var(--accent); }
-.settings-card textarea { min-height: 100px; resize: vertical; background: rgba(255,255,255,0.5); }
-body.dark-theme .settings-card textarea { background: rgba(0,0,0,0.1); }
+.settings-card textarea { min-height: 100px; resize: vertical; background: rgba(0,0,0,0.04); border: none; }
+body.dark-theme .settings-card textarea { background: rgba(255,255,255,0.04); border: none; }
 .settings-card textarea.settings-textarea--readonly { opacity: 0.65; cursor: default; }
 .settings-card textarea.settings-textarea--preview { font-family: var(--font-family-monospace, "Cascadia Code", "Consolas", monospace); }
 .settings-caption.settings-caption--success { color: #188038; }
@@ -2186,9 +2184,9 @@ body.dark-theme ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
 /* Bento Grid Specific Styles */
 .bento-identity { grid-column: span 2; }
 .bento-prompt { grid-column: span 2; background: var(--macaron-blue) !important; }
-.bento-params { grid-column: span 1; background: var(--macaron-yellow) !important; }
-.bento-limits { grid-column: span 1; }
-.bento-style { grid-column: span 2; background: var(--macaron-green) !important; }
+.bento-params { grid-column: span 2; }
+.bento-limits { grid-column: span 2; }
+
 .bento-actions { grid-column: span 2; }
 
 /* Topic Item Fixes */
@@ -2218,10 +2216,11 @@ body.dark-theme ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
 .settings-panel__header > div { min-width: 0; }
 
 /* Params spacing */
-.bento-params .field-grid label { flex-direction: row; justify-content: space-between; align-items: center; }
-.bento-params input { width: 80px; text-align: right; padding: 6px 10px; }
-.bento-limits .field-grid label { flex-direction: row; justify-content: space-between; align-items: center; }
-.bento-limits input { width: 80px; text-align: right; padding: 6px 10px; }
+.bento-params .field-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bento-params .field-grid label { flex-direction: column; align-items: stretch; gap: 6px; }
+.bento-params input { width: 100%; text-align: left; padding: 6px 10px; }
+.bento-limits .field-grid label { flex-direction: column; align-items: stretch; gap: 6px; }
+.bento-limits input { width: 100%; text-align: left; padding: 6px 10px; }
 
 /* Make the topics panel header look like NotebookLM */
 .panel--topics .panel__header--stacked { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -2305,7 +2304,7 @@ body.dark-theme ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
 }
 
 /* Input refinements */
-.field-grid label span { font-size: 13px; font-weight: 500; color: var(--muted); }
+.field-grid label > span:first-child { font-size: 13px; font-weight: 500; color: var(--muted); }
 .settings-card input[type="text"], 
 .settings-card input[type="number"], 
 .settings-card input[type="password"], 
@@ -2319,8 +2318,9 @@ body.dark-theme ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
     transition: all 0.2s;
 }
 .settings-card input:focus, .settings-card select:focus {
-    border-color: var(--accent);
-    background: var(--paper);
+  border-color: var(--accent);
+  background: var(--paper);
+  box-shadow: none;
 }
 
 body.dark-theme .settings-card input, 
@@ -2385,6 +2385,8 @@ body.dark-theme .icon-btn:hover { background: rgba(255,255,255,0.1); }
 /* Fix missing icons in topic render */
 /* We will inject this via JS replace in renderer.js */
 
+.confirm-dialog-overlay {
+  position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
@@ -3032,24 +3034,22 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   text-align: left;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
-  background: color-mix(in srgb, var(--panel) 97%, transparent);
+  border: none;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+  transition: background-color 0.16s ease;
 }
 
 .settings-record-card:hover,
 .settings-record-card:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-soft) 24%, transparent);
+  background: color-mix(in srgb, var(--line) 50%, transparent);
   outline: none;
 }
 
 .settings-record-card--active {
-  border-color: color-mix(in srgb, var(--accent) 36%, transparent);
-  background: color-mix(in srgb, var(--accent-soft) 18%, var(--panel) 82%);
+  background: var(--accent-soft);
 }
 
 .settings-record-card__top {
@@ -3098,8 +3098,8 @@ button.settings-tag-chip {
   min-height: 180px;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
-  background: color-mix(in srgb, var(--panel) 97%, transparent);
+  border: none;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -3115,8 +3115,8 @@ button.settings-tag-chip {
   margin: 0;
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
-  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: none;
+  background: var(--paper);
   font-size: 12px;
   line-height: 1.6;
   overflow: auto;
@@ -3140,8 +3140,8 @@ button.settings-tag-chip {
 .settings-record-debug-item {
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
-  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  border: none;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
   gap: 8px;

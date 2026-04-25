@@ -76,15 +76,15 @@ test('cleanupLegacyPromptConfigProfile rewrites configured prompt files, preserv
     assert.equal(rewrittenSettingsBackup.followUpPromptTemplate, 'Next {{UserName}}');
     assert.equal(rewrittenSettingsBackup.topicTitlePromptTemplate, 'Time {{CurrentDateTime}}');
 
-    assert.deepEqual(rewrittenAgentConfig.promptAliases, ['Nova']);
-    assert.equal(rewrittenAgentConfig.toolSignature, '[Nova]tool');
+    assert.equal('promptAliases' in rewrittenAgentConfig, false);
+    assert.equal('toolSignature' in rewrittenAgentConfig, false);
     assert.equal('vcpAliases' in rewrittenAgentConfig, false);
     assert.equal('vcpMaid' in rewrittenAgentConfig, false);
     assert.equal(rewrittenAgentConfig.systemPrompt, 'Hello {{UserName}} {{VCPThoughtClusterManager}}');
     assert.equal(rewrittenAgentConfig.originalSystemPrompt, 'Daily {{DailyNoteGuide}}');
 
-    assert.deepEqual(rewrittenAgentBackup.promptAliases, ['KeepMe']);
-    assert.equal(rewrittenAgentBackup.toolSignature, '[Keep]tool');
+    assert.equal('promptAliases' in rewrittenAgentBackup, false);
+    assert.equal('toolSignature' in rewrittenAgentBackup, false);
     assert.equal('vcpAliases' in rewrittenAgentBackup, false);
     assert.equal('vcpMaid' in rewrittenAgentBackup, false);
     assert.equal(rewrittenAgentBackup.systemPrompt, 'Backup {{DailyNoteGuide}}');

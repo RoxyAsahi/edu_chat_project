@@ -2017,23 +2017,12 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
         // User bubbles also tint the sender name.
         shouldApplyColorToName = true;
     } else if (message.role === 'assistant') {
-    } else if (message.role === 'assistant') {
         if (currentSelectedItem) {
             avatarColorToUse = currentSelectedItem.config?.avatarCalculatedColor
                 || currentSelectedItem.avatarCalculatedColor
                 || currentSelectedItem.config?.avatarColor
                 || currentSelectedItem.avatarColor;
             avatarUrlToUse = currentSelectedItem.avatarUrl;
-
-            // For single-chat messages, read settings from the active agent.
-            const agentConfig = currentSelectedItem.config || currentSelectedItem;
-            if (agentConfig) {
-                useThemeColors = agentConfig.useThemeColorsInChat || false;
-                if (!useThemeColors) {
-                    customBorderColor = agentConfig.avatarBorderColor;
-                    customNameColor = agentConfig.nameTextColor;
-                }
-            }
         }
     }
 

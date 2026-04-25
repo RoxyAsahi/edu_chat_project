@@ -62,15 +62,13 @@ test('resolvePromptVariables resolves study profile variables and DailyNoteGuide
         },
         agentConfig: {
             name: 'Hornet_验收',
-            promptAliases: ['Hornet'],
-            toolSignature: '[Hornet]Hornet',
         },
     });
 
     assert.match(result.resolvedPrompt, /Alice @ Dorm A-301 \/ Laptop \+ Pen Tablet/);
     assert.match(result.resolvedPrompt, /DailyNote/);
     assert.match(result.resolvedPrompt, /<<<\[TOOL_REQUEST\]>>>/);
-    assert.match(result.resolvedPrompt, /\[Hornet\]Hornet/);
+    assert.match(result.resolvedPrompt, /\[Hornet_验收\]Hornet_验收/);
     assert.deepEqual(result.unresolvedTokens, []);
 });
 

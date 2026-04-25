@@ -336,7 +336,7 @@
               <p id="currentTopicKnowledgeBaseStatus" class="chat-stage__status hidden">每个话题会自动准备独立 Source</p>
             </div>
             <div class="chat-stage__header-actions hidden">
-              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn"><span class="material-symbols-outlined">tune</span> 智能体设置</button>
+              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn"><span class="material-symbols-outlined">tune</span> 学科设置</button>
             </div>
           </header>
 
@@ -751,9 +751,6 @@
           </nav>
 
           <div class="settings-modal__content">
-            <div class="settings-modal__content-header">
-              <p id="settingsModalTitleDisplay" class="settings-modal__content-title">模型服务</p>
-            </div>
             <div class="settings-modal__content-scroll">
             <section id="settingsModalSectionServices" class="settings-modal__section" data-settings-section="services">
               <section class="settings-card settings-card--modal model-service-card">
@@ -791,10 +788,10 @@
               </section>
             </section>
 
-              <section id="settingsModalSectionDefaultModel" class="settings-modal__section hidden" data-settings-section="default-model">
-              <section class="settings-card settings-card--modal">
-                <div class="model-service-default-shell">
-                  <h3>默认模型</h3>
+            <section id="settingsModalSectionDefaultModel" class="settings-modal__section hidden" data-settings-section="default-model">
+              <section class="settings-list-card model-service-default-shell">
+                <h3>模型用途</h3>
+                <div class="settings-list-card__body">
                   <div id="modelServiceDefaultSelectors" class="model-service-default-grid" aria-live="polite"></div>
                 </div>
                 <div class="hidden" aria-hidden="true">
@@ -802,255 +799,118 @@
                   <input id="followUpDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
                   <input id="topicTitleDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
                 </div>
-                <p class="settings-caption">选择器只展示当前已启用且能力匹配的模型。聊天、追问、话题命名、embedding、rerank 可以分别落在不同 Provider 上。</p>
               </section>
             </section>
 
             <section id="settingsModalSectionRetrieval" class="settings-modal__section hidden" data-settings-section="retrieval">
-              <section class="settings-card settings-card--modal">
-                <h3>检索调优</h3>
-                <div class="field-grid">
-                  <div class="checkbox-row" style="grid-column: span 2;">
-                    <label>
-                      <input id="kbUseRerank" type="checkbox" />
-                      <span>启用 Rerank 重排</span>
-                    </label>
+              <section class="settings-list-card">
+                <h3>来源检索</h3>
+                <div class="settings-list">
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>Rerank 重排</strong><span>用重排模型重新排序候选片段，提高命中质量。</span></div>
+                    <label class="toggle-switch settings-row__control" aria-label="启用 Rerank 重排"><input id="kbUseRerank" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label>
                   </div>
-                  <label>
-                    <span>Top K / Threshold</span>
-                    <div class="kb-inline-fields">
-                      <input id="kbTopK" type="number" min="1" step="1" />
-                      <input id="kbScoreThreshold" type="number" min="0" max="1" step="0.01" />
-                    </div>
-                  </label>
-                  <label>
-                    <span>Candidate Top K</span>
-                    <input id="kbCandidateTopK" type="number" min="1" step="1" />
-                  </label>
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>返回片段数</strong><span>最终注入对话的来源片段数量。</span></div>
+                    <input id="kbTopK" class="settings-row__number" type="number" min="1" step="1" />
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>候选片段数</strong><span>重排前先取多少条候选，数字越大越慢。</span></div>
+                    <input id="kbCandidateTopK" class="settings-row__number" type="number" min="1" step="1" />
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>最低相关度</strong><span>低于这个分数的来源片段会被过滤。</span></div>
+                    <input id="kbScoreThreshold" class="settings-row__number" type="number" min="0" max="1" step="0.01" />
+                  </div>
                 </div>
-                <p class="settings-caption">这里只保留检索行为参数；真正的 embedding / rerank 模型请在“默认模型”里跨 Provider 选择。</p>
               </section>
             </section>
 
             <section id="settingsModalSectionPrompts" class="settings-modal__section hidden" data-settings-section="prompts">
-              <section class="settings-card settings-card--modal">
+              <section class="settings-list-card">
                 <h3>学习档案</h3>
-                <div class="field-grid">
-                  <label>
-                    <span>学生姓名</span>
-                    <input id="studentNameInput" type="text" placeholder="用于 {{StudentName}}" />
-                  </label>
-                  <label>
-                    <span>所在城市</span>
-                    <input id="studyCityInput" type="text" placeholder="用于 {{City}}" />
-                  </label>
-                  <label>
-                    <span>学习工作区</span>
-                    <input id="studyWorkspaceInput" type="text" placeholder="用于 {{StudyWorkspace}}" />
-                  </label>
-                  <label>
-                    <span>工作环境</span>
-                    <input id="workEnvironmentInput" type="text" placeholder="用于 {{WorkEnvironment}}" />
-                  </label>
-                  <label>
-                    <span>默认时区</span>
-                    <input id="studyTimezoneInput" type="text" placeholder="Asia/Hong_Kong" />
-                  </label>
+                <div class="settings-list">
+                  <div class="settings-row"><div class="settings-row__main"><strong>学生姓名</strong><span>用于 {{StudentName}}。</span></div><input id="studentNameInput" type="text" placeholder="未设置" /></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>所在城市</strong><span>用于 {{City}}。</span></div><input id="studyCityInput" type="text" placeholder="未设置" /></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>学习工作区</strong><span>用于 {{StudyWorkspace}}。</span></div><input id="studyWorkspaceInput" type="text" placeholder="例如 A-301" /></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>工作环境</strong><span>用于 {{WorkEnvironment}}。</span></div><input id="workEnvironmentInput" type="text" placeholder="例如 Laptop + Pen Tablet" /></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>默认时区</strong><span>用于日期和日记时间。</span></div><input id="studyTimezoneInput" type="text" placeholder="Asia/Hong_Kong" /></div>
                 </div>
-                <div class="checkbox-row">
-                  <label><input id="studyLogEnabledInput" type="checkbox" /> 启用本地学习日志工具环</label>
-                </div>
-                <p class="settings-caption">关闭后，DailyNote 工具执行、自动协议注入和日志写入都会一起停用。</p>
                 <div class="field-grid hidden">
-                  <label>
-                    <span>日志工具回合上限</span>
-                    <input id="studyLogMaxRoundsInput" type="number" min="1" step="1" />
-                  </label>
-                  <label>
-                    <span>长期记忆 Top K</span>
-                    <input id="studyMemoryTopKInput" type="number" min="1" step="1" />
-                  </label>
-                  <label>
-                    <span>Fallback Top K</span>
-                    <input id="studyMemoryFallbackTopKInput" type="number" min="1" step="1" />
-                  </label>
+                  <label><span>日志工具回合上限</span><input id="studyLogMaxRoundsInput" type="number" min="1" step="1" /></label>
+                  <label><span>长期记忆 Top K</span><input id="studyMemoryTopKInput" type="number" min="1" step="1" /></label>
+                  <label><span>Fallback Top K</span><input id="studyMemoryFallbackTopKInput" type="number" min="1" step="1" /></label>
                 </div>
                 <div class="field-grid hidden" style="grid-template-columns: 1fr;">
-                  <label>
-                    <span>自定义提示词变量(JSON)</span>
-                    <textarea
-                      id="promptVariablesInput"
-                      rows="5"
-                      placeholder='{"CourseName":"高数","Classroom":"A-301"}'
-                    ></textarea>
-                    <span class="settings-caption">支持字符串键值对，会和系统内置变量一起参与提示词解析。</span>
-                  </label>
+                  <label><span>自定义提示词变量(JSON)</span><textarea id="promptVariablesInput" rows="5" placeholder='{"CourseName":"高数","Classroom":"A-301"}'></textarea></label>
                 </div>
               </section>
 
-              <section class="settings-card settings-card--modal">
-                <h3>提示词与日志协议</h3>
-                <div class="settings-subsection settings-subsection--primary">
-                  <div class="settings-subsection__header">
-                    <div>
-                      <h4>高频常用</h4>
-                      <p class="settings-caption">这里只保留最常改的几项：渲染提示、气泡提示、DailyNote 协议和追问模板。</p>
-                    </div>
-                  </div>
-                  <div class="field-grid" style="grid-template-columns: 1fr;">
-                    <div class="settings-prompt-editor-grid">
-                      <div class="settings-prompt-editor">
-                        <span class="settings-prompt-editor__title">
-                          <label><input id="enableRenderingPromptInput" type="checkbox" /> 结构化渲染提示</label>
-                          <code>{{RenderingGuide}} / {{RenderingGuide}}</code>
-                        </span>
-                        <textarea
-                          id="renderingPromptInput"
-                          rows="5"
-                          placeholder="用于控制结构化 div 渲染风格；关闭后会从提示词里解析为空。"
-                        ></textarea>
-                        <span class="settings-caption">控制回答是否携带结构化渲染指导。留空时会自动显示并使用内置默认文案。</span>
-                      </div>
-                      <div class="settings-prompt-editor">
-                        <span class="settings-prompt-editor__title">
-                          <label><input id="enableEmoticonPromptInput" type="checkbox" /> 表情包提示</label>
-                          <code>{{EmoticonGuide}} / {{EmoticonGuide}}</code>
-                        </span>
-                        <textarea
-                          id="emoticonPromptInput"
-                          rows="7"
-                          placeholder="用于控制内置表情包的文件列表和伪路径提示；启用后会自动追加到 system prompt，除非当前 agent prompt 已自带对应变量。"
-                        ></textarea>
-                        <span class="settings-caption">控制模型是否知道当前内置表情包、可用文件名，以及应该输出怎样的 <code>&lt;img src=&quot;/通用表情包/文件名&quot; width=&quot;120&quot;&gt;</code> 伪路径。启用后会自动追加到最终 system prompt；如果当前 agent prompt 已经显式写了 <code>{{EmoticonGuide}}</code> 或 <code>{{EmoticonGuide}}</code>，系统会跳过自动追加以避免重复。留空时会自动显示并使用内置默认文案。</span>
-                      </div>
-                      <div class="settings-prompt-editor">
-                        <span class="settings-prompt-editor__title">
-                          <label><input id="enableAdaptiveBubbleTipInput" type="checkbox" /> 简洁气泡补充</label>
-                          <code>{{AdaptiveBubbleTip}}</code>
-                        </span>
-                        <textarea
-                          id="adaptiveBubbleTipInput"
-                          rows="4"
-                          placeholder="用于补充气泡风格自适应提示；关闭后会从提示词里解析为空。"
-                        ></textarea>
-                        <span class="settings-caption">控制回答偏紧凑还是偏展开。留空时会自动显示并使用内置默认文案。</span>
-                      </div>
-                      <div class="settings-prompt-editor">
-                        <span class="settings-prompt-editor__title">
-                          <label><input id="enableAgentBubbleTheme" type="checkbox" /> 视觉气泡主题注入</label>
-                          <code>append to system prompt</code>
-                        </span>
-                        <textarea
-                          id="agentBubbleThemePrompt"
-                          rows="5"
-                          placeholder="启用后，这段提示词会额外追加到发送给上游的 system 消息中。"
-                        ></textarea>
-                        <span class="settings-caption">这是一段真正“追加到 system prompt 末尾”的附加提示。留空时会自动显示并使用默认文案。</span>
-                        <span id="agentBubbleThemePersistStatus" class="settings-caption"></span>
-                      </div>
-                      <div class="settings-prompt-editor">
-                        <span class="settings-prompt-editor__title">
-                          <span>DailyNote 协议文本（全局）</span>
-                          <code>{{DailyNoteGuide}} / auto inject</code>
-                        </span>
-                        <div class="settings-prompt-editor__toggles">
-                          <label><input id="studyLogEnablePromptVariablesInput" type="checkbox" /> 作为内建变量注入</label>
-                          <label><input id="studyLogAutoInjectProtocolInput" type="checkbox" /> 发送前自动补上协议</label>
-                        </div>
-                        <textarea
-                          id="dailyNoteGuideInput"
-                          rows="7"
-                          placeholder="这里定义全局 DailyNote 协议文本。启用内建变量或自动注入后，都会使用这里的内容。"
-                        ></textarea>
-                        <span class="settings-caption">这份文本会作为 <code>{{DailyNoteGuide}}</code>、<code>{{DailyNoteGuide}}</code> 的展开内容，也会被“自动追加到 system prompt”复用。<code>{{DailyNoteGuide}}</code> 仅作为兼容别名继续可用。留空时会直接显示并使用默认协议。</span>
-                      </div>
-                      <div class="settings-prompt-editor">
-                        <span class="settings-prompt-editor__title">
-                          <span>追问提示词模板（全局）</span>
-                          <code>{{CHAT_HISTORY}}</code>
-                        </span>
-                        <textarea
-                          id="followUpPromptTemplateInput"
-                          rows="7"
-                          placeholder="这里定义回复完成后自动生成追问时使用的全局模板。"
-                        ></textarea>
-                        <span class="settings-caption">留空时会自动显示并使用内置默认模板。若未显式写入 <code>{{CHAT_HISTORY}}</code>，系统会把裁剪后的最近对话自动追加到模板末尾。</span>
-                      </div>
-                      <div class="settings-prompt-editor">
-                        <span class="settings-prompt-editor__title">
-                          <label><input id="enableTopicTitleGenerationInput" type="checkbox" /> 自动命名话题（全局）</label>
-                          <code>{{CHAT_HISTORY}}</code>
-                        </span>
-                        <textarea
-                          id="topicTitlePromptTemplateInput"
-                          rows="7"
-                          placeholder="这里定义首轮回复完成后自动命名话题时使用的全局模板。"
-                        ></textarea>
-                        <span class="settings-caption">只会在首轮助手回复成功后尝试自动命名。留空时会自动显示并使用内置默认模板，要求模型只返回 <code>{\"title\":\"😀 标题\"}</code> 这种 JSON。</span>
-                      </div>
-                    </div>
-                  </div>
+              <section class="settings-list-card">
+                <h3>学习日志</h3>
+                <div class="settings-list">
+                  <div class="settings-row"><div class="settings-row__main"><strong>本地学习日志</strong><span>关闭后 DailyNote 工具、自动协议注入和日志写入都会停用。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnabledInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>作为提示变量</strong><span>允许 {{DailyNoteGuide}} 展开为 DailyNote 协议。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnablePromptVariablesInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>发送前自动补上协议</strong><span>工具对话时自动把 DailyNote 协议追加到 system prompt。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogAutoInjectProtocolInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>DailyNote 协议文本</strong><span>留空时使用内置默认协议。</span></div><textarea id="dailyNoteGuideInput" rows="6" placeholder="这里定义全局 DailyNote 协议文本。"></textarea></div>
                 </div>
+              </section>
 
-                <div class="settings-subsection">
-                  <div class="settings-subsection__header">
-                    <div>
-                      <h4>协议预览</h4>
-                      <p class="settings-caption">先看“哪些片段会被加入”，再看真正发给上游的完整 system prompt。</p>
-                    </div>
-                  </div>
-                  <div id="promptSegmentPreview" class="settings-token-grid" aria-label="当前提示词片段总览"></div>
-                  <div class="field-grid" style="grid-template-columns: 1fr;">
-                    <label>
-                      <span>最终完整 system prompt</span>
-                      <textarea
-                        id="finalSystemPromptPreview"
-                        class="settings-textarea--preview"
-                        rows="12"
-                        readonly
-                        aria-readonly="true"
-                        placeholder="这里会显示当前选中智能体在发送时真正使用的完整 system prompt。"
-                      ></textarea>
-                      <div id="finalSystemPromptPreviewMeta" class="settings-preview-meta">这里会显示当前上下文、哪些片段会生效，以及未解析变量提示。</div>
-                    </label>
-                  </div>
-                  <div class="settings-inline-actions">
-                    <button id="refreshFinalSystemPromptPreviewBtn" class="ghost-button icon-text-btn" type="button">
-                      <span class="material-symbols-outlined">preview</span> 刷新完整预览
-                    </button>
-                  </div>
+              <section class="settings-list-card">
+                <h3>回答表现</h3>
+                <div class="settings-list">
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>结构化渲染提示</strong><span>控制回答是否携带结构化渲染指导。</span></div><label class="toggle-switch settings-row__control"><input id="enableRenderingPromptInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="renderingPromptInput" rows="4" placeholder="用于控制结构化 div 渲染风格。"></textarea></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>表情包提示</strong><span>让模型知道可用表情包和图片伪路径。</span></div><label class="toggle-switch settings-row__control"><input id="enableEmoticonPromptInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="emoticonPromptInput" rows="5" placeholder="用于控制内置表情包的文件列表和伪路径提示。"></textarea></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>简洁气泡补充</strong><span>控制回答偏紧凑还是偏展开。</span></div><label class="toggle-switch settings-row__control"><input id="enableAdaptiveBubbleTipInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="adaptiveBubbleTipInput" rows="3" placeholder="用于补充气泡风格自适应提示。"></textarea></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>视觉气泡主题注入</strong><span>额外追加到 system prompt 末尾的视觉风格提示。</span></div><label class="toggle-switch settings-row__control"><input id="enableAgentBubbleTheme" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="agentBubbleThemePrompt" rows="4" placeholder="启用后，这段提示词会额外追加到发送给上游的 system 消息中。"></textarea><span id="agentBubbleThemePersistStatus" class="settings-caption"></span></div>
                 </div>
+              </section>
 
+              <section class="settings-list-card">
+                <h3>自动辅助</h3>
+                <div class="settings-list">
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>追问提示词模板</strong><span>用于回复完成后生成后续追问。</span></div><textarea id="followUpPromptTemplateInput" rows="5" placeholder="这里定义回复完成后自动生成追问时使用的全局模板。"></textarea></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>自动命名话题</strong><span>首轮助手回复成功后尝试自动生成话题标题。</span></div><label class="toggle-switch settings-row__control"><input id="enableTopicTitleGenerationInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="topicTitlePromptTemplateInput" rows="5" placeholder="这里定义首轮回复完成后自动命名话题时使用的全局模板。"></textarea></div>
+                </div>
+              </section>
+
+              <section class="settings-list-card">
+                <h3>协议预览</h3>
+                <div class="settings-list">
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>当前提示词片段</strong><span>查看哪些片段会被加入最终 system prompt。</span></div><button id="refreshFinalSystemPromptPreviewBtn" class="ghost-button icon-text-btn settings-row__button" type="button"><span class="material-symbols-outlined">preview</span> 刷新</button><div id="promptSegmentPreview" class="settings-token-grid" aria-label="当前提示词片段总览"></div></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>最终完整 system prompt</strong><span>当前选中学科实际发送给上游的完整 system prompt。</span></div><textarea id="finalSystemPromptPreview" class="settings-textarea--preview" rows="10" readonly aria-readonly="true" placeholder="这里会显示完整 system prompt。"></textarea><div id="finalSystemPromptPreviewMeta" class="settings-preview-meta"></div></div>
+                </div>
               </section>
             </section>
 
             <section id="settingsModalSectionDisplay" class="settings-modal__section hidden" data-settings-section="display">
-              <section class="settings-card settings-card--modal">
-                <h3>显示与排版</h3>
-                <div class="field-grid">
-                  <label>
-                    <span>聊天字体</span>
-                    <select id="chatFontPreset">
+              <section class="settings-list-card">
+                <h3>聊天显示</h3>
+                <div class="settings-list">
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>聊天字体</strong><span>控制普通对话内容的字体风格。</span></div>
+                    <select id="chatFontPreset" class="settings-row__control">
                       <option value="system">系统</option>
                       <option value="serif">衬线</option>
                       <option value="monospace">等宽</option>
                     </select>
-                  </label>
-                  <label>
-                    <span>代码字体</span>
-                    <select id="chatCodeFontPreset">
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>代码字体</strong><span>控制代码块和等宽内容的字体。</span></div>
+                    <select id="chatCodeFontPreset" class="settings-row__control">
                       <option value="consolas">Consolas</option>
                       <option value="monospace">等宽</option>
                       <option value="system">系统</option>
                     </select>
-                  </label>
-                  <label>
-                    <span>气泡宽度 %</span>
-                    <input id="chatBubbleMaxWidthWideDefault" type="number" min="50" max="96" />
-                  </label>
-                </div>
-                <div class="checkbox-row">
-                  <label><input id="enableSmoothStreaming" type="checkbox" /> 平滑流式输出</label>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>气泡宽度</strong><span>控制宽屏聊天气泡最大宽度百分比。</span></div>
+                    <input id="chatBubbleMaxWidthWideDefault" class="settings-row__number" type="number" min="50" max="96" />
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>平滑流式输出</strong><span>让模型回复逐步展开，视觉上更顺滑。</span></div>
+                    <label class="toggle-switch settings-row__control" aria-label="启用平滑流式输出"><input id="enableSmoothStreaming" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label>
+                  </div>
                 </div>
               </section>
             </section>
@@ -1058,7 +918,7 @@
             <section id="settingsModalSectionAgent" class="settings-modal__section hidden" data-settings-section="agent">
               <div class="settings-panel__header settings-modal__agent-header">
                 <div>
-                  <h2 id="agentSettingsContainerTitle">智能体设置</h2>
+                  <h2 id="agentSettingsContainerTitle">学科设置</h2>
                   <p id="selectedAgentNameForSettings" class="settings-caption hidden"></p>
                 </div>
               </div>
@@ -1068,133 +928,37 @@
                 <p>请选择一个智能体以进行配置</p>
               </div>
 
-              <div id="agentSettingsContainer" class="settings-stack hidden">
-                <section class="settings-card bento-identity">
-                  <h3><span class="material-symbols-outlined bento-icon">account_circle</span> 资料</h3>
-                  <div class="identity-grid">
-                    <div class="avatar-editor" title="点击上传头像">
+              <div id="agentSettingsContainer" class="settings-stack settings-stack--agent hidden">
+                <section class="settings-list-card">
+                  <h3>学科信息</h3>
+                  <div class="settings-list">
+                    <div class="settings-row settings-row--avatar">
+                      <div class="settings-row__main"><strong>头像</strong><span>点击图片更换当前学科头像。</span></div>
+                      <div class="avatar-editor settings-row__avatar" title="点击上传头像">
                       <img id="agentAvatarPreview" src="../assets/default_avatar.png" alt="avatar" />
                       <input id="agentAvatarInput" type="file" accept="image/*" />
+                      </div>
                     </div>
-                    <div class="field-grid">
-                      <label>
-                        <span>名称</span>
-                        <input id="agentNameInput" type="text" />
-                      </label>
-                      <label>
-                        <span>模型</span>
-                        <input id="agentModel" type="text" />
-                      </label>
+                    <div class="settings-row">
+                      <div class="settings-row__main"><strong>名称</strong><span>显示在学科列表和聊天顶部。</span></div>
+                      <input id="agentNameInput" class="settings-row__control" type="text" />
+                    </div>
+                    <div class="settings-row">
+                      <div class="settings-row__main"><strong>模型</strong><span>当前学科优先使用的聊天模型。</span></div>
+                      <input id="agentModel" class="settings-row__control" type="text" />
+                    </div>
+                    <div class="settings-row settings-row--editor settings-row--agent-prompt">
+                      <div class="settings-row__main"><strong>系统提示词</strong><span>定义这个学科的回答方式和教学风格。</span></div>
+                      <div id="systemPromptContainer"></div>
                     </div>
                   </div>
                   <input id="editingAgentId" type="hidden" />
                 </section>
 
-                <section class="settings-card">
-                  <h3><span class="material-symbols-outlined bento-icon">construction</span> 兼容迁移</h3>
-                  <div class="settings-subsection settings-subsection--primary">
-                    <div class="settings-subsection__header">
-                      <div>
-                        <h4>兼容与工具署名</h4>
-                        <p class="settings-caption">把旧 prompt 的 alias 和工具署名直接收回到当前学科设置里，方便做迁移与长期维护。</p>
-                      </div>
-                    </div>
-                    <div class="field-grid" style="grid-template-columns: 1fr;">
-                      <label>
-                        <span>兼容 Alias（每行一个）</span>
-                        <textarea
-                          id="agentPromptAliasesInput"
-                          rows="4"
-                          placeholder="Nova"
-                        ></textarea>
-                        <span class="settings-caption">用于兼容 <code>{{Nova}}</code> 这类旧变量和 agent 别名。留空时会回退到当前学科名称。</span>
-                      </label>
-                      <label>
-                        <span>兼容署名</span>
-                        <input id="agentToolSignatureInput" type="text" placeholder="[UniStudy/{{AgentName}}]{{UserName}}" />
-                        <span class="settings-caption">工具调用时优先使用这里的署名；留空时回退到全局 Maid 签名模板。</span>
-                      </label>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="settings-card bento-prompt">
-                  <h3><span class="material-symbols-outlined bento-icon">code_blocks</span> 系统提示词</h3>
-                  <div id="systemPromptContainer"></div>
-                </section>
-
-                <section class="settings-card bento-params">
-                  <h3><span class="material-symbols-outlined bento-icon">instant_mix</span> 参数</h3>
-                  <div class="field-grid" style="grid-template-columns: 1fr;">
-                    <label>
-                      <span>温度 (Temperature)</span>
-                      <input id="agentTemperature" type="number" min="0" max="2" step="0.1" />
-                    </label>
-                    <label>
-                      <span>Top P</span>
-                      <input id="agentTopP" type="number" min="0" max="1" step="0.01" />
-                    </label>
-                    <label>
-                      <span>Top K</span>
-                      <input id="agentTopK" type="number" min="0" step="1" />
-                    </label>
-                  </div>
-                </section>
-
-                <section class="settings-card bento-limits">
-                  <h3><span class="material-symbols-outlined bento-icon">rule</span> 约束</h3>
-                  <div class="field-grid" style="grid-template-columns: 1fr;">
-                    <label>
-                      <span>上下文 Token</span>
-                      <input id="agentContextTokenLimit" type="number" min="1" step="1" />
-                    </label>
-                    <label>
-                      <span>最大输出 Token</span>
-                      <input id="agentMaxOutputTokens" type="number" min="1" step="1" />
-                    </label>
-                    <label>
-                      <span>思考预算 (Thinking Budget)</span>
-                      <input id="agentThinkingBudget" type="number" min="1" step="1" placeholder="留空使用服务端默认值" />
-                      <span class="settings-caption">仅在启用原生思考请求时生效；留空时由模型服务自行决定。</span>
-                    </label>
-                  </div>
-                  <div class="radio-row" style="margin-top: 12px; font-weight: 500; font-size: 13px;">
-                    <span style="display:block; margin-bottom: 4px;">流式输出</span>
-                    <label><input id="agentStreamOutputTrue" type="radio" name="agentStreamOutput" checked /> 开启</label>
-                    <label><input id="agentStreamOutputFalse" type="radio" name="agentStreamOutput" /> 关闭</label>
-                  </div>
-                  <div class="checkbox-row" style="margin-top: 12px;">
-                    <label><input id="agentEnableThinkingRequest" type="checkbox" /> 启用原生思考请求</label>
-                    <label><input id="agentIncludeUsageInStream" type="checkbox" checked /> 流式附带 Usage</label>
-                  </div>
-                </section>
-
-                <section class="settings-card bento-style">
-                  <h3><span class="material-symbols-outlined bento-icon">palette</span> 聊天样式</h3>
-                  <div class="field-grid">
-                    <label>
-                      <span>头像边框色</span>
-                      <input id="agentAvatarBorderColor" type="color" value="#3d5a80" />
-                      <input id="agentAvatarBorderColorText" type="text" value="#3d5a80" style="display:none" />
-                    </label>
-                    <label>
-                      <span>名称颜色</span>
-                      <input id="agentNameTextColor" type="color" value="#ffffff" />
-                      <input id="agentNameTextColorText" type="text" value="#ffffff" style="display:none" />
-                    </label>
-                  </div>
-                  <div class="checkbox-row">
-                    <label><input id="disableCustomColors" type="checkbox" /> 禁用自定义颜色</label>
-                    <label><input id="useThemeColorsInChat" type="checkbox" /> 在聊天中使用主题色</label>
-                  </div>
-                </section>
-
-                <section class="settings-card bento-actions" style="background: transparent; box-shadow: none; padding: 0;">
-                  <div class="settings-agent-actions">
-                    <button id="saveAgentSettingsBtn" class="accent-button settings-agent-actions__save" style="height: 48px; border-radius: 24px;">保存智能体设置</button>
-                    <button id="deleteAgentBtn" class="ghost-button ghost-button--danger settings-agent-actions__delete" type="button">删除智能体</button>
-                  </div>
-                </section>
+                <div class="settings-agent-actions">
+                  <button id="saveAgentSettingsBtn" class="accent-button settings-agent-actions__save">保存学科设置</button>
+                  <button id="deleteAgentBtn" class="ghost-button ghost-button--danger settings-agent-actions__delete" type="button">删除学科</button>
+                </div>
               </div>
             </section>
 

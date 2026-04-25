@@ -105,7 +105,7 @@ function createDom() {
           <div id="settingsModal" class="hidden"></div>
           <div id="settingsModalBackdrop"></div>
           <div id="settingsModalTitle"></div>
-          <div id="settingsModalTitleDisplay"></div>
+
           <div id="settingsModalSubtitle"></div>
           <button id="settingsModalCloseBtn" type="button">close</button>
           <div id="settingsModalFooter"></div>
@@ -129,24 +129,7 @@ function createDom() {
           <img id="agentAvatarPreview" />
           <input id="agentAvatarInput" type="file" />
           <input id="agentModel" />
-          <textarea id="agentPromptAliasesInput"></textarea>
-          <input id="agentToolSignatureInput" />
-          <input id="agentTemperature" />
-          <input id="agentContextTokenLimit" />
-          <input id="agentMaxOutputTokens" />
-          <input id="agentThinkingBudget" />
-          <input id="agentTopP" />
-          <input id="agentTopK" />
-          <input id="agentStreamOutputTrue" type="radio" name="agentStreamOutput" />
-          <input id="agentStreamOutputFalse" type="radio" name="agentStreamOutput" />
-          <input id="agentEnableThinkingRequest" type="checkbox" />
-          <input id="agentIncludeUsageInStream" type="checkbox" />
-          <input id="agentAvatarBorderColor" />
-          <input id="agentAvatarBorderColorText" />
-          <input id="agentNameTextColor" />
-          <input id="agentNameTextColorText" />
-          <input id="disableCustomColors" type="checkbox" />
-          <input id="useThemeColorsInChat" type="checkbox" />
+
           <button id="saveAgentSettingsBtn" type="button">save-agent</button>
           <div id="selectAgentPromptForSettings"></div>
           <div id="agentSettingsContainer"></div>
@@ -234,7 +217,7 @@ function createElementMap(documentObj) {
         settingsModalSectionAgent: documentObj.getElementById('settingsModalSectionAgent'),
         settingsModalSectionKnowledgeBase: documentObj.getElementById('settingsModalSectionKnowledgeBase'),
         settingsModalTitle: documentObj.getElementById('settingsModalTitle'),
-        settingsModalTitleDisplay: documentObj.getElementById('settingsModalTitleDisplay'),
+
         settingsModalSubtitle: documentObj.getElementById('settingsModalSubtitle'),
         settingsModalFooter: documentObj.getElementById('settingsModalFooter'),
         editingAgentId: documentObj.getElementById('editingAgentId'),
@@ -242,24 +225,7 @@ function createElementMap(documentObj) {
         agentAvatarPreview: documentObj.getElementById('agentAvatarPreview'),
         agentAvatarInput: documentObj.getElementById('agentAvatarInput'),
         agentModel: documentObj.getElementById('agentModel'),
-        agentPromptAliasesInput: documentObj.getElementById('agentPromptAliasesInput'),
-        agentToolSignatureInput: documentObj.getElementById('agentToolSignatureInput'),
-        agentTemperature: documentObj.getElementById('agentTemperature'),
-        agentContextTokenLimit: documentObj.getElementById('agentContextTokenLimit'),
-        agentMaxOutputTokens: documentObj.getElementById('agentMaxOutputTokens'),
-        agentThinkingBudget: documentObj.getElementById('agentThinkingBudget'),
-        agentTopP: documentObj.getElementById('agentTopP'),
-        agentTopK: documentObj.getElementById('agentTopK'),
-        agentStreamOutputTrue: documentObj.getElementById('agentStreamOutputTrue'),
-        agentStreamOutputFalse: documentObj.getElementById('agentStreamOutputFalse'),
-        agentEnableThinkingRequest: documentObj.getElementById('agentEnableThinkingRequest'),
-        agentIncludeUsageInStream: documentObj.getElementById('agentIncludeUsageInStream'),
-        agentAvatarBorderColor: documentObj.getElementById('agentAvatarBorderColor'),
-        agentAvatarBorderColorText: documentObj.getElementById('agentAvatarBorderColorText'),
-        agentNameTextColor: documentObj.getElementById('agentNameTextColor'),
-        agentNameTextColorText: documentObj.getElementById('agentNameTextColorText'),
-        disableCustomColors: documentObj.getElementById('disableCustomColors'),
-        useThemeColorsInChat: documentObj.getElementById('useThemeColorsInChat'),
+
         saveAgentSettingsBtn: documentObj.getElementById('saveAgentSettingsBtn'),
         selectAgentPromptForSettings: documentObj.getElementById('selectAgentPromptForSettings'),
         agentSettingsContainer: documentObj.getElementById('agentSettingsContainer'),
@@ -951,13 +917,12 @@ test('settingsController lets the global settings navigation switch into the cur
     assert.equal(el.settingsModalSectionServices.classList.contains('hidden'), true);
     assert.equal(agentNavButton.classList.contains('settings-modal__nav-button--active'), true);
     assert.equal(agentNavButton.getAttribute('aria-current'), 'page');
-    assert.equal(el.settingsModalTitle.textContent, '智能体设置');
-    assert.equal(el.settingsModalTitleDisplay.textContent, '智能体设置');
-    assert.equal(el.settingsModalSubtitle.textContent, '调整当前学科入口的模型、提示词、输出参数与聊天样式。');
+    assert.equal(el.settingsModalTitle.textContent, '学科设置');
+    assert.equal(el.settingsModalSubtitle.textContent, '调整当前学科的头像、名称、模型和系统提示词。');
     assert.equal(el.settingsModalFooter.classList.contains('hidden'), true);
 });
 
-test('settingsController saves native agent prompt alias and tool signature fields', async (t) => {
+test('settingsController saves agent settings without legacy compatibility fields', async (t) => {
     const { createSettingsController } = await loadSettingsControllerModule();
     const dom = createDom();
     const previousWindow = global.window;
@@ -981,21 +946,6 @@ test('settingsController saves native agent prompt alias and tool signature fiel
 
     el.agentNameInput.value = 'Nova Agent';
     el.agentModel.value = 'qwen3.5-plus';
-    el.agentPromptAliasesInput.value = 'Nova\nTutor';
-    el.agentToolSignatureInput.value = '[Nova]Nova';
-    el.agentTemperature.value = '0.2';
-    el.agentContextTokenLimit.value = '100000';
-    el.agentMaxOutputTokens.value = '4000';
-    el.agentThinkingBudget.value = '2048';
-    el.agentTopP.value = '0.95';
-    el.agentTopK.value = '40';
-    el.agentStreamOutputTrue.checked = true;
-    el.agentEnableThinkingRequest.checked = true;
-    el.agentIncludeUsageInStream.checked = false;
-    el.agentAvatarBorderColor.value = '#3d5a80';
-    el.agentNameTextColor.value = '#ffffff';
-    el.disableCustomColors.checked = false;
-    el.useThemeColorsInChat.checked = true;
 
     const controller = createSettingsController({
         store,
@@ -1028,21 +978,6 @@ test('settingsController saves native agent prompt alias and tool signature fiel
         patch: {
             name: 'Nova Agent',
             model: 'qwen3.5-plus',
-            promptAliases: ['Nova', 'Tutor'],
-            toolSignature: '[Nova]Nova',
-            temperature: 0.2,
-            contextTokenLimit: 100000,
-            maxOutputTokens: 4000,
-            thinkingBudget: 2048,
-            top_p: 0.95,
-            top_k: 40,
-            streamOutput: true,
-            enableThinkingRequest: true,
-            includeUsageInStream: false,
-            avatarBorderColor: '#3d5a80',
-            nameTextColor: '#ffffff',
-            disableCustomColors: false,
-            useThemeColorsInChat: true,
             promptMode: 'original',
             originalSystemPrompt: 'Prompt text',
             systemPrompt: 'Prompt text',

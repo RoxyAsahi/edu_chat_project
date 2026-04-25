@@ -17,10 +17,20 @@ const AGENT_PROMPT_FIELDS = Object.freeze([
     'originalSystemPrompt',
 ]);
 
-const LEGACY_KEY_RENAMES = Object.freeze({
-    vcpAliases: 'promptAliases',
-    vcpMaid: 'toolSignature',
-});
+const LEGACY_AGENT_CONFIG_KEYS = Object.freeze([
+    'vcpAliases',
+    'vcpMaid',
+    'promptAliases',
+    'toolSignature',
+    'temperature',
+    'contextTokenLimit',
+    'maxOutputTokens',
+    'thinkingBudget',
+    'top_p',
+    'top_k',
+    'enableThinkingRequest',
+    'includeUsageInStream',
+]);
 
 const STATIC_PROMPT_REPLACEMENTS = Object.freeze([
     {
@@ -121,7 +131,7 @@ function collectRemainingLegacyMarkers(value = '') {
     return [...markers];
 }
 
-function renameLegacyKeys(target = {}) {
+function dropLegacyAgentConfigKeys(target = {}) {
     if (!target || typeof target !== 'object' || Array.isArray(target)) {
         return {
             nextValue: target,
@@ -132,19 +142,13 @@ function renameLegacyKeys(target = {}) {
     const nextValue = { ...target };
     const changes = [];
 
-    Object.entries(LEGACY_KEY_RENAMES).forEach(([legacyKey, canonicalKey]) => {
+    LEGACY_AGENT_CONFIG_KEYS.forEach((legacyKey) => {
         if (!Object.prototype.hasOwnProperty.call(nextValue, legacyKey)) {
             return;
         }
 
-        if (!Object.prototype.hasOwnProperty.call(nextValue, canonicalKey)) {
-            nextValue[canonicalKey] = nextValue[legacyKey];
-            changes.push(`key:${legacyKey}->${canonicalKey}`);
-        } else {
-            changes.push(`key:${legacyKey}->${canonicalKey}(kept-existing)`);
-        }
-
         delete nextValue[legacyKey];
+        changes.push(`key:${legacyKey}->removed`);
     });
 
     return {
@@ -239,7 +243,7 @@ async function transformJsonFile(filePath, profileRoot) {
     const isSettingsFile = path.basename(filePath).startsWith('settings.json');
     const keyRenameResult = isSettingsFile
         ? { nextValue: parsed, changes: [] }
-        : renameLegacyKeys(parsed);
+        : dropLegacyAgentConfigKeys(parsed);
     const promptRewriteResult = rewritePromptFields(
         keyRenameResult.nextValue,
         isSettingsFile ? SETTINGS_PROMPT_FIELDS : AGENT_PROMPT_FIELDS
@@ -309,7 +313,7 @@ async function cleanupLegacyPromptConfigProfile(profileRoot = buildDefaultProfil
 
 module.exports = {
     AGENT_PROMPT_FIELDS,
-    LEGACY_KEY_RENAMES,
+    LEGACY_AGENT_CONFIG_KEYS,
     REMAINING_LEGACY_PATTERNS,
     SETTINGS_PROMPT_FIELDS,
     STATIC_PROMPT_REPLACEMENTS,

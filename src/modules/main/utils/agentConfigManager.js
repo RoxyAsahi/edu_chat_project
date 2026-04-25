@@ -142,9 +142,6 @@ class AgentConfigManager extends EventEmitter {
                     name: id,
                     systemPrompt: `你是 ${id}。`,
                     model: 'gemini-3.1-flash-lite-preview',
-                    temperature: 0.7,
-                    contextTokenLimit: 1000000,
-                    maxOutputTokens: 60000,
                     topics: [buildDefaultPlaceholderTopic()]
                 };
                 console.warn(`Agent ${id} config not found, returning default config (allowDefault=true)`);

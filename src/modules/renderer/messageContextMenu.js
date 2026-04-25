@@ -680,10 +680,6 @@ async function handleRegenerateResponse(originalAssistantMessage) {
 
         const modelConfigForChat = {
             model: agentConfig.model || currentSelectedItemVal.config?.model || 'gemini-3.1-flash-lite-preview',
-            temperature: Number(agentConfig.temperature ?? currentSelectedItemVal.config?.temperature ?? 0.7),
-            max_tokens: Number(agentConfig.maxOutputTokens ?? currentSelectedItemVal.config?.maxOutputTokens ?? 1000),
-            top_p: agentConfig.top_p,
-            top_k: agentConfig.top_k,
             stream: agentConfig.streamOutput !== false,
         };
 
