@@ -147,6 +147,7 @@ function createWorkspaceController(deps = {}) {
         activeDaysLast7: 0,
         totalLearningDays: 0,
     };
+    let overviewDiaryCards = [];
     let overviewClockTimerId = null;
     let overviewSubjectRevealObserver = null;
     let overviewSubjectRevealResetTimerId = null;
@@ -270,6 +271,36 @@ function createWorkspaceController(deps = {}) {
 
         overviewLearningMetrics = buildFallbackLearningMetrics();
         return overviewLearningMetrics;
+    }
+
+    async function refreshOverviewDiaryCards() {
+        if (typeof chatAPI.listStudyDiaryWallCards !== 'function') {
+            overviewDiaryCards = [];
+            return overviewDiaryCards;
+        }
+
+        try {
+            const result = await chatAPI.listStudyDiaryWallCards({
+                scope: 'global',
+                agentId: '',
+                topicId: '',
+                query: '',
+                dateKey: '',
+                notebookId: '',
+                notebookName: '',
+                limit: 5,
+            });
+
+            if (result?.success && Array.isArray(result.items)) {
+                overviewDiaryCards = result.items;
+                return overviewDiaryCards;
+            }
+        } catch (_error) {
+            // Silently fall back to empty.
+        }
+
+        overviewDiaryCards = [];
+        return overviewDiaryCards;
     }
 
     function clearOverviewClockTimer() {
@@ -802,6 +833,7 @@ function createWorkspaceController(deps = {}) {
             selectedAgentName: getCurrentAgentDisplayName(),
             currentTopicName: getCurrentTopicDisplayName(),
             learningMetrics: overviewLearningMetrics,
+            diaryCards: overviewDiaryCards,
         });
 
         if (el.subjectOverviewHeadline) {
@@ -920,6 +952,7 @@ function createWorkspaceController(deps = {}) {
         const unreadResult = await chatAPI.getUnreadTopicCounts().catch(() => ({ counts: {} }));
         await refreshAgentOverviewStats(unreadResult?.counts || {});
         await refreshOverviewLearningMetrics();
+        await refreshOverviewDiaryCards();
         renderAgentList(unreadResult?.counts || {});
         renderSubjectOverview();
         return state.agents;
