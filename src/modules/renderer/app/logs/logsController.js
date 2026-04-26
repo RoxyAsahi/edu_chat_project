@@ -215,7 +215,7 @@ function createLogsController(deps = {}) {
               <div class="logs-card__meta">${escapeHtml([
                   `${Number(day.entryCount || 0)} 条`,
                   `召回 ${Number(day.recallCount || 0)} 次`,
-                  Array.isArray(day.maidSignatures) && day.maidSignatures.length ? day.maidSignatures.slice(0, 2).join(' / ') : '',
+                  Array.isArray(day.subjectSignatures) && day.subjectSignatures.length ? day.subjectSignatures.slice(0, 2).join(' / ') : '',
               ].filter(Boolean).join(' · '))}</div>
             </button>
         `).join('');
@@ -253,7 +253,7 @@ function createLogsController(deps = {}) {
               <div class="logs-card__body">${escapeHtml(String(entry.contentMarkdown || '').slice(0, 140) || '空日志')}</div>
               <div class="logs-card__meta">${escapeHtml([
                   `${entry.requestedToolName || entry.toolRequest?.toolName || 'DailyNote'}.${entry.requestedCommand || entry.toolRequest?.command || 'create'}`,
-                  entry.maidSignature || entry.maidRaw || '未记录主题',
+                  entry.subjectSignature || entry.subjectRaw || '未记录主题',
                   `召回 ${Number(entry.recallCount || 0)} 次`,
                   entry.status === 'imported' ? '旧迁移数据' : `状态 ${entry.status || 'unknown'}`,
               ].join(' · '))}</div>
@@ -302,7 +302,7 @@ function createLogsController(deps = {}) {
                   <strong>元数据</strong>
                   <div class="logs-detail-meta-grid">
                     <span>日记本：[${escapeHtml(item.notebookName || '默认')}]</span>
-                    <span>主题：${escapeHtml(Array.isArray(item.maidSignatures) ? item.maidSignatures.join(' / ') : '')}</span>
+                    <span>主题：${escapeHtml(Array.isArray(item.subjectSignatures) ? item.subjectSignatures.join(' / ') : '')}</span>
                     <span>条目数：${escapeHtml(String(item.entryCount || 0))}</span>
                     <span>最近召回：${escapeHtml(item.lastRecalledAt ? formatTimestamp(item.lastRecalledAt) : '未召回')}</span>
                   </div>
@@ -336,7 +336,7 @@ function createLogsController(deps = {}) {
               <div class="logs-detail-meta-grid">
                 <span>工具：${escapeHtml(`${entry.requestedToolName || entry.toolRequest?.toolName || 'DailyNote'}.${entry.requestedCommand || entry.toolRequest?.command || 'create'}`)}</span>
                 <span>日记本：[${escapeHtml(entry.notebookName || '默认')}]</span>
-                <span>主题：${escapeHtml(entry.maidSignature || entry.maidRaw || '未记录')}</span>
+                <span>主题：${escapeHtml(entry.subjectSignature || entry.subjectRaw || '未记录')}</span>
                 <span>文件：${escapeHtml(entry.filePath || '未记录')}</span>
                 <span>来源：${escapeHtml(entry.modelSnapshot || entry.agentNameSnapshot || entry.agentId || '未记录')}</span>
                 <span>来源状态：${entry.status === 'imported' ? '历史导入' : '当前 UniStudy 写入'}</span>

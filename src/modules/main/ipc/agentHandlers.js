@@ -21,7 +21,6 @@ const DEPRECATED_AGENT_CONFIG_FIELDS = [
     'promptAliases',
     'toolSignature',
     'vcpAliases',
-    'vcpMaid',
     'temperature',
     'contextTokenLimit',
     'maxOutputTokens',

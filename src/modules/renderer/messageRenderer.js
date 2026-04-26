@@ -653,7 +653,7 @@ function transformSpecialBlocks(text, codeBlockMap) {
         const isDailyNoteUpdate = isDailyNoteGuide && normalizedCommand === 'update';
 
         if (isDailyNoteCreate || isDailyNoteUpdate) {
-            const notebook = normalizeWrappedValue(readLineValue(content, 'maid') || readLineValue(content, 'maidName'));
+            const notebook = normalizeWrappedValue(readLineValue(content, 'subject'));
             const date = normalizeWrappedValue(readLineValue(content, 'date') || readLineValue(content, 'Date'));
 
             if (isDailyNoteCreate) {
@@ -708,15 +708,15 @@ function transformSpecialBlocks(text, codeBlockMap) {
     // Process Daily Notes
     processed = processed.replace(NOTE_REGEX, (match, rawContent) => {
         const content = rawContent.trim();
-        const maidRegex = /(?:Maid|日志本):\s*([^\n\r]*)/;
+            const subjectRegex = /(?:Subject|日志本):\s*([^\n\r]*)/;
         const dateRegex = /Date:\s*([^\n\r]*)/;
         const contentRegex = /Content:\s*([\s\S]*)/;
 
-        const maidMatch = content.match(maidRegex);
+            const subjectMatch = content.match(subjectRegex);
         const dateMatch = content.match(dateRegex);
         const contentMatch = content.match(contentRegex);
 
-        const notebook = maidMatch ? maidMatch[1].trim() : '';
+            const notebook = subjectMatch ? subjectMatch[1].trim() : '';
         const date = dateMatch ? dateMatch[1].trim() : '';
         // The rest of the text after "Content:", or the full text if "Content:" is not found
         const diaryContent = contentMatch ? contentMatch[1].trim() : content;

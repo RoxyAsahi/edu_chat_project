@@ -16,7 +16,7 @@
       "toolName": "DailyNote",
       "command": "create",
       "args": {
-        "maid": "[考前复盘]Reflection Coach",
+        "subject": "[考前复盘]Reflection Coach",
         "Date": "2026-04-15",
         "Content": "[22:30] 临考前最后一次对清单进行闭环检查，发现大部分黄色区域已经变绿，不再去纠结那些根本没思路的难题了。\nTag: 考前心态, 复盘闭环",
         "Tag": "考前心态, 复盘闭环"
@@ -37,8 +37,8 @@
     "notebookId": "考前复盘",
     "notebookName": "考前复盘",
     "diaryId": "study_diary_考前复盘_2026-04-15",
-    "maidRaw": "[考前复盘]Reflection Coach",
-    "maidSignature": "Reflection Coach",
+    "subjectRaw": "[考前复盘]Reflection Coach",
+    "subjectSignature": "Reflection Coach",
     "requestedToolName": "DailyNote",
     "requestedCommand": "create",
     "archery": "no_reply",
@@ -61,7 +61,7 @@
       "toolName": "DailyNote",
       "command": "create",
       "args": {
-        "maid": "[考前复盘]Reflection Coach",
+        "subject": "[考前复盘]Reflection Coach",
         "Date": "2026-04-14",
         "Content": "[22:00] 针对黄色考点进行了专项突破，把之前容易算错的导数求导规则重新过了一遍，感觉这几分现在拿稳了。\nTag: 精准提分, 数学复习",
         "Tag": "精准提分, 数学复习"
@@ -82,8 +82,8 @@
     "notebookId": "考前复盘",
     "notebookName": "考前复盘",
     "diaryId": "study_diary_考前复盘_2026-04-14",
-    "maidRaw": "[考前复盘]Reflection Coach",
-    "maidSignature": "Reflection Coach",
+    "subjectRaw": "[考前复盘]Reflection Coach",
+    "subjectSignature": "Reflection Coach",
     "requestedToolName": "DailyNote",
     "requestedCommand": "create",
     "archery": "no_reply",
@@ -106,7 +106,7 @@
       "toolName": "DailyNote",
       "command": "create",
       "args": {
-        "maid": "[考前复盘]Reflection Coach",
+        "subject": "[考前复盘]Reflection Coach",
         "Date": "2026-04-13",
         "Content": "[21:50] 练习时强制执行了15分钟跳出策略，不再为一个思路不通的压轴题耗费整个晚上，这种及时止损让心态稳了不少。\nTag: 时间管理, 止损策略",
         "Tag": "时间管理, 止损策略"
@@ -127,8 +127,8 @@
     "notebookId": "考前复盘",
     "notebookName": "考前复盘",
     "diaryId": "study_diary_考前复盘_2026-04-13",
-    "maidRaw": "[考前复盘]Reflection Coach",
-    "maidSignature": "Reflection Coach",
+    "subjectRaw": "[考前复盘]Reflection Coach",
+    "subjectSignature": "Reflection Coach",
     "requestedToolName": "DailyNote",
     "requestedCommand": "create",
     "archery": "no_reply",
@@ -151,7 +151,7 @@
       "toolName": "DailyNote",
       "command": "create",
       "args": {
-        "maid": "[考前复盘]Reflection Coach",
+        "subject": "[考前复盘]Reflection Coach",
         "Date": "2026-04-12",
         "Content": "[22:15] 把今晚的目标从学两小时改成了解决三道圆锥曲线的第一问，完成后的掌控感确实比盲目刷题要强很多。\nTag: 产出导向, 执行力",
         "Tag": "产出导向, 执行力"
@@ -172,8 +172,8 @@
     "notebookId": "考前复盘",
     "notebookName": "考前复盘",
     "diaryId": "study_diary_考前复盘_2026-04-12",
-    "maidRaw": "[考前复盘]Reflection Coach",
-    "maidSignature": "Reflection Coach",
+    "subjectRaw": "[考前复盘]Reflection Coach",
+    "subjectSignature": "Reflection Coach",
     "requestedToolName": "DailyNote",
     "requestedCommand": "create",
     "archery": "no_reply",
@@ -196,7 +196,7 @@
       "toolName": "DailyNote",
       "command": "create",
       "args": {
-        "maid": "[考前复盘]Reflection Coach",
+        "subject": "[考前复盘]Reflection Coach",
         "Date": "2026-04-11",
         "Content": "[21:30] 今天用三色复盘法理清了思路，发现之前一直在死磕红色的压轴题，难怪总觉得没进展，明天开始主攻黄色区域。\nTag: 三色复盘, 目标拆解",
         "Tag": "三色复盘, 目标拆解"
@@ -217,8 +217,8 @@
     "notebookId": "考前复盘",
     "notebookName": "考前复盘",
     "diaryId": "study_diary_考前复盘_2026-04-11",
-    "maidRaw": "[考前复盘]Reflection Coach",
-    "maidSignature": "Reflection Coach",
+    "subjectRaw": "[考前复盘]Reflection Coach",
+    "subjectSignature": "Reflection Coach",
     "requestedToolName": "DailyNote",
     "requestedCommand": "create",
     "archery": "no_reply",

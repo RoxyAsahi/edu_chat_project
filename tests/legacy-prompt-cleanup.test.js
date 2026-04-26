@@ -30,7 +30,6 @@ test('cleanupLegacyPromptConfigProfile rewrites configured prompt files, preserv
         id: 'agent-1',
         name: 'Legacy Agent',
         vcpAliases: ['Nova'],
-        vcpMaid: '[Nova]tool',
         systemPrompt: 'Hello {{VarUser}} {{VCPThoughtClusterManager}}',
         originalSystemPrompt: 'Daily {{VarDailyNoteGuide}}',
     };
@@ -40,7 +39,6 @@ test('cleanupLegacyPromptConfigProfile rewrites configured prompt files, preserv
         promptAliases: ['KeepMe'],
         toolSignature: '[Keep]tool',
         vcpAliases: ['OldAlias'],
-        vcpMaid: '[Old]tool',
         systemPrompt: 'Backup {{DailyNoteTool}}',
         originalSystemPrompt: 'Backup <div id="vcp-root"> VCP工具',
     };
@@ -79,14 +77,12 @@ test('cleanupLegacyPromptConfigProfile rewrites configured prompt files, preserv
     assert.equal('promptAliases' in rewrittenAgentConfig, false);
     assert.equal('toolSignature' in rewrittenAgentConfig, false);
     assert.equal('vcpAliases' in rewrittenAgentConfig, false);
-    assert.equal('vcpMaid' in rewrittenAgentConfig, false);
     assert.equal(rewrittenAgentConfig.systemPrompt, 'Hello {{UserName}} {{VCPThoughtClusterManager}}');
     assert.equal(rewrittenAgentConfig.originalSystemPrompt, 'Daily {{DailyNoteGuide}}');
 
     assert.equal('promptAliases' in rewrittenAgentBackup, false);
     assert.equal('toolSignature' in rewrittenAgentBackup, false);
     assert.equal('vcpAliases' in rewrittenAgentBackup, false);
-    assert.equal('vcpMaid' in rewrittenAgentBackup, false);
     assert.equal(rewrittenAgentBackup.systemPrompt, 'Backup {{DailyNoteGuide}}');
     assert.equal(rewrittenAgentBackup.originalSystemPrompt, 'Backup <div id="response-root"> 内建工具');
 

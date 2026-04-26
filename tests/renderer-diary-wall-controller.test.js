@@ -93,7 +93,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
             entryCount: 2,
             recallCount: 3,
             tags: ['二次函数', '错因复盘'],
-            maidSignatures: ['Nova'],
+            subjectSignatures: ['Nova'],
             agentNames: ['Nova'],
             topics: {
                 junior_math_quadratic: {
@@ -113,7 +113,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
             entryCount: 1,
             recallCount: 1,
             tags: ['共享记忆'],
-            maidSignatures: ['Nova'],
+            subjectSignatures: ['Nova'],
             agentNames: ['Nova'],
             topics: {},
             previewMarkdown: '# DailyNote\n公共日记本。',
@@ -129,7 +129,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
             entryCount: 1,
             recallCount: 2,
             tags: ['英语语法'],
-            maidSignatures: ['Hornet'],
+            subjectSignatures: ['Hornet'],
             agentNames: ['Hornet'],
             topics: {
                 senior_english_clause: {
@@ -148,13 +148,13 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
         entryCount: 2,
         recallCount: 3,
         contentMarkdown: '# DailyNote 2026-04-14\n复盘了顶点式与对称轴。',
-        maidSignatures: ['Nova'],
+        subjectSignatures: ['Nova'],
         entries: [
             {
                 id: 'entry-1',
                 createdAt: Date.UTC(2026, 3, 14, 11, 30, 0),
                 notebookName: 'Nova',
-                maidSignature: 'Nova',
+                subjectSignature: 'Nova',
                 topicId: 'junior_math_quadratic',
                 topicNameSnapshot: '初中数学_二次函数',
                 contentMarkdown: '[19:30] 复盘了顶点式与对称轴。\nTag: 二次函数, 错因复盘',
@@ -164,7 +164,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
                     toolName: 'DailyNote',
                     command: 'create',
                     args: {
-                        maid: '[Nova]Nova',
+                        subject: '[Nova]Nova',
                     },
                 },
                 requestedToolName: 'DailyNote',
@@ -180,13 +180,13 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
         entryCount: 1,
         recallCount: 2,
         contentMarkdown: '# DailyNote 2026-04-12\n复盘了定语从句里的先行词判断。',
-        maidSignatures: ['Hornet'],
+        subjectSignatures: ['Hornet'],
         entries: [
             {
                 id: 'entry-2',
                 createdAt: Date.UTC(2026, 3, 12, 8, 0, 0),
                 notebookName: 'Hornet',
-                maidSignature: 'Hornet',
+                subjectSignature: 'Hornet',
                 topicId: 'senior_english_clause',
                 topicNameSnapshot: '高中英语_定语从句',
                 contentMarkdown: '[18:40] 复盘了定语从句里的先行词判断。\nTag: 英语语法',
@@ -196,7 +196,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
                     toolName: 'DailyNote',
                     command: 'create',
                     args: {
-                        maid: '[Hornet]Hornet',
+                        subject: '[Hornet]Hornet',
                     },
                 },
                 requestedToolName: 'DailyNote',
@@ -335,7 +335,7 @@ test('diaryWallController can jump back to source messages without handing off t
                         entryCount: 1,
                         recallCount: 0,
                         tags: ['验收'],
-                        maidSignatures: ['Nova'],
+                        subjectSignatures: ['Nova'],
                         agentNames: ['Nova'],
                         topics: {},
                         previewMarkdown: '# DailyNote\n一次验收。',
@@ -353,12 +353,12 @@ test('diaryWallController can jump back to source messages without handing off t
                         entryCount: 1,
                         recallCount: 0,
                         contentMarkdown: '# DailyNote 2026-04-14\n一次验收。',
-                        maidSignatures: ['Nova'],
+                        subjectSignatures: ['Nova'],
                         entries: [{
                             id: 'entry-1',
                             createdAt: Date.UTC(2026, 3, 14, 11, 30, 0),
                             notebookName: 'Nova',
-                            maidSignature: 'Nova',
+                            subjectSignature: 'Nova',
                             topicId: 'junior_math_quadratic',
                             topicNameSnapshot: '初中数学_二次函数',
                             contentMarkdown: '[20:18] 记录今日与主人的互动测试。',

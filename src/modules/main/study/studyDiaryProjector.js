@@ -26,14 +26,14 @@ function buildEntryMarkdown(entry = {}) {
     const tags = Array.isArray(entry.tags) && entry.tags.length > 0
         ? `\n\nTags: ${entry.tags.map((tag) => `#${tag}`).join(' ')}`
         : '';
-    const subjectLine = sanitizeText(entry.maidRaw)
-        ? `\n\nSubject: ${entry.maidRaw}`
-        : sanitizeText(entry.maidSignature)
-            ? `\n\nSubject: ${entry.maidSignature}`
+    const subjectLine = sanitizeText(entry.subjectRaw)
+        ? `\n\nSubject: ${entry.subjectRaw}`
+        : sanitizeText(entry.subjectSignature)
+            ? `\n\nSubject: ${entry.subjectSignature}`
             : '';
 
     return [
-        `#### ${formatTime(entry.createdAt)}${sanitizeText(entry.maidSignature) ? ` · ${entry.maidSignature}` : ''}`,
+        `#### ${formatTime(entry.createdAt)}${sanitizeText(entry.subjectSignature) ? ` · ${entry.subjectSignature}` : ''}`,
         sanitizeText(entry.contentMarkdown, '_No content_'),
         subjectLine,
         tags,
@@ -144,10 +144,10 @@ function createStudyDiaryProjector(options = {}) {
         const agentIds = uniqueValues(sortedEntries.map((entry) => entry.agentId));
         const topicIds = uniqueValues(sortedEntries.map((entry) => entry.topicId));
         const sourceMessageIds = uniqueValues(sortedEntries.flatMap((entry) => entry.sourceMessageIds || []));
-        const maidSignatures = uniqueValues(sortedEntries.map((entry) => entry.maidSignature || entry.maidRaw));
+        const subjectSignatures = uniqueValues(sortedEntries.map((entry) => entry.subjectSignature || entry.subjectRaw));
         const agentNames = uniqueValues(sortedEntries.map((entry) => (
             sanitizeText(entry.agentNameSnapshot)
-            || sanitizeText(entry.maidSignature)
+            || sanitizeText(entry.subjectSignature)
             || sanitizeText(entry.agentId)
         )));
         const entryRefs = sortedEntries.map((entry) => ({
@@ -190,7 +190,7 @@ function createStudyDiaryProjector(options = {}) {
             agentIds,
             agentNames,
             sourceMessageIds,
-            maidSignatures,
+            subjectSignatures,
             isPublicNotebook: notebookName === '公共',
             contentMarkdown: buildDiaryMarkdownFromEntries(sortedEntries, {
                 notebookName,
@@ -293,7 +293,7 @@ function createStudyDiaryProjector(options = {}) {
                 topicIds: scopedDiary.topicIds,
                 topics: scopedDiary.topics,
                 sourceMessageIds: scopedDiary.sourceMessageIds,
-                maidSignatures: scopedDiary.maidSignatures,
+                subjectSignatures: scopedDiary.subjectSignatures,
                 viewContentMarkdown: scopedDiary.contentMarkdown,
                 matchedEntryIds: scopedDiary.entryIds,
                 matchedEntryRefs: scopedDiary.entryRefs,
@@ -411,7 +411,7 @@ function createStudyDiaryProjector(options = {}) {
             topics: item.topics || {},
             tags: item.tags || [],
             entryRefs: item.matchedEntryRefs || item.entryRefs || [],
-            maidSignatures: item.maidSignatures || [],
+            subjectSignatures: item.subjectSignatures || [],
             previewMarkdown: String(item.viewContentMarkdown || item.contentMarkdown || '').slice(0, 480),
             contentMarkdown: item.contentMarkdown || '',
             isPublicNotebook: item.isPublicNotebook === true,

@@ -600,7 +600,7 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
     assert.match(storedLogs[0].contentMarkdown, /导数复习/);
     assert.equal(storedLogs[0].notebookName, 'Nova');
     assert.equal(storedLogs[0].toolRequest.args.subject, '[Nova]Nova');
-    assert.equal(storedLogs[0].maidRaw, '[Nova]Nova');
+    assert.equal(storedLogs[0].subjectRaw, '[Nova]Nova');
     assert.equal(storedLogs[0].requestedToolName, 'DailyNote');
 });
 

@@ -204,10 +204,12 @@
     /**
      * Scrolls the chat messages div to the bottom.
      */
-    uiHelperFunctions.scrollToBottom = function() {
+    uiHelperFunctions.scrollToBottom = function(options = {}) {
         const chatMessagesDiv = document.getElementById('chatMessages');
         const parentContainer = document.querySelector('.chat-messages-container');
         if (!chatMessagesDiv || !parentContainer) return;
+
+        const force = options === true || options?.force === true;
 
         // 🟢 核心修复：使用真正的滚动容器（parentContainer）进行判断
         // 之前的逻辑错误地使用了 chatMessagesDiv，而它通常没有滚动条，导致判断永远为 true
@@ -215,7 +217,7 @@
         const isScrolledToBottom = parentContainer.scrollHeight - parentContainer.clientHeight <= parentContainer.scrollTop + scrollThreshold;
 
         // 只有当用户已经位于底部时，才执行自动滚动。
-        if (isScrolledToBottom) {
+        if (force || isScrolledToBottom) {
             // 使用 requestAnimationFrame 来确保滚动操作在下一次浏览器重绘前执行。
             requestAnimationFrame(() => {
                 if (document.body.contains(parentContainer)) {

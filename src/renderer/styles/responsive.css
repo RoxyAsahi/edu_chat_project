@@ -1042,3 +1042,23 @@
     display: none;
   }
 }
+
+body .titlebar__tab {
+  border: 0.5px solid rgba(95, 99, 104, 0.18);
+  box-shadow: none;
+}
+
+body .titlebar__tab:hover,
+body .titlebar__tab:focus-visible {
+  border-color: rgba(95, 99, 104, 0.28);
+  box-shadow: none;
+}
+
+body .titlebar__context-card.titlebar__tab--active,
+body .titlebar__tab--active,
+body.workspace-view-overview .titlebar__home-btn,
+body.workspace-view-subject #workspaceOpenSubjectBtn,
+body.workspace-view-manual-notes #manualNotesLibraryBtn {
+  border-color: rgba(95, 99, 104, 0.16);
+  box-shadow: none;
+}

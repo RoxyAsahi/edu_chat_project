@@ -120,9 +120,8 @@ function buildPlainPreview(value, maxChars = 150) {
         .replace(/^#{1,6}\s*\d{2}:\d{2}(:\d{2})?\s*[·•]\s*.+$/gim, '')
         // 移除话题二级标题
         .replace(/^#{2}\s+.+$/gim, '')
-        // 移除 Subject / legacy Maid / Tags 行
+        // 移除 Subject / Tags 行
         .replace(/^Subject:\s*.+$/gim, '')
-        .replace(/^Maid:\s*.+$/gim, '')
         .replace(/^Tags:\s*(#[^\s]+\s*)*$/gim, '')
         // 移除普通 Markdown
         .replace(/```[\s\S]*?```/g, ' ')
@@ -160,11 +159,11 @@ function getCardAgentNames(card = {}) {
         return names;
     }
 
-    const maidNames = Array.isArray(card.maidSignatures)
-        ? card.maidSignatures.map((name) => String(name || '').trim()).filter(Boolean)
+    const subjectNames = Array.isArray(card.subjectSignatures)
+        ? card.subjectSignatures.map((name) => String(name || '').trim()).filter(Boolean)
         : [];
-    if (maidNames.length > 0) {
-        return maidNames;
+    if (subjectNames.length > 0) {
+        return subjectNames;
     }
 
     return Array.isArray(card.agentIds)
@@ -485,7 +484,7 @@ function createDiaryWallController(deps = {}) {
                   </div>
                   <div class="diary-wall-entry__meta">${escapeHtml([
                       `[${entry.notebookName || '默认'}]`,
-                      entry.maidSignature || entry.maidRaw || '未记录主题',
+                      entry.subjectSignature || entry.subjectRaw || '未记录主题',
                       entry.topicNameSnapshot || entry.topicId || '未命名话题',
                   ].join(' · '))}</div>
                   <div class="diary-wall-entry__body">${renderMarkdownFragment(entry.contentMarkdown || '')}</div>
@@ -507,7 +506,7 @@ function createDiaryWallController(deps = {}) {
                 <p class="settings-caption">${escapeHtml([
                     `${Number(item.entryCount || 0)} 条`,
                     `召回 ${Number(item.recallCount || 0)} 次`,
-                    item.maidSignatures?.length ? item.maidSignatures.join(' / ') : '',
+                    item.subjectSignatures?.length ? item.subjectSignatures.join(' / ') : '',
                 ].filter(Boolean).join(' · '))}</p>
               </div>
             </div>

@@ -43,8 +43,8 @@ textarea:focus, input:focus, select:focus {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 58px;
-  padding: 10px 16px;
+  min-height: 62px;
+  padding: 12px 16px;
   background: color-mix(in srgb, var(--paper) 82%, transparent);
   backdrop-filter: blur(16px) saturate(120%);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
@@ -95,8 +95,8 @@ body.workspace-view-overview .titlebar {
 .titlebar__meta > * { flex-shrink: 0; }
 
 .brand-mark {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: block;
   object-fit: contain;
   flex: 0 0 auto;
@@ -104,13 +104,13 @@ body.workspace-view-overview .titlebar {
 
 .titlebar__title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.01em;
 }
 
 .titlebar__subtitle {
   color: var(--color-text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .titlebar__tab {
@@ -118,11 +118,11 @@ body.workspace-view-overview .titlebar {
   display: flex;
   align-items: center;
   gap: 7px;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 36px;
+  padding: 0 13px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--panel) 70%, transparent);
-  border: 1px solid color-mix(in srgb, var(--line) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   box-shadow: none;
   color: #202124;
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
@@ -154,19 +154,19 @@ body.workspace-view-manual-notes #manualNotesLibraryBtn {
 .titlebar__tab-text {
   min-width: 0;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   line-height: 1;
 }
 
 .titlebar__tab-icon {
   flex: 0 0 auto;
-  font-size: 16px;
+  font-size: 17px;
   color: currentColor;
 }
 
 .titlebar__tab .titlebar__tab-icon {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .titlebar__tab-copy {
@@ -179,9 +179,13 @@ body.workspace-view-manual-notes #manualNotesLibraryBtn {
 
 .titlebar__context-card {
   max-width: 420px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   justify-content: flex-start;
-  padding-inline: 12px;
+  padding-inline: 13px;
+}
+
+.titlebar__context-card.titlebar__tab--active {
+  border-color: #e0e3e7;
 }
 
 .titlebar__context-card--action {
@@ -194,7 +198,7 @@ body.workspace-view-manual-notes #manualNotesLibraryBtn {
 }
 
 .titlebar__context-card strong {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   white-space: nowrap;
   color: currentColor;
@@ -227,7 +231,7 @@ body.workspace-view-manual-notes #manualNotesLibraryBtn {
 }
 
 .titlebar__home-btn .material-symbols-outlined {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .titlebar .ghost-button,
@@ -425,7 +429,7 @@ h1, h2, h3, p { margin: 0; }
 
 .accent-button--danger { background: #d93025; }
 
-.window-button { width: 32px; height: 32px; padding: 0; text-align: center; border-radius: 16px; color: var(--muted); background: transparent; }
+.window-button { width: 34px; height: 34px; padding: 0; text-align: center; border-radius: 17px; color: var(--muted); background: transparent; }
 
 .window-button:hover { background: rgba(0,0,0,0.05); color: var(--ink); }
 
@@ -498,6 +502,22 @@ body.dark-theme ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
 /* Base button resets */
 button { border: none; background: transparent; outline: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 
+.titlebar__tab {
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.titlebar__tab:hover,
+.titlebar__tab:focus-visible {
+  border-color: #dadce0;
+}
+
+.titlebar__tab--active,
+body.workspace-view-overview .titlebar__home-btn,
+body.workspace-view-subject #workspaceOpenSubjectBtn,
+body.workspace-view-manual-notes #manualNotesLibraryBtn {
+  border-color: #e0e3e7;
+}
+
 /* Icon buttons */
 .icon-btn { width: 32px; height: 32px; border-radius: 50%; padding: 0 !important; color: var(--muted); }
 
@@ -508,6 +528,8 @@ body.dark-theme .icon-btn:hover { background: rgba(255,255,255,0.1); }
 .icon-text-btn { padding: 6px 12px; border-radius: var(--radius-pill); font-weight: 500; }
 
 .icon-text-btn .material-symbols-outlined { font-size: 18px; }
+
+.titlebar .icon-text-btn .material-symbols-outlined { font-size: 19px; }
 
 /* Empty States */
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px; color: var(--muted); background: var(--paper); border-radius: 24px; border: 1px dashed var(--line); }
@@ -522,30 +544,32 @@ body.dark-theme .icon-btn:hover { background: rgba(255,255,255,0.1); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
+  min-height: 38px;
+  padding: 0 15px;
   border-radius: 999px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
   background: transparent;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   flex-shrink: 0;
 }
 
 .titlebar-settings-pill:hover {
   background: rgba(0, 0, 0, 0.06);
+  border-color: color-mix(in srgb, var(--line) 96%, transparent);
   color: var(--ink);
 }
 
 .titlebar-settings-pill .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 19px;
 }
 
 body.workspace-view-settings .titlebar-settings-pill {
   background: rgba(0, 0, 0, 0.08);
+  border-color: color-mix(in srgb, var(--line) 96%, transparent);
   color: var(--ink);
 }
 
@@ -557,12 +581,14 @@ body:not(.light-theme) .titlebar-settings-pill {
 body.dark-theme .titlebar-settings-pill:hover,
 body:not(.light-theme) .titlebar-settings-pill:hover {
   background: rgba(255, 255, 255, 0.08);
+  border-color: color-mix(in srgb, var(--line) 100%, transparent);
   color: var(--ink);
 }
 
 body.dark-theme.workspace-view-settings .titlebar-settings-pill,
 body:not(.light-theme).workspace-view-settings .titlebar-settings-pill {
   background: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in srgb, var(--line) 100%, transparent);
   color: var(--ink);
 }
 

@@ -127,6 +127,110 @@ UniStudy 让 AI 帮用户生成理解资料的学习场景。
 - `npm run test:renderer:dom`: 3 passed
 - `git diff --check`: clean
 
+## Tool Request 与 DailyNote 机制
+Tool Request 是 UniStudy 让模型在普通聊天中调用本地学习工具的轻量协议。模型仍然输出一条普通 assistant 消息，但当消息中出现完整工具块时，主进程会把工具块解析出来，执行本地工具，并把执行结果作为下一轮上下文交回模型。
+
+工具块边界固定为:
+
+```text
+<<<[TOOL_REQUEST]>>>
+key:「始」value「末」,
+...
+<<<[END_TOOL_REQUEST]>>>
+```
+
+当前解析入口在 `src/modules/main/study/toolProtocol.js`:
+- `parseToolRequests(rawContent)` 扫描 assistant 原文，提取一个或多个完整工具块。
+- `parseDelimitedBlock()` 按 `key:「始」value「末」` 解析字段，字段值支持多行。
+- `normalizeProtocolArgs()` 统一输出工具参数对象，缺省字段补为空字符串，供运行时稳定读取。
+- 普通回复内容仍可继续流式显示；工具块在结束标记到达后具备完整边界，可以被 renderer 美化成工具卡片。
+
+Tool Request 的主流程如下:
+
+```text
+模型输出 assistant 消息
+  -> chatOrchestrator 调用 parseToolRequests()
+  -> 可见正文继续作为聊天内容渲染
+  -> studyToolRuntime.executeToolRequest() 执行本地工具
+  -> buildToolPayloadMessage() 生成工具执行结果消息
+  -> 下一轮模型基于工具结果继续正常对话
+```
+
+DailyNote 是当前 Tool Request 中用于写入学习日志 / 日记的工具。模型应使用 `tool_name: DailyNote`，并通过 `command` 区分创建和更新。
+
+创建日志使用 `command: create`，核心字段为:
+- `subject`: 学习主题与署名，格式建议为 `[学习主题或日记本名]Agent署名`。
+- `Date`: 日志日期，格式为 `YYYY-MM-DD`。
+- `Content`: 日志正文。常规日志应以 `[HH:MM]` 开头，正文中可以自然包含多行内容。
+- `Tag`: 可选标签。标签可以写在独立 `Tag` 字段中，也可以写在 `Content` 末尾的 `Tag:` 行中；独立字段优先。
+- `archery`: 工具执行后的回复策略，常用 `no_reply` 表示工具只记录，不额外打断当前回答。
+
+示例:
+
+```text
+<<<[TOOL_REQUEST]>>>
+subject:「始」[数学错题]Nova「末」,
+tool_name:「始」DailyNote「末」,
+command:「始」create「末」,
+Date:「始」2026-04-27「末」,
+Content:「始」[09:30] 今天复盘了二次函数顶点式，发现配方法的符号容易写反。
+Tag: 数学, 二次函数, 错题复盘「末」,
+archery:「始」no_reply「末」
+<<<[END_TOOL_REQUEST]>>>
+```
+
+该工具块解析后，DailyNote 运行时会得到:
+
+```json
+{
+  "subject": "[数学错题]Nova",
+  "Date": "2026-04-27",
+  "Content": "[09:30] 今天复盘了二次函数顶点式，发现配方法的符号容易写反。\nTag: 数学, 二次函数, 错题复盘",
+  "Tag": "",
+  "archery": "no_reply",
+  "target": "",
+  "replace": "",
+  "title": "",
+  "summary": "",
+  "fileName": ""
+}
+```
+
+`src/modules/main/study/studyToolRuntime.js` 会进一步解析 `subject`:
+- `subjectRaw` 保留原始值，例如 `[数学错题]Nova`。
+- `notebookName` 来自方括号内的主题，例如 `数学错题`。
+- `notebookId` 根据主题生成，用于定位同一个日记本 / 学习日志集合。
+- `subjectSignature` 来自方括号后的署名，例如 `Nova`。
+
+写入链路如下:
+
+```text
+DailyNote create
+  -> studyToolRuntime 构造规范日志对象
+  -> studyLogStore.writeEntry() 写入 StudyLogs
+  -> studyDiaryProjector 重建当天 StudyDiary
+  -> 日记墙从 StudyDiary 投影生成 cards/detail
+  -> 学习记忆检索可读取同一批 StudyLogs / StudyDiary 数据
+```
+
+更新日志使用 `command: update`:
+- `subject` 用于确定目标日记本 / 学习主题范围。
+- `Date` 用于限定当天日志。
+- `target` 是要替换的原文片段，要求足够长以避免误替换。
+- `replace` 是替换后的新内容。
+- 更新成功后会同步重建当天的 StudyDiary，使日记墙和详情页看到最新内容。
+
+DailyNote 的日记投影由 `src/modules/main/study/studyDiaryProjector.js` 负责:
+- 每天的 StudyLogs 会被聚合为 StudyDiary markdown。
+- markdown 中保留 `Subject: ...` 行，便于排查来源。
+- `listDiaryWallCards()` 返回日记墙卡片数据，卡片中包含 `subjectSignatures`，用于展示该日记涉及的 Agent / 署名。
+- renderer 侧的日记墙、日志页和工作区概览只消费投影结果，不直接改写底层日志。
+
+当前命名规则:
+- Tool Request 新协议只使用 `subject` 表达学习主题与署名。
+- 新写入数据只使用 `subjectRaw`、`subjectSignature`、`subjectSignatures` 等字段。
+- 新提示词、测试、脚本和文档不应再引入旧字段名；如果需要兼容历史数据，应在读取层做显式转换，并避免把旧字段重新写回新数据。
+
 ## 当前架构边界
 ### 主运行链
 - `src/main/main.js`: Electron 启动、窗口装配、主进程 handler 注册

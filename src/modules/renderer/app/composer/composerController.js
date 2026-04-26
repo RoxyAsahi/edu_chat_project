@@ -181,6 +181,15 @@ function createComposerController(deps = {}) {
         },
     });
 
+    const preparingRequestIds = new Set();
+    const locallyCancelledBeforeSendRequestIds = new Set();
+
+    function forceScrollToLatestMessage() {
+        if (typeof ui?.scrollToBottom === 'function') {
+            ui.scrollToBottom({ force: true });
+        }
+    }
+
     function refreshAttachmentPreview() {
         ui.updateAttachmentPreview(state.pendingAttachments, el.attachmentPreviewArea);
     }
@@ -561,6 +570,36 @@ function createComposerController(deps = {}) {
         updateSendButtonState();
     }
 
+    function isPreparingRequest(requestId = '') {
+        return Boolean(requestId && preparingRequestIds.has(requestId));
+    }
+
+    function markPreparedRequestCancelled(requestId = '') {
+        if (requestId && preparingRequestIds.has(requestId)) {
+            locallyCancelledBeforeSendRequestIds.add(requestId);
+            return true;
+        }
+        return false;
+    }
+
+    function clearPreparedRequestState(requestId = '') {
+        if (!requestId) return;
+        preparingRequestIds.delete(requestId);
+        locallyCancelledBeforeSendRequestIds.delete(requestId);
+    }
+
+    function finishPreparedRequestIfCancelled(requestId = '') {
+        if (!requestId || !locallyCancelledBeforeSendRequestIds.has(requestId)) {
+            return false;
+        }
+
+        clearPreparedRequestState(requestId);
+        if (state.activeRequestId === requestId) {
+            setActiveRequestId(null);
+        }
+        return true;
+    }
+
     function patchCurrentHistoryMessage(messageId, updater) {
         let nextMessage = null;
         updateCurrentChatHistory((history = []) => history.map((item) => {
@@ -730,8 +769,8 @@ function createComposerController(deps = {}) {
         };
 
         updateCurrentChatHistory((history = []) => [...history, userMessage]);
-        await persistHistory();
         await messageRendererApi.renderMessage(userMessage, false, true);
+        forceScrollToLatestMessage();
         decorateChatMessages();
 
         if (clearComposerDraft) {
@@ -759,21 +798,11 @@ function createComposerController(deps = {}) {
             studyMemoryRefs: [],
         };
 
-        const retrieval = await buildKnowledgeBaseRetrieval(userMessage, requestTopic);
-        const selectionRefsForCitation = userMessage.selectionContextRefs.map((ref) => ({
-            ...ref,
-            score: null,
-            sourceType: 'reader-selection',
-            snippet: ref.selectionText || ref.snippet || '',
-        }));
-        const combinedRefs = [...selectionRefsForCitation, ...retrieval.refs];
-        if (combinedRefs.length > 0) {
-            assistantMessage.kbContextRefs = combinedRefs;
-        }
-
         updateCurrentChatHistory((history = []) => [...history, assistantMessage]);
-        await persistHistory();
-        messageRendererApi.startStreamingMessage(assistantMessage);
+        preparingRequestIds.add(assistantMessage.id);
+        setActiveRequestId(assistantMessage.id);
+        await messageRendererApi.startStreamingMessage(assistantMessage);
+        forceScrollToLatestMessage();
         decorateChatMessages();
 
         const modelConfig = {
@@ -781,32 +810,91 @@ function createComposerController(deps = {}) {
             stream: requestContext.selectedItem.config?.streamOutput !== false,
         };
 
-        state.activeRequestId = assistantMessage.id;
-        updateSendButtonState();
-
         const requestPayloadContext = buildRequestContext(requestContext, {
             topicName: requestContext.topicName,
             lastUserMessageId: userMessage.id,
             assistantMessageId: assistantMessage.id,
             model: modelConfig.model,
         });
-        const historyForRequest = state.currentChatHistory;
-        const response = await chatAPI.sendChatRequest({
-            requestId: assistantMessage.id,
-            endpoint: requestContext.settings.chatEndpoint,
-            apiKey: requestContext.settings.chatApiKey,
-            executionMode: requestPayloadContext.executionMode,
-            messages: await buildApiMessages({
+        let retrieval = { refs: [], temporarySystemMessages: [] };
+        let response = null;
+
+        try {
+            await persistHistory();
+            if (finishPreparedRequestIfCancelled(assistantMessage.id)) {
+                return;
+            }
+
+            retrieval = await buildKnowledgeBaseRetrieval(userMessage, requestTopic);
+            if (finishPreparedRequestIfCancelled(assistantMessage.id)) {
+                return;
+            }
+
+            const selectionRefsForCitation = userMessage.selectionContextRefs.map((ref) => ({
+                ...ref,
+                score: null,
+                sourceType: 'reader-selection',
+                snippet: ref.selectionText || ref.snippet || '',
+            }));
+            const combinedRefs = [...selectionRefsForCitation, ...retrieval.refs];
+            if (combinedRefs.length > 0) {
+                assistantMessage.kbContextRefs = combinedRefs;
+                patchCurrentHistoryMessage(assistantMessage.id, (entry) => ({
+                    ...entry,
+                    kbContextRefs: combinedRefs,
+                }));
+            }
+
+            await persistHistory();
+            if (finishPreparedRequestIfCancelled(assistantMessage.id)) {
+                return;
+            }
+
+            const historyForRequest = state.currentChatHistory;
+            const apiMessages = await buildApiMessages({
                 agentIdOverride: requestContext.selectedItem.id,
                 historyOverride: historyForRequest,
                 temporarySystemMessages: [
                     ...buildSelectionContextTemporaryMessages(userMessage.selectionContextRefs, getReaderLocatorLabel),
                     ...retrieval.temporarySystemMessages,
                 ],
-            }),
-            modelConfig,
-            context: requestPayloadContext,
-        });
+            });
+            if (finishPreparedRequestIfCancelled(assistantMessage.id)) {
+                return;
+            }
+
+            preparingRequestIds.delete(assistantMessage.id);
+            response = await chatAPI.sendChatRequest({
+                requestId: assistantMessage.id,
+                endpoint: requestContext.settings.chatEndpoint,
+                apiKey: requestContext.settings.chatApiKey,
+                executionMode: requestPayloadContext.executionMode,
+                messages: apiMessages,
+                modelConfig,
+                context: requestPayloadContext,
+            });
+        } catch (error) {
+            const wasPreparing = isPreparingRequest(assistantMessage.id);
+            const wasCancelled = locallyCancelledBeforeSendRequestIds.has(assistantMessage.id);
+            clearPreparedRequestState(assistantMessage.id);
+            if (state.activeRequestId === assistantMessage.id) {
+                setActiveRequestId(null);
+            }
+            if (wasCancelled) {
+                return;
+            }
+            if (wasPreparing) {
+                const errorMessage = error?.message || String(error || '请求准备失败');
+                await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'error', requestPayloadContext, {
+                    error: errorMessage,
+                });
+                decorateChatMessages();
+                await persistHistory();
+                ui.showToastNotification(`请求准备失败：${errorMessage}`, 'error');
+                return;
+            }
+            throw error;
+        }
 
         if (response?.error) {
             await messageRendererApi.finalizeStreamedMessage(assistantMessage.id, 'error', requestPayloadContext, {
@@ -889,6 +977,18 @@ function createComposerController(deps = {}) {
 
         if (sendAction.kind === 'interrupt') {
             const requestId = state.activeRequestId;
+            if (markPreparedRequestCancelled(requestId)) {
+                await messageRendererApi.finalizeStreamedMessage(requestId, 'cancelled_by_user', buildTopicContext(), {
+                    fullResponse: '已取消',
+                });
+                decorateChatMessages();
+                if (state.activeRequestId === requestId) {
+                    setActiveRequestId(null);
+                }
+                await persistHistory();
+                return;
+            }
+
             const result = await interruptRequest(requestId);
             if (!result?.success) {
                 await messageRendererApi.finalizeStreamedMessage(requestId, 'error', buildTopicContext(), {

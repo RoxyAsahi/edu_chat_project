@@ -240,15 +240,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Process Daily Notes - Viewer Mode (Styled)
         processed = processed.replace(noteRegex, (match, rawContent) => {
             const content = rawContent.trim();
-            const maidRegex = /(?:Maid|日志本):\s*([^\n\r]*)/;
+            const subjectRegex = /(?:Subject|日志本):\s*([^\n\r]*)/;
             const dateRegex = /Date:\s*([^\n\r]*)/;
             const contentRegex = /Content:\s*([\s\S]*)/;
 
-            const maidMatch = content.match(maidRegex);
+            const subjectMatch = content.match(subjectRegex);
             const dateMatch = content.match(dateRegex);
             const contentMatch = content.match(contentRegex);
 
-            const notebook = maidMatch ? maidMatch[1].trim() : '';
+            const notebook = subjectMatch ? subjectMatch[1].trim() : '';
             const date = dateMatch ? dateMatch[1].trim() : '';
             const diaryContent = contentMatch ? contentMatch[1].trim() : content;
 

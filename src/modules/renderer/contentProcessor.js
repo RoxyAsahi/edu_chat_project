@@ -220,9 +220,7 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
         if (toolName === 'DailyNote' && (command === 'create' || command === 'update')) {
             preElement.classList.add('learning-diary-bubble');
 
-            const notebook = extractToolFieldFromRequest(relevantContent, 'subject')
-                || extractToolFieldFromRequest(relevantContent, 'maid')
-                || extractToolFieldFromRequest(relevantContent, 'maidName');
+            const notebook = extractToolFieldFromRequest(relevantContent, 'subject');
             const date = extractToolFieldFromRequest(relevantContent, 'Date')
                 || extractToolFieldFromRequest(relevantContent, 'date');
             const diaryTitle = command === 'update'
@@ -280,10 +278,10 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
         const lines = actualNoteContent.split('\n');
         const firstLineTrimmed = lines[0] ? lines[0].trim() : "";
 
-        if (firstLineTrimmed.startsWith('Subject:') || firstLineTrimmed.startsWith('Maid:') || firstLineTrimmed.startsWith('日志本:')) {
+        if (firstLineTrimmed.startsWith('Subject:') || firstLineTrimmed.startsWith('日志本:')) {
             finalHtml = `<span class="diary-notebook-inline-label">${lines.shift().trim()}</span>`;
             finalHtml += lines.join('\n');
-        } else if (firstLineTrimmed.startsWith('Subject') || firstLineTrimmed.startsWith('Maid') || firstLineTrimmed.startsWith('日志本')) {
+        } else if (firstLineTrimmed.startsWith('Subject') || firstLineTrimmed.startsWith('日志本')) {
             finalHtml = `<span class="diary-notebook-inline-label">${lines.shift().trim()}</span>`;
             finalHtml += lines.join('\n');
         } else {
