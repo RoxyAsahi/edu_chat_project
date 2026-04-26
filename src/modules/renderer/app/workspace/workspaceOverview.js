@@ -367,9 +367,6 @@ function buildSubjectOverviewMarkup({
     const primaryAction = hasAgents ? 'continue-learning' : 'create-subject';
     const primaryActionText = hasAgents ? '继续学习' : '新建学科';
     const heroTitle = '个人 AI 学习中心';
-    const heroSubtitle = hasAgents
-        ? '把资料、对话、笔记和复盘放在同一个学习空间里，围绕当前话题持续推进。'
-        : '先创建一个学科工作台，把课件、论文、题目、图片和对话都收进同一个学习空间。';
 
     const workflowCards = [
         { title: '放入资料', desc: 'PDF、DOCX、图片和文本会归入当前话题的 Source。', icon: 'upload_file', action: 'open-subject', step: '01' },
@@ -403,10 +400,7 @@ function buildSubjectOverviewMarkup({
     const workflowSection = `
         <section class="home-flow">
             <div class="home-section-header">
-                <div>
-                    <span>功能怎么用</span>
-                    <h3>一条完整学习链路</h3>
-                </div>
+                <h3>功能怎么用</h3>
             </div>
             <div class="home-flow__grid">${workflowCards}</div>
         </section>
@@ -414,10 +408,7 @@ function buildSubjectOverviewMarkup({
     const statusSection = `
         <section class="home-status">
             <div class="home-section-header">
-                <div>
-                    <span>学习状态</span>
-                    <h3>今天的概览</h3>
-                </div>
+                <h3>学习状态</h3>
             </div>
             <div class="home-status__grid">
                 <div><span>学科</span><strong>${agents.length}</strong></div>
@@ -435,10 +426,7 @@ function buildSubjectOverviewMarkup({
     const recentLearningSection = `
         <section class="home-recent-learning">
             <div class="home-section-header">
-                <div>
-                    <span>最近学习</span>
-                    <h3>继续之前的对话</h3>
-                </div>
+                <h3>最近学习</h3>
                 <button type="button" class="ghost-button" data-home-action="continue-learning">
                     查看更多
                     <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
@@ -451,10 +439,7 @@ function buildSubjectOverviewMarkup({
     const diarySection = `
         <section class="home-diary">
             <div class="home-section-header">
-                <div>
-                    <span>学习结晶</span>
-                    <h3>AI 学习日记</h3>
-                </div>
+                <h3>学习结晶</h3>
                 <button type="button" class="ghost-button" data-home-action="open-diary">
                     查看全部
                     <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
@@ -468,10 +453,7 @@ function buildSubjectOverviewMarkup({
         ? `
         <section class="home-subjects">
             <div class="home-section-header">
-                <div>
-                    <span>学习空间</span>
-                    <h3>选择一个学科继续</h3>
-                </div>
+                <h3>学习空间</h3>
                 <div class="home-subjects__actions">
                     <div class="overview-subject-browser__view-toggle" role="tablist" aria-label="学科视图切换">
                         <button type="button" class="overview-subject-browser__toggle-btn is-active" data-subject-view="grid" aria-pressed="true">
@@ -530,7 +512,6 @@ function buildSubjectOverviewMarkup({
                             <div class="home-hero__copy">
                                 <h2>${escapeHtml(heroTitle)}</h2>
                                 <p class="home-hero__tagline">资料理解 · 对话辅导 · 笔记复盘</p>
-                                <p>${escapeHtml(heroSubtitle)}</p>
                                 <div class="home-hero__actions">
                                     <button type="button" class="home-primary-action" data-home-action="${primaryAction}">
                                         <span class="material-symbols-outlined" aria-hidden="true">${hasAgents ? 'play_arrow' : 'add'}</span>

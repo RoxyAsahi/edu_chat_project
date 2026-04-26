@@ -291,6 +291,81 @@ test('showSubjectWorkspace requests a deferred desktop layout reset after leavin
     }]);
 });
 
+test('overview subject cards expose edit from the right-click menu', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getAgentConfig(agentId) {
+                return {
+                    id: agentId,
+                    name: '数学',
+                    avatarUrl: null,
+                    agentDataPath: `C:\\data\\${agentId}`,
+                };
+            },
+            async getAgentTopics() {
+                return [{ id: 'topic-2', name: 'Topic 2', createdAt: Date.now() }];
+            },
+        },
+    });
+    const { window, document, el } = createOverviewDom();
+    const settingsCalls = [];
+    harness.state.session.agents = [{ id: 'math', name: '数学' }];
+    harness.state.session.currentSelectedItem = {
+        id: null,
+        type: 'agent',
+        name: null,
+        avatarUrl: null,
+        config: null,
+    };
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        el: {
+            ...harness.deps.el,
+            ...el,
+        },
+        windowObj: window,
+        documentObj: document,
+        buildSubjectOverviewMarkup: () => ({
+            headline: '学习工作台',
+            summary: '',
+            gridMarkup: '<div id="subjectOverviewCollectionHost"></div>',
+        }),
+        buildSubjectCollectionMarkup: () => `
+            <div data-subject-collection>
+                <button type="button" data-subject-card data-agent-id="math">数学</button>
+            </div>
+        `,
+        setIntervalFn: () => 1,
+        clearIntervalFn: () => {},
+        openSettingsModal: (section) => {
+            settingsCalls.push(section);
+        },
+    });
+
+    controller.renderSubjectOverview();
+    const card = document.querySelector('[data-subject-card]');
+    card.dispatchEvent(new window.MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 80,
+        clientY: 90,
+    }));
+
+    const menu = document.querySelector('.subject-action-menu');
+    assert.ok(menu);
+    assert.match(menu.textContent, /编辑/);
+    assert.match(menu.textContent, /删除/);
+
+    menu.querySelector('[data-subject-action="edit"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(settingsCalls, ['agent']);
+    assert.equal(harness.state.session.currentSelectedItem.id, 'math');
+});
+
 test('createTopic creates a placeholder topic without opening the prompt dialog', async () => {
     const { createWorkspaceController } = await loadWorkspaceModule();
     let promptCalls = 0;

@@ -1244,24 +1244,62 @@
 
 .home-section-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-}
-
-.home-section-header span {
-  color: #7b8aa6;
-  font-size: 11px;
-  font-weight: 800;
+  gap: 10px;
+  padding: 2px 16px 9px;
+  margin-left: -16px;
+  margin-right: -16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  height: 34px;
 }
 
 .home-section-header h3 {
-  margin: 2px 0 0;
-  color: #18243c;
-  font-size: 17px;
-  font-weight: 760;
-  line-height: 1.2;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--unistudy-chat-font);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.15;
   letter-spacing: 0;
+}
+
+.home-section-header .ghost-button {
+  min-height: 0;
+  padding: 0 2px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.home-section-header .ghost-button .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.home-section-header .overview-subject-browser__view-toggle {
+  padding: 2px;
+}
+
+.home-section-header .overview-subject-browser__toggle-btn {
+  min-height: auto;
+  min-width: auto;
+  padding: 2px 6px;
+  font-size: 0;
+}
+
+.home-section-header .overview-subject-browser__toggle-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.home-section-header .overview-subject-browser__create {
+  min-height: auto;
+  padding: 2px 10px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.home-section-header .overview-subject-browser__create .material-symbols-outlined {
+  font-size: 16px;
 }
 
 .home-flow {
@@ -1398,7 +1436,7 @@
 
 .home-subjects__intro {
   width: min(100%, 620px);
-  margin: 10px auto 14px;
+  margin: 28px auto 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1418,7 +1456,6 @@
   width: 190px;
   height: 190px;
   object-fit: contain;
-  transform: translateY(-14px);
 }
 
 .home-subjects__intro strong {
@@ -1525,18 +1562,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.home-recent-learning .ghost-button {
-  min-height: 28px;
-  padding: 0 2px 0 8px;
-  color: #94a0b6;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.home-recent-learning .ghost-button .material-symbols-outlined {
-  font-size: 18px;
 }
 
 .home-recent-learning__list {
@@ -1985,14 +2010,14 @@ body:not(.light-theme) .home-diary__empty p {
 
   .home-section-header {
     gap: 8px;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .home-section-header h3 {
     font-size: 15px;
-  }
-
-  .home-section-header span {
-    font-size: 10px;
   }
 
   .home-status__grid {
@@ -2059,7 +2084,7 @@ body:not(.light-theme) .home-diary__empty p {
   .home-subjects__intro {
     width: min(100%, 520px);
     gap: 6px;
-    margin: 4px auto 6px;
+    margin: 18px auto 6px;
   }
 
   .home-subjects__intro-visual {
@@ -2070,7 +2095,6 @@ body:not(.light-theme) .home-diary__empty p {
   .home-subjects__intro-visual img {
     width: 136px;
     height: 136px;
-    transform: translateY(-10px);
   }
 
   .home-subjects__intro strong {
@@ -2284,7 +2308,6 @@ body:not(.light-theme) .home-diary__empty p {
   .home-subjects__intro-visual img {
     width: 112px;
     height: 112px;
-    transform: translateY(-8px);
   }
 
   .home-subjects__intro strong {
@@ -4915,12 +4938,11 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 1px 12px 6px;
+  padding: 2px 12px 9px;
   margin-left: -12px;
   margin-right: -12px;
-  margin-bottom: -1px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
-  min-height: 34px;
+  height: 34px;
 }
 
 .workspace-card__header > div {
@@ -5245,4 +5267,3 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .source-file-action-menu__item .material-symbols-outlined {
   font-size: 18px;
 }
-

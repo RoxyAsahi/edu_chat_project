@@ -3,7 +3,8 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const TOKEN_PATTERN = /{{\s*([A-Za-z0-9_]+)\s*}}/g;
-const DEFAULT_GENERAL_PACK_NAME = '通用表情包';
+const DEFAULT_GENERAL_PACK_NAME = '表情包';
+const BUNDLED_EMOTICON_ASSETS_DIR = path.join('src', 'assets', 'emoticons');
 const DEFAULT_EMOTICON_PROMPT = [
     'This client supports local emoticon packs rendered from pseudo paths.',
     'Available emoticon packs:',
@@ -83,8 +84,9 @@ function buildBundledItem(category = '', packRoot = '', fileName = '') {
 
 async function scanBundledEmoticonPacks(options = {}) {
     const projectRoot = resolveProjectRoot(options.projectRoot);
-    const rootEntries = await fs.readdir(projectRoot, { withFileTypes: true }).catch(() => []);
-    const packDirs = rootEntries
+    const assetsRoot = path.join(projectRoot, BUNDLED_EMOTICON_ASSETS_DIR);
+    const assetEntries = await fs.readdir(assetsRoot, { withFileTypes: true }).catch(() => []);
+    const packDirs = assetEntries
         .filter((entry) => entry?.isDirectory?.() && /表情包$/u.test(entry.name))
         .map((entry) => entry.name)
         .sort(sortPackNames);
@@ -92,7 +94,7 @@ async function scanBundledEmoticonPacks(options = {}) {
     const packs = [];
 
     for (const category of packDirs) {
-        const packRoot = path.join(projectRoot, category);
+        const packRoot = path.join(assetsRoot, category);
         const files = await fs.readdir(packRoot, { withFileTypes: true }).catch(() => []);
         const fileNames = files
             .filter((entry) => entry?.isFile?.() && isSupportedEmoticonFile(entry.name))

@@ -1,6 +1,5 @@
 var emoticonManagerApi = window.chatAPI || window.utilityAPI || window.electronAPI;
-
-const ALL_CATEGORY_KEY = '__all__';
+const DEFAULT_EMOTICON_CATEGORY = '表情包';
 
 const emoticonManager = (() => {
     let emoticonLibrary = [];
@@ -11,7 +10,6 @@ const emoticonManager = (() => {
     let onEmoticonSelected = null;
     let currentTargetInput = null;
     let currentUserName = '';
-    let activeCategory = ALL_CATEGORY_KEY;
     let lastLoadStatus = 'idle';
     let lastLoadReason = '';
     let manageMode = false;
@@ -19,10 +17,6 @@ const emoticonManager = (() => {
     function setLoadStatus(status, reason = '') {
         lastLoadStatus = status;
         lastLoadReason = reason;
-    }
-
-    function getPrompt(message, defaultValue = '') {
-        return window.prompt(message, defaultValue);
     }
 
     function getConfirm(message) {
@@ -33,23 +27,10 @@ const emoticonManager = (() => {
         window.uiHelperFunctions?.showToastNotification?.(message, type, duration);
     }
 
-    function getCategoryPriority(category) {
-        if (category === '通用表情包') return 0;
-        return 1;
-    }
-
-    function sortCategories(a, b) {
-        const priorityDiff = getCategoryPriority(a.category || '') - getCategoryPriority(b.category || '');
-        if (priorityDiff !== 0) {
-            return priorityDiff;
-        }
-        return (a.category || '').localeCompare(b.category || '', 'zh-Hans-CN');
-    }
-
     function rebuildGroups() {
         const byCategory = new Map();
         for (const emoticon of emoticonLibrary) {
-            const category = emoticon?.category || '未分类';
+            const category = emoticon?.category || DEFAULT_EMOTICON_CATEGORY;
             if (!byCategory.has(category)) {
                 byCategory.set(category, []);
             }
@@ -58,11 +39,7 @@ const emoticonManager = (() => {
 
         groupedEmoticons = [...byCategory.entries()]
             .map(([category, items]) => ({ category, items }))
-            .sort(sortCategories);
-
-        if (!groupedEmoticons.some((group) => group.category === activeCategory)) {
-            activeCategory = ALL_CATEGORY_KEY;
-        }
+            .sort((a, b) => (a.category || '').localeCompare(b.category || '', 'zh-Hans-CN'));
     }
 
     async function initialize(elements) {
@@ -86,7 +63,6 @@ const emoticonManager = (() => {
     async function loadUserEmoticons() {
         emoticonLibrary = [];
         groupedEmoticons = [];
-        activeCategory = ALL_CATEGORY_KEY;
         setLoadStatus('loading');
 
         try {
@@ -115,29 +91,8 @@ const emoticonManager = (() => {
         }
     }
 
-    function buildTabs() {
-        const tabs = [{
-            key: ALL_CATEGORY_KEY,
-            label: '全部',
-            count: emoticonLibrary.length,
-        }];
-
-        groupedEmoticons.forEach((group) => {
-            tabs.push({
-                key: group.category,
-                label: group.category,
-                count: group.items.length,
-            });
-        });
-
-        return tabs;
-    }
-
     function getVisibleEmoticons() {
-        if (activeCategory === ALL_CATEGORY_KEY) {
-            return groupedEmoticons.flatMap((group) => group.items);
-        }
-        return groupedEmoticons.find((group) => group.category === activeCategory)?.items || [];
+        return groupedEmoticons.flatMap((group) => group.items);
     }
 
     async function importFiles() {
@@ -151,7 +106,7 @@ const emoticonManager = (() => {
                 .map((file) => ({
                     sourcePath: file.path || '',
                     name: file.name.replace(/\.[^.]+$/, ''),
-                    category: activeCategory === ALL_CATEGORY_KEY ? '未分类' : activeCategory,
+                    category: DEFAULT_EMOTICON_CATEGORY,
                 }))
                 .filter((item) => item.sourcePath);
 
@@ -166,34 +121,12 @@ const emoticonManager = (() => {
         fileInput.click();
     }
 
-    async function editEmoticon(emoticon) {
-        if (typeof emoticonManagerApi?.saveEmoticonItem !== 'function') {
-            return;
-        }
-
-        const nextName = getPrompt('表情名称', emoticon.name || emoticon.filename);
-        if (!nextName) {
-            return;
-        }
-
-        const nextCategory = getPrompt('分类', emoticon.category || '未分类');
-        if (!nextCategory) {
-            return;
-        }
-
-        const nextTags = getPrompt('标签（逗号分隔）', Array.isArray(emoticon.tags) ? emoticon.tags.join(', ') : '');
-        await emoticonManagerApi.saveEmoticonItem({
-            id: emoticon.id,
-            name: nextName.trim(),
-            filename: emoticon.filename,
-            category: nextCategory.trim(),
-            tags: String(nextTags || '').split(',').map((item) => item.trim()).filter(Boolean),
-        });
-        await loadUserEmoticons();
-        renderPanelContent();
-    }
-
     async function deleteEmoticon(emoticon) {
+        if (emoticon.readonly === true || emoticon.source === 'bundled') {
+            showToast('内置表情需要在资源目录中管理。', 'info');
+            return;
+        }
+
         if (!getConfirm(`删除表情“${emoticon.name || emoticon.filename}”？`)) {
             return;
         }
@@ -202,7 +135,11 @@ const emoticonManager = (() => {
             return;
         }
 
-        await emoticonManagerApi.deleteEmoticonItem(emoticon.id);
+        const result = await emoticonManagerApi.deleteEmoticonItem(emoticon.id);
+        if (result?.success === false) {
+            showToast(result.error || '删除表情失败。', 'warning');
+            return;
+        }
         await loadUserEmoticons();
         renderPanelContent();
     }
@@ -217,36 +154,18 @@ const emoticonManager = (() => {
         header.innerHTML = `
             <div class="emoticon-panel-title">UniStudy 表情库</div>
             <div class="emoticon-panel-actions">
-              <button type="button" class="ghost-button icon-text-btn" data-emoticon-action="import">导入</button>
-              <button type="button" class="ghost-button icon-text-btn" data-emoticon-action="manage">${manageMode ? '完成' : '管理'}</button>
+              <button type="button" class="ghost-button icon-btn emoticon-manage-button${manageMode ? ' is-active' : ''}" data-emoticon-action="manage" title="${manageMode ? '完成管理' : '管理表情'}" aria-label="${manageMode ? '完成管理' : '管理表情'}">
+                <span class="material-symbols-outlined" aria-hidden="true">${manageMode ? 'done' : 'edit'}</span>
+              </button>
             </div>
         `;
         emoticonPanel.appendChild(header);
 
-        header.querySelector('[data-emoticon-action="import"]')?.addEventListener('click', () => {
-            void importFiles();
-        });
-        header.querySelector('[data-emoticon-action="manage"]')?.addEventListener('click', () => {
+        header.querySelector('[data-emoticon-action="manage"]')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
             manageMode = !manageMode;
             renderPanelContent();
-        });
-
-        const tabsScroller = document.createElement('div');
-        tabsScroller.className = 'emoticon-category-scroller';
-        emoticonPanel.appendChild(tabsScroller);
-
-        const tabs = buildTabs();
-        tabs.forEach((tab) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = `emoticon-category-tab${tab.key === activeCategory ? ' is-active' : ''}`;
-            button.title = `${tab.label} (${tab.count})`;
-            button.textContent = `${tab.label} ${tab.count}`;
-            button.addEventListener('click', () => {
-                activeCategory = tab.key;
-                renderPanelContent();
-            });
-            tabsScroller.appendChild(button);
         });
 
         const content = document.createElement('div');
@@ -254,17 +173,25 @@ const emoticonManager = (() => {
         emoticonPanel.appendChild(content);
 
         const visibleEmoticons = getVisibleEmoticons();
-        if (visibleEmoticons.length === 0) {
-            content.innerHTML = '<div class="emoticon-item-placeholder">当前分类下没有表情</div>';
-            return;
-        }
-
         const grid = document.createElement('div');
         grid.className = 'emoticon-grid';
 
+        const addCard = document.createElement('button');
+        addCard.type = 'button';
+        addCard.className = 'emoticon-card emoticon-card--add';
+        addCard.title = '导入表情';
+        addCard.setAttribute('aria-label', '导入表情');
+        addCard.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">add</span>';
+        addCard.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void importFiles();
+        });
+        grid.appendChild(addCard);
+
         visibleEmoticons.forEach((emoticon) => {
             const card = document.createElement('div');
-            card.className = 'emoticon-card';
+            card.className = `emoticon-card${manageMode ? ' is-managing' : ''}`;
 
             const img = document.createElement('img');
             img.src = emoticon.url;
@@ -274,38 +201,29 @@ const emoticonManager = (() => {
             card.appendChild(img);
 
             if (manageMode) {
-                const meta = document.createElement('div');
-                meta.className = 'emoticon-card__meta';
-                const tag = emoticon.readonly === true || emoticon.source === 'bundled'
-                    ? '内置'
-                    : '自定义';
-                meta.innerHTML = `
-                    <strong>${emoticon.name || emoticon.filename}</strong>
-                    <span>${emoticon.category} · ${tag}</span>
-                `;
-                card.appendChild(meta);
-
-                if (emoticon.readonly !== true && emoticon.source !== 'bundled') {
-                    const actions = document.createElement('div');
-                    actions.className = 'emoticon-card__actions';
-                    actions.innerHTML = `
-                        <button type="button" class="ghost-button icon-text-btn" data-action="edit">编辑</button>
-                        <button type="button" class="ghost-button icon-text-btn" data-action="delete">删除</button>
-                    `;
-                    actions.querySelector('[data-action="edit"]')?.addEventListener('click', (event) => {
-                        event.stopPropagation();
-                        void editEmoticon(emoticon);
-                    });
-                    actions.querySelector('[data-action="delete"]')?.addEventListener('click', (event) => {
-                        event.stopPropagation();
-                        void deleteEmoticon(emoticon);
-                    });
-                    card.appendChild(actions);
-                }
+                const isReadOnly = emoticon.readonly === true || emoticon.source === 'bundled';
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = `emoticon-card__delete${isReadOnly ? ' is-disabled' : ''}`;
+                deleteButton.title = isReadOnly ? '内置表情不可在这里删除' : `删除 ${emoticon.name || emoticon.filename}`;
+                deleteButton.setAttribute('aria-label', deleteButton.title);
+                deleteButton.textContent = '×';
+                deleteButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    void deleteEmoticon(emoticon);
+                });
+                card.appendChild(deleteButton);
             }
 
             grid.appendChild(card);
         });
+
+        if (visibleEmoticons.length === 0) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'emoticon-item-placeholder';
+            placeholder.textContent = '还没有表情';
+            grid.appendChild(placeholder);
+        }
 
         content.appendChild(grid);
     }
@@ -386,8 +304,8 @@ const emoticonManager = (() => {
         currentTargetInput = input;
 
         const rect = triggerButton.getBoundingClientRect();
-        const panelWidth = 380;
-        const panelHeight = 420;
+        const panelWidth = 360;
+        const panelHeight = 380;
         let x = rect.left - panelWidth + rect.width;
         let y = rect.top - panelHeight - 10;
 
@@ -413,7 +331,6 @@ const emoticonManager = (() => {
             emoticonCount: emoticonLibrary.length,
             categoryCount: groupedEmoticons.length,
             currentUserName,
-            activeCategory,
             manageMode,
         }),
     };

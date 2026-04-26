@@ -43,7 +43,7 @@ test('emoticon handlers load bundled packs, write generated lists, and keep user
     t.after(() => fs.remove(tempRoot));
 
     const projectRoot = path.join(tempRoot, 'project-root');
-    const bundledPackDir = path.join(projectRoot, '通用表情包');
+    const bundledPackDir = path.join(projectRoot, 'src', 'assets', 'emoticons', '表情包');
     await fs.ensureDir(bundledPackDir);
     await fs.writeFile(path.join(bundledPackDir, '阿巴阿巴.jpg'), Buffer.from([255, 216, 255]));
     await fs.writeFile(path.join(bundledPackDir, '啊？.png'), Buffer.from([137, 80, 78, 71]));
@@ -67,7 +67,7 @@ test('emoticon handlers load bundled packs, write generated lists, and keep user
         sourcePath: sourceImage,
         name: 'Smile',
         filename: 'smile.png',
-        category: '通用表情包',
+        category: '表情包',
         tags: ['开心'],
     });
     assert.equal(saveResult.success, true);
@@ -78,10 +78,10 @@ test('emoticon handlers load bundled packs, write generated lists, and keep user
     assert.equal(listResult.items.length, 3);
     assert.equal(listResult.items[0].source, 'bundled');
     assert.equal(listResult.items[0].readonly, true);
-    assert.equal(listResult.items[0].renderPath, `/通用表情包/${listResult.items[0].filename}`);
+    assert.equal(listResult.items[0].renderPath, `/表情包/${listResult.items[0].filename}`);
     assert.equal(listResult.items.some((item) => item.name === 'Smile' && item.source === 'user'), true);
 
-    const generatedListPath = path.join(tempRoot, 'generated_lists', '通用表情包.txt');
+    const generatedListPath = path.join(tempRoot, 'generated_lists', '表情包.txt');
     assert.equal(await fs.pathExists(generatedListPath), true);
     assert.deepEqual(
         (await fs.readFile(generatedListPath, 'utf8')).split('|').filter(Boolean).sort(),
