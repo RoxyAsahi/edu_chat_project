@@ -590,3 +590,371 @@ test('streamManager renders native reasoning deltas before stream finalization',
     assert.equal(contentDiv.querySelector('.unistudy-live-reasoning-header'), header);
     assert.match(contentDiv.textContent, /keeps expanding/);
 });
+
+test('streamManager renders a completed tool request block before stream finalization', async (t) => {
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatMessages">
+            <article class="message-item thinking" data-message-id="assistant-tool-live">
+              <div class="name-time-block"></div>
+              <div class="md-content"><div class="thinking-indicator"></div></div>
+            </article>
+          </div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalPerformance = global.performance;
+
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = () => 1;
+    global.performance = { now: () => Date.now() };
+
+    t.after(() => {
+        global.window = originalWindow;
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.performance = originalPerformance;
+    });
+
+    const { initStreamManager, startStreamingMessage, appendStreamChunk } = await loadStreamManagerModule();
+
+    let currentHistory = cloneHistory([{
+        id: 'user-tool-live',
+        role: 'user',
+        content: 'write a note',
+        timestamp: 1,
+    }]);
+
+    initStreamManager({
+        currentSelectedItemRef: {
+            get: () => ({ id: 'agent-1' }),
+        },
+        currentTopicIdRef: {
+            get: () => 'topic-1',
+        },
+        currentChatHistoryRef: {
+            get: () => currentHistory,
+            set: (value) => {
+                currentHistory = cloneHistory(value);
+            },
+        },
+        globalSettingsRef: {
+            get: () => ({ enableSmoothStreaming: false }),
+        },
+        chatMessagesDiv: dom.window.document.getElementById('chatMessages'),
+        electronAPI: {
+            async getChatHistory() {
+                return cloneHistory(currentHistory);
+            },
+            async saveChatHistory() {
+                return { success: true };
+            },
+        },
+        uiHelper: {
+            scrollToBottom() {},
+        },
+        markedInstance: {
+            parse: (text) => {
+                if (text.includes('<<<[TOOL_REQUEST]>>>') && text.includes('<<<[END_TOOL_REQUEST]>>>')) {
+                    return '<p>回答</p><div class="learning-diary-bubble">学习日志已渲染</div>';
+                }
+                return `<p>${text}</p>`;
+            },
+        },
+        preprocessFullContent: (text) => text,
+        setContentAndProcessImages(contentDiv, rawHtml) {
+            contentDiv.innerHTML = rawHtml;
+        },
+        processRenderedContent() {},
+        runTextHighlights() {},
+        processAnimationsInContent() {},
+        prependNativeReasoningBubble: (rawHtml) => rawHtml,
+        renderMessage() {
+            throw new Error('existing DOM node should be reused');
+        },
+    });
+
+    const messageItem = dom.window.document.querySelector('.message-item[data-message-id="assistant-tool-live"]');
+    await startStreamingMessage({
+        id: 'assistant-tool-live',
+        role: 'assistant',
+        name: 'Agent One',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        content: 'Thinking',
+        isThinking: true,
+        timestamp: 2,
+    }, messageItem);
+
+    appendStreamChunk('assistant-tool-live', {
+        content: '回答\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」DailyNote「末」\n',
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-tool-live"] .md-content');
+    assert.doesNotMatch(contentDiv.innerHTML, /learning-diary-bubble/);
+
+    appendStreamChunk('assistant-tool-live', {
+        content: 'command:「始」create「末」\nContent:「始」[12:00] 流式工具块闭合后即时渲染。\nTag: 流式「末」\n<<<[END_TOOL_REQUEST]>>>',
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.match(contentDiv.innerHTML, /learning-diary-bubble/);
+    assert.match(contentDiv.textContent, /学习日志已渲染/);
+});
+
+test('streamManager post-processes completed HTML code blocks after the fence closes', async (t) => {
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatMessages">
+            <article class="message-item thinking" data-message-id="assistant-html-live">
+              <div class="name-time-block"></div>
+              <div class="md-content"><div class="thinking-indicator"></div></div>
+            </article>
+          </div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalPerformance = global.performance;
+
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = () => 1;
+    global.performance = { now: () => Date.now() };
+
+    t.after(() => {
+        global.window = originalWindow;
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.performance = originalPerformance;
+    });
+
+    const { initStreamManager, startStreamingMessage, appendStreamChunk } = await loadStreamManagerModule();
+
+    let currentHistory = cloneHistory([{
+        id: 'user-html-live',
+        role: 'user',
+        content: 'render html',
+        timestamp: 1,
+    }]);
+
+    initStreamManager({
+        currentSelectedItemRef: {
+            get: () => ({ id: 'agent-1' }),
+        },
+        currentTopicIdRef: {
+            get: () => 'topic-1',
+        },
+        currentChatHistoryRef: {
+            get: () => currentHistory,
+            set: (value) => {
+                currentHistory = cloneHistory(value);
+            },
+        },
+        globalSettingsRef: {
+            get: () => ({ enableSmoothStreaming: false }),
+        },
+        chatMessagesDiv: dom.window.document.getElementById('chatMessages'),
+        electronAPI: {
+            async getChatHistory() {
+                return cloneHistory(currentHistory);
+            },
+            async saveChatHistory() {
+                return { success: true };
+            },
+        },
+        uiHelper: {
+            scrollToBottom() {},
+        },
+        markedInstance: {
+            parse: (text) => text.replace(/```html\n([\s\S]*?)```/g, (_match, code) => {
+                return `<pre><code class="language-html">${code}</code></pre>`;
+            }),
+        },
+        preprocessFullContent: (text) => text,
+        setContentAndProcessImages(contentDiv, rawHtml) {
+            contentDiv.innerHTML = rawHtml;
+        },
+        processRenderedContent(contentDiv) {
+            const pre = contentDiv.querySelector('pre');
+            if (!pre) return;
+            const preview = dom.window.document.createElement('div');
+            preview.className = 'unistudy-html-preview-container preview-mode';
+            preview.textContent = 'HTML 已预览';
+            pre.replaceWith(preview);
+        },
+        runTextHighlights() {},
+        processAnimationsInContent() {},
+        prependNativeReasoningBubble: (rawHtml) => rawHtml,
+        renderMessage() {
+            throw new Error('existing DOM node should be reused');
+        },
+    });
+
+    const messageItem = dom.window.document.querySelector('.message-item[data-message-id="assistant-html-live"]');
+    await startStreamingMessage({
+        id: 'assistant-html-live',
+        role: 'assistant',
+        name: 'Agent One',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        content: 'Thinking',
+        isThinking: true,
+        timestamp: 2,
+    }, messageItem);
+
+    appendStreamChunk('assistant-html-live', {
+        content: '```html\n<div class="demo">',
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-html-live"] .md-content');
+    assert.doesNotMatch(contentDiv.innerHTML, /unistudy-live-html-preview/);
+    assert.doesNotMatch(contentDiv.innerHTML, /unistudy-html-preview-container/);
+    assert.match(contentDiv.textContent, /```html/);
+
+    appendStreamChunk('assistant-html-live', {
+        content: '<button>Start</button></div>\n```',
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.match(contentDiv.innerHTML, /unistudy-html-preview-container/);
+    assert.match(contentDiv.textContent, /HTML 已预览/);
+});
+
+test('streamManager streams bare HTML fragments through marked into the message DOM', async (t) => {
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatMessages">
+            <article class="message-item thinking" data-message-id="assistant-raw-html-live">
+              <div class="name-time-block"></div>
+              <div class="md-content"><div class="thinking-indicator"></div></div>
+            </article>
+          </div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalPerformance = global.performance;
+
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = () => 1;
+    global.performance = { now: () => Date.now() };
+
+    t.after(() => {
+        global.window = originalWindow;
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.performance = originalPerformance;
+    });
+
+    const { initStreamManager, startStreamingMessage, appendStreamChunk } = await loadStreamManagerModule();
+
+    let currentHistory = cloneHistory([{
+        id: 'user-raw-html-live',
+        role: 'user',
+        content: 'render raw html',
+        timestamp: 1,
+    }]);
+
+    initStreamManager({
+        currentSelectedItemRef: {
+            get: () => ({ id: 'agent-1' }),
+        },
+        currentTopicIdRef: {
+            get: () => 'topic-1',
+        },
+        currentChatHistoryRef: {
+            get: () => currentHistory,
+            set: (value) => {
+                currentHistory = cloneHistory(value);
+            },
+        },
+        globalSettingsRef: {
+            get: () => ({ enableSmoothStreaming: false }),
+        },
+        chatMessagesDiv: dom.window.document.getElementById('chatMessages'),
+        electronAPI: {
+            async getChatHistory() {
+                return cloneHistory(currentHistory);
+            },
+            async saveChatHistory() {
+                return { success: true };
+            },
+        },
+        uiHelper: {
+            scrollToBottom() {},
+        },
+        markedInstance: {
+            parse: (text) => text,
+        },
+        preprocessFullContent: (text) => text,
+        setContentAndProcessImages(contentDiv, rawHtml) {
+            contentDiv.innerHTML = rawHtml;
+        },
+        processRenderedContent() {},
+        runTextHighlights() {},
+        processAnimationsInContent() {},
+        prependNativeReasoningBubble: (rawHtml) => rawHtml,
+        renderMessage() {
+            throw new Error('existing DOM node should be reused');
+        },
+    });
+
+    const messageItem = dom.window.document.querySelector('.message-item[data-message-id="assistant-raw-html-live"]');
+    await startStreamingMessage({
+        id: 'assistant-raw-html-live',
+        role: 'assistant',
+        name: 'Agent One',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        content: 'Thinking',
+        isThinking: true,
+        timestamp: 2,
+    }, messageItem);
+
+    appendStreamChunk('assistant-raw-html-live', {
+        content: '<div id="response-root" class="demo"><button>Go</button>',
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-raw-html-live"] .md-content');
+    assert.ok(contentDiv.querySelector('#response-root.demo'));
+    assert.ok(contentDiv.querySelector('button'));
+    assert.equal(contentDiv.querySelector('button')?.textContent, 'Go');
+    assert.doesNotMatch(contentDiv.innerHTML, /unistudy-live-html-preview/);
+    assert.doesNotMatch(contentDiv.innerHTML, /<pre>/);
+
+    appendStreamChunk('assistant-raw-html-live', {
+        content: '<span>More</span></div>',
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.ok(contentDiv.querySelector('#response-root.demo span'));
+    assert.equal(contentDiv.querySelector('#response-root.demo span')?.textContent, 'More');
+});

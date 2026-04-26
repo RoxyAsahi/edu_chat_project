@@ -2158,7 +2158,8 @@ body.dark-theme .settings-subsection--status {
 }
 
 .model-service-card,
-.model-service-default-shell {
+.model-service-default-shell,
+.model-service-modal-overlay {
   --settings-width: 250px;
   --provider-pane-width: calc(var(--settings-width) + 10px);
   --navbar-height: 44px;
@@ -3298,9 +3299,10 @@ body.dark-theme .model-service-default-shell.settings-list-card {
   gap: 12px;
   padding: 18px 20px 20px;
   border-radius: 16px;
-  border: none;
-  background: var(--color-background-soft);
-  box-shadow: none;
+  border: 0.5px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-text-1);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2);
 }
 
 .model-service-modal--wide {

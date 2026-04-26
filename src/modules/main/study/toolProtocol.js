@@ -31,7 +31,7 @@ const DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION = [
     '——创建——',
     '',
     TOOL_REQUEST_START,
-    'maid:「始」[Nova]Nova「末」,',
+    'subject:「始」[Nova]Nova「末」,',
     'tool_name:「始」DailyNote「末」,',
     'command:「始」create「末」,',
     'Date:「始」2025-11-23「末」,',
@@ -43,7 +43,7 @@ const DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION = [
     'archery:「始」no_reply「末」',
     TOOL_REQUEST_END,
     '',
-    '**maid**：格式必须是 `[日记本名]Agent署名`。例如 `[Nova]Nova`、`[Nova的知识]Nova`、`[公共]Nova`。分类日记是好习惯，未来的检索路径始于今天的归档选择。',
+    '**subject**：格式必须是 `[学习主题/日记本名]Agent署名`。例如 `[数学错题]Nova`、`[英语阅读]Nova`、`[公共]Nova`。分类记录是好习惯，未来的检索路径始于今天的归档选择。',
     '**Date**：使用 `YYYY-MM-DD`。',
     '**Content**：必须以 `[HH:MM]` 开头。这个时间来自上下文里的真实当前时间，不要臆造。正文追求信息密度，聚焦核心事件，保留洞察链条与决策脉络。',
     '**Tag**：是 Content 的必需尾行，也可以作为独立字段提供；如果独立字段存在，就覆盖 Content 里的 Tag 行。',
@@ -56,7 +56,7 @@ const DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION = [
     '——更新——',
     '',
     TOOL_REQUEST_START,
-    'maid:「始」[Nova]Nova「末」,',
+    'subject:「始」[Nova]Nova「末」,',
     'tool_name:「始」DailyNote「末」,',
     'command:「始」update「末」,',
     'target:「始」日记中需被替换的旧内容，至少15字符以确保精准匹配「末」,',
@@ -64,7 +64,7 @@ const DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION = [
     'archery:「始」no_reply「末」',
     TOOL_REQUEST_END,
     '',
-    '一次调用只改一处匹配。target 至少 15 字符。maid 同样使用 `[索引名]署名` 格式。',
+    '一次调用只改一处匹配。target 至少 15 字符。subject 同样使用 `[学习主题/索引名]署名` 格式。',
     '',
     '——联想锚定 (Associative Anchoring)——',
     '',
@@ -78,7 +78,7 @@ function sanitizeText(value, fallback = '') {
     return normalized || fallback;
 }
 
-function resolvePreferredDailyNoteMaid(options = {}) {
+function resolvePreferredDailyNoteSubject(options = {}) {
     const agentConfig = options.agentConfig && typeof options.agentConfig === 'object'
         ? options.agentConfig
         : {};
@@ -88,6 +88,8 @@ function resolvePreferredDailyNoteMaid(options = {}) {
     const agentName = sanitizeText(context.agentName || agentConfig.name || context.agentId, 'UniStudy');
     return `[${agentName}]${agentName}`;
 }
+
+const resolvePreferredDailyNoteMaid = resolvePreferredDailyNoteSubject;
 
 function stripThinkBlocks(content = '') {
     return String(content || '').replace(THINK_BLOCK_REGEX, '');
@@ -148,7 +150,8 @@ function normalizeProtocolArgs(rawArgs = {}) {
     };
 
     return {
-        maid: read('maid', 'maidName'),
+        subject: read('subject', 'maid', 'maidName'),
+        maid: read('subject', 'maid', 'maidName'),
         Date: read('Date', 'date', 'dateKey', 'dateString'),
         Content: read('Content', 'contentMarkdown', 'contentText', 'content', 'markdown'),
         Tag: read('Tag', 'tags'),
@@ -228,7 +231,9 @@ function parseToolRequests(content = '') {
             continue;
         }
 
-        const maid = block.match(/^\s*Maid:\s*(.+?)$/mi)?.[1]?.trim() || '';
+        const subject = block.match(/^\s*Subject:\s*(.+?)$/mi)?.[1]?.trim()
+            || block.match(/^\s*Maid:\s*(.+?)$/mi)?.[1]?.trim()
+            || '';
         const dateString = block.match(/^\s*Date:\s*(.+?)$/mi)?.[1]?.trim() || '';
         const fileName = block.match(/^\s*FileName:\s*(.+?)$/mi)?.[1]?.trim() || '';
         const tagLine = block.match(/^\s*Tag:\s*(.+?)$/mi)?.[1]?.trim() || '';
@@ -247,7 +252,8 @@ function parseToolRequests(content = '') {
             command: 'create',
             compatibilityMode: 'legacy-daily-note',
             args: {
-                maid,
+                subject,
+                maid: subject,
                 Date: dateString,
                 Content: contentText,
                 Tag: tagLine,
@@ -291,7 +297,7 @@ function buildToolPayloadMessage(results = []) {
             `entryId: ${result?.entryId || ''}`,
             `diaryId: ${result?.diaryDayId || ''}`,
             `dateKey: ${result?.dateKey || ''}`,
-            `maid: ${result?.maidRaw || ''}`,
+            `subject: ${result?.maidRaw || ''}`,
             `notebook: ${result?.notebookName || ''}`,
             `message: ${result?.message || ''}`,
             `tags: ${toArray(result?.tags).join(', ')}`,
@@ -327,11 +333,12 @@ function injectResponseContent(response = {}, content = '') {
 }
 
 function resolveDailyNoteGuideInstruction(customGuide = '', options = {}) {
-    const preferredMaid = resolvePreferredDailyNoteMaid(options);
+    const preferredSubject = resolvePreferredDailyNoteSubject(options);
     const baseInstruction = sanitizeText(customGuide, DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION);
     const normalizedInstruction = baseInstruction
-        .replace(/maid:「始」\[Nova\]Nova「末」,/g, `maid:「始」${preferredMaid}「末」,`);
-    const preferredMaidLine = `本轮默认优先写入：${preferredMaid}。若无特别说明，不要改用 [默认] 或省略 []。`;
+        .replace(/subject:「始」\[Nova\]Nova「末」,/g, `subject:「始」${preferredSubject}「末」,`)
+        .replace(/maid:「始」\[Nova\]Nova「末」,/g, `subject:「始」${preferredSubject}「末」,`);
+    const preferredMaidLine = `本轮默认优先写入 subject：${preferredSubject}。若无特别说明，不要改用 [默认] 或省略 []。`;
 
     if (normalizedInstruction.includes(preferredMaidLine)) {
         return normalizedInstruction;
@@ -360,6 +367,7 @@ module.exports = {
     normalizeToolName,
     parseToolRequests,
     resolvePreferredDailyNoteMaid,
+    resolvePreferredDailyNoteSubject,
     resolveDailyNoteGuideInstruction,
     rewriteLegacyStudyLogPromptText,
     stripToolArtifacts,

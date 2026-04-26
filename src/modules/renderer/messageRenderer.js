@@ -21,6 +21,7 @@ import {
 } from './messageCitations.js';
 
 const colorExtractionPromises = new Map();
+const ASSISTANT_LOGO_AVATAR_URL = '../assets/brand-logo.png';
 let delegatedClickHandler = null;
 let delegatedContextMenuHandler = null;
 let delegatedEventTarget = null;
@@ -116,7 +117,6 @@ const TOOL_RESULT_REGEX = /\[\[(?:\u5de5\u5177\u8c03\u7528\u7ed3\u679c\u4fe1\u60
 const BUTTON_CLICK_REGEX = /\[\[(?:\u70b9\u51fb\u6309\u94ae):(.*?)\]\]/gs;
 const CANVAS_PLACEHOLDER_REGEX = /\{\{ChatCanvas\}\}/g;
 const STYLE_REGEX = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
-const HTML_FENCE_CHECK_REGEX = /```\w*\n<!DOCTYPE html>/i;
 const MERMAID_CODE_REGEX = /<code.*?>\s*(flowchart|graph|mermaid)\s+([\s\S]*?)<\/code>/gi;
 const MERMAID_FENCE_REGEX = /```(mermaid|flowchart|graph)\n([\s\S]*?)```/g;
 const CODE_FENCE_REGEX = /```\w*([\s\S]*?)```/g;
@@ -857,6 +857,8 @@ function processAndInjectScopedCss(content, scopeId) {
     let cssContent = '';
     let styleInjected = false;
 
+    document.querySelectorAll(`style[data-unistudy-scope-id="${scopeId}"]`).forEach(el => el.remove());
+
     const processedContent = content.replace(STYLE_REGEX, (match, css) => {
         cssContent += css.trim() + '\n';
         return ''; // Remove style tags from the content
@@ -882,6 +884,53 @@ function processAndInjectScopedCss(content, scopeId) {
     return { processedContent, styleInjected };
 }
 
+function prepareAssistantScopedStyles(text, scopeId) {
+    if (!scopeId || typeof text !== 'string' || !/<style\b/i.test(text)) {
+        return text;
+    }
+
+    // Protect blocks that may legally contain <style> content before extracting styles.
+    const protectedBlocks = [];
+    let textWithProtectedBlocks = text.replace(TOOL_REGEX, (match) => {
+        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
+        protectedBlocks.push(match);
+        return placeholder;
+    });
+
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(/「始」[\s\S]*?(「末」|$)/g, (match) => {
+        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
+        protectedBlocks.push(match);
+        return placeholder;
+    });
+
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_REGEX, (match) => {
+        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
+        protectedBlocks.push(match);
+        return placeholder;
+    });
+
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_PARTIAL_REGEX, (match) => {
+        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
+        protectedBlocks.push(match);
+        return placeholder;
+    });
+
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(CODE_FENCE_REGEX, (match) => {
+        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
+        protectedBlocks.push(match);
+        return placeholder;
+    });
+
+    const { processedContent } = processAndInjectScopedCss(textWithProtectedBlocks, scopeId);
+
+    let restoredContent = processedContent;
+    protectedBlocks.forEach((block, i) => {
+        restoredContent = restoredContent.replace(`__STYLE_PROTECT_${i}__`, block);
+    });
+
+    return restoredContent;
+}
+
 
 /**
  * Wraps raw HTML documents in markdown code fences if they aren't already.
@@ -890,7 +939,9 @@ function processAndInjectScopedCss(content, scopeId) {
  * @returns {string} The processed text.
  */
 /**
- * Wraps raw HTML documents in markdown code fences if they aren't already.
+ * Wraps full doctype HTML documents in markdown code fences if they aren't already.
+ * Bare HTML fragments, including <div id="response-root"> render bubbles, must stay
+ * untouched so streaming can pass them through marked/morphdom like VCPChat.
  * Skip HTML inside protected start/end markers so tool payloads are not fenced by mistake.
  */
 function ensureHtmlFenced(text) {
@@ -898,33 +949,43 @@ function ensureHtmlFenced(text) {
     const htmlCloseTag = '</html>';
     const lowerText = text.toLowerCase();
 
-    // Already fenced; no additional work needed.
-    if (HTML_FENCE_CHECK_REGEX.test(text)) {
-        return text;
-    }
-
-    // Fast exit when there is no HTML document marker.
+    // Fast exit when there is no complete HTML document marker.
     if (!lowerText.includes(doctypeTag.toLowerCase())) {
         return text;
     }
 
     // Build protected ranges for start/end markers.
-    const protectedRanges = [];    const START_MARKER = '???';    const END_MARKER = '???';
+    const protectedRanges = [];
     let searchStart = 0;
 
-    while (true) {
-        const startPos = text.indexOf(START_MARKER, searchStart);
-        if (startPos === -1) break;
+    const markerPairs = [
+        { start: '「始ESCAPE」', end: '「末ESCAPE」' },
+        { start: '「始」', end: '「末」' },
+    ];
 
-        const endPos = text.indexOf(END_MARKER, startPos + START_MARKER.length);
+    while (true) {
+        let matchedPair = null;
+        let startPos = -1;
+
+        markerPairs.forEach((pair) => {
+            const index = text.indexOf(pair.start, searchStart);
+            if (index !== -1 && (startPos === -1 || index < startPos)) {
+                startPos = index;
+                matchedPair = pair;
+            }
+        });
+
+        if (startPos === -1 || !matchedPair) break;
+
+        const endPos = text.indexOf(matchedPair.end, startPos + matchedPair.start.length);
         if (endPos === -1) {
             // An unfinished start marker can reach the text tail during streaming.
             protectedRanges.push({ start: startPos, end: text.length });
             break;
         }
 
-        protectedRanges.push({ start: startPos, end: endPos + END_MARKER.length });
-        searchStart = endPos + END_MARKER.length;
+        protectedRanges.push({ start: startPos, end: endPos + matchedPair.end.length });
+        searchStart = endPos + matchedPair.end.length;
     }
 
     // Check whether a position falls inside a protected range.
@@ -936,13 +997,14 @@ function ensureHtmlFenced(text) {
     let lastIndex = 0;
 
     while (true) {
-        const startIndex = text.toLowerCase().indexOf(doctypeTag.toLowerCase(), lastIndex);
+        const doctypeIndex = lowerText.indexOf(doctypeTag.toLowerCase(), lastIndex);
+        const startIndex = doctypeIndex;
 
         result += text.substring(lastIndex, startIndex === -1 ? text.length : startIndex);
 
         if (startIndex === -1) break;
 
-        const endIndex = text.toLowerCase().indexOf(htmlCloseTag.toLowerCase(), startIndex + doctypeTag.length);
+        const endIndex = lowerText.indexOf(htmlCloseTag.toLowerCase(), startIndex);
 
         if (endIndex === -1) {
             result += text.substring(startIndex);
@@ -2017,13 +2079,8 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
         // User bubbles also tint the sender name.
         shouldApplyColorToName = true;
     } else if (message.role === 'assistant') {
-        if (currentSelectedItem) {
-            avatarColorToUse = currentSelectedItem.config?.avatarCalculatedColor
-                || currentSelectedItem.avatarCalculatedColor
-                || currentSelectedItem.config?.avatarColor
-                || currentSelectedItem.avatarColor;
-            avatarUrlToUse = currentSelectedItem.avatarUrl;
-        }
+        avatarColorToUse = null;
+        avatarUrlToUse = ASSISTANT_LOGO_AVATAR_URL;
     }
 
     // Append the message to the DOM before starting visibility tracking.
@@ -2055,55 +2112,7 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
         if (message.role === 'user') {
             textToRender = prepareUserMessageText(textToRender);
         } else if (message.role === 'assistant' && scopeId) {
-            // Protect blocks that may legally contain <style> content before extracting styles.
-            const protectedBlocks = [];
-            
-            // Protect tool request blocks because payloads may contain complete HTML documents.
-            // Reuse the hardened TOOL_REGEX so backtick-wrapped payloads stay untouched.
-            let textWithProtectedBlocks = textToRender.replace(TOOL_REGEX, (match) => {
-                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-                protectedBlocks.push(match);
-                return placeholder;
-            });
-            
-            // Protect start/end marker blocks because they may contain arbitrary HTML.
-            // Their content is tool payload data and must not be interpreted as page markup.
-            textWithProtectedBlocks = textWithProtectedBlocks.replace(/「始」[\s\S]*?(「末」|$)/g, (match) => {
-                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-                protectedBlocks.push(match);
-                return placeholder;
-            });
-            
-            // Protect desktop-push blocks before code-fence handling because they may include code fences.
-            textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_REGEX, (match) => {
-                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-                protectedBlocks.push(match);
-                return placeholder;
-            });
-            // Also protect incomplete desktop-push blocks during streaming.
-            textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_PARTIAL_REGEX, (match) => {
-                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-                protectedBlocks.push(match);
-                return placeholder;
-            });
-            
-            // Protect fenced code blocks.
-            textWithProtectedBlocks = textWithProtectedBlocks.replace(CODE_FENCE_REGEX, (match) => {
-                const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-                protectedBlocks.push(match);
-                return placeholder;
-            });
-
-            // At this point only unprotected style tags can still be matched.
-            const { processedContent: contentWithoutStyles } = processAndInjectScopedCss(textWithProtectedBlocks, scopeId);
-
-            // Restore every protected block after scoped CSS extraction.
-            textToRender = contentWithoutStyles;
-            protectedBlocks.forEach((block, i) => {
-                const placeholder = `__STYLE_PROTECT_${i}__`;
-                textToRender = textToRender.replace(placeholder, block);
-            });
-            // --- End protected-style handling ---
+            textToRender = prepareAssistantScopedStyles(textToRender, scopeId);
         }
 
         // --- Calculate depth by conversation turn ---
@@ -2461,6 +2470,7 @@ async function renderFullMessage(messageId, fullContent, agentName, agentId) {
         fullContent = applyFrontendRegexRules(fullContent, agentConfigForRegex.stripRegexes, messageFromHistoryForRegex.role, depth);
     }
     // End frontend regex rule application.
+    fullContent = prepareAssistantScopedStyles(fullContent, messageItem.id);
     const { text: processedFinalText, toolResultMap: toolResultMapFinal } = preprocessFullContent(fullContent, globalSettings, 'assistant');
     // Protect LaTeX before parsing Markdown.
     const { text: protectedFinalText, map: latexMapFinal } = protectLatexBlocks(processedFinalText);
@@ -2538,6 +2548,9 @@ function updateMessageContent(messageId, newContent) {
         textToRender = applyFrontendRegexRules(textToRender, agentConfigForRegex.stripRegexes, messageInHistory.role, depthForUpdate);
     }
     // End frontend regex reapplication.
+    if (messageInHistory?.role === 'assistant') {
+        textToRender = prepareAssistantScopedStyles(textToRender, messageItem.id);
+    }
     const { text: processedContent, toolResultMap: toolResultMapUpdate } = preprocessFullContent(textToRender, globalSettings, messageInHistory?.role || 'assistant', depthForUpdate);
     // Protect LaTeX before parsing Markdown.
     const { text: protectedContentUpdate, map: latexMapUpdate } = protectLatexBlocks(processedContent);

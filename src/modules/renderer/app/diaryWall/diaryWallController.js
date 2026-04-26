@@ -120,7 +120,8 @@ function buildPlainPreview(value, maxChars = 150) {
         .replace(/^#{1,6}\s*\d{2}:\d{2}(:\d{2})?\s*[·•]\s*.+$/gim, '')
         // 移除话题二级标题
         .replace(/^#{2}\s+.+$/gim, '')
-        // 移除 Maid / Tags 行
+        // 移除 Subject / legacy Maid / Tags 行
+        .replace(/^Subject:\s*.+$/gim, '')
         .replace(/^Maid:\s*.+$/gim, '')
         .replace(/^Tags:\s*(#[^\s]+\s*)*$/gim, '')
         // 移除普通 Markdown
@@ -484,7 +485,7 @@ function createDiaryWallController(deps = {}) {
                   </div>
                   <div class="diary-wall-entry__meta">${escapeHtml([
                       `[${entry.notebookName || '默认'}]`,
-                      entry.maidSignature || entry.maidRaw || '未记录署名',
+                      entry.maidSignature || entry.maidRaw || '未记录主题',
                       entry.topicNameSnapshot || entry.topicId || '未命名话题',
                   ].join(' · '))}</div>
                   <div class="diary-wall-entry__body">${renderMarkdownFragment(entry.contentMarkdown || '')}</div>

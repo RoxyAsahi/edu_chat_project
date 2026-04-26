@@ -23,6 +23,7 @@ const TOOL_RESULT_MARKERS = [
 const DESKTOP_PUSH_START = '<<<[DESKTOP_PUSH]>>>';
 const DESKTOP_PUSH_END = '<<<[DESKTOP_PUSH_END]>>>';
 const CODE_FENCE = '```';
+const STYLE_TAG_REGEX = /<style\b[^>]*>[\s\S]*?<\/style>/gi;
 
 // --- DOM Cache ---
 const messageDomCache = new Map(); // messageId -> { messageItem, contentDiv }
@@ -720,15 +721,18 @@ function renderStreamFrame(messageId) {
 
     if (nextStableCutoff > segmentState.stableCutoff) {
         const stableText = textForRendering.slice(0, nextStableCutoff);
-        const processedStableText = applyStreamingPreprocessors(stableText);
+        const processedStableText = applyStreamingPreprocessors(stableText).replace(STYLE_TAG_REGEX, '');
         const stableHtml = refs.markedInstance.parse(processedStableText);
         stableRoot.innerHTML = stableHtml;
+        if (typeof refs.processRenderedContent === 'function') {
+            refs.processRenderedContent(stableRoot);
+        }
         segmentState.stableCutoff = nextStableCutoff;
         segmentState.stableHtml = stableHtml;
     }
 
     const tailText = textForRendering.slice(segmentState.stableCutoff);
-    const processedText = applyStreamingPreprocessors(tailText);
+    const processedText = applyStreamingPreprocessors(tailText).replace(STYLE_TAG_REGEX, '');
     const rawHtml = refs.markedInstance.parse(processedText);
 
     if (refs.morphdom) {

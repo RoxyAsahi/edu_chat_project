@@ -505,7 +505,7 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
                             message: {
                                 content: [
                                     '<<<[TOOL_REQUEST]>>>',
-                                    'maid: 「始」[Nova]Nova「末」',
+                                    'subject: 「始」[Nova]Nova「末」',
                                     'tool_name: 「始」DailyNote「末」',
                                     'command: 「始」create「末」',
                                     'Date: 「始」2026-04-14「末」',
@@ -599,6 +599,8 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
     assert.equal(storedLogs.length, 1);
     assert.match(storedLogs[0].contentMarkdown, /导数复习/);
     assert.equal(storedLogs[0].notebookName, 'Nova');
+    assert.equal(storedLogs[0].toolRequest.args.subject, '[Nova]Nova');
+    assert.equal(storedLogs[0].maidRaw, '[Nova]Nova');
     assert.equal(storedLogs[0].requestedToolName, 'DailyNote');
 });
 
@@ -859,7 +861,7 @@ test('generate-follow-ups retries once when the first upstream reply is malforme
         },
         agentConfigManager: {
             async readAgentConfig() {
-                return { model: 'agent-model' };
+                return { model: 'Qwen/Qwen3.5-35B-A3B' };
             },
         },
     });
@@ -883,11 +885,13 @@ test('generate-follow-ups retries once when the first upstream reply is malforme
         followUps: ['继续讲一下', '给我一个例子'],
     });
     assert.equal(requests.length, 2);
-    assert.equal(requests[0].modelConfig.model, 'agent-model');
+    assert.equal(requests[0].modelConfig.model, 'Qwen/Qwen3.5-35B-A3B');
     assert.equal(requests[0].round, 1);
     assert.equal(requests[1].round, 2);
     assert.deepEqual(requests[0].modelConfig.response_format, { type: 'json_object' });
     assert.equal(requests[0].modelConfig.max_tokens, 1200);
+    assert.equal(requests[0].modelConfig.enable_thinking, false);
+    assert.equal(requests[1].modelConfig.enable_thinking, false);
     assert.equal(requests[1].modelConfig.temperature, 0);
     assert.match(requests[1].messages[0].content, /请重新生成 3 条简短追问/);
     assert.doesNotMatch(requests[0].messages[0].content, /<div>|TOOL_REQUEST/);

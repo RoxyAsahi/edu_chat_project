@@ -79,7 +79,6 @@ test('agent config manager allowDefault uses the new placeholder topic name', as
 
 test('create-agent, delete-topic fallback, and create-new-topic all use placeholder topic names', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-topic-title-main-'));
-    t.after(() => fs.remove(tempRoot));
 
     const agentDir = path.join(tempRoot, 'agents');
     const userDataDir = path.join(tempRoot, 'user-data');
@@ -94,6 +93,10 @@ test('create-agent, delete-topic fallback, and create-new-topic all use placehol
         },
     };
     const { chatHandlers, agentHandlers, handlers } = loadMainHandlers();
+    t.after(async () => {
+        await chatHandlers.shutdown();
+        await fs.remove(tempRoot);
+    });
 
     agentHandlers.initialize({
         AGENT_DIR: agentDir,
@@ -111,6 +114,11 @@ test('create-agent, delete-topic fallback, and create-new-topic all use placehol
         fileWatcher: null,
         settingsManager,
         agentConfigManager: manager,
+        chatHistoryStore: {
+            async replaceHistory() {},
+            async deleteTopic() {},
+            async close() {},
+        },
     });
 
     const createAgent = handlers.get('create-agent');
@@ -174,7 +182,7 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
         settingsManager: {
             async readSettings() {
                 return {
-                    topicTitleDefaultModel: 'topic-title-model',
+                    topicTitleDefaultModel: 'Qwen/Qwen3.5-35B-A3B',
                     defaultModel: 'global-model',
                     chatEndpoint: 'http://example.com/v1/chat/completions',
                     chatApiKey: 'secret',
@@ -199,7 +207,8 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
 
     assert.equal(result.success, true);
     assert.equal(result.title, '📘 线性函数复习');
-    assert.equal(capturedRequest.modelConfig.model, 'topic-title-model');
+    assert.equal(capturedRequest.modelConfig.model, 'Qwen/Qwen3.5-35B-A3B');
+    assert.equal(capturedRequest.modelConfig.enable_thinking, false);
     assert.match(capturedRequest.messages[0].content, /自定义标题模板/);
     assert.match(capturedRequest.messages[0].content, /\[1\] 用户:/);
 });

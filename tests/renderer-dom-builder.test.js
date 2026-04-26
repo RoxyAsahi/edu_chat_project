@@ -36,6 +36,7 @@ test('createMessageSkeleton renders assistant meta with name and timestamp', asy
 
         assert.equal(messageItem.classList.contains('assistant'), true);
         assert.equal(Boolean(avatarImg), true);
+        assert.equal(avatarImg?.getAttribute('src'), '../assets/brand-logo.png');
         assert.equal(senderNameDiv?.textContent, '数学老师');
         assert.equal(nameTimeDiv?.querySelector('.message-timestamp')?.textContent, '2026-04-16 16:30');
     } finally {

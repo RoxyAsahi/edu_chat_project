@@ -589,6 +589,10 @@ function createComposerController(deps = {}) {
     }
 
     function buildRequestContext(snapshot, extra = {}) {
+        const studyLogPolicy = snapshot?.settings?.studyLogPolicy || {};
+        const shouldUseStudyToolLoop = studyLogPolicy.enabled !== false
+            && studyLogPolicy.autoInjectDailyNoteProtocol !== false;
+
         return {
             agentId: snapshot?.selectedItem?.id || '',
             topicId: snapshot?.topicId || '',
@@ -597,7 +601,7 @@ function createComposerController(deps = {}) {
             avatarColor: snapshot?.selectedItem?.config?.avatarCalculatedColor || null,
             isGroupMessage: false,
             source: 'main-chat',
-            executionMode: 'direct-stream',
+            executionMode: shouldUseStudyToolLoop ? 'tool-orchestrated' : 'direct-stream',
             ...extra,
         };
     }
@@ -788,7 +792,7 @@ function createComposerController(deps = {}) {
             requestId: assistantMessage.id,
             endpoint: requestContext.settings.chatEndpoint,
             apiKey: requestContext.settings.chatApiKey,
-            executionMode: 'direct-stream',
+            executionMode: requestPayloadContext.executionMode,
             messages: await buildApiMessages({
                 agentIdOverride: requestContext.selectedItem.id,
                 historyOverride: historyForRequest,

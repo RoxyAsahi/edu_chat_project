@@ -49,6 +49,8 @@ const USER_MESSAGE_LAYOUT_CLASSES = [
     'user-bubble-meta-hidden'
 ];
 
+const ASSISTANT_LOGO_AVATAR_URL = '../assets/brand-logo.png';
+
 export function applyUserMessageLayoutState(messageItem, globalSettings) {
     if (!messageItem?.classList || !messageItem.classList.contains('user')) {
         return;
@@ -91,13 +93,8 @@ export function createMessageSkeleton(message, globalSettings, currentSelectedIt
         avatarUrlToUse = globalSettings.userAvatarUrl || '../assets/default_user_avatar.png';
         senderNameToUse = message.name || globalSettings.userName || '你';
     } else if (message.role === 'assistant') {
-        if (currentSelectedItem && currentSelectedItem.avatarUrl) {
-            avatarUrlToUse = currentSelectedItem.avatarUrl;
-            senderNameToUse = message.name || currentSelectedItem.name || 'AI';
-        } else {
-            avatarUrlToUse = '../assets/default_avatar.png';
-            senderNameToUse = message.name || 'AI';
-        }
+        avatarUrlToUse = ASSISTANT_LOGO_AVATAR_URL;
+        senderNameToUse = message.name || currentSelectedItem?.name || 'AI';
     }
 
     if (message.role === 'assistant') {
@@ -107,7 +104,7 @@ export function createMessageSkeleton(message, globalSettings, currentSelectedIt
         avatarImg.alt = `${senderNameToUse} 头像`;
         avatarImg.onerror = () => {
             avatarImg.onerror = null;
-            avatarImg.src = fixVoiceChatAssetPath(message.role === 'user' ? '../assets/default_user_avatar.png' : '../assets/default_avatar.png');
+            avatarImg.src = fixVoiceChatAssetPath(ASSISTANT_LOGO_AVATAR_URL);
         };
 
         nameTimeDiv = document.createElement('div');

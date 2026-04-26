@@ -26,16 +26,16 @@ function buildEntryMarkdown(entry = {}) {
     const tags = Array.isArray(entry.tags) && entry.tags.length > 0
         ? `\n\nTags: ${entry.tags.map((tag) => `#${tag}`).join(' ')}`
         : '';
-    const maidLine = sanitizeText(entry.maidRaw)
-        ? `\n\nMaid: ${entry.maidRaw}`
+    const subjectLine = sanitizeText(entry.maidRaw)
+        ? `\n\nSubject: ${entry.maidRaw}`
         : sanitizeText(entry.maidSignature)
-            ? `\n\nMaid: ${entry.maidSignature}`
+            ? `\n\nSubject: ${entry.maidSignature}`
             : '';
 
     return [
         `#### ${formatTime(entry.createdAt)}${sanitizeText(entry.maidSignature) ? ` · ${entry.maidSignature}` : ''}`,
         sanitizeText(entry.contentMarkdown, '_No content_'),
-        maidLine,
+        subjectLine,
         tags,
     ].join('\n');
 }
