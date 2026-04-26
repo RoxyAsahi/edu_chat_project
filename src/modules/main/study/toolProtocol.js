@@ -89,8 +89,6 @@ function resolvePreferredDailyNoteSubject(options = {}) {
     return `[${agentName}]${agentName}`;
 }
 
-const resolvePreferredDailyNoteMaid = resolvePreferredDailyNoteSubject;
-
 function stripThinkBlocks(content = '') {
     return String(content || '').replace(THINK_BLOCK_REGEX, '');
 }
@@ -150,8 +148,7 @@ function normalizeProtocolArgs(rawArgs = {}) {
     };
 
     return {
-        subject: read('subject', 'maid', 'maidName'),
-        maid: read('subject', 'maid', 'maidName'),
+        subject: read('subject'),
         Date: read('Date', 'date', 'dateKey', 'dateString'),
         Content: read('Content', 'contentMarkdown', 'contentText', 'content', 'markdown'),
         Tag: read('Tag', 'tags'),
@@ -232,7 +229,6 @@ function parseToolRequests(content = '') {
         }
 
         const subject = block.match(/^\s*Subject:\s*(.+?)$/mi)?.[1]?.trim()
-            || block.match(/^\s*Maid:\s*(.+?)$/mi)?.[1]?.trim()
             || '';
         const dateString = block.match(/^\s*Date:\s*(.+?)$/mi)?.[1]?.trim() || '';
         const fileName = block.match(/^\s*FileName:\s*(.+?)$/mi)?.[1]?.trim() || '';
@@ -253,7 +249,6 @@ function parseToolRequests(content = '') {
             compatibilityMode: 'legacy-daily-note',
             args: {
                 subject,
-                maid: subject,
                 Date: dateString,
                 Content: contentText,
                 Tag: tagLine,
@@ -297,7 +292,7 @@ function buildToolPayloadMessage(results = []) {
             `entryId: ${result?.entryId || ''}`,
             `diaryId: ${result?.diaryDayId || ''}`,
             `dateKey: ${result?.dateKey || ''}`,
-            `subject: ${result?.maidRaw || ''}`,
+            `subject: ${result?.subjectRaw || ''}`,
             `notebook: ${result?.notebookName || ''}`,
             `message: ${result?.message || ''}`,
             `tags: ${toArray(result?.tags).join(', ')}`,
@@ -336,15 +331,14 @@ function resolveDailyNoteGuideInstruction(customGuide = '', options = {}) {
     const preferredSubject = resolvePreferredDailyNoteSubject(options);
     const baseInstruction = sanitizeText(customGuide, DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION);
     const normalizedInstruction = baseInstruction
-        .replace(/subject:「始」\[Nova\]Nova「末」,/g, `subject:「始」${preferredSubject}「末」,`)
-        .replace(/maid:「始」\[Nova\]Nova「末」,/g, `subject:「始」${preferredSubject}「末」,`);
-    const preferredMaidLine = `本轮默认优先写入 subject：${preferredSubject}。若无特别说明，不要改用 [默认] 或省略 []。`;
+        .replace(/subject:「始」\[Nova\]Nova「末」,/g, `subject:「始」${preferredSubject}「末」,`);
+    const preferredSubjectLine = `本轮默认优先写入 subject：${preferredSubject}。若无特别说明，不要改用 [默认] 或省略 []。`;
 
-    if (normalizedInstruction.includes(preferredMaidLine)) {
+    if (normalizedInstruction.includes(preferredSubjectLine)) {
         return normalizedInstruction;
     }
 
-    return `${normalizedInstruction}\n\n${preferredMaidLine}`.trim();
+    return `${normalizedInstruction}\n\n${preferredSubjectLine}`.trim();
 }
 
 function buildDailyNoteGuideInstruction(customGuide = '', options = {}) {
@@ -366,7 +360,6 @@ module.exports = {
     normalizeToolCommand,
     normalizeToolName,
     parseToolRequests,
-    resolvePreferredDailyNoteMaid,
     resolvePreferredDailyNoteSubject,
     resolveDailyNoteGuideInstruction,
     rewriteLegacyStudyLogPromptText,

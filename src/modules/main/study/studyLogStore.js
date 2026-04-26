@@ -124,8 +124,8 @@ function createStudyLogStore(options = {}) {
             notebookId,
             notebookName,
             diaryId: sanitizeText(entryInput.diaryId, `study_diary_${notebookId}_${sanitizeText(entryInput.dateKey)}`),
-            maidRaw: sanitizeText(entryInput.maidRaw),
-            maidSignature: sanitizeText(entryInput.maidSignature),
+            subjectRaw: sanitizeText(entryInput.subjectRaw),
+            subjectSignature: sanitizeText(entryInput.subjectSignature),
             requestedToolName: sanitizeText(entryInput.requestedToolName, 'DailyNote'),
             requestedCommand: sanitizeText(entryInput.requestedCommand, 'create'),
             archery: sanitizeText(entryInput.archery),
@@ -140,8 +140,8 @@ function createStudyLogStore(options = {}) {
             entry.studentNameSnapshot,
             entry.agentNameSnapshot,
             entry.notebookName,
-            entry.maidRaw,
-            entry.maidSignature,
+            entry.subjectRaw,
+            entry.subjectSignature,
             (entry.tags || []).join(' '),
         ].join('\n').toLowerCase();
     }

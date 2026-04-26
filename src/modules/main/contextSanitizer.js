@@ -138,7 +138,7 @@ class ContextSanitizer {
 
                 // ✅ jsdom 支持 classList
                 return node.classList.contains('tool-request-bubble') ||
-                    node.classList.contains('maid-diary-bubble');
+                    node.classList.contains('learning-diary-bubble');
             },
             replacement: (content, node) => {
                 // ✅ 从 data-raw-content 获取原始内容
@@ -162,7 +162,7 @@ class ContextSanitizer {
 
                 // 排除已美化的（由上面的规则处理）
                 if (node.classList.contains('tool-request-bubble') ||
-                    node.classList.contains('maid-diary-bubble')) {
+                    node.classList.contains('learning-diary-bubble')) {
                     return false;
                 }
 

@@ -50,9 +50,8 @@ function stripMarkdownForPreview(value, maxChars = 120) {
         .replace(/^#{1,6}\s*\d{2}:\d{2}(:\d{2})?\s*[·•]\s*.+$/gim, '')
         // 移除话题二级标题
         .replace(/^#{2}\s+.+$/gim, '')
-        // 移除 Subject / legacy Maid / Tags 行
+        // 移除 Subject / Tags 行
         .replace(/^Subject:\s*.+$/gim, '')
-        .replace(/^Maid:\s*.+$/gim, '')
         .replace(/^Tags:\s*(#[^\s]+\s*)*$/gim, '')
         // 移除普通 Markdown
         .replace(/```[\s\S]*?```/g, ' ')
@@ -93,7 +92,7 @@ function buildDiaryCardsMarkup({ diaryCards = [] } = {}) {
         const preview = stripMarkdownForPreview(card.previewMarkdown || card.contentMarkdown || '', 140);
         const agentNames = Array.isArray(card.agentNames) && card.agentNames.length > 0
             ? card.agentNames
-            : (Array.isArray(card.maidSignatures) && card.maidSignatures.length > 0 ? card.maidSignatures : []);
+            : (Array.isArray(card.subjectSignatures) && card.subjectSignatures.length > 0 ? card.subjectSignatures : []);
         const agentLabel = agentNames[0] || 'AI 助手';
         const topicNames = Object.values(card.topics || {})
             .map((t) => String(t?.topicName || '').trim())

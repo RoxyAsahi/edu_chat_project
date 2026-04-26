@@ -19,7 +19,6 @@ const AGENT_PROMPT_FIELDS = Object.freeze([
 
 const LEGACY_AGENT_CONFIG_KEYS = Object.freeze([
     'vcpAliases',
-    'vcpMaid',
     'promptAliases',
     'toolSignature',
     'temperature',

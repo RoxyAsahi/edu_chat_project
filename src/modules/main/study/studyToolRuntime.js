@@ -31,31 +31,29 @@ function parseSubject(value = '', runtimeContext = {}) {
     const bracketMatch = raw.match(/^\[([^\]]+)\](.+)$/);
     if (bracketMatch) {
         const notebookName = sanitizeText(bracketMatch[1], sanitizeText(runtimeContext.agentName, '默认'));
-        const maidSignature = sanitizeText(bracketMatch[2], sanitizeText(runtimeContext.agentName, notebookName));
+        const subjectSignature = sanitizeText(bracketMatch[2], sanitizeText(runtimeContext.agentName, notebookName));
         return {
-            maidRaw: raw,
+            subjectRaw: raw,
             notebookName,
             notebookId: normalizeNotebookId(notebookName, 'default'),
-            maidSignature,
+            subjectSignature,
             isPublicNotebook: notebookName === '公共',
         };
     }
 
     const fallbackNotebookName = sanitizeText(runtimeContext.agentName || runtimeContext.agentId, '默认');
     return {
-        maidRaw: raw,
+        subjectRaw: raw,
         notebookName: raw.startsWith('[') && raw.endsWith(']')
             ? raw.slice(1, -1).trim() || fallbackNotebookName
             : fallbackNotebookName,
         notebookId: normalizeNotebookId(raw.startsWith('[') && raw.endsWith(']')
             ? raw.slice(1, -1).trim()
             : fallbackNotebookName, 'default'),
-        maidSignature: raw,
+        subjectSignature: raw,
         isPublicNotebook: raw === '[公共]' || raw === '公共',
     };
 }
-
-const parseMaid = parseSubject;
 
 function splitContentAndTags(content = '', explicitTagValue = '') {
     const trimmed = String(content || '').trim();
@@ -75,14 +73,13 @@ function splitContentAndTags(content = '', explicitTagValue = '') {
     };
 }
 
-function buildStoredToolRequest(toolRequest = {}, args = {}, maidInfo = {}) {
-    const subject = maidInfo.maidRaw || sanitizeText(args.subject || args.maid);
+function buildStoredToolRequest(toolRequest = {}, args = {}, subjectInfo = {}) {
+    const subject = subjectInfo.subjectRaw || sanitizeText(args.subject);
     return {
         toolName: 'DailyNote',
         command: sanitizeText(toolRequest.command, 'create'),
         args: {
             subject,
-            maid: subject,
             command: sanitizeText(toolRequest.command, 'create'),
             Date: sanitizeText(args.Date),
             Content: sanitizeText(args.Content),
@@ -101,7 +98,7 @@ function createStudyToolRuntime(options = {}) {
     async function executeCreate(toolRequest = {}, runtimeContext = {}) {
         const args = toolRequest.args || {};
         const compatibilityMode = sanitizeText(toolRequest.compatibilityMode);
-        const maidInfo = parseSubject(args.subject || args.maid, runtimeContext);
+        const subjectInfo = parseSubject(args.subject, runtimeContext);
         const dateKey = resolveDateKey(args.Date, runtimeContext.dateKey);
         const contentValue = sanitizeText(args.Content);
 
@@ -131,7 +128,7 @@ function createStudyToolRuntime(options = {}) {
         }
 
         const contentParts = splitContentAndTags(contentValue, args.Tag);
-        const storedToolRequest = buildStoredToolRequest(toolRequest, args, maidInfo);
+        const storedToolRequest = buildStoredToolRequest(toolRequest, args, subjectInfo);
         const entry = await studyLogStore.writeEntry({
             agentId: runtimeContext.agentId,
             agentNameSnapshot: runtimeContext.agentName,
@@ -146,10 +143,10 @@ function createStudyToolRuntime(options = {}) {
             contentMarkdown: contentParts.contentMarkdown,
             tags: contentParts.tags,
             status: 'written',
-            notebookId: maidInfo.notebookId,
-            notebookName: maidInfo.notebookName,
-            maidRaw: maidInfo.maidRaw,
-            maidSignature: maidInfo.maidSignature,
+            notebookId: subjectInfo.notebookId,
+            notebookName: subjectInfo.notebookName,
+            subjectRaw: subjectInfo.subjectRaw,
+            subjectSignature: subjectInfo.subjectSignature,
             requestedToolName: 'DailyNote',
             requestedCommand: 'create',
             archery: sanitizeText(args.archery),
@@ -166,17 +163,17 @@ function createStudyToolRuntime(options = {}) {
             tags: entry.tags,
             entry,
             diaryDayId: diaryDay?.id || '',
-            message: `DailyNote.create saved to [${maidInfo.notebookName}] for ${dateKey}.`,
-            notebookId: maidInfo.notebookId,
-            notebookName: maidInfo.notebookName,
-            maidRaw: maidInfo.maidRaw,
-            maidSignature: maidInfo.maidSignature,
+            message: `DailyNote.create saved to [${subjectInfo.notebookName}] for ${dateKey}.`,
+            notebookId: subjectInfo.notebookId,
+            notebookName: subjectInfo.notebookName,
+            subjectRaw: subjectInfo.subjectRaw,
+            subjectSignature: subjectInfo.subjectSignature,
         };
     }
 
     async function executeUpdate(toolRequest = {}, runtimeContext = {}) {
         const args = toolRequest.args || {};
-        const maidInfo = parseSubject(args.subject || args.maid, runtimeContext);
+        const subjectInfo = parseSubject(args.subject, runtimeContext);
         const target = sanitizeText(args.target);
         const replace = sanitizeText(args.replace);
         const dateKey = sanitizeText(args.Date);
@@ -201,7 +198,7 @@ function createStudyToolRuntime(options = {}) {
         const scopedEntries = await studyLogStore.listEntries({
             agentId: runtimeContext.agentId,
             topicId: runtimeContext.topicId,
-            notebookId: maidInfo.notebookId,
+            notebookId: subjectInfo.notebookId,
             dateKey,
             limit: 5000,
         });
@@ -209,7 +206,7 @@ function createStudyToolRuntime(options = {}) {
             ? []
             : await studyLogStore.listEntries({
                 agentId: runtimeContext.agentId,
-                notebookId: maidInfo.notebookId,
+                notebookId: subjectInfo.notebookId,
                 dateKey,
                 limit: 5000,
             });
@@ -221,11 +218,11 @@ function createStudyToolRuntime(options = {}) {
                 success: false,
                 toolName: 'DailyNote',
                 command: 'update',
-                message: `DailyNote.update could not find the target text in notebook [${maidInfo.notebookName}].`,
-                notebookId: maidInfo.notebookId,
-                notebookName: maidInfo.notebookName,
-                maidRaw: maidInfo.maidRaw,
-                maidSignature: maidInfo.maidSignature,
+                message: `DailyNote.update could not find the target text in notebook [${subjectInfo.notebookName}].`,
+                notebookId: subjectInfo.notebookId,
+                notebookName: subjectInfo.notebookName,
+                subjectRaw: subjectInfo.subjectRaw,
+                subjectSignature: subjectInfo.subjectSignature,
             };
         }
 
@@ -235,7 +232,7 @@ function createStudyToolRuntime(options = {}) {
             ...args,
             Date: matchedEntry.dateKey,
             Content: nextContentParts.contentMarkdown,
-        }, maidInfo);
+        }, subjectInfo);
         const updatedEntry = await studyLogStore.updateEntry({
             agentId: matchedEntry.agentId,
             topicId: matchedEntry.topicId,
@@ -278,11 +275,11 @@ function createStudyToolRuntime(options = {}) {
             tags: updatedEntry.tags,
             entry: updatedEntry,
             diaryDayId: diaryDay?.id || '',
-            message: `DailyNote.update updated entry ${updatedEntry.id} in [${maidInfo.notebookName}].`,
-            notebookId: maidInfo.notebookId,
-            notebookName: maidInfo.notebookName,
-            maidRaw: maidInfo.maidRaw,
-            maidSignature: maidInfo.maidSignature,
+            message: `DailyNote.update updated entry ${updatedEntry.id} in [${subjectInfo.notebookName}].`,
+            notebookId: subjectInfo.notebookId,
+            notebookName: subjectInfo.notebookName,
+            subjectRaw: subjectInfo.subjectRaw,
+            subjectSignature: subjectInfo.subjectSignature,
         };
     }
 

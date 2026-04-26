@@ -100,7 +100,7 @@ function formatToolRequest(toolRequest = {}, index = 0) {
     const lines = [
         `[${index + 1}] ${toolRequest?.toolName || 'UnknownTool'}.${toolRequest?.command || 'unknown'}`,
         `requested: ${(toolRequest?.requestedToolName || '').trim() || '(none)'}.${(toolRequest?.requestedCommand || '').trim() || '(none)'}`,
-        `subject: ${args.subject || args.maid || '(none)'}`,
+        `subject: ${args.subject || '(none)'}`,
         `date: ${args.Date || '(none)'}`,
         `target: ${args.target || '(none)'}`,
         `replace: ${args.replace || '(none)'}`,
@@ -133,7 +133,7 @@ function formatToolResult(result = {}, index = 0) {
         `entryId: ${result?.entryId || '(none)'}`,
         `dateKey: ${result?.dateKey || '(none)'}`,
         `notebook: ${result?.notebookName || '(none)'}`,
-        `subject: ${result?.maidRaw || '(none)'}`,
+        `subject: ${result?.subjectRaw || '(none)'}`,
         `message: ${result?.message || '(none)'}`,
     ].join('\n');
 }
