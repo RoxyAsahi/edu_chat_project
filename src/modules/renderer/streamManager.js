@@ -396,16 +396,49 @@ function getReasoningPreviewLines(reasoningContent) {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-        .slice(-5);
+        .slice(-3);
+}
+
+function getReasoningClockNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+}
+
+function formatReasoningDuration(elapsedMs) {
+    const safeElapsedMs = Math.max(100, Number(elapsedMs) || 100);
+    return `${(safeElapsedMs / 1000).toFixed(1)} 秒`;
 }
 
 function formatReasoningElapsed(messageId) {
     const startedAt = reasoningStartTimes.get(messageId);
-    if (!startedAt || typeof performance?.now !== 'function') {
-        return '0.1s';
+    if (!startedAt) {
+        return '0.1 秒';
     }
-    const elapsedMs = Math.max(100, performance.now() - startedAt);
-    return `${(elapsedMs / 1000).toFixed(1)}s`;
+    return formatReasoningDuration(getReasoningClockNow() - startedAt);
+}
+
+function normalizeReasoningElapsedText(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    return value.trim();
+}
+
+function resolveFinalReasoningElapsedText(messageId, finalPayload) {
+    const payloadElapsed = normalizeReasoningElapsedText(finalPayload?.reasoningElapsed)
+        || normalizeReasoningElapsedText(finalPayload?.reasoning_elapsed)
+        || normalizeReasoningElapsedText(finalPayload?.reasoningElapsedText)
+        || normalizeReasoningElapsedText(finalPayload?.reasoning_elapsed_text);
+    if (payloadElapsed) {
+        return payloadElapsed;
+    }
+
+    const startedAt = reasoningStartTimes.get(messageId);
+    if (!startedAt) {
+        return '';
+    }
+    return formatReasoningDuration(getReasoningClockNow() - startedAt);
 }
 
 function createStableReasoningBubble(messageId) {
@@ -426,6 +459,9 @@ function createStableReasoningBubble(messageId) {
     const textWrap = document.createElement('span');
     textWrap.className = 'unistudy-live-reasoning-text-wrap';
 
+    const titleRow = document.createElement('span');
+    titleRow.className = 'unistudy-live-reasoning-title-row';
+
     const label = document.createElement('span');
     label.className = 'unistudy-thought-chain-label unistudy-live-reasoning-label';
     label.textContent = 'AI 正在思考';
@@ -443,7 +479,8 @@ function createStableReasoningBubble(messageId) {
     const body = document.createElement('div');
     body.className = 'unistudy-thought-chain-body unistudy-live-reasoning-body';
 
-    textWrap.appendChild(label);
+    titleRow.appendChild(label);
+    textWrap.appendChild(titleRow);
     textWrap.appendChild(preview);
     header.appendChild(icon);
     header.appendChild(textWrap);
@@ -458,13 +495,41 @@ function createStableReasoningBubble(messageId) {
         header.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     };
 
+    const shouldIgnoreToggleTarget = (target) => {
+        if (!target || typeof target.closest !== 'function') {
+            return false;
+        }
+
+        if (bubble.classList.contains('expanded') && target.closest('.unistudy-thought-chain-collapsible-content')) {
+            return true;
+        }
+
+        return Boolean(target.closest('a, button, input, textarea, select, [contenteditable="true"]'));
+    };
+
     const toggleExpanded = (event) => {
+        if (shouldIgnoreToggleTarget(event?.target)) {
+            return false;
+        }
         event?.preventDefault?.();
         event?.stopPropagation?.();
         applyExpandedState(!bubble.classList.contains('expanded'));
+        return true;
     };
 
-    header.addEventListener('click', toggleExpanded);
+    let pointerHandled = false;
+    bubble.addEventListener('pointerdown', (event) => {
+        pointerHandled = toggleExpanded(event) === true;
+    }, true);
+    bubble.addEventListener('click', (event) => {
+        if (pointerHandled) {
+            pointerHandled = false;
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+        toggleExpanded(event);
+    }, true);
     header.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
             toggleExpanded(event);
@@ -499,14 +564,14 @@ function renderStreamingReasoning(reasoningRoot, messageId) {
 
     const label = bubble.querySelector('.unistudy-live-reasoning-label');
     if (label) {
-        label.textContent = `正在思考... ${formatReasoningElapsed(messageId)}`;
+        label.textContent = `思考中（用时 ${formatReasoningElapsed(messageId)}）`;
     }
 
     const preview = bubble.querySelector('.unistudy-live-reasoning-preview');
     if (preview) {
         const lines = getReasoningPreviewLines(reasoningContent);
         preview.innerHTML = lines.map((line) => `<span>${escapeHtml(line)}</span>`).join('');
-        preview.style.setProperty('--reasoning-preview-lines', String(Math.max(1, Math.min(lines.length, 5))));
+        preview.style.setProperty('--reasoning-preview-lines', String(Math.max(1, Math.min(lines.length, 3))));
     }
 
     const body = bubble.querySelector('.unistudy-live-reasoning-body');
@@ -1331,7 +1396,7 @@ export function appendStreamChunk(messageId, chunkData, context) {
 
     if (reasoningToAppend) {
         if (!reasoningStartTimes.has(messageId)) {
-            reasoningStartTimes.set(messageId, typeof performance?.now === 'function' ? performance.now() : Date.now());
+            reasoningStartTimes.set(messageId, getReasoningClockNow());
         }
         const currentReasoning = accumulatedStreamReasoning.get(messageId) || "";
         accumulatedStreamReasoning.set(messageId, currentReasoning + reasoningToAppend);
@@ -1422,6 +1487,9 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
         const finalReasoningContent = payloadReasoningContent.trim()
             ? payloadReasoningContent
             : accumulatedReasoningContent;
+        const finalReasoningElapsed = finalReasoningContent.trim()
+            ? resolveFinalReasoningElapsedText(messageId, finalPayload)
+            : "";
         const payloadFallbackMeta = finalPayload?.fallbackMeta && typeof finalPayload.fallbackMeta === 'object'
             ? finalPayload.fallbackMeta
             : null;
@@ -1469,6 +1537,9 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
         message.isThinking = false;
         if (finalReasoningContent.trim()) {
             message.reasoning_content = finalReasoningContent;
+            if (finalReasoningElapsed) {
+                message.reasoning_elapsed = finalReasoningElapsed;
+            }
         }
         if (payloadFallbackMeta) {
             message.fallbackMeta = payloadFallbackMeta;
