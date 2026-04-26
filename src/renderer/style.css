@@ -2759,15 +2759,15 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 }
 
 .emoticon-panel-title {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--accent);
-  margin-bottom: 8px;
   text-align: center;
   flex-shrink: 0;
+  flex: 1;
 }
 
 .emoticon-category-scroller {
-  display: flex;
+  display: none;
   gap: 8px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -2806,22 +2806,23 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .emoticon-panel-content {
   overflow-y: auto;
   flex-grow: 1;
-  padding: 2px 2px 0;
+  padding: 4px 2px 0;
 }
 
 .emoticon-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 12px 10px;
+  align-items: start;
 }
 
 .emoticon-item {
-  width: 52px;
-  height: 52px;
+  width: 58px;
+  height: 58px;
   object-fit: contain;
   cursor: pointer;
   border-radius: 8px;
-  padding: 3px;
+  padding: 0;
   box-sizing: border-box;
   transition: transform 0.2s ease, background-color 0.2s ease;
 }
@@ -2833,7 +2834,8 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 
 .emoticon-item-placeholder {
     width: 100%;
-    height: 100%;
+    min-height: 58px;
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2845,9 +2847,8 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
 .emoticon-panel-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 10px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 .emoticon-panel-actions {
@@ -2855,32 +2856,79 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
     gap: 8px;
 }
 
+.emoticon-manage-button {
+    width: 30px;
+    height: 30px;
+    color: var(--accent);
+}
+
+.emoticon-manage-button.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+}
+
+.emoticon-manage-button .material-symbols-outlined {
+    font-size: 19px;
+}
+
 .emoticon-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 6px;
-    border-radius: 14px;
-    border: 1px solid transparent;
-    background: color-mix(in srgb, var(--panel) 96%, transparent);
+    position: relative;
+    width: 58px;
+    height: 58px;
+    border: 0;
+    border-radius: 8px;
+    padding: 0;
+    background: transparent;
+    box-sizing: border-box;
+    justify-self: center;
 }
 
-.emoticon-card__meta {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 11px;
-    color: var(--muted);
+.emoticon-card--add {
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    border: 1px dashed color-mix(in srgb, var(--accent) 48%, var(--line) 52%);
+    background: color-mix(in srgb, var(--accent-soft) 64%, transparent);
+    color: var(--accent-strong);
+    transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
 }
 
-.emoticon-card__meta strong {
-    color: var(--ink);
-    font-size: 12px;
+.emoticon-card--add:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    transform: translateY(-1px);
 }
 
-.emoticon-card__actions {
-    display: flex;
-    gap: 6px;
+.emoticon-card--add span {
+    display: block;
+    font-size: 28px;
+    line-height: 1;
+}
+
+.emoticon-card__delete {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    border: 1px solid color-mix(in srgb, #ffffff 82%, transparent);
+    border-radius: 50%;
+    background: #ef4444;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    z-index: 1;
+}
+
+.emoticon-card__delete.is-disabled {
+    background: color-mix(in srgb, var(--muted) 62%, transparent);
+    cursor: not-allowed;
+    opacity: 0.72;
 }
 
 /* Note Suggestions */

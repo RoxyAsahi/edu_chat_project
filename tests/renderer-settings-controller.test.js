@@ -398,7 +398,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                         finalSystemPrompt: [
                             payload.systemPrompt || 'Base prompt',
                             renderingText && `RENDER::${renderingText}`,
-                            emoticonText && `EMOTICON::${emoticonText.replace('{{GeneralEmoticonPath}}', '/通用表情包')}`,
+                            emoticonText && `EMOTICON::${emoticonText.replace('{{GeneralEmoticonPath}}', '/表情包')}`,
                             adaptiveText && `ADAPTIVE::${adaptiveText}`,
                             dailyText && `DAILY::${dailyText}`,
                             bubbleText && `BUBBLE::${bubbleText.replace('{{RenderingGuide}}', 'DIV_RENDER')}`,
@@ -421,7 +421,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                                 source: payload.settings?.emoticonPrompt ? 'custom' : 'default',
                                 referencedInBasePrompt: true,
                                 rawPrompt: emoticonText,
-                                resolvedPrompt: emoticonText.replace('{{GeneralEmoticonPath}}', '/通用表情包'),
+                                resolvedPrompt: emoticonText.replace('{{GeneralEmoticonPath}}', '/表情包'),
                             },
                             adaptiveBubbleTip: {
                                 enabled: payload.settings?.enableAdaptiveBubbleTip !== false,
@@ -600,7 +600,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     el.refreshFinalSystemPromptPreviewBtn.click();
     await flushAsyncWork();
     assert.match(el.finalSystemPromptPreview.value, /BUBBLE::Editable prompt: DIV_RENDER/);
-    assert.match(el.finalSystemPromptPreview.value, /EMOTICON::native emoticon prompt: \/通用表情包/);
+    assert.match(el.finalSystemPromptPreview.value, /EMOTICON::native emoticon prompt: \/表情包/);
     assert.match(el.finalSystemPromptPreviewMeta.textContent, /智能体：Agent One/);
 
     documentObj.querySelector('input[name="themeMode"][value="dark"]').checked = true;

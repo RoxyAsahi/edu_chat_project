@@ -334,6 +334,7 @@ workspaceController = createWorkspaceController({
     setLeftSidebarMode,
     setLeftReaderTab,
     setRightPanelMode,
+    openSettingsModal,
     ensureTopicSource,
     loadCurrentTopicKnowledgeBaseDocuments,
     loadTopicNotes: (...args) => notesController?.loadTopicNotes?.(...args),

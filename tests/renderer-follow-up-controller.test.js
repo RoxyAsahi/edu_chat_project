@@ -673,12 +673,12 @@ test('composerController adds selected emoticons into the shared attachment prev
     });
 
     const result = await controller.addEmoticonAttachment({
-        id: 'bundled:通用表情包:不要优化我.jpg',
+        id: 'bundled:表情包:不要优化我.jpg',
         filename: '不要优化我.jpg',
         name: '不要优化我',
-        category: '通用表情包',
+        category: '表情包',
         url: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
-        renderPath: '/通用表情包/不要优化我.jpg',
+        renderPath: '/表情包/不要优化我.jpg',
         source: 'bundled',
     });
 
@@ -689,14 +689,14 @@ test('composerController adds selected emoticons into the shared attachment prev
     assert.equal(store.getState().composer.pendingAttachments[0].src, 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg');
     assert.equal(store.getState().composer.pendingAttachments[0].internalPath, 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg');
     assert.equal(store.getState().composer.pendingAttachments[0].attachmentKind, 'emoticon');
-    assert.equal(store.getState().composer.pendingAttachments[0].renderPath, '/通用表情包/不要优化我.jpg');
+    assert.equal(store.getState().composer.pendingAttachments[0].renderPath, '/表情包/不要优化我.jpg');
     assert.equal(previewCalls.length, 1);
     assert.deepEqual(previewCalls[0], [{
         name: '不要优化我.jpg',
         type: 'image/jpeg',
         src: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
         internalPath: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
-        renderPath: '/通用表情包/不要优化我.jpg',
+        renderPath: '/表情包/不要优化我.jpg',
     }]);
 });
 
@@ -813,10 +813,10 @@ test('composerController serializes emoticon attachments back into pseudo-path i
                 type: 'image/jpeg',
                 src: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
                 internalPath: 'file:///C:/packs/%E4%B8%8D%E8%A6%81%E4%BC%98%E5%8C%96%E6%88%91.jpg',
-                renderPath: '/通用表情包/不要优化我.jpg',
+                renderPath: '/表情包/不要优化我.jpg',
                 attachmentKind: 'emoticon',
-                emoticonId: 'bundled:通用表情包:不要优化我.jpg',
-                emoticonCategory: '通用表情包',
+                emoticonId: 'bundled:表情包:不要优化我.jpg',
+                emoticonCategory: '表情包',
                 source: 'bundled',
             }],
         }],
@@ -824,7 +824,7 @@ test('composerController serializes emoticon attachments back into pseudo-path i
 
     assert.deepEqual(messages, [{
         role: 'user',
-        content: '<img src="/通用表情包/不要优化我.jpg" width="80">',
+        content: '<img src="/表情包/不要优化我.jpg" width="80">',
     }]);
     assert.equal(base64Reads, 0);
 });

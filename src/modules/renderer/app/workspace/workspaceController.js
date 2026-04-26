@@ -49,6 +49,7 @@ function createWorkspaceController(deps = {}) {
     const setLeftSidebarMode = deps.setLeftSidebarMode || (() => {});
     const setLeftReaderTab = deps.setLeftReaderTab || (() => {});
     const setRightPanelMode = deps.setRightPanelMode || (() => {});
+    const openSettingsModal = deps.openSettingsModal || (() => {});
     const ensureTopicSource = deps.ensureTopicSource || (async () => null);
     const loadCurrentTopicKnowledgeBaseDocuments = deps.loadCurrentTopicKnowledgeBaseDocuments || (async () => {});
     const loadTopicNotes = deps.loadTopicNotes || (async () => {});
@@ -151,6 +152,8 @@ function createWorkspaceController(deps = {}) {
     let overviewClockTimerId = null;
     let overviewSubjectRevealObserver = null;
     let overviewSubjectRevealResetTimerId = null;
+    let subjectActionMenuElement = null;
+    let activeSubjectActionMenu = null;
     const overviewSubjectBrowserState = {
         search: '',
         viewMode: 'grid',
@@ -485,6 +488,114 @@ function createWorkspaceController(deps = {}) {
         el.topicActionMenu.style.visibility = '';
     }
 
+    function ensureSubjectActionMenu() {
+        if (subjectActionMenuElement && documentObj.body.contains(subjectActionMenuElement)) {
+            return subjectActionMenuElement;
+        }
+
+        subjectActionMenuElement = documentObj.createElement('div');
+        subjectActionMenuElement.className = 'topic-action-menu subject-action-menu hidden';
+        subjectActionMenuElement.setAttribute('role', 'menu');
+        subjectActionMenuElement.setAttribute('aria-label', '学科操作');
+        documentObj.body.appendChild(subjectActionMenuElement);
+        return subjectActionMenuElement;
+    }
+
+    function closeSubjectActionMenu() {
+        activeSubjectActionMenu = null;
+        if (!subjectActionMenuElement) {
+            return;
+        }
+        subjectActionMenuElement.classList.add('hidden');
+        subjectActionMenuElement.innerHTML = '';
+        subjectActionMenuElement.style.left = '0px';
+        subjectActionMenuElement.style.top = '0px';
+        subjectActionMenuElement.style.visibility = '';
+    }
+
+    function getAgentOverviewLabel(agentId) {
+        const agent = state.agents.find((item) => item.id === agentId) || null;
+        return agent?.name || agent?.id || agentId || '未命名学科';
+    }
+
+    async function editAgentById(agentId, trigger = null) {
+        if (!agentId) {
+            return;
+        }
+
+        closeSubjectActionMenu();
+        await selectAgent(agentId, { showSubjectWorkspace: false });
+        openSettingsModal('agent', trigger);
+    }
+
+    function renderSubjectActionMenu() {
+        const menu = ensureSubjectActionMenu();
+        if (!activeSubjectActionMenu?.agentId || !activeSubjectActionMenu?.anchorRect) {
+            closeSubjectActionMenu();
+            return;
+        }
+
+        const agentId = activeSubjectActionMenu.agentId;
+        const agentName = activeSubjectActionMenu.agentName || getAgentOverviewLabel(agentId);
+        const actions = [
+            { key: 'edit', label: '编辑', icon: 'edit' },
+            { key: 'delete', label: '删除', icon: 'delete', danger: true },
+        ];
+
+        menu.innerHTML = actions.map((action) => `
+            <button
+                type="button"
+                class="topic-action-menu__item ${action.danger ? 'topic-action-menu__item--danger' : ''}"
+                data-subject-action="${escapeHtml(action.key)}"
+                role="menuitem"
+            >
+                <span class="material-symbols-outlined">${escapeHtml(action.icon)}</span>
+                <span>${escapeHtml(action.label)}</span>
+            </button>
+        `).join('');
+
+        menu.classList.remove('hidden');
+        menu.style.visibility = 'hidden';
+        positionFloatingElement(menu, activeSubjectActionMenu.anchorRect, 'right', windowObj);
+        menu.style.visibility = 'visible';
+
+        menu.querySelectorAll('[data-subject-action]').forEach((button) => {
+            button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const action = button.dataset.subjectAction;
+                if (action === 'edit') {
+                    await editAgentById(agentId, activeSubjectActionMenu.trigger || null);
+                } else if (action === 'delete') {
+                    closeSubjectActionMenu();
+                    await deleteAgentById(agentId, { agentName });
+                }
+            });
+        });
+    }
+
+    function openSubjectActionMenu(event, button) {
+        event.preventDefault();
+        event.stopPropagation();
+        const agentId = String(button?.dataset?.agentId || '').trim();
+        if (!agentId) {
+            return;
+        }
+
+        closeTopicActionMenu();
+        activeSubjectActionMenu = {
+            agentId,
+            agentName: getAgentOverviewLabel(agentId),
+            trigger: button,
+            anchorRect: {
+                left: event.clientX,
+                right: event.clientX,
+                top: event.clientY,
+                bottom: event.clientY,
+            },
+        };
+        renderSubjectActionMenu();
+    }
+
     function renderTopicActionMenu() {
         if (!el.topicActionMenu || !state.activeTopicMenu?.topic || !state.activeTopicMenu?.anchorRect) {
             closeTopicActionMenu();
@@ -733,7 +844,11 @@ function createWorkspaceController(deps = {}) {
                 if (!agentId) {
                     return;
                 }
+                closeSubjectActionMenu();
                 void selectAgent(agentId);
+            });
+            button.addEventListener('contextmenu', (event) => {
+                openSubjectActionMenu(event, button);
             });
         });
         host.querySelectorAll('[data-create-subject-card]').forEach((button) => {
@@ -825,6 +940,7 @@ function createWorkspaceController(deps = {}) {
         if (!el.subjectOverviewGrid) {
             return;
         }
+        closeSubjectActionMenu();
 
         const markup = buildOverviewMarkup({
             agents: state.agents,
@@ -1561,12 +1677,20 @@ function createWorkspaceController(deps = {}) {
         });
         el.topicList?.addEventListener('scroll', () => {
             closeTopicActionMenu();
+            closeSubjectActionMenu();
         });
         windowObj.addEventListener('resize', () => {
             closeTopicActionMenu();
+            closeSubjectActionMenu();
         });
         documentObj.addEventListener('click', (event) => {
             const target = event.target;
+            if (activeSubjectActionMenu) {
+                if (target instanceof Element && (target.closest('.subject-action-menu') || target.closest('[data-subject-card]'))) {
+                    return;
+                }
+                closeSubjectActionMenu();
+            }
             if (!state.activeTopicMenu) {
                 return;
             }
@@ -1579,6 +1703,7 @@ function createWorkspaceController(deps = {}) {
         documentObj.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
                 closeTopicActionMenu();
+                closeSubjectActionMenu();
             }
         });
     }

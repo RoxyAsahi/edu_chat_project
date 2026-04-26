@@ -234,7 +234,7 @@ test('preview-final-system-prompt reports segment states and final prompt', asyn
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const projectRoot = path.join(tempRoot, 'project-root');
-    const bundledPackDir = path.join(projectRoot, '通用表情包');
+    const bundledPackDir = path.join(projectRoot, 'src', 'assets', 'emoticons', '表情包');
     const manager = new SettingsManager(settingsPath);
     t.after(() => fs.remove(tempRoot));
 
@@ -288,7 +288,7 @@ test('preview-final-system-prompt reports segment states and final prompt', asyn
     assert.equal(result.preview.segments.emoticonPrompt.available, true);
     assert.equal(result.preview.segments.emoticonPrompt.appended, false);
     assert.equal(result.preview.segments.emoticonPrompt.skippedBecausePromptAlreadyContainsVariable, true);
-    assert.match(result.preview.finalSystemPrompt, /Path \/通用表情包/);
+    assert.match(result.preview.finalSystemPrompt, /Path \/表情包/);
     assert.equal(result.preview.segments.dailyNoteVariable.enabled, true);
     assert.equal(result.preview.segments.bubbleTheme.appended, true);
 });
@@ -297,7 +297,7 @@ test('preview-final-system-prompt auto-appends the emoticon segment when the bas
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const projectRoot = path.join(tempRoot, 'project-root');
-    const bundledPackDir = path.join(projectRoot, '通用表情包');
+    const bundledPackDir = path.join(projectRoot, 'src', 'assets', 'emoticons', '表情包');
     const manager = new SettingsManager(settingsPath);
     t.after(() => fs.remove(tempRoot));
 
@@ -335,7 +335,7 @@ test('preview-final-system-prompt auto-appends the emoticon segment when the bas
 
     assert.equal(result.success, true);
     assert.match(result.preview.finalSystemPrompt, /Hello PreviewUser/);
-    assert.match(result.preview.finalSystemPrompt, /Auto \/通用表情包/);
+    assert.match(result.preview.finalSystemPrompt, /Auto \/表情包/);
     assert.equal(result.preview.segments.emoticonPrompt.appended, true);
     assert.equal(result.preview.segments.emoticonPrompt.skippedBecausePromptAlreadyContainsVariable, false);
 });

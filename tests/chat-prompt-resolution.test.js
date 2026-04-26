@@ -225,7 +225,7 @@ test('send-chat-request injects bundled emoticon prompt text before calling the 
     t.after(() => fs.remove(tempRoot));
 
     const projectRoot = path.join(tempRoot, 'project-root');
-    const bundledPackDir = path.join(projectRoot, '通用表情包');
+    const bundledPackDir = path.join(projectRoot, 'src', 'assets', 'emoticons', '表情包');
     await fs.ensureDir(bundledPackDir);
     await fs.writeFile(path.join(bundledPackDir, '阿巴阿巴.jpg'), Buffer.from([255, 216, 255]));
     await fs.writeFile(path.join(bundledPackDir, '啊？.png'), Buffer.from([137, 80, 78, 71]));
@@ -272,9 +272,9 @@ test('send-chat-request injects bundled emoticon prompt text before calling the 
     assert.equal(result.ok, true);
     assert.ok(capturedRequest);
     assert.equal(capturedRequest.messages[0].content.includes('{{EmoticonGuide}}'), false);
-    assert.match(capturedRequest.messages[0].content, /Path \/通用表情包/);
+    assert.match(capturedRequest.messages[0].content, /Path \/表情包/);
     assert.match(capturedRequest.messages[0].content, /阿巴阿巴.jpg\|啊？.png/);
-    assert.equal((capturedRequest.messages[0].content.match(/Path \/通用表情包/g) || []).length, 1);
+    assert.equal((capturedRequest.messages[0].content.match(/Path \/表情包/g) || []).length, 1);
 });
 
 test('send-chat-request auto-appends emoticon prompt when the base prompt does not reference emoticon variables', async (t) => {
@@ -282,7 +282,7 @@ test('send-chat-request auto-appends emoticon prompt when the base prompt does n
     t.after(() => fs.remove(tempRoot));
 
     const projectRoot = path.join(tempRoot, 'project-root');
-    const bundledPackDir = path.join(projectRoot, '通用表情包');
+    const bundledPackDir = path.join(projectRoot, 'src', 'assets', 'emoticons', '表情包');
     await fs.ensureDir(bundledPackDir);
     await fs.writeFile(path.join(bundledPackDir, '阿巴阿巴.jpg'), Buffer.from([255, 216, 255]));
 
@@ -328,7 +328,7 @@ test('send-chat-request auto-appends emoticon prompt when the base prompt does n
     assert.equal(result.ok, true);
     assert.ok(capturedRequest);
     assert.match(capturedRequest.messages[0].content, /原始系统提示词/);
-    assert.match(capturedRequest.messages[0].content, /Auto emoticon path \/通用表情包/);
+    assert.match(capturedRequest.messages[0].content, /Auto emoticon path \/表情包/);
 });
 
 test('send-chat-request skips bubble theme injection when the configured prompt is blank', async (t) => {
