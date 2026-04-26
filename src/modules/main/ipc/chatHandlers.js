@@ -58,6 +58,7 @@ const FOLLOW_UP_CODE_FENCE_REGEX = /```[\s\S]*?```/g;
 const FOLLOW_UP_HTML_BLOCK_REGEX = /<(style|script|svg|canvas|iframe)\b[^>]*>[\s\S]*?<\/\1>/gi;
 const FOLLOW_UP_BUTTON_REGEX = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
 const FOLLOW_UP_BLOCK_TAG_REGEX = /<\/?(address|article|aside|blockquote|br|caption|dd|details|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)\b[^>]*>/gi;
+const UTILITY_TASK_DISABLE_THINKING_MODEL_REGEX = /qwen/i;
 const TOOL_PROTOCOL_SIGNAL_PATTERNS = [
     /{{\s*DailyNoteGuide\s*}}/i,
     /——\s*日记\s*\(DailyNote\)\s*——/i,
@@ -173,6 +174,17 @@ function buildFollowUpRetryPrompt(prompt = '') {
     ].join('\n');
 
     return `${String(prompt || '').trim()}\n\n${reminder}`.trim();
+}
+
+function shouldDisableThinkingForUtilityTask(model = '') {
+    return UTILITY_TASK_DISABLE_THINKING_MODEL_REGEX.test(String(model || ''));
+}
+
+function buildUtilityTaskModelConfig(model, config = {}) {
+    return {
+        ...config,
+        ...(shouldDisableThinkingForUtilityTask(model) ? { enable_thinking: false } : {}),
+    };
 }
 
 function normalizeMessageForPreprocessing(message) {
@@ -699,13 +711,13 @@ async function requestFollowUpsOnce({
             role: 'user',
             content: attempt === 1 ? prompt : buildFollowUpRetryPrompt(prompt),
         }],
-        modelConfig: {
+        modelConfig: buildUtilityTaskModelConfig(model, {
             model,
             stream: false,
             temperature: 0,
             max_tokens: 1200,
             response_format: { type: 'json_object' },
-        },
+        }),
         context,
         timeoutMs: 120000,
         fallbackExecution,
@@ -1646,12 +1658,12 @@ function initialize(mainWindow, context) {
                     role: 'user',
                     content: prompt,
                 }],
-                modelConfig: {
+                modelConfig: buildUtilityTaskModelConfig(model, {
                     model,
                     stream: false,
                     temperature: 0.1,
                     max_tokens: 200,
-                },
+                }),
                 context: {
                     source: 'topic-title-generation',
                     agentId: requestPayload.agentId || '',

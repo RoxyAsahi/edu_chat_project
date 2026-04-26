@@ -810,7 +810,7 @@
     flex-shrink: 0;
     align-self: flex-start;
     border: none !important;
-    box-shadow: var(--shadow-elevation-1);
+    box-shadow: none;
     background: var(--paper);
 }
 

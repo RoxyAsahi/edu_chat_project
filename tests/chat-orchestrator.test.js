@@ -118,7 +118,7 @@ test('chatOrchestrator merges study memory into the leading system message inste
     assert.match(capturedRequest.messages[0].content, /memory context/);
 });
 
-test('chatOrchestrator streams visible text across tool rounds without leaking tool protocol blocks', async () => {
+test('chatOrchestrator streams raw tool blocks across tool rounds and preserves final tool cards', async () => {
     const senderEvents = [];
     let sendCount = 0;
     const orchestrator = createChatOrchestrator({
@@ -127,6 +127,12 @@ test('chatOrchestrator streams visible text across tool rounds without leaking t
                 sendCount += 1;
 
                 if (sendCount === 1) {
+                    request.onStreamChunk?.({
+                        textDelta: '',
+                        reasoningDelta: '先判断是否需要写入学习日志。',
+                        chunk: { choices: [{ delta: { reasoning_content: '先判断是否需要写入学习日志。' } }] },
+                    });
+
                     const roundOneChunks = [
                         '先给你一个简短结论。',
                         '\n<<<[TOOL_REQUEST]>>>\n',
@@ -216,16 +222,27 @@ test('chatOrchestrator streams visible text across tool rounds without leaking t
     });
 
     const dataPayloads = senderEvents.filter((event) => event.payload.type === 'data').map((event) => event.payload.chunk.content);
+    const reasoningPayloads = senderEvents
+        .filter((event) => event.payload.type === 'data')
+        .map((event) => event.payload.reasoningDelta || '')
+        .filter(Boolean);
     const endPayload = senderEvents.find((event) => event.payload.type === 'end')?.payload || null;
     const streamedVisibleText = dataPayloads.join('');
 
     assert.equal(result.streamingStarted, true);
     assert.equal(sendCount, 2);
-    assert.equal(streamedVisibleText, '先给你一个简短结论。\n\n工具执行完成，下面继续展开说明。');
-    assert.equal(streamedVisibleText.includes('<<<[TOOL_REQUEST]>>>'), false);
+    assert.match(streamedVisibleText, /先给你一个简短结论。/);
+    assert.match(streamedVisibleText, /<<<\[TOOL_REQUEST\]>>>/);
+    assert.match(streamedVisibleText, /tool_name:「始」DailyNote「末」/);
+    assert.match(streamedVisibleText, /<<<\[END_TOOL_REQUEST\]>>>/);
+    assert.match(streamedVisibleText, /工具执行完成，下面继续展开说明。/);
+    assert.deepEqual(reasoningPayloads, ['先判断是否需要写入学习日志。']);
+    assert.equal(streamedVisibleText.includes('<<<[TOOL_REQUEST]>>>'), true);
     assert.ok(endPayload);
-    assert.equal(endPayload.fullResponse, '先给你一个简短结论。\n\n工具执行完成，下面继续展开说明。');
-    assert.equal(endPayload.fullResponse.includes('<<<[TOOL_REQUEST]>>>'), false);
+    assert.match(endPayload.fullResponse, /先给你一个简短结论。/);
+    assert.match(endPayload.fullResponse, /<<<\[TOOL_REQUEST\]>>>/);
+    assert.match(endPayload.fullResponse, /tool_name:「始」DailyNote「末」/);
+    assert.match(endPayload.fullResponse, /工具执行完成，下面继续展开说明。/);
     assert.equal(Array.isArray(result.toolEvents), true);
     assert.equal(result.toolEvents.length, 1);
 });

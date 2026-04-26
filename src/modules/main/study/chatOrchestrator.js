@@ -2,13 +2,9 @@ const {
     buildToolPayloadMessage,
     extractResponseContent,
     injectResponseContent,
-    LEGACY_DAILY_NOTE_REGEX,
     parseToolRequests,
     stripToolArtifacts,
     THINK_BLOCK_REGEX,
-    TOOL_BLOCK_REGEX,
-    TOOL_REQUEST_END,
-    TOOL_REQUEST_START,
 } = require('./toolProtocol');
 const {
     logFinalAssistantReply,
@@ -19,7 +15,6 @@ const {
 
 const DEFAULT_SYNTHETIC_STREAM_INTERVAL_MS = 18;
 const DEFAULT_MAX_TOOL_ROUNDS = 3;
-const STREAM_PROTOCOL_HOLDBACK_CHARS = 96;
 const syntheticRequestState = new Map();
 
 function cloneMessages(messages = []) {
@@ -121,14 +116,23 @@ function buildVisibleAssistantTranscript(segments = []) {
         .trim();
 }
 
-function makeSyntheticChunkEvent(requestId, context, content) {
+function makeSyntheticChunkEvent(requestId, context, content, options = {}) {
+    const reasoningDelta = typeof options.reasoningDelta === 'string'
+        ? options.reasoningDelta
+        : '';
+
     return {
         type: 'data',
         requestId,
         context,
-        chunk: { content },
+        chunk: {
+            ...(content ? { content } : {}),
+            ...(reasoningDelta ? { reasoning_content: reasoningDelta } : {}),
+        },
         textDelta: content,
+        reasoningDelta,
         hasRenderableText: Boolean(content),
+        hasRenderableReasoning: Boolean(reasoningDelta),
     };
 }
 
@@ -249,19 +253,9 @@ function abortSyntheticRequest(requestId) {
     return true;
 }
 
-function stripStreamingToolArtifacts(content = '') {
-    return String(content || '')
-        .replace(THINK_BLOCK_REGEX, '')
-        .replace(TOOL_BLOCK_REGEX, '')
-        .replace(LEGACY_DAILY_NOTE_REGEX, '')
-        .replace(/\n{3,}/g, '\n\n');
-}
-
-function findUnclosedMarkerStart(text = '') {
+function findUnclosedThoughtMarkerStart(text = '') {
     const normalized = String(text || '');
     const markerPairs = [
-        { start: TOOL_REQUEST_START, end: TOOL_REQUEST_END },
-        { start: '<<<DailyNoteStart>>>', end: '<<<DailyNoteEnd>>>' },
         { start: '<thinking>', end: '</thinking>' },
         { start: '<think>', end: '</think>' },
     ];
@@ -286,21 +280,16 @@ function findUnclosedMarkerStart(text = '') {
     return earliestUnsafeIndex;
 }
 
-function computeVisibleRoundText(content = '', finalized = false) {
-    const normalized = String(content || '');
-    if (!normalized) {
-        return '';
+function computeRawStreamingRoundText(content = '', finalized = false) {
+    let safePrefix = String(content || '');
+    if (!finalized) {
+        const unsafeThoughtIndex = findUnclosedThoughtMarkerStart(safePrefix);
+        if (unsafeThoughtIndex >= 0) {
+            safePrefix = safePrefix.slice(0, unsafeThoughtIndex);
+        }
     }
 
-    let safePrefix = finalized
-        ? normalized
-        : normalized.slice(0, Math.max(0, normalized.length - STREAM_PROTOCOL_HOLDBACK_CHARS));
-    const unsafeIndex = findUnclosedMarkerStart(safePrefix);
-    if (unsafeIndex >= 0) {
-        safePrefix = safePrefix.slice(0, unsafeIndex);
-    }
-
-    return stripStreamingToolArtifacts(safePrefix).replace(/\s+$/u, '');
+    return stripThoughtArtifacts(safePrefix).replace(/\s+$/u, '');
 }
 
 function buildRoundDisplayText(visibleText = '', completedSegmentCount = 0) {
@@ -444,6 +433,23 @@ function createChatOrchestrator(options = {}) {
             webContents.send(streamChannel, makeSyntheticChunkEvent(requestId, context, delta));
         };
 
+        const emitReasoningDelta = (reasoningDelta = '') => {
+            const normalizedReasoningDelta = String(reasoningDelta || '');
+            if (!normalizedReasoningDelta) {
+                return;
+            }
+            if (!webContents || typeof webContents.send !== 'function') {
+                return;
+            }
+            if (typeof webContents.isDestroyed === 'function' && webContents.isDestroyed()) {
+                return;
+            }
+
+            webContents.send(streamChannel, makeSyntheticChunkEvent(requestId, context, '', {
+                reasoningDelta: normalizedReasoningDelta,
+            }));
+        };
+
         const emitTerminal = (type, payload = {}) => {
             if (terminalEventSent) {
                 return;
@@ -510,9 +516,10 @@ function createChatOrchestrator(options = {}) {
                         }
                         if (payload?.reasoningDelta) {
                             roundState.reasoningContent += payload.reasoningDelta;
+                            emitReasoningDelta(payload.reasoningDelta);
                         }
 
-                        const visibleRoundText = computeVisibleRoundText(roundState.rawContent, false);
+                        const visibleRoundText = computeRawStreamingRoundText(roundState.rawContent, false);
                         emitChunkDelta(
                             buildRoundDisplayText(visibleRoundText, roundState.completedSegmentCountAtStart),
                             roundState
@@ -556,7 +563,8 @@ function createChatOrchestrator(options = {}) {
             const rawContent = typeof streamEndResult?.content === 'string'
                 ? streamEndResult.content
                 : roundState.rawContent;
-            const roundVisibleText = computeVisibleRoundText(rawContent, true).trim();
+            const roundVisibleText = computeRawStreamingRoundText(rawContent, true).trim();
+            const roundFinalText = stripThoughtArtifacts(rawContent);
             emitChunkDelta(
                 buildRoundDisplayText(roundVisibleText, roundState.completedSegmentCountAtStart),
                 roundState
@@ -659,8 +667,8 @@ function createChatOrchestrator(options = {}) {
                 };
             }
 
-            if (roundVisibleText) {
-                visibleAssistantSegments.push(roundVisibleText);
+            if (roundFinalText) {
+                visibleAssistantSegments.push(roundFinalText);
             }
             logVisibleAssistantReply({
                 requestId,
@@ -775,7 +783,7 @@ function createChatOrchestrator(options = {}) {
             if (upstreamResult?.error) {
                 return {
                     error: upstreamResult.error,
-                    studyMemoryRefs: studyMemory.refs,
+                    studyMemoryRefs: prepared.studyMemoryRefs,
                     toolEvents,
                     fallbackMeta,
                 };

@@ -49,8 +49,8 @@ function processStartEndMarkers(text) {
  */
 function ensureNewlineAfterCodeBlock(text) {
     if (typeof text !== 'string') return text;
-    // Replace ``` (possibly with leading spaces) not followed by \n or \r\n with the same ``` (and spaces) followed by \n
-    return text.replace(/^(\s*```)(?![\r\n])/gm, '$1\n');
+    // Keep valid info strings such as ```html intact; only split truly inline fences.
+    return text.replace(/^(\s*```)(?![A-Za-z0-9_-]*[\r\n])(?=\S)/gm, '$1\n');
 }
 
 /**
@@ -220,7 +220,8 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
         if (toolName === 'DailyNote' && (command === 'create' || command === 'update')) {
             preElement.classList.add('learning-diary-bubble');
 
-            const notebook = extractToolFieldFromRequest(relevantContent, 'maid')
+            const notebook = extractToolFieldFromRequest(relevantContent, 'subject')
+                || extractToolFieldFromRequest(relevantContent, 'maid')
                 || extractToolFieldFromRequest(relevantContent, 'maidName');
             const date = extractToolFieldFromRequest(relevantContent, 'Date')
                 || extractToolFieldFromRequest(relevantContent, 'date');
@@ -279,10 +280,10 @@ function prettifySinglePreElement(preElement, type, relevantContent) {
         const lines = actualNoteContent.split('\n');
         const firstLineTrimmed = lines[0] ? lines[0].trim() : "";
 
-        if (firstLineTrimmed.startsWith('Maid:') || firstLineTrimmed.startsWith('日志本:')) {
+        if (firstLineTrimmed.startsWith('Subject:') || firstLineTrimmed.startsWith('Maid:') || firstLineTrimmed.startsWith('日志本:')) {
             finalHtml = `<span class="diary-notebook-inline-label">${lines.shift().trim()}</span>`;
             finalHtml += lines.join('\n');
-        } else if (firstLineTrimmed.startsWith('Maid') || firstLineTrimmed.startsWith('日志本')) {
+        } else if (firstLineTrimmed.startsWith('Subject') || firstLineTrimmed.startsWith('Maid') || firstLineTrimmed.startsWith('日志本')) {
             finalHtml = `<span class="diary-notebook-inline-label">${lines.shift().trim()}</span>`;
             finalHtml += lines.join('\n');
         } else {
@@ -468,6 +469,278 @@ function processAllPreBlocksInContentDiv(contentDiv) {
         else if (codeElement && (codeElement.classList.contains('language-html') || blockText.trim().startsWith('<!DOCTYPE html>') || blockText.trim().startsWith('<html'))) {
             setupHtmlPreview(preElement, blockText);
         }
+        // Check for standalone Three.js code. AI-rendered learning cards often emit
+        // raw <pre><code> blocks without a language class, so content detection matters.
+        else if (codeElement && isThreeJsCodeBlock(codeElement, blockText)) {
+            setupThreeJsPreview(preElement, blockText);
+        }
+    });
+}
+
+function isThreeJsCodeBlock(codeElement, blockText) {
+    if (!codeElement || typeof blockText !== 'string') return false;
+
+    const classLooksLikeScript = Array.from(codeElement.classList || [])
+        .some(cls => /^language-(javascript|js|threejs)$/i.test(cls));
+    const contentLooksLikeThree = /\bTHREE\./.test(blockText);
+    const trimmed = blockText.trim().toLowerCase();
+    const looksLikeFullHtml = trimmed.startsWith('<!doctype html>') || trimmed.startsWith('<html');
+
+    return contentLooksLikeThree && !looksLikeFullHtml && (
+        classLooksLikeScript
+        || /\bnew\s+THREE\.WebGLRenderer\b/.test(blockText)
+        || /\bTHREE\.(Scene|PerspectiveCamera|BoxGeometry|Mesh|WebGLRenderer)\b/.test(blockText)
+    );
+}
+
+function buildThreeJsPreviewHtml(codeContent, frameId) {
+    const safeScriptContent = String(codeContent || '').replace(/<\/script/gi, '<\\/script');
+    const threeScriptSrc = (() => {
+        try {
+            return new URL('../../vendor/three.min.js', window.location.href).href;
+        } catch (_error) {
+            return '../../vendor/three.min.js';
+        }
+    })();
+
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                html, body {
+                    width: 100%;
+                    height: 100%;
+                    margin: 0;
+                    overflow: hidden;
+                    background: #020617;
+                }
+                #unistudy-three-mount {
+                    width: 100%;
+                    min-height: 360px;
+                    height: auto;
+                    overflow: hidden;
+                    position: relative;
+                }
+                canvas {
+                    display: block;
+                    max-width: 100%;
+                }
+                .unistudy-three-error {
+                    color: #fecaca;
+                    background: #450a0a;
+                    border: 1px solid #ef4444;
+                    font: 13px/1.5 Consolas, Monaco, monospace;
+                    margin: 16px;
+                    padding: 14px;
+                    border-radius: 8px;
+                    white-space: pre-wrap;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="unistudy-three-mount"></div>
+            <script src="${escapeHtml(threeScriptSrc)}"><\/script>
+            <script>
+                const frameId = ${JSON.stringify(frameId)};
+                const mount = document.getElementById('unistudy-three-mount');
+                const originalBodyAppendChild = document.body.appendChild.bind(document.body);
+                const originalBodyInsertBefore = document.body.insertBefore.bind(document.body);
+
+                function shouldMountInsidePreview(node) {
+                    return node && node.nodeType === 1 && String(node.tagName || '').toUpperCase() === 'CANVAS';
+                }
+
+                document.body.appendChild = function(node) {
+                    if (shouldMountInsidePreview(node)) {
+                        return mount.appendChild(node);
+                    }
+                    return originalBodyAppendChild(node);
+                };
+
+                document.body.insertBefore = function(node, before) {
+                    if (shouldMountInsidePreview(node)) {
+                        return mount.insertBefore(node, before && before.parentNode === mount ? before : null);
+                    }
+                    return originalBodyInsertBefore(node, before);
+                };
+
+                function reportHeight() {
+                    const height = Math.max(360, mount.scrollHeight || mount.clientHeight || document.body.scrollHeight || 360);
+                    window.parent.postMessage({
+                        type: 'unistudy-html-resize',
+                        height,
+                        frameId
+                    }, '*');
+                }
+
+                function showError(error) {
+                    mount.innerHTML = '<div class="unistudy-three-error">' +
+                        'Three.js preview failed:\\n\\n' +
+                        String(error && (error.stack || error.message) || error)
+                            .replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch])) +
+                        '</div>';
+                    reportHeight();
+                }
+
+                window.addEventListener('load', () => {
+                    try {
+                        if (!window.THREE) {
+                            throw new Error('THREE is not available. Check vendor/three.min.js path.');
+                        }
+
+                        const OriginalRenderer = THREE.WebGLRenderer;
+                        THREE.WebGLRenderer = function(...args) {
+                            const renderer = new OriginalRenderer(...args);
+                            if (renderer && renderer.domElement && !renderer.domElement.isConnected) {
+                                mount.appendChild(renderer.domElement);
+                            }
+
+                            const originalSetSize = renderer.setSize.bind(renderer);
+                            renderer.setSize = function(width, height, updateStyle) {
+                                const nextWidth = Number.isFinite(width) && width > 0 ? Math.min(width, mount.clientWidth || width) : (mount.clientWidth || 640);
+                                const nextHeight = Number.isFinite(height) && height > 0 ? Math.min(height, 720) : 420;
+                                return originalSetSize(nextWidth, nextHeight, updateStyle);
+                            };
+
+                            return renderer;
+                        };
+                        THREE.WebGLRenderer.prototype = OriginalRenderer.prototype;
+
+                        ${safeScriptContent}
+
+                        setTimeout(reportHeight, 50);
+                        setTimeout(reportHeight, 500);
+                    } catch (error) {
+                        showError(error);
+                    }
+                });
+
+                new ResizeObserver(reportHeight).observe(mount);
+            <\/script>
+        </body>
+        </html>
+    `;
+}
+
+function setupThreeJsPreview(preElement, codeContent) {
+    if (preElement.dataset.richHtmlPreview === "true" ||
+        preElement.dataset.richHtmlPreview === "blocked") return;
+
+    const isInsideRichBubble = preElement.closest('.tool-request-bubble, .unistudy-tool-result-bubble, .learning-diary-bubble');
+    if (isInsideRichBubble) {
+        preElement.dataset.richHtmlPreview = "blocked";
+        return;
+    }
+
+    if (codeContent.includes('「始」') || codeContent.includes('「末」')) {
+        preElement.dataset.richHtmlPreview = "blocked";
+        return;
+    }
+
+    preElement.dataset.richHtmlPreview = "true";
+
+    const container = document.createElement('div');
+    container.className = 'unistudy-html-preview-container unistudy-three-preview-container';
+    preElement.parentNode.insertBefore(container, preElement);
+    container.appendChild(preElement);
+
+    const actionBtn = document.createElement('button');
+    actionBtn.className = 'unistudy-html-preview-toggle';
+    actionBtn.innerHTML = '<span>▶️ 预览</span>';
+    actionBtn.title = '切换 Three.js 预览 / 源码';
+    actionBtn.dataset.interactivePreview = 'true';
+    actionBtn.type = 'button';
+    container.appendChild(actionBtn);
+
+    let previewFrame = null;
+    let messageHandler = null;
+    const frameId = `unistudy-three-${Math.random().toString(36).substr(2, 9)}`;
+
+    const destroyPreview = () => {
+        if (messageHandler) {
+            window.removeEventListener('message', messageHandler);
+            messageHandler = null;
+        }
+        if (previewFrame) {
+            try {
+                previewFrame.srcdoc = '';
+                previewFrame.src = 'about:blank';
+                previewFrame.contentWindow?.stop?.();
+            } catch (e) { /* ignore */ }
+            previewFrame.remove();
+            previewFrame = null;
+        }
+    };
+
+    container._previewCleanup = destroyPreview;
+
+    const openPreview = () => {
+        if (container.classList.contains('preview-mode')) return;
+
+        const measuredHeight = preElement.offsetHeight || 0;
+        const initialHeight = Math.max(260, Math.min(measuredHeight || 420, 720));
+        container.style.minHeight = initialHeight + 'px';
+        container.classList.add('preview-mode');
+        actionBtn.innerHTML = '<span>源码</span>';
+
+        if (!previewFrame) {
+            previewFrame = document.createElement('iframe');
+            previewFrame.className = 'unistudy-html-preview-frame unistudy-three-preview-frame';
+            previewFrame.dataset.frameId = frameId;
+            previewFrame.sandbox = 'allow-scripts allow-same-origin allow-modals';
+            previewFrame.style.height = initialHeight + 'px';
+            previewFrame.srcdoc = buildThreeJsPreviewHtml(codeContent, frameId);
+
+            messageHandler = (msg) => {
+                if (msg.data && msg.data.type === 'unistudy-html-resize' && msg.data.frameId === frameId) {
+                    if (previewFrame) {
+                        previewFrame.style.transition = 'height 0.3s ease';
+                        previewFrame.style.height = msg.data.height + 'px';
+                        container.style.minHeight = msg.data.height + 'px';
+                    }
+                }
+            };
+            window.addEventListener('message', messageHandler);
+            container.appendChild(previewFrame);
+        }
+
+        setTimeout(() => {
+            preElement.style.display = 'none';
+        }, 50);
+    };
+
+    const showSource = () => {
+        if (!container.classList.contains('preview-mode')) return;
+        container.classList.remove('preview-mode');
+        actionBtn.innerHTML = '<span>预览</span>';
+        preElement.style.display = 'block';
+        destroyPreview();
+        container.style.minHeight = '';
+    };
+
+    actionBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        if (container.classList.contains('preview-mode')) {
+            showSource();
+        } else {
+            openPreview();
+        }
+    });
+
+    if (container.isConnected && preElement.isConnected) {
+        openPreview();
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        if (container.isConnected && preElement.isConnected) {
+            openPreview();
+        }
     });
 }
 
@@ -507,7 +780,7 @@ function setupHtmlPreview(preElement, htmlContent) {
     const actionBtn = document.createElement('button');
     actionBtn.className = 'unistudy-html-preview-toggle';
     actionBtn.innerHTML = '<span>▶️ 播放</span>';
-    actionBtn.title = '在气泡内预览 HTML';
+    actionBtn.title = '切换 HTML 预览 / 源码';
     actionBtn.dataset.interactivePreview = 'true';
     actionBtn.type = 'button';
     container.appendChild(actionBtn);
@@ -536,33 +809,24 @@ function setupHtmlPreview(preElement, htmlContent) {
     // 将清理函数绑定到容器，以便外部（如 messageRenderer）调用
     container._previewCleanup = destroyPreview;
 
-    actionBtn.addEventListener('click', (e) => {
-        // 🔴 彻底阻止事件传播，防止触发任何父级监听器
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
+    const openPreview = () => {
+        if (container.classList.contains('preview-mode')) return;
 
-        const isPreviewing = container.classList.contains('preview-mode');
-        
-        if (!isPreviewing) {
-            // 🟢 核心修复：先获取当前高度，避免高度塌陷导致的滚动跳动
-            const currentHeight = preElement.offsetHeight;
-            
-            // 为容器设置固定高度，防止高度塌陷
-            container.style.minHeight = currentHeight + 'px';
-            
-            container.classList.add('preview-mode');
-            actionBtn.innerHTML = '<span>🔙 返回</span>';
-            
-            if (!previewFrame) {
-                previewFrame = document.createElement('iframe');
-                previewFrame.className = 'unistudy-html-preview-frame';
-                previewFrame.dataset.frameId = frameId;
-                
-                // 🟢 先设置iframe的初始高度为当前代码块高度
-                previewFrame.style.height = currentHeight + 'px';
-                
-                previewFrame.srcdoc = `
+        // Keep the initial preview size reasonable even when the source code is very long.
+        const measuredHeight = preElement.offsetHeight || 0;
+        const initialHeight = Math.max(220, Math.min(measuredHeight || 360, 640));
+
+        container.style.minHeight = initialHeight + 'px';
+        container.classList.add('preview-mode');
+        actionBtn.innerHTML = '<span>源码</span>';
+
+        if (!previewFrame) {
+            previewFrame = document.createElement('iframe');
+            previewFrame.className = 'unistudy-html-preview-frame';
+            previewFrame.dataset.frameId = frameId;
+            previewFrame.style.height = initialHeight + 'px';
+
+            previewFrame.srcdoc = `
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -604,42 +868,68 @@ function setupHtmlPreview(preElement, htmlContent) {
                     </body>
                     </html>
                 `;
-                
-                messageHandler = (msg) => {
-                    if (msg.data && msg.data.type === 'unistudy-html-resize' && msg.data.frameId === frameId) {
-                        if (previewFrame) {
-                            // 🟢 平滑过渡到新高度
-                            previewFrame.style.transition = 'height 0.3s ease';
-                            previewFrame.style.height = msg.data.height + 'px';
-                            
-                            // 同时更新容器的最小高度
-                            container.style.minHeight = msg.data.height + 'px';
-                        }
+
+            messageHandler = (msg) => {
+                if (msg.data && msg.data.type === 'unistudy-html-resize' && msg.data.frameId === frameId) {
+                    if (previewFrame) {
+                        // 🟢 平滑过渡到新高度
+                        previewFrame.style.transition = 'height 0.3s ease';
+                        previewFrame.style.height = msg.data.height + 'px';
+
+                        // 同时更新容器的最小高度
+                        container.style.minHeight = msg.data.height + 'px';
                     }
-                };
-                window.addEventListener('message', messageHandler);
+                }
+            };
+            window.addEventListener('message', messageHandler);
 
-                container.appendChild(previewFrame);
-            }
-            
-            // 🟢 延迟隐藏代码块，确保iframe先显示
-            setTimeout(() => {
-                preElement.style.display = 'none';
-            }, 50);
-            
+            container.appendChild(previewFrame);
+        }
+
+        // 🟢 延迟隐藏代码块，确保iframe先显示
+        setTimeout(() => {
+            preElement.style.display = 'none';
+        }, 50);
+    };
+
+    const showSource = () => {
+        if (!container.classList.contains('preview-mode')) return;
+
+        container.classList.remove('preview-mode');
+        actionBtn.innerHTML = '<span>播放</span>';
+
+        // 🟢 先显示代码块
+        preElement.style.display = 'block';
+
+        // 🔴 关键修复：点击返回时销毁预览产生的资源，停止 JS 运行
+        destroyPreview();
+
+        // 清除固定高度限制
+        container.style.minHeight = '';
+    };
+
+    actionBtn.addEventListener('click', (e) => {
+        // 🔴 彻底阻止事件传播，防止触发任何父级监听器
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        if (container.classList.contains('preview-mode')) {
+            showSource();
         } else {
-            // 返回代码模式
-            container.classList.remove('preview-mode');
-            actionBtn.innerHTML = '<span>▶️ 播放</span>';
-            
-            // 🟢 先显示代码块
-            preElement.style.display = 'block';
-            
-            // 🔴 关键修复：点击返回时销毁预览产生的资源，停止 JS 运行
-            destroyPreview();
+            openPreview();
+        }
+    });
 
-            // 清除固定高度限制
-            container.style.minHeight = '';
+    // Default to the rendered learning artifact. Source remains available via the toggle.
+    if (container.isConnected && preElement.isConnected) {
+        openPreview();
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        if (container.isConnected && preElement.isConnected) {
+            openPreview();
         }
     });
 }
@@ -908,7 +1198,7 @@ function applyContentProcessors(text) {
     // Then apply simple regex replacements
     return processedText
         // ensureNewlineAfterCodeBlock
-        .replace(/^(\s*```)(?![\r\n])/gm, '$1\n')
+        .replace(/^(\s*```)(?![A-Za-z0-9_-]*[\r\n])(?=\S)/gm, '$1\n')
         // ensureSpaceAfterTilde
         .replace(/(^|[^\w/\\=])~(?![\s~])/g, '$1~ ')
         // removeSpeakerTags - Simplified regex to remove all occurrences at the start

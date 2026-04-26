@@ -21,13 +21,13 @@ function hasTimePrefix(value = '') {
     return /^\[\d{2}:\d{2}\]/.test(String(value || '').trim());
 }
 
-function buildDefaultMaid(runtimeContext = {}) {
+function buildDefaultSubject(runtimeContext = {}) {
     const signature = sanitizeText(runtimeContext.agentName || runtimeContext.agentId, 'UniStudy');
     return `[${signature}]${signature}`;
 }
 
-function parseMaid(value = '', runtimeContext = {}) {
-    const raw = sanitizeText(value, buildDefaultMaid(runtimeContext));
+function parseSubject(value = '', runtimeContext = {}) {
+    const raw = sanitizeText(value, buildDefaultSubject(runtimeContext));
     const bracketMatch = raw.match(/^\[([^\]]+)\](.+)$/);
     if (bracketMatch) {
         const notebookName = sanitizeText(bracketMatch[1], sanitizeText(runtimeContext.agentName, '默认'));
@@ -55,6 +55,8 @@ function parseMaid(value = '', runtimeContext = {}) {
     };
 }
 
+const parseMaid = parseSubject;
+
 function splitContentAndTags(content = '', explicitTagValue = '') {
     const trimmed = String(content || '').trim();
     const tagMatch = trimmed.match(/(?:^|\n)Tag:\s*(.+)$/i);
@@ -74,11 +76,13 @@ function splitContentAndTags(content = '', explicitTagValue = '') {
 }
 
 function buildStoredToolRequest(toolRequest = {}, args = {}, maidInfo = {}) {
+    const subject = maidInfo.maidRaw || sanitizeText(args.subject || args.maid);
     return {
         toolName: 'DailyNote',
         command: sanitizeText(toolRequest.command, 'create'),
         args: {
-            maid: maidInfo.maidRaw || sanitizeText(args.maid),
+            subject,
+            maid: subject,
             command: sanitizeText(toolRequest.command, 'create'),
             Date: sanitizeText(args.Date),
             Content: sanitizeText(args.Content),
@@ -97,7 +101,7 @@ function createStudyToolRuntime(options = {}) {
     async function executeCreate(toolRequest = {}, runtimeContext = {}) {
         const args = toolRequest.args || {};
         const compatibilityMode = sanitizeText(toolRequest.compatibilityMode);
-        const maidInfo = parseMaid(args.maid, runtimeContext);
+        const maidInfo = parseSubject(args.subject || args.maid, runtimeContext);
         const dateKey = resolveDateKey(args.Date, runtimeContext.dateKey);
         const contentValue = sanitizeText(args.Content);
 
@@ -172,7 +176,7 @@ function createStudyToolRuntime(options = {}) {
 
     async function executeUpdate(toolRequest = {}, runtimeContext = {}) {
         const args = toolRequest.args || {};
-        const maidInfo = parseMaid(args.maid, runtimeContext);
+        const maidInfo = parseSubject(args.subject || args.maid, runtimeContext);
         const target = sanitizeText(args.target);
         const replace = sanitizeText(args.replace);
         const dateKey = sanitizeText(args.Date);

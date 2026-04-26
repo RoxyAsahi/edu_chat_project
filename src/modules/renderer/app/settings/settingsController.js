@@ -35,8 +35,11 @@ const SETTINGS_MODAL_META = Object.freeze({
 
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{RenderingGuide}}';
 const DEFAULT_RENDERING_PROMPT = [
-    'When structured rendering helps, emit semantic HTML div blocks that the client can render directly.',
-    'Prefer normal Markdown for standard prose.',
+    'When structured rendering helps, emit a raw HTML fragment directly in the answer so the chat bubble can render it while streaming.',
+    'Use one root container such as <div id="response-root" style="...">...</div>; do not output <!DOCTYPE html>, <html>, <head>, or <body>.',
+    'Do not wrap renderable HTML in Markdown fences like ```html, and do not present it as source code.',
+    'Prefer normal Markdown for standard prose; use <pre><code> only when the learning content itself is code.',
+    'When emitting tool or DailyNote protocol blocks, keep the protocol text raw and unstyled.',
     'Do not echo unresolved template variables in the final answer.',
 ].join(' ');
 const DEFAULT_EMOTICON_PROMPT = [
