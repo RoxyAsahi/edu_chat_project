@@ -169,7 +169,7 @@ async function createHarness(t) {
     return { chatMessages, history, messageRenderer };
 }
 
-test('messageRenderer wraps raw doctype HTML into an interactive preview block', async (t) => {
+test('messageRenderer wraps raw doctype HTML into a VCPChat-style preview toggle', async (t) => {
     const { chatMessages, history, messageRenderer } = await createHarness(t);
     const message = {
         id: 'assistant-html-doctype',
@@ -182,12 +182,46 @@ test('messageRenderer wraps raw doctype HTML into an interactive preview block',
 
     await messageRenderer.renderMessage(message);
 
-    await waitFor(() => chatMessages.querySelector('.unistudy-html-preview-container.preview-mode'));
+    await waitFor(() => chatMessages.querySelector('.unistudy-html-preview-container'));
     const previewContainer = chatMessages.querySelector('.unistudy-html-preview-container');
     assert.ok(previewContainer);
-    assert.ok(previewContainer.querySelector('.unistudy-html-preview-toggle'));
-    assert.ok(previewContainer.querySelector('.unistudy-html-preview-frame'));
+    const toggle = previewContainer.querySelector('.unistudy-html-preview-toggle');
+    assert.ok(toggle);
+    assert.equal(previewContainer.querySelector('.unistudy-html-preview-frame'), null);
     assert.equal(previewContainer.querySelector('pre')?.dataset.richHtmlPreview, 'true');
+
+    toggle.click();
+    await waitFor(() => previewContainer.classList.contains('preview-mode') && previewContainer.querySelector('.unistudy-html-preview-frame'));
+    assert.match(toggle.textContent, /返回/);
+    assert.ok(['loading', 'ready'].includes(previewContainer.dataset.previewStatus));
+
+    const frame = previewContainer.querySelector('.unistudy-html-preview-frame');
+    chatMessages.ownerDocument.defaultView.dispatchEvent(new chatMessages.ownerDocument.defaultView.MessageEvent('message', {
+        data: {
+            type: 'unistudy-preview-status',
+            frameId: frame.dataset.frameId,
+            status: 'ready',
+            message: 'HTML ready',
+        },
+    }));
+    await waitFor(() => previewContainer.dataset.previewStatus === 'ready');
+    assert.equal(previewContainer.querySelector('.unistudy-html-preview-status').hidden, true);
+
+    chatMessages.ownerDocument.defaultView.dispatchEvent(new chatMessages.ownerDocument.defaultView.MessageEvent('message', {
+        data: {
+            type: 'unistudy-preview-status',
+            frameId: frame.dataset.frameId,
+            status: 'error',
+            message: 'HTML boom',
+        },
+    }));
+    await waitFor(() => previewContainer.dataset.previewStatus === 'error');
+    assert.match(previewContainer.querySelector('.unistudy-html-preview-status').textContent, /HTML boom/);
+
+    toggle.click();
+    await waitFor(() => !previewContainer.classList.contains('preview-mode') && !previewContainer.querySelector('.unistudy-html-preview-frame'));
+    assert.match(toggle.textContent, /播放/);
+    assert.equal(previewContainer.dataset.previewStatus, 'idle');
 });
 
 test('messageRenderer keeps raw html fragments without a doctype as inline DOM', async (t) => {
@@ -206,6 +240,94 @@ test('messageRenderer keeps raw html fragments without a doctype as inline DOM',
     await waitFor(() => Boolean(chatMessages.querySelector('#response-root h1')));
     assert.equal(chatMessages.querySelector('#response-root h1')?.textContent, 'Plain HTML');
     assert.equal(chatMessages.querySelector('#response-root button')?.textContent, 'Start');
+    assert.equal(chatMessages.querySelector('.unistudy-html-preview-container'), null);
+});
+
+test('messageRenderer adds a Three.js preview toggle with the local vendor runner', async (t) => {
+    const { chatMessages, history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-three-preview',
+        role: 'assistant',
+        name: 'Tutor',
+        content: [
+            '```javascript',
+            'const scene = new THREE.Scene();',
+            'const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);',
+            'const renderer = new THREE.WebGLRenderer({ antialias: true });',
+            'renderer.setSize(320, 240);',
+            'document.body.appendChild(renderer.domElement);',
+            '```',
+        ].join('\n'),
+        timestamp: Date.UTC(2026, 3, 26, 8, 1),
+    };
+    history.push(message);
+
+    await messageRenderer.renderMessage(message);
+
+    await waitFor(() => chatMessages.querySelector('.unistudy-three-preview-container'));
+    const previewContainer = chatMessages.querySelector('.unistudy-three-preview-container');
+    const toggle = previewContainer.querySelector('.unistudy-html-preview-toggle');
+
+    assert.ok(toggle);
+    assert.equal(previewContainer.querySelector('.unistudy-three-preview-frame'), null);
+
+    toggle.click();
+    await waitFor(() => previewContainer.querySelector('.unistudy-three-preview-frame'));
+    const frame = previewContainer.querySelector('.unistudy-three-preview-frame');
+    assert.match(frame.srcdoc, /vendor\/three\.min\.js/);
+    assert.match(frame.srcdoc, /unistudy-three-mount/);
+    assert.match(frame.srcdoc, /THREE\.WebGLRenderer/);
+    assert.match(frame.srcdoc, /document\.body\.appendChild/);
+    assert.match(frame.srcdoc, /Three\.js preview failed/);
+    assert.match(frame.srcdoc, /unistudy-preview-status/);
+    assert.match(frame.srcdoc, /WebGL is not available/);
+    assert.match(frame.srcdoc, /canvas 已创建，但首帧看起来仍是空白/);
+
+    chatMessages.ownerDocument.defaultView.dispatchEvent(new chatMessages.ownerDocument.defaultView.MessageEvent('message', {
+        data: {
+            type: 'unistudy-preview-status',
+            frameId: frame.dataset.frameId,
+            status: 'blank',
+            message: 'canvas blank',
+        },
+    }));
+    await waitFor(() => previewContainer.dataset.previewStatus === 'blank');
+    assert.match(previewContainer.querySelector('.unistudy-html-preview-status').textContent, /canvas blank/);
+
+    toggle.click();
+    await waitFor(() => !previewContainer.querySelector('.unistudy-three-preview-frame'));
+    assert.match(toggle.textContent, /预览/);
+    assert.equal(previewContainer.dataset.previewStatus, 'idle');
+});
+
+test('messageRenderer does not attach HTML preview to tool or DailyNote blocks', async (t) => {
+    const { chatMessages, history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-tool-diary-preview-block',
+        role: 'assistant',
+        name: 'Tutor',
+        content: [
+            '```text',
+            '<<<[TOOL_REQUEST]>>>',
+            'tool_name:「始」DailyNote「末」',
+            'content:「始」<html><body>not a preview</body></html>「末」',
+            '<<<[END_TOOL_REQUEST]>>>',
+            '```',
+            '',
+            '```text',
+            '<<<DailyNoteStart>>>',
+            '<html><body>also not a preview</body></html>',
+            '<<<DailyNoteEnd>>>',
+            '```',
+        ].join('\n'),
+        timestamp: Date.UTC(2026, 3, 26, 8, 1),
+    };
+    history.push(message);
+
+    await messageRenderer.renderMessage(message);
+
+    await waitFor(() => Boolean(chatMessages.querySelector('.tool-request-bubble')));
+    assert.ok(chatMessages.querySelector('.learning-diary-bubble'));
     assert.equal(chatMessages.querySelector('.unistudy-html-preview-container'), null);
 });
 
@@ -246,7 +368,43 @@ test('messageRenderer scopes assistant style tags to the message bubble', async 
     assert.equal(chatMessages.ownerDocument.getElementById('global-toolbar-button')?.textContent, 'Global');
 });
 
-test('messageRenderer keeps raw HTML preview after streamed message finalization', async (t) => {
+test('messageRenderer does not extract style tags from protected code and tool blocks', async (t) => {
+    const { chatMessages, history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-style-protected-blocks',
+        role: 'assistant',
+        name: 'Tutor',
+        content: [
+            '<style>.outer { color: red; }</style>',
+            '<div id="protected-style-root">Visible</div>',
+            '',
+            '```html',
+            '<style>.inside-code { color: blue; }</style>',
+            '<div>code only</div>',
+            '```',
+            '',
+            '<<<[TOOL_REQUEST]>>>',
+            'tool_name:「始」DailyNote「末」',
+            'content:「始ESCAPE」<style>.inside-tool { color: green; }</style>「末ESCAPE」',
+            '<<<[END_TOOL_REQUEST]>>>',
+        ].join('\n'),
+        timestamp: Date.UTC(2026, 3, 26, 8, 2),
+    };
+    history.push(message);
+
+    await messageRenderer.renderMessage(message);
+
+    await waitFor(() => Boolean(chatMessages.querySelector('#protected-style-root')));
+    const messageItem = chatMessages.querySelector('.message-item[data-message-id="assistant-style-protected-blocks"]');
+    const scopedStyle = chatMessages.ownerDocument.head.querySelector(`style[data-unistudy-scope-id="${messageItem.id}"]`);
+
+    assert.ok(scopedStyle);
+    assert.match(scopedStyle.textContent, /\.outer/);
+    assert.doesNotMatch(scopedStyle.textContent, /\.inside-code/);
+    assert.doesNotMatch(scopedStyle.textContent, /\.inside-tool/);
+});
+
+test('messageRenderer keeps raw HTML preview toggle after streamed message finalization', async (t) => {
     const { chatMessages, history, messageRenderer } = await createHarness(t);
     const html = '<!DOCTYPE html>\n<html><body><button>Play</button></body></html>';
 
@@ -275,16 +433,21 @@ test('messageRenderer keeps raw HTML preview after streamed message finalization
         fullResponse: html,
     });
 
-    await waitFor(() => chatMessages.querySelector('.unistudy-html-preview-container.preview-mode'));
+    await waitFor(() => chatMessages.querySelector('.unistudy-html-preview-container'));
     const messageItem = chatMessages.querySelector('.message-item[data-message-id="assistant-html-stream"]');
     const previewContainer = messageItem.querySelector('.unistudy-html-preview-container');
 
     assert.ok(previewContainer);
     assert.equal(messageItem.classList.contains('streaming'), false);
     assert.equal(messageItem.classList.contains('thinking'), false);
-    assert.ok(previewContainer.querySelector('.unistudy-html-preview-toggle'));
-    assert.ok(previewContainer.querySelector('.unistudy-html-preview-frame'));
+    const toggle = previewContainer.querySelector('.unistudy-html-preview-toggle');
+    assert.ok(toggle);
+    assert.equal(previewContainer.querySelector('.unistudy-html-preview-frame'), null);
     assert.equal(previewContainer.querySelector('pre')?.dataset.richHtmlPreview, 'true');
+
+    toggle.click();
+    await waitFor(() => previewContainer.querySelector('.unistudy-html-preview-frame'));
+    assert.match(previewContainer.querySelector('.unistudy-html-preview-frame')?.srcdoc, /vcp-wrapper/);
 });
 
 test('messageRenderer scopes style tags after streamed finalization', async (t) => {
@@ -323,4 +486,38 @@ test('messageRenderer scopes style tags after streamed finalization', async (t) 
     assert.ok(scopedStyle);
     assert.match(scopedStyle.textContent, new RegExp(`#${messageItem.id} button\\s*\\{`));
     assert.equal(messageItem.querySelector('style'), null);
+});
+
+test('messageRenderer cleans live preview resources before updateMessageContent replaces DOM', async (t) => {
+    const { chatMessages, history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-preview-cleanup-update',
+        role: 'assistant',
+        name: 'Tutor',
+        content: '<!DOCTYPE html>\n<html><body><button>Old</button></body></html>',
+        timestamp: Date.UTC(2026, 3, 26, 8, 6),
+    };
+    history.push(message);
+
+    await messageRenderer.renderMessage(message);
+
+    await waitFor(() => chatMessages.querySelector('.unistudy-html-preview-container'));
+    const previewContainer = chatMessages.querySelector('.unistudy-html-preview-container');
+    const toggle = previewContainer.querySelector('.unistudy-html-preview-toggle');
+
+    toggle.click();
+    await waitFor(() => previewContainer.querySelector('.unistudy-html-preview-frame'));
+
+    let cleanupCalled = false;
+    previewContainer._previewCleanup = () => {
+        cleanupCalled = true;
+    };
+
+    message.content = '<div id="updated-inline-html">Updated</div>';
+    messageRenderer.updateMessageContent(message.id, message.content);
+
+    await waitFor(() => Boolean(chatMessages.querySelector('#updated-inline-html')));
+    assert.equal(cleanupCalled, true);
+    assert.equal(chatMessages.querySelector('.unistudy-html-preview-frame'), null);
+    assert.equal(chatMessages.querySelector('#updated-inline-html')?.textContent, 'Updated');
 });

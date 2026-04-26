@@ -14,6 +14,7 @@
 
 // 存储每个消息的动画状态
 const messageAnimationStates = new WeakMap();
+const observedMessages = new Set();
 
 // 全局 Observer 实例
 let visibilityObserver = null;
@@ -137,6 +138,7 @@ function scheduleBatchProcess() {
  */
 export function observeMessage(messageItem) {
     if (!visibilityObserver || !messageItem) return;
+    observedMessages.add(messageItem);
 
     // 初始化状态存储
     if (!messageAnimationStates.has(messageItem)) {
@@ -607,6 +609,7 @@ export function unobserveMessage(messageItem) {
     if (visibilityObserver) {
         visibilityObserver.unobserve(messageItem);
     }
+    observedMessages.delete(messageItem);
 
     const state = messageAnimationStates.get(messageItem);
     if (state) {
@@ -632,6 +635,43 @@ export function unobserveMessage(messageItem) {
 
     pendingPause.delete(messageItem);
     pendingResume.delete(messageItem);
+}
+
+export function getVisibilityOptimizerDebugSnapshot() {
+    const totals = {
+        observedMessages: 0,
+        pausedMessages: 0,
+        webAnimations: 0,
+        animeInstances: 0,
+        threeContexts: 0,
+        canvasContexts: 0,
+        mediaElements: 0,
+        svgElements: 0,
+        gifImages: 0,
+        pendingPause: pendingPause.size,
+        pendingResume: pendingResume.size,
+    };
+
+    observedMessages.forEach((messageItem) => {
+        const state = messageAnimationStates.get(messageItem);
+        if (!state) {
+            return;
+        }
+
+        totals.observedMessages += 1;
+        if (state.isPaused) {
+            totals.pausedMessages += 1;
+        }
+        totals.webAnimations += state.webAnimations.length;
+        totals.animeInstances += state.animeInstances.length;
+        totals.threeContexts += state.threeContexts.length;
+        totals.canvasContexts += state.canvasContexts.length;
+        totals.mediaElements += state.mediaElements.length;
+        totals.svgElements += state.svgElements.length;
+        totals.gifImages += state.gifImages.length;
+    });
+
+    return totals;
 }
 
 /**
@@ -667,6 +707,15 @@ export function destroyVisibilityOptimizer() {
         visibilityObserver.disconnect();
         visibilityObserver = null;
     }
+
+    observedMessages.forEach((messageItem) => {
+        const state = messageAnimationStates.get(messageItem);
+        if (state?.mutationObserver) {
+            state.mutationObserver.disconnect();
+            state.mutationObserver = null;
+        }
+    });
+    observedMessages.clear();
 
     // 恢复原始的 Element.animate
     if (originalElementAnimate) {

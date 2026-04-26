@@ -90,6 +90,7 @@ const CONTENT_KEYS = [
     'listKnowledgeBaseDocuments',
     'retryKnowledgeBaseDocument',
     'setTopicKnowledgeBase',
+    'setTopicSourceSelection',
     'getTopicKnowledgeBase',
     'retrieveKnowledgeBaseContext',
     'searchKnowledgeBase',

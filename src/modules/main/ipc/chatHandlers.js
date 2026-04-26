@@ -1008,6 +1008,9 @@ function initialize(mainWindow, context) {
                     unread: topic.unread !== undefined ? topic.unread : false,
                     creatorSource: topic.creatorSource || 'unknown',
                     knowledgeBaseId: topic.knowledgeBaseId || null,
+                    selectedKnowledgeBaseDocumentIds: Array.isArray(topic.selectedKnowledgeBaseDocumentIds)
+                        ? topic.selectedKnowledgeBaseDocumentIds
+                        : null,
                 }));
                 return normalizedTopics;
             }
@@ -1041,6 +1044,7 @@ function initialize(mainWindow, context) {
                     unread: false,
                     creatorSource: "ui",
                     knowledgeBaseId: null,
+                    selectedKnowledgeBaseDocumentIds: null,
                 };
                 await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
                     ...existingConfig,

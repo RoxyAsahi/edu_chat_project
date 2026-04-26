@@ -853,8 +853,7 @@ function createNotesController(deps = {}) {
         el.notesList?.addEventListener('scroll', notesDomApi.closeNoteActionMenu);
         el.topicNotesScopeBtn?.addEventListener('click', () => setNotesScope('topic'));
         el.agentNotesScopeBtn?.addEventListener('click', () => setNotesScope('agent'));
-        el.newNoteBtn?.addEventListener('click', createBlankNote);
-        el.newNoteFabBtn?.addEventListener('click', createBlankNote);
+        el.manualNewNoteBtn?.addEventListener('click', createBlankNote);
         el.notesStudioOpenBtn?.addEventListener('click', openNotesStudio);
         el.manualNotesLibraryBtn?.addEventListener('click', (event) => {
             void openManualNotesLibrary({ trigger: event.currentTarget });

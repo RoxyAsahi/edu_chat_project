@@ -404,14 +404,25 @@ function createKnowledgeBaseRepository(deps = {}) {
         });
     }
 
-    async function listChunkRowsByKnowledgeBase(kbId) {
+    async function listChunkRowsByKnowledgeBase(kbId, documentIds = null) {
         const db = getDbImpl();
+        const filteredDocumentIds = Array.isArray(documentIds)
+            ? [...new Set(documentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+            : null;
+
+        if (Array.isArray(filteredDocumentIds) && filteredDocumentIds.length === 0) {
+            return [];
+        }
+
+        const documentFilter = Array.isArray(filteredDocumentIds)
+            ? ` AND c.document_id IN (${filteredDocumentIds.map(() => '?').join(', ')})`
+            : '';
         const result = await db.execute({
             sql: `SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.content_type, c.char_length, c.section_title, c.page_number, c.paragraph_index, d.name AS document_name
                 FROM kb_chunk c
                 JOIN kb_document d ON d.id = c.document_id
-                WHERE c.kb_id = ? AND d.status = 'done'`,
-            args: [kbId],
+                WHERE c.kb_id = ? AND d.status = 'done'${documentFilter}`,
+            args: [kbId, ...(filteredDocumentIds || [])],
         });
 
         return result.rows || [];

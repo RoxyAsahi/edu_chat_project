@@ -185,6 +185,9 @@ test('renderHistory mounts only the latest window for long histories', async (t)
 
     await new Promise((resolve) => setTimeout(resolve, 40));
     assert.equal(chatMessages.querySelectorAll('.message-item').length, 50, 'older messages should not render in the background');
+    assert.equal(messageRenderer.isHistoryWindowActive(), true);
+    assert.deepEqual(messageRenderer.getRenderedMessageIds().slice(0, 2), ['message-70', 'message-71']);
+    assert.equal(messageRenderer.getHistoryWindowSnapshot().renderedStartIndex, 70);
 });
 
 test('history loader prepends older windows in order and preserves scroll offset', async (t) => {
@@ -219,4 +222,51 @@ test('history loader prepends older windows in order and preserves scroll offset
     assert.equal(renderedMessages.at(-1).dataset.messageId, 'message-119');
     assert.equal(chatMessages.querySelector('[data-history-window-loader]'), null);
     assert.equal(scrollContainer.scrollTop, 1520);
+});
+
+test('reorderRenderedMessagesById moves only mounted message nodes', async (t) => {
+    const {
+        chatMessages,
+        history,
+        messageRenderer,
+    } = await createHarness(t);
+
+    await messageRenderer.renderHistory(history, {
+        autoLoadOnScroll: false,
+        prependBatchSize: 40,
+        windowSize: 50,
+    });
+
+    const movedIds = messageRenderer.reorderRenderedMessagesById(['message-119', 'message-70', 'message-71', 'message-118']);
+    assert.deepEqual(movedIds, ['message-119', 'message-70', 'message-71', 'message-118']);
+
+    const renderedMessages = [...chatMessages.querySelectorAll('.message-item')];
+    assert.equal(renderedMessages.at(-4).dataset.messageId, 'message-119');
+    assert.equal(renderedMessages.at(-3).dataset.messageId, 'message-70');
+    assert.equal(renderedMessages.at(-2).dataset.messageId, 'message-71');
+    assert.equal(renderedMessages.at(-1).dataset.messageId, 'message-118');
+    assert.ok(chatMessages.querySelector('[data-history-window-loader]'));
+});
+
+test('syncHistoryWindowHistory keeps loader count aligned with memory history', async (t) => {
+    const {
+        chatMessages,
+        history,
+        messageRenderer,
+    } = await createHarness(t);
+
+    await messageRenderer.renderHistory(history, {
+        autoLoadOnScroll: false,
+        prependBatchSize: 40,
+        windowSize: 50,
+    });
+
+    const nextHistory = [
+        { id: 'inserted-before-window', role: 'user', content: 'Inserted' },
+        ...history,
+    ];
+    messageRenderer.syncHistoryWindowHistory(nextHistory);
+
+    assert.equal(messageRenderer.getHistoryWindowSnapshot().renderedStartIndex, 71);
+    assert.match(chatMessages.querySelector('[data-history-window-loader]')?.textContent || '', /加载更早消息（71）/);
 });

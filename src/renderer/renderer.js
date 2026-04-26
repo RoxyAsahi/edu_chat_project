@@ -32,6 +32,29 @@ const chatAPI = window.chatAPI || window.electronAPI;
 const ui = window.uiHelperFunctions;
 const store = createAppStore(createInitialAppState());
 let markedInstance;
+let agentAvatarPreviewObjectUrl = null;
+let agentAvatarPreviewListenerCleanup = null;
+
+function clearAgentAvatarPreviewListeners() {
+    if (typeof agentAvatarPreviewListenerCleanup === 'function') {
+        agentAvatarPreviewListenerCleanup();
+        agentAvatarPreviewListenerCleanup = null;
+    }
+}
+
+function revokeAgentAvatarPreviewObjectUrl(url = agentAvatarPreviewObjectUrl) {
+    const isCurrentPreviewUrl = url === agentAvatarPreviewObjectUrl;
+    if (isCurrentPreviewUrl) {
+        clearAgentAvatarPreviewListeners();
+    }
+    if (!url) return;
+    if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(url);
+    }
+    if (isCurrentPreviewUrl) {
+        agentAvatarPreviewObjectUrl = null;
+    }
+}
 
 const el = collectRootElements(document);
 const initializeMarked = createMarkedInitializer(window);
@@ -221,6 +244,7 @@ sourceController = createSourceController({
     getSourceListScrollTop,
     setSourceListScrollTop,
     updateTopicKnowledgeBaseBinding,
+    updateTopicSourceSelection,
 });
 const {
     closeSourceFileActionMenu,
@@ -546,6 +570,26 @@ function updateTopicKnowledgeBaseBinding(knowledgeBaseId = null) {
     }));
 }
 
+function updateTopicSourceSelection(selectedKnowledgeBaseDocumentIds = null) {
+    const session = getSessionSlice();
+    if (!session.currentTopicId) {
+        return;
+    }
+
+    const normalizedSelection = Array.isArray(selectedKnowledgeBaseDocumentIds)
+        ? [...new Set(selectedKnowledgeBaseDocumentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+        : null;
+
+    store.patchState('session', (current) => ({
+        ...current,
+        topics: current.topics.map((topic) => (
+            topic.id === current.currentTopicId
+                ? { ...topic, selectedKnowledgeBaseDocumentIds: normalizedSelection }
+                : topic
+        )),
+    }));
+}
+
 function clearTopicKnowledgeBaseDocuments() {
     store.patchState('source', {
         topicKnowledgeBaseDocuments: [],
@@ -759,6 +803,7 @@ async function populateAgentForm(config) {
     const session = getSessionSlice();
     el.editingAgentId.value = session.currentSelectedItem.id;
     el.agentNameInput.value = config.name || '';
+    revokeAgentAvatarPreviewObjectUrl();
     el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';
     el.agentModel.value = config.model || '';
 
@@ -879,9 +924,36 @@ function bindShellEvents() {
 
     el.agentAvatarInput?.addEventListener('change', () => {
         const file = el.agentAvatarInput.files?.[0];
+        revokeAgentAvatarPreviewObjectUrl();
         if (!file) return;
-        el.agentAvatarPreview.src = file.path ? `file://${file.path.replace(/\\/g, '/')}` : URL.createObjectURL(file);
+
+        if (file.path) {
+            el.agentAvatarPreview.src = `file://${file.path.replace(/\\/g, '/')}`;
+            return;
+        }
+
+        const previewUrl = URL.createObjectURL(file);
+        agentAvatarPreviewObjectUrl = previewUrl;
+        const releasePreviewUrl = () => revokeAgentAvatarPreviewObjectUrl(previewUrl);
+        const handlePreviewLoad = () => {
+            el.agentAvatarPreview.removeEventListener('error', handlePreviewError);
+            releasePreviewUrl();
+        };
+        const handlePreviewError = () => {
+            el.agentAvatarPreview.removeEventListener('load', handlePreviewLoad);
+            releasePreviewUrl();
+        };
+        agentAvatarPreviewListenerCleanup = () => {
+            el.agentAvatarPreview.removeEventListener('load', handlePreviewLoad);
+            el.agentAvatarPreview.removeEventListener('error', handlePreviewError);
+        };
+        el.agentAvatarPreview.addEventListener('load', handlePreviewLoad, { once: true });
+        el.agentAvatarPreview.addEventListener('error', handlePreviewError, { once: true });
+        el.agentAvatarPreview.src = previewUrl;
     });
+
+    window.addEventListener('pagehide', () => revokeAgentAvatarPreviewObjectUrl());
+    window.addEventListener('beforeunload', () => revokeAgentAvatarPreviewObjectUrl());
 
     el.sidePanelNotesTabBtn?.addEventListener('click', () => {
         setSidePanelTab('notes');

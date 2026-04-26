@@ -165,3 +165,82 @@ test('createAppBootstrap cleans up IPC subscriptions before re-registering them'
     assert.equal(historyUnsubscribed, 1);
     assert.equal(bindFeatureEventsCalls, 1);
 });
+
+test('createAppBootstrap routes matching history watcher updates to incremental sync', async () => {
+    const { createAppBootstrap } = await loadModule('src/modules/renderer/app/bootstrap.js');
+    let historyCallback = null;
+    let syncCalls = 0;
+    let selectTopicCalls = 0;
+
+    const bootstrapApi = createAppBootstrap({
+        store: {
+            getState: () => ({
+                session: {
+                    currentSelectedItem: { id: 'agent-1' },
+                    currentTopicId: 'topic-1',
+                    agents: [{ id: 'agent-1' }],
+                },
+                settings: {
+                    settings: {},
+                },
+            }),
+        },
+        chatAPI: {
+            getCurrentTheme: async () => 'light',
+            onThemeUpdated: () => () => {},
+            onChatStreamEvent: () => () => {},
+            onHistoryFileUpdated: (callback) => {
+                historyCallback = callback;
+                return () => {};
+            },
+        },
+        ui: {},
+        windowObj: {
+            chatAPI: {},
+            electronAPI: {},
+            electronPath: {},
+        },
+        applyTheme: () => {},
+        loadSettings: async () => {},
+        initializeResizableLayout: () => {},
+        loadKnowledgeBases: async () => {},
+        initializeAppRuntime: async () => {},
+        workspaceController: {
+            syncWorkspaceContext() {},
+            async loadAgents() {},
+            async selectAgent() {},
+            async selectTopic() {
+                selectTopicCalls += 1;
+            },
+            async syncCurrentTopicHistoryFromFile(payload) {
+                syncCalls += 1;
+                assert.deepEqual(payload, {
+                    agentId: 'agent-1',
+                    topicId: 'topic-1',
+                });
+            },
+        },
+        handleStreamEvent: () => {},
+        bindFeatureEvents: () => {},
+        renderReaderPanel: () => {},
+        renderSelectionContextPreview: () => {},
+        renderNotesPanel: () => {},
+        renderCurrentHistory: async () => {},
+        finalizeBootstrap: () => {},
+        setLeftSidebarMode: () => {},
+        setLeftReaderTab: () => {},
+        setRightPanelMode: () => {},
+        setPromptVisible: () => {},
+    });
+
+    await bootstrapApi.bootstrap();
+    assert.equal(typeof historyCallback, 'function');
+
+    await historyCallback({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(syncCalls, 1);
+    assert.equal(selectTopicCalls, 0);
+});

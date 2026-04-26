@@ -1,6 +1,6 @@
 # UniStudy
 
-UniStudy 是一个基于 Electron 的桌面端个人 AI 学习终端。项目围绕“学科 / 主题 / 对话 / 资料 / 笔记”组织学习过程，提供多学科入口、多话题历史、流式 AI 对话、Source 资料检索、Notes 学习笔记、附件集中存储与可打包分发能力。
+UniStudy 是一个基于 Electron 的桌面端个人 AI 学习终端。项目围绕“学科 / 主题 / 对话 / 资料 / 笔记”组织学习过程，提供多学科入口、多话题历史、流式 AI 对话、交互式内容渲染、Source 资料检索、Notes 学习笔记、附件集中存储与可打包分发能力。
 
 当前代码处于面向个人学习工作台持续演进的阶段，适合本地开发、内部试用、教学演示与学习助手原型验证。
 
@@ -42,6 +42,9 @@ UniStudy 是一个基于 Electron 的桌面端个人 AI 学习终端。项目围
 ### 内容渲染与附件
 
 - 支持 Markdown、代码块、图片、KaTeX、Mermaid、PreTeXt 等消息内容渲染能力。
+- 支持裸 HTML / SVG 片段在聊天气泡内随流式输出逐步形成可交互学习界面。
+- 支持 HTML 代码块 iframe 预览，以及 Three.js 代码块本地 vendor 预览和可见错误诊断。
+- 流式渲染将原生思维链、稳定内容和活跃尾部内容分区管理，减少最终重绘闪烁。
 - 支持文本 viewer 与图片 viewer 辅助窗口。
 - 支持文件选择、粘贴图片 / 文件、拖拽文件到输入区。
 - 附件由主进程集中落盘，历史记录保存中心化附件对象，避免依赖浏览器临时 URL。
@@ -215,7 +218,7 @@ flowchart LR
 - `src/renderer/renderer.js`：渲染层壳层，负责组合 store、控制器、API 与 UI 初始化。
 - `src/modules/renderer/app/`：按功能拆分的控制器，包括 workspace、composer、settings、source、notes、reader、logs、flashcards、follow-ups、topic titles、layout 等。
 - `src/modules/renderer/messageRenderer.js`：高保真消息渲染主模块。
-- `src/modules/renderer/streamManager.js`：流式消息管理。
+- `src/modules/renderer/streamManager.js`：流式消息管理，负责思维链 / stable / tail 分区、morphdom 增量更新和流式状态收口。
 - `src/modules/renderer/text-viewer.*` 与 `image-viewer.*`：文本 / 图片辅助查看器。
 
 ## 数据目录与持久化
@@ -278,7 +281,7 @@ Source 底层复用知识库模块：
 - `src/modules/main/ipc/chatHandlers.js`：聊天 IPC 主链，处理消息发送、上下文构建、Source 检索、流式事件、追问和话题标题生成。
 - `src/modules/main/study/chatOrchestrator.js`：学习工具协议、学习记忆、日志和模型调用的编排层。
 - `src/modules/renderer/app/composer/composerController.js`：输入区、附件、发送、中断和消息落盘相关交互。
-- `src/modules/renderer/streamManager.js`：渲染层流式输出管理。
+- `src/modules/renderer/streamManager.js`：渲染层流式输出管理，保留正在运行的预览、表单、媒体和交互状态。
 
 ### 工作区与布局
 
@@ -314,6 +317,8 @@ Source 底层复用知识库模块：
 
 - 主窗口、文本 viewer、图片 viewer 通过各自 preload 暴露受控 API。
 - 渲染层包含安全 HTML 处理、CSS 作用域处理、消息引用、上下文菜单和可见性优化模块。
+- 预览 iframe、动画、Three.js、media、canvas 和临时对象 URL 需要在 DOM 替换、消息删除、弹窗关闭或页面卸载时主动清理。
+- 当前话题历史文件变动会优先按 message id 做局部同步；正在流式输出或正在编辑的消息不会被外部 watcher 覆盖。
 - 项目历史文档中已有 Electron sandbox、CSP、远程资源与本地文件访问边界的安全审查记录，后续扩展 renderer 能力时应继续遵守最小暴露原则。
 
 ## 测试与质量保障
@@ -481,4 +486,3 @@ npm install
 - `docs/unistudy-e2e-smoke.md`：E2E smoke 测试说明。
 - `docs/windows-exe-packaging.md`：Windows 打包与内部试发布说明。
 - `docs/architecture-security-review-20260411.md`：架构与安全审查历史记录。
-

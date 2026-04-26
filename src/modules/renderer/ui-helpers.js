@@ -5,6 +5,7 @@
     // --- State for helper functions ---
     let croppedAgentAvatarFile = null;
     let croppedUserAvatarFile = null;
+    let activeAvatarCropperCleanup = null;
 
     const uiHelperFunctions = {};
     const filePreviewIconMarkup = `
@@ -368,6 +369,10 @@
      * @param {string} [cropType='agent'] The type of avatar ('agent', 'group', 'user').
      */
     uiHelperFunctions.openAvatarCropper = async function(file, onCropConfirmedCallback, cropType = 'agent') {
+        if (typeof activeAvatarCropperCleanup === 'function') {
+            activeAvatarCropperCleanup({ closeModal: false });
+        }
+
         // 🟢 修复：先调用 openModal 确保从模板实例化 DOM 元素
         uiHelperFunctions.openModal('avatarCropperModal');
 
@@ -389,8 +394,52 @@
 
         let img = new Image();
         let currentEventListeners = {};
+        let objectUrl = null;
+        let cleanupDone = false;
+
+        const removeListener = (target, eventName, handler) => {
+            if (target && typeof handler === 'function') {
+                target.removeEventListener(eventName, handler);
+            }
+        };
+
+        const revokeObjectUrl = () => {
+            if (!objectUrl) return;
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+        };
+
+        function cleanupAndClose(options = {}) {
+            if (cleanupDone) return;
+            cleanupDone = true;
+
+            removeListener(cropperContainer, 'mousedown', currentEventListeners.onMouseDown);
+            removeListener(document, 'mousemove', currentEventListeners.onMouseMove);
+            removeListener(document, 'mouseup', currentEventListeners.onMouseUpOrLeave);
+            removeListener(cropperContainer, 'mouseleave', currentEventListeners.onMouseUpOrLeave);
+            removeListener(cropperContainer, 'wheel', currentEventListeners.onWheel);
+            removeListener(confirmCropBtn, 'click', currentEventListeners.onConfirmCrop);
+            removeListener(cancelCropBtn, 'click', currentEventListeners.onCancelCrop);
+
+            img.onload = null;
+            img.onerror = null;
+            img.src = '';
+            revokeObjectUrl();
+            currentEventListeners = {};
+
+            if (activeAvatarCropperCleanup === cleanupAndClose) {
+                activeAvatarCropperCleanup = null;
+            }
+
+            if (options.closeModal !== false) {
+                uiHelperFunctions.closeModal('avatarCropperModal');
+            }
+        }
+
+        activeAvatarCropperCleanup = cleanupAndClose;
 
         img.onload = () => {
+            if (cleanupDone) return;
             canvas.width = 360;
             canvas.height = 360;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -403,6 +452,7 @@
             let offsetX = (canvas.width - scaledWidth) / 2;
             let offsetY = (canvas.height - scaledHeight) / 2;
             ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+            revokeObjectUrl();
 
             let circle = { x: canvas.width / 2, y: canvas.height / 2, r: Math.min(canvas.width / 2, canvas.height / 2, 100) };
             updateCircleSVG();
@@ -503,17 +553,6 @@
                 else if (cropType === 'user' && userAvatarInput) userAvatarInput.value = '';
             };
 
-            function cleanupAndClose() {
-                cropperContainer.removeEventListener('mousedown', currentEventListeners.onMouseDown);
-                document.removeEventListener('mousemove', currentEventListeners.onMouseMove);
-                document.removeEventListener('mouseup', currentEventListeners.onMouseUpOrLeave);
-                cropperContainer.removeEventListener('mouseleave', currentEventListeners.onMouseUpOrLeave);
-                cropperContainer.removeEventListener('wheel', currentEventListeners.onWheel);
-                confirmCropBtn.removeEventListener('click', currentEventListeners.onConfirmCrop);
-                cancelCropBtn.removeEventListener('click', currentEventListeners.onCancelCrop);
-                uiHelperFunctions.closeModal('avatarCropperModal');
-            }
-
             cropperContainer.addEventListener('mousedown', currentEventListeners.onMouseDown);
             document.addEventListener('mousemove', currentEventListeners.onMouseMove);
             document.addEventListener('mouseup', currentEventListeners.onMouseUpOrLeave);
@@ -526,9 +565,10 @@
         img.onerror = () => {
             console.error("[AvatarCropper] Image failed to load from blob URL.");
             uiHelperFunctions.showToastNotification("无法加载选择的图片，请尝试其他图片。", 'error');
-            uiHelperFunctions.closeModal('avatarCropperModal');
+            cleanupAndClose();
         };
-        img.src = URL.createObjectURL(file);
+        objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
     };
 
     /**
@@ -955,4 +995,3 @@
     window.uiHelperFunctions = uiHelperFunctions;
 
 })();
-
