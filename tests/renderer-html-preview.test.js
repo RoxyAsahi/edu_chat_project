@@ -169,6 +169,35 @@ async function createHarness(t) {
     return { chatMessages, history, messageRenderer };
 }
 
+test('messageRenderer renders open-webui style thinking skeleton with synced text', async (t) => {
+    const { chatMessages, history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-thinking-status',
+        role: 'assistant',
+        name: 'Tutor',
+        content: '<script>alert(1)</script>',
+        isThinking: true,
+        timestamp: Date.UTC(2026, 3, 26, 7, 59),
+    };
+    history.push(message);
+
+    await messageRenderer.renderMessage(message);
+
+    const indicator = chatMessages.querySelector('.message-item[data-message-id="assistant-thinking-status"] .thinking-indicator');
+    assert.ok(indicator);
+    assert.ok(indicator.classList.contains('unistudy-thinking-skeleton'));
+    assert.equal(indicator.querySelector('script'), null);
+    assert.match(indicator.textContent, /Thinking/);
+    assert.match(indicator.getAttribute('aria-label'), /<script>alert\(1\)<\/script>/);
+    assert.ok(indicator.querySelector('.unistudy-thinking-pulse'));
+    assert.ok(indicator.querySelector('.unistudy-thinking-pulse-ring'));
+    assert.ok(indicator.querySelector('.unistudy-thinking-pulse-dot'));
+    assert.deepEqual(
+        Array.from(indicator.querySelectorAll('.unistudy-thinking-text span')).map((item) => item.textContent),
+        ['Thinking', 'Thinking.', 'Thinking..', 'Thinking...']
+    );
+});
+
 test('messageRenderer wraps raw doctype HTML into a VCPChat-style preview toggle', async (t) => {
     const { chatMessages, history, messageRenderer } = await createHarness(t);
     const message = {

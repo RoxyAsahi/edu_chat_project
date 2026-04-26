@@ -89,6 +89,34 @@ test('avatar preview object URLs are released after transient preview use', asyn
     assert.match(rendererSource, /URL\.revokeObjectURL\(url\)/);
 });
 
+test('thinking indicator keeps the flat chat visual style', async () => {
+    const messageRendererCss = await readRepoFile('src/styles/messageRenderer.css');
+    const skeletonBlock = messageRendererCss.match(/\.thinking-indicator\.unistudy-thinking-skeleton\s*\{(?<body>[\s\S]*?)\n\}/)?.groups?.body || '';
+    const thinkingBlockStart = messageRendererCss.indexOf('.thinking-indicator.unistudy-thinking-skeleton');
+    const thinkingBlockEnd = messageRendererCss.indexOf('/* 主气泡样式 - Tool Use */');
+    const thinkingStyles = thinkingBlockStart >= 0 && thinkingBlockEnd > thinkingBlockStart
+        ? messageRendererCss.slice(thinkingBlockStart, thinkingBlockEnd)
+        : skeletonBlock;
+
+    assert.match(skeletonBlock, /display:\s*inline-flex\s*;/);
+    assert.match(skeletonBlock, /align-items:\s*center\s*;/);
+    assert.match(skeletonBlock, /justify-content:\s*flex-start\s*;/);
+    assert.match(skeletonBlock, /gap:\s*8px\s*;/);
+    assert.match(skeletonBlock, /min-height:\s*20px\s*;/);
+    assert.match(skeletonBlock, /border:\s*0\s*;/);
+    assert.match(skeletonBlock, /border-radius:\s*0\s*;/);
+    assert.match(skeletonBlock, /background:\s*transparent\s*;/);
+    assert.match(skeletonBlock, /box-shadow:\s*none\s*;/);
+    assert.match(skeletonBlock, /text-shadow:\s*none\s*;/);
+    assert.match(skeletonBlock, /filter:\s*none\s*;/);
+    assert.match(skeletonBlock, /animation:\s*none\s*;/);
+    assert.doesNotMatch(thinkingStyles, /gradient\(/);
+    assert.doesNotMatch(thinkingStyles, /box-shadow\s*:(?!\s*none\s*;)/);
+    assert.doesNotMatch(thinkingStyles, /text-shadow\s*:(?!\s*none\s*;)/);
+    assert.doesNotMatch(thinkingStyles, /filter\s*:(?!\s*none\s*;)/);
+    assert.doesNotMatch(thinkingStyles, /scale\(/);
+});
+
 test('package scripts expose renderer logic and dom checks under renderer-specific names', async () => {
     const packageJson = JSON.parse(await readRepoFile('package.json'));
 

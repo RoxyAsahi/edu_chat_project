@@ -23,6 +23,8 @@ import {
 const colorExtractionPromises = new Map();
 const ASSISTANT_LOGO_AVATAR_URL = '../assets/brand-logo.png';
 let delegatedClickHandler = null;
+let delegatedPointerDownHandler = null;
+let delegatedKeydownHandler = null;
 let delegatedContextMenuHandler = null;
 let delegatedEventTarget = null;
 let citationPopoverController = null;
@@ -164,7 +166,35 @@ function escapeHtml(text) {
     return contentProcessor.escapeHtml(text);
 }
 
-function buildNativeReasoningBubbleHtml(reasoningContent) {
+function buildThinkingIndicatorHtml(message = {}) {
+    const rawLabel = typeof message?.content === 'string' ? message.content.trim() : '';
+    const normalizedLabel = rawLabel.toLowerCase();
+    const displayLabel = !rawLabel
+        || normalizedLabel === 'thinking'
+        || normalizedLabel === 'thinking...'
+        || rawLabel === '\u601d\u8003\u4e2d'
+        || rawLabel === '\u601d\u8003\u4e2d...'
+        ? 'AI \u6b63\u5728\u601d\u8003'
+        : rawLabel;
+    const safeLabel = escapeHtml(displayLabel);
+
+    return `
+        <span class="thinking-indicator unistudy-thinking-skeleton" role="status" aria-live="polite" aria-label="${safeLabel}">
+            <span class="unistudy-thinking-pulse" aria-hidden="true">
+                <span class="unistudy-thinking-pulse-ring"></span>
+                <span class="unistudy-thinking-pulse-dot"></span>
+            </span>
+            <span class="unistudy-thinking-text" aria-hidden="true">
+                <span>Thinking</span>
+                <span>Thinking.</span>
+                <span>Thinking..</span>
+                <span>Thinking...</span>
+            </span>
+        </span>
+    `;
+}
+
+function buildNativeReasoningBubbleHtml(reasoningContent, reasoningElapsedText = '') {
     if (typeof reasoningContent !== 'string' || !reasoningContent.trim()) {
         return '';
     }
@@ -183,20 +213,17 @@ function buildNativeReasoningBubbleHtml(reasoningContent) {
         processedContent = `<pre>${safeMarkdown}</pre>`;
     }
 
-    const previewLines = content
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .slice(-5)
-        .map((line) => `<span>${escapeHtml(line)}</span>`)
-        .join('');
+    const elapsedSuffix = typeof reasoningElapsedText === 'string' && reasoningElapsedText.trim()
+        ? `（用时 ${escapeHtml(reasoningElapsedText.trim())}）`
+        : '';
 
-    let html = `<div class="native-reasoning-bubble reasoning-bubble collapsible unistudy-live-reasoning-bubble" data-thought-title="原生思维链">`;
+    let html = `<div class="native-reasoning-bubble reasoning-bubble collapsible unistudy-live-reasoning-bubble is-complete" data-thought-title="原生思维链">`;
     html += `<div class="unistudy-thought-chain-header unistudy-live-reasoning-header" role="button" tabindex="0" aria-expanded="false">`;
     html += `<span class="unistudy-thought-chain-icon unistudy-live-reasoning-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21h6M10 17h4M12 3a6 6 0 0 0-3.8 10.6c.7.6 1.2 1.4 1.4 2.4h4.8c.2-1 .7-1.8 1.4-2.4A6 6 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
     html += `<span class="unistudy-live-reasoning-text-wrap">`;
-    html += `<span class="unistudy-thought-chain-label unistudy-live-reasoning-label">已深度思考</span>`;
-    html += `<span class="unistudy-live-reasoning-preview">${previewLines}</span>`;
+    html += `<span class="unistudy-live-reasoning-title-row">`;
+    html += `<span class="unistudy-thought-chain-label unistudy-live-reasoning-label">已深度思考${elapsedSuffix}</span>`;
+    html += `</span>`;
     html += `</span>`;
     html += `<span class="unistudy-live-reasoning-toggle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
     html += `</div>`;
@@ -213,7 +240,7 @@ function prependNativeReasoningBubble(rawHtml, message) {
         return rawHtml;
     }
 
-    const nativeReasoningHtml = buildNativeReasoningBubbleHtml(message.reasoning_content);
+    const nativeReasoningHtml = buildNativeReasoningBubbleHtml(message.reasoning_content, message.reasoning_elapsed);
     return nativeReasoningHtml ? `${nativeReasoningHtml}${rawHtml}` : rawHtml;
 }
 
@@ -1733,6 +1760,12 @@ function initializeMessageRenderer(refs) {
     if (delegatedEventTarget && delegatedClickHandler) {
         delegatedEventTarget.removeEventListener('click', delegatedClickHandler);
     }
+    if (delegatedEventTarget && delegatedPointerDownHandler) {
+        delegatedEventTarget.removeEventListener('pointerdown', delegatedPointerDownHandler, true);
+    }
+    if (delegatedEventTarget && delegatedKeydownHandler) {
+        delegatedEventTarget.removeEventListener('keydown', delegatedKeydownHandler);
+    }
     if (delegatedEventTarget && delegatedContextMenuHandler) {
         delegatedEventTarget.removeEventListener('contextmenu', delegatedContextMenuHandler);
     }
@@ -1802,6 +1835,43 @@ function initializeMessageRenderer(refs) {
 
     // --- Event Delegation ---
     delegatedEventTarget = mainRendererReferences.chatMessagesDiv;
+    const shouldIgnoreReasoningToggleTarget = (bubble, target) => {
+        if (!bubble || !target || typeof target.closest !== 'function') {
+            return false;
+        }
+
+        if (bubble.classList.contains('expanded') && target.closest('.unistudy-thought-chain-collapsible-content')) {
+            return true;
+        }
+
+        return Boolean(target.closest('a, button, input, textarea, select, [contenteditable="true"]'));
+    };
+    const toggleReasoningBubble = (bubble, event) => {
+        if (!bubble || shouldIgnoreReasoningToggleTarget(bubble, event?.target)) {
+            return false;
+        }
+
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const expanded = bubble.classList.toggle('expanded');
+        bubble.querySelector('.unistudy-thought-chain-header')?.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        return true;
+    };
+    delegatedPointerDownHandler = (e) => {
+        const bubble = e.target.closest?.('.unistudy-live-reasoning-bubble.reasoning-bubble.collapsible');
+        if (!bubble) {
+            return;
+        }
+        if (bubble.closest('.unistudy-stream-reasoning-root')) {
+            return;
+        }
+
+        if (toggleReasoningBubble(bubble, e)) {
+            bubble.dataset.pointerToggleHandled = 'true';
+        }
+    };
+    mainRendererReferences.chatMessagesDiv.addEventListener('pointerdown', delegatedPointerDownHandler, true);
+
     delegatedClickHandler = (e) => {
         const citationChip = e.target.closest('.message-citation-chip');
         if (citationChip) {
@@ -1825,6 +1895,22 @@ function initializeMessageRenderer(refs) {
             return;
         }
 
+        const liveReasoningBubble = e.target.closest?.('.unistudy-live-reasoning-bubble.reasoning-bubble.collapsible');
+        if (liveReasoningBubble) {
+            if (liveReasoningBubble.closest('.unistudy-stream-reasoning-root')) {
+                return;
+            }
+            if (liveReasoningBubble.dataset.pointerToggleHandled === 'true') {
+                delete liveReasoningBubble.dataset.pointerToggleHandled;
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            if (toggleReasoningBubble(liveReasoningBubble, e)) {
+                return;
+            }
+        }
+
         // 1. Handle collapsible tool results and thought chains
         const toolHeader = e.target.closest('.unistudy-tool-result-header');
         if (toolHeader) {
@@ -1839,15 +1925,14 @@ function initializeMessageRenderer(refs) {
         if (thoughtHeader) {
             const bubble = thoughtHeader.closest('.reasoning-bubble.collapsible');
             if (bubble) {
-                const expanded = bubble.classList.toggle('expanded');
-                thoughtHeader.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                toggleReasoningBubble(bubble, e);
             }
             return;
         }
     };
     mainRendererReferences.chatMessagesDiv.addEventListener('click', delegatedClickHandler);
 
-    mainRendererReferences.chatMessagesDiv.addEventListener('keydown', (e) => {
+    delegatedKeydownHandler = (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         const thoughtHeader = e.target.closest?.('.unistudy-thought-chain-header');
         if (!thoughtHeader) return;
@@ -1856,9 +1941,9 @@ function initializeMessageRenderer(refs) {
         if (!bubble) return;
 
         e.preventDefault();
-        const expanded = bubble.classList.toggle('expanded');
-        thoughtHeader.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    });
+        toggleReasoningBubble(bubble, e);
+    };
+    mainRendererReferences.chatMessagesDiv.addEventListener('keydown', delegatedKeydownHandler);
 
     // Delegated context menu
     delegatedContextMenuHandler = (e) => {
@@ -2175,7 +2260,7 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
     }
 
     if (message.isThinking) {
-        contentDiv.innerHTML = `<span class="thinking-indicator">${message.content || '\u601d\u8003\u4e2d'}<span class="thinking-indicator-dots">...</span></span>`;
+        contentDiv.innerHTML = buildThinkingIndicatorHtml(message);
         messageItem.classList.add('thinking');
     } else {
         let textToRender = "";

@@ -1059,6 +1059,6 @@ body .titlebar__tab--active,
 body.workspace-view-overview .titlebar__home-btn,
 body.workspace-view-subject #workspaceOpenSubjectBtn,
 body.workspace-view-manual-notes #manualNotesLibraryBtn {
-  border-color: rgba(95, 99, 104, 0.16);
+  border-color: #ffffff;
   box-shadow: none;
 }

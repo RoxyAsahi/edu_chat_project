@@ -137,7 +137,7 @@ body.workspace-view-overview .titlebar {
 
 .titlebar__tab--active {
   background: #ffffff;
-  border-color: #e0e3e7;
+  border-color: #ffffff;
   box-shadow: none;
   color: #111111;
 }
@@ -146,7 +146,7 @@ body.workspace-view-overview .titlebar__home-btn,
 body.workspace-view-subject #workspaceOpenSubjectBtn,
 body.workspace-view-manual-notes #manualNotesLibraryBtn {
   background: #ffffff;
-  border-color: #e0e3e7;
+  border-color: #ffffff;
   box-shadow: none;
   color: #111111;
 }
@@ -185,7 +185,7 @@ body.workspace-view-manual-notes #manualNotesLibraryBtn {
 }
 
 .titlebar__context-card.titlebar__tab--active {
-  border-color: #e0e3e7;
+  border-color: #ffffff;
 }
 
 .titlebar__context-card--action {
@@ -515,7 +515,7 @@ button { border: none; background: transparent; outline: none; cursor: pointer; 
 body.workspace-view-overview .titlebar__home-btn,
 body.workspace-view-subject #workspaceOpenSubjectBtn,
 body.workspace-view-manual-notes #manualNotesLibraryBtn {
-  border-color: #e0e3e7;
+  border-color: #ffffff;
 }
 
 /* Icon buttons */

@@ -619,7 +619,12 @@ test('streamManager renders native reasoning deltas before stream finalization',
         global.performance = originalPerformance;
     });
 
-    const { initStreamManager, startStreamingMessage, appendStreamChunk } = await loadStreamManagerModule();
+    const {
+        initStreamManager,
+        startStreamingMessage,
+        appendStreamChunk,
+        finalizeStreamedMessage,
+    } = await loadStreamManagerModule();
 
     let currentHistory = cloneHistory([{
         id: 'user-1',
@@ -670,7 +675,10 @@ test('streamManager renders native reasoning deltas before stream finalization',
         processRenderedContent() {},
         runTextHighlights() {},
         processAnimationsInContent() {},
-        prependNativeReasoningBubble: (rawHtml) => rawHtml,
+        prependNativeReasoningBubble: (rawHtml, message) => {
+            const elapsed = message.reasoning_elapsed ? `（用时 ${message.reasoning_elapsed}）` : '';
+            return `<div class="native-reasoning-bubble unistudy-live-reasoning-bubble is-complete"><span class="unistudy-live-reasoning-label">已深度思考${elapsed}</span></div>${rawHtml}`;
+        },
         renderMessage() {
             throw new Error('existing DOM node should be reused');
         },
@@ -689,8 +697,8 @@ test('streamManager renders native reasoning deltas before stream finalization',
     }, messageItem);
 
     appendStreamChunk('assistant-reasoning-live', {
-        reasoningDelta: 'live reasoning ',
-        chunk: { choices: [{ delta: { reasoning_content: 'live reasoning ' } }] },
+        reasoningDelta: 'first line\nsecond line\nthird line\nfourth line\n',
+        chunk: { choices: [{ delta: { reasoning_content: 'first line\nsecond line\nthird line\nfourth line\n' } }] },
     }, {
         agentId: 'agent-1',
         topicId: 'topic-1',
@@ -699,12 +707,18 @@ test('streamManager renders native reasoning deltas before stream finalization',
     const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-reasoning-live"] .md-content');
     assert.equal(parseCalls, 1);
     assert.match(contentDiv.innerHTML, /native-reasoning-bubble/);
-    assert.match(contentDiv.textContent, /live reasoning/);
+    assert.match(contentDiv.textContent, /思考中/);
+    assert.match(contentDiv.textContent, /用时/);
+    assert.match(contentDiv.textContent, /fourth line/);
+    assert.doesNotMatch(contentDiv.querySelector('.unistudy-live-reasoning-preview')?.textContent || '', /first line/);
+    assert.equal(contentDiv.querySelectorAll('.unistudy-live-reasoning-preview span').length, 3);
 
     const bubble = contentDiv.querySelector('.native-reasoning-bubble');
     const header = contentDiv.querySelector('.unistudy-live-reasoning-header');
+    const titleRow = contentDiv.querySelector('.unistudy-live-reasoning-title-row');
     assert.ok(header);
-    header.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    assert.ok(titleRow);
+    bubble.dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
     assert.ok(contentDiv.querySelector('.native-reasoning-bubble.expanded'));
 
     appendStreamChunk('assistant-reasoning-live', {
@@ -717,8 +731,23 @@ test('streamManager renders native reasoning deltas before stream finalization',
 
     assert.ok(contentDiv.querySelector('.native-reasoning-bubble.expanded'));
     assert.equal(contentDiv.querySelector('.unistudy-live-reasoning-header'), header);
+    assert.ok(contentDiv.querySelector('.unistudy-live-reasoning-title-row'));
     assert.match(contentDiv.textContent, /keeps expanding/);
     assert.equal(parseCalls, 2);
+
+    await finalizeStreamedMessage('assistant-reasoning-live', 'completed', {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    }, {
+        fullResponse: 'final answer',
+    });
+
+    const finalizedMessage = currentHistory.find((message) => message.id === 'assistant-reasoning-live');
+    assert.ok(finalizedMessage);
+    assert.match(finalizedMessage.reasoning_elapsed, /^\d+\.\d 秒$/);
+    assert.ok(contentDiv.querySelector('.unistudy-live-reasoning-bubble.is-complete'));
+    assert.match(contentDiv.textContent, /已深度思考（用时 \d+\.\d 秒）/);
+    assert.doesNotMatch(contentDiv.innerHTML, /unistudy-live-reasoning-preview/);
 });
 
 test('streamManager renders a completed tool request block before stream finalization', async (t) => {
@@ -1072,6 +1101,7 @@ test('streamManager streams bare HTML fragments through marked into the message 
     });
 
     const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-raw-html-live"] .md-content');
+    assert.equal(contentDiv.querySelector('.thinking-indicator'), null);
     assert.ok(contentDiv.querySelector('#response-root.demo'));
     assert.match(contentDiv.querySelector('#response-root.demo style')?.textContent || '', /\.demo \{ color: red; \}/);
     assert.ok(contentDiv.querySelector('button'));
