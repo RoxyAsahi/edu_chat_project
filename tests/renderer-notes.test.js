@@ -143,8 +143,7 @@ function createNotesDom() {
             <div id="notesSelectionSummary"></div>
             <button id="topicNotesScopeBtn"></button>
             <button id="agentNotesScopeBtn"></button>
-            <button id="newNoteBtn"></button>
-            <button id="newNoteFabBtn"></button>
+            <button id="manualNewNoteBtn"></button>
             <button id="notesStudioOpenBtn"></button>
             <button id="manualNotesLibraryBtn"></button>
             <button id="saveNoteBtn"></button>
@@ -207,8 +206,7 @@ function createNotesDom() {
             notesSelectionSummary: window.document.getElementById('notesSelectionSummary'),
             topicNotesScopeBtn: window.document.getElementById('topicNotesScopeBtn'),
             agentNotesScopeBtn: window.document.getElementById('agentNotesScopeBtn'),
-            newNoteBtn: window.document.getElementById('newNoteBtn'),
-            newNoteFabBtn: window.document.getElementById('newNoteFabBtn'),
+            manualNewNoteBtn: window.document.getElementById('manualNewNoteBtn'),
             notesStudioOpenBtn: window.document.getElementById('notesStudioOpenBtn'),
             manualNotesLibraryBtn: window.document.getElementById('manualNotesLibraryBtn'),
             saveNoteBtn: window.document.getElementById('saveNoteBtn'),

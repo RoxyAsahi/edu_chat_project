@@ -112,6 +112,19 @@
   box-shadow: none;
 }
 
+.manual-notes-library-page__new-note {
+  min-height: 38px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.manual-notes-library-page__new-note .material-symbols-outlined {
+  font-size: 18px;
+}
+
 .manual-notes-library-page__filter:hover,
 .manual-notes-library-page__filter:focus-visible {
   background: #f1f3f4;
@@ -4752,6 +4765,53 @@ body.dark-theme .topic-action-btn:hover { background: rgba(255,255,255,0.1); col
   background: transparent;
   position: relative;
   transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.source-select-all-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 10px 4px 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.source-selection-checkbox {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: color-mix(in srgb, var(--line) 70%, var(--panel) 30%);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.source-selection-checkbox:hover,
+.source-selection-checkbox:focus-visible {
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--line) 55%);
+  outline: none;
+}
+
+.source-selection-checkbox .material-symbols-outlined {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.source-selection-checkbox:not(.source-selection-checkbox--checked):not(.source-selection-checkbox--indeterminate) {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+}
+
+.kb-document-row--source-disabled {
+  opacity: 0.48;
 }
 
 .kb-document-row__leading {

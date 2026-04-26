@@ -29,6 +29,7 @@ function createSourceController(deps = {}) {
     const getSourceListScrollTop = deps.getSourceListScrollTop || (() => 0);
     const setSourceListScrollTop = deps.setSourceListScrollTop || (() => {});
     const updateTopicKnowledgeBaseBinding = deps.updateTopicKnowledgeBaseBinding || (() => {});
+    const updateTopicSourceSelection = deps.updateTopicSourceSelection || (() => {});
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
     const getTopics = deps.getTopics || (() => store.getState().session.topics);
@@ -188,6 +189,7 @@ function createSourceController(deps = {}) {
         getCurrentTopic,
         getCurrentTopicKnowledgeBaseId,
         updateTopicKnowledgeBaseBinding,
+        updateTopicSourceSelection,
         getFacade,
     });
 
@@ -329,8 +331,10 @@ function createSourceController(deps = {}) {
         renderTopicKnowledgeBaseFiles: dom.renderTopicKnowledgeBaseFiles,
         runKnowledgeBaseDebug: operations.runKnowledgeBaseDebug,
         runKnowledgeBaseSearch: operations.runKnowledgeBaseSearch,
+        setAllTopicSourceDocumentsSelected: operations.setAllTopicSourceDocumentsSelected,
         syncCurrentTopicKnowledgeBaseControls: dom.syncCurrentTopicKnowledgeBaseControls,
         syncKnowledgeBasePolling,
+        toggleTopicSourceDocument: operations.toggleTopicSourceDocument,
         bindEvents,
     });
 

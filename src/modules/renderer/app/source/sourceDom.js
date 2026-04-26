@@ -155,9 +155,69 @@ function createSourceDom(deps = {}) {
         renderSourceFileActionMenu();
     }
 
-    function renderKnowledgeBaseDocumentRow(documentItem) {
+    function getSelectedTopicDocumentIdSet() {
+        const currentTopic = getCurrentTopic();
+        const selectedIds = currentTopic?.selectedKnowledgeBaseDocumentIds;
+        if (!Array.isArray(selectedIds)) {
+            return null;
+        }
+        return new Set(selectedIds.map((id) => String(id || '').trim()).filter(Boolean));
+    }
+
+    function isTopicDocumentSelected(documentItem) {
+        const selectedSet = getSelectedTopicDocumentIdSet();
+        return selectedSet === null || selectedSet.has(documentItem?.id);
+    }
+
+    function renderSourceCheckbox({ checked = true, indeterminate = false, label = '选择来源', documentId = '' } = {}) {
+        const button = documentObj.createElement('button');
+        button.type = 'button';
+        button.className = 'source-selection-checkbox';
+        button.classList.toggle('source-selection-checkbox--checked', checked);
+        button.classList.toggle('source-selection-checkbox--indeterminate', indeterminate);
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', checked ? 'true' : 'false');
+        if (documentId) {
+            button.dataset.sourceDocumentToggle = documentId;
+        } else {
+            button.dataset.sourceSelectAllToggle = 'true';
+        }
+        button.innerHTML = `<span class="material-symbols-outlined">${indeterminate ? 'remove' : (checked ? 'check' : '')}</span>`;
+        return button;
+    }
+
+    function renderSelectAllTopicSourcesRow(documents = []) {
+        const selectedSet = getSelectedTopicDocumentIdSet();
+        const allIds = documents.map((item) => item.id).filter(Boolean);
+        const selectedCount = selectedSet === null
+            ? allIds.length
+            : allIds.filter((id) => selectedSet.has(id)).length;
+        const checked = allIds.length > 0 && selectedCount === allIds.length;
+        const indeterminate = selectedCount > 0 && selectedCount < allIds.length;
+
+        const row = documentObj.createElement('div');
+        row.className = 'source-select-all-row';
+        row.innerHTML = `
+            <span>选择所有来源</span>
+        `;
+        const checkbox = renderSourceCheckbox({
+            checked,
+            indeterminate,
+            label: checked && !indeterminate ? '取消选择所有来源' : '选择所有来源',
+        });
+        checkbox.addEventListener('click', (event) => {
+            event.stopPropagation();
+            void getFacade().setAllTopicSourceDocumentsSelected(!(checked && !indeterminate));
+        });
+        row.appendChild(checkbox);
+        return row;
+    }
+
+    function renderKnowledgeBaseDocumentRow(documentItem, options = {}) {
         const row = documentObj.createElement('div');
         row.className = 'kb-document-row';
+        const selectable = options.selectable === true;
+        const selected = isTopicDocumentSelected(documentItem);
         const readable = isReaderSupportedDocument(documentItem) && documentItem.status === 'done';
         const visual = getKnowledgeBaseDocumentVisual(documentItem);
         const menuOpen = state.activeSourceFileMenu?.documentId === documentItem.id;
@@ -166,6 +226,7 @@ function createSourceDom(deps = {}) {
         row.classList.toggle('kb-document-row--active', isReaderDocumentActive(documentItem.id));
         row.classList.toggle('kb-document-row--menu-open', menuOpen);
         row.classList.toggle('kb-document-row--processing', processing);
+        row.classList.toggle('kb-document-row--source-disabled', selectable && !selected);
 
         row.innerHTML = `
             <div class="kb-document-row__leading">
@@ -184,6 +245,19 @@ function createSourceDom(deps = {}) {
                 <strong>${escapeHtml(documentItem.name)}</strong>
             </div>
         `;
+
+        if (selectable) {
+            const checkbox = renderSourceCheckbox({
+                checked: selected,
+                label: selected ? `不使用 ${documentItem.name}` : `使用 ${documentItem.name}`,
+                documentId: documentItem.id,
+            });
+            checkbox.addEventListener('click', (event) => {
+                event.stopPropagation();
+                void getFacade().toggleTopicSourceDocument(documentItem.id);
+            });
+            row.appendChild(checkbox);
+        }
 
         row.addEventListener('mouseenter', () => {
             showSourceFileTooltip(documentItem, row);
@@ -424,7 +498,10 @@ function createSourceDom(deps = {}) {
         }
 
         state.topicKnowledgeBaseDocuments.forEach((documentItem) => {
-            const row = renderKnowledgeBaseDocumentRow(documentItem);
+            if (documentItem === state.topicKnowledgeBaseDocuments[0]) {
+                el.topicKnowledgeBaseFiles.appendChild(renderSelectAllTopicSourcesRow(state.topicKnowledgeBaseDocuments));
+            }
+            const row = renderKnowledgeBaseDocumentRow(documentItem, { selectable: true });
             el.topicKnowledgeBaseFiles.appendChild(row);
         });
 

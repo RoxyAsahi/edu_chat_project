@@ -58,6 +58,9 @@ function normalizeTopic(topic = {}) {
     return {
         ...topic,
         knowledgeBaseId: topic.knowledgeBaseId || null,
+        selectedKnowledgeBaseDocumentIds: Array.isArray(topic.selectedKnowledgeBaseDocumentIds)
+            ? topic.selectedKnowledgeBaseDocumentIds
+            : null,
     };
 }
 

@@ -1251,6 +1251,88 @@ function createWorkspaceController(deps = {}) {
         return state.currentSelectedItem?.id === agentId && state.currentTopicId === topicId;
     }
 
+    function messageDisplaySignature(message = {}) {
+        return JSON.stringify({
+            role: message.role || '',
+            name: message.name || '',
+            avatarUrl: message.avatarUrl || '',
+            avatarColor: message.avatarColor || '',
+            content: message.content ?? '',
+            reasoning_content: message.reasoning_content ?? '',
+            attachments: message.attachments || [],
+            kbContextRefs: message.kbContextRefs || [],
+            studyMemoryRefs: message.studyMemoryRefs || [],
+            followUps: message.followUps || [],
+            citations: message.citations || [],
+            finishReason: message.finishReason || '',
+            fallbackMeta: message.fallbackMeta || null,
+        });
+    }
+
+    function historyHasStableMessageIds(history) {
+        return Array.isArray(history)
+            && history.every((message) => message && typeof message.id === 'string' && message.id.trim());
+    }
+
+    async function reloadCurrentTopicFromWatcher(reason = 'fallback') {
+        console.warn(`[UniStudyRenderer] Falling back to full topic reload after watcher update: ${reason}`);
+        if (state.currentSelectedItem?.id && state.currentTopicId) {
+            await selectTopic(state.currentTopicId, { fromWatcher: true });
+            return { applied: false, fallback: true, reason };
+        }
+
+        await renderCurrentHistory();
+        return { applied: false, fallback: true, reason };
+    }
+
+    function idsEqual(left = [], right = []) {
+        return left.length === right.length && left.every((id, index) => id === right[index]);
+    }
+
+    function analyzeIncrementalHistoryDiff(oldHistory, newHistory, activeStreamingMessageId) {
+        const oldIds = oldHistory.map((message) => message.id);
+        const newIds = newHistory.map((message) => message.id);
+        const oldIdSet = new Set(oldIds);
+        const newIdSet = new Set(newIds);
+        const oldIdsWithoutActive = oldIds.filter((id) => id !== activeStreamingMessageId);
+        const newIdsWithoutActive = newIds.filter((id) => id !== activeStreamingMessageId);
+        const retainedOldIds = oldIdsWithoutActive.filter((id) => newIdSet.has(id));
+        const newExistingIds = newIdsWithoutActive.filter((id) => oldIdSet.has(id));
+        const existingOrderChanged = !idsEqual(retainedOldIds, newExistingIds);
+
+        let sawAddedMessage = false;
+        let addedBeforeExistingMessage = false;
+        for (const id of newIdsWithoutActive) {
+            if (!oldIdSet.has(id)) {
+                sawAddedMessage = true;
+                continue;
+            }
+            if (sawAddedMessage) {
+                addedBeforeExistingMessage = true;
+                break;
+            }
+        }
+
+        const requiresRenderedReorder = existingOrderChanged || addedBeforeExistingMessage;
+        if (activeStreamingMessageId && requiresRenderedReorder) {
+            return { canApply: false, reason: 'active-streaming-order-change' };
+        }
+
+        if (requiresRenderedReorder && typeof messageRendererApi?.reorderRenderedMessagesById !== 'function') {
+            return { canApply: false, reason: 'missing-rendered-reorder-api' };
+        }
+
+        if (messageRendererApi?.isHistoryWindowActive?.() === true
+            && typeof messageRendererApi?.getRenderedMessageIds !== 'function') {
+            return { canApply: false, reason: 'missing-rendered-window-api' };
+        }
+
+        return {
+            canApply: true,
+            requiresRenderedReorder,
+        };
+    }
+
     function runTopicBackgroundTask(label, task) {
         Promise.resolve()
             .then(task)
@@ -1299,6 +1381,153 @@ function createWorkspaceController(deps = {}) {
         if (isActiveTopicSelection(agentId, topicId)) {
             await loadAgents();
         }
+    }
+
+    async function syncCurrentTopicHistoryFromFile(payload = {}) {
+        const agentId = payload?.agentId;
+        const topicId = payload?.topicId;
+
+        if (!isActiveTopicSelection(agentId, topicId)) {
+            return { applied: false, skipped: true, reason: 'payload-mismatch' };
+        }
+
+        if (documentObj.querySelector?.('.message-item-editing')) {
+            return { applied: false, skipped: true, reason: 'editing' };
+        }
+
+        let persistedHistory;
+        try {
+            persistedHistory = await chatAPI.getChatHistory(agentId, topicId);
+        } catch (error) {
+            console.warn('[UniStudyRenderer] Failed to read updated history for diff sync:', error);
+            return reloadCurrentTopicFromWatcher('history-read-failed');
+        }
+
+        if (!Array.isArray(persistedHistory)) {
+            return reloadCurrentTopicFromWatcher('history-not-array');
+        }
+
+        const nextHistory = normalizeHistory(persistedHistory);
+        if (!historyHasStableMessageIds(nextHistory)) {
+            return reloadCurrentTopicFromWatcher('missing-message-id');
+        }
+
+        const currentHistory = Array.isArray(state.currentChatHistory)
+            ? [...state.currentChatHistory]
+            : [];
+
+        if (!historyHasStableMessageIds(currentHistory)) {
+            return reloadCurrentTopicFromWatcher('current-history-missing-message-id');
+        }
+
+        const activeStreamingMessageId = messageRendererApi?.getActiveStreamingMessageId?.() || null;
+        const diffSafety = analyzeIncrementalHistoryDiff(currentHistory, nextHistory, activeStreamingMessageId);
+        if (!diffSafety.canApply) {
+            return reloadCurrentTopicFromWatcher(diffSafety.reason || 'complex-history-order-change');
+        }
+
+        const oldById = new Map(currentHistory.map((message) => [message.id, message]));
+        const nextById = new Map(nextHistory.map((message) => [message.id, message]));
+        const activeStreamingMessage = activeStreamingMessageId ? oldById.get(activeStreamingMessageId) : null;
+        const mergedHistory = nextHistory.map((message) => (
+            message.id === activeStreamingMessageId && activeStreamingMessage
+                ? activeStreamingMessage
+                : message
+        ));
+
+        if (activeStreamingMessage && !nextById.has(activeStreamingMessageId)) {
+            mergedHistory.push(activeStreamingMessage);
+        }
+
+        state.currentChatHistory = mergedHistory;
+
+        const historyWindowSnapshot = typeof messageRendererApi?.getHistoryWindowSnapshot === 'function'
+            ? messageRendererApi.getHistoryWindowSnapshot()
+            : null;
+        const isWindowedHistory = historyWindowSnapshot?.active === true
+            || messageRendererApi?.isHistoryWindowActive?.() === true;
+        const renderedIds = new Set(
+            typeof messageRendererApi?.getRenderedMessageIds === 'function'
+                ? messageRendererApi.getRenderedMessageIds()
+                : []
+        );
+        const renderedStartIndex = Number.isFinite(historyWindowSnapshot?.renderedStartIndex)
+            ? historyWindowSnapshot.renderedStartIndex
+            : 0;
+        const shouldTouchExistingMessageDom = (messageId) => (
+            !isWindowedHistory || renderedIds.has(messageId)
+        );
+        const shouldRenderNewMessageDom = (message) => {
+            if (!isWindowedHistory || renderedIds.has(message.id)) {
+                return true;
+            }
+
+            const nextIndex = nextHistory.findIndex((candidate) => candidate.id === message.id);
+            return nextIndex >= renderedStartIndex;
+        };
+
+        const removedIds = [];
+        const updatedIds = [];
+        const addedIds = [];
+        const memoryOnlyIds = [];
+
+        for (const oldMessage of currentHistory) {
+            if (oldMessage.id === activeStreamingMessageId) {
+                continue;
+            }
+            if (!nextById.has(oldMessage.id)) {
+                removedIds.push(oldMessage.id);
+                if (shouldTouchExistingMessageDom(oldMessage.id)) {
+                    messageRendererApi?.removeMessageById?.(oldMessage.id, false);
+                    renderedIds.delete(oldMessage.id);
+                } else {
+                    memoryOnlyIds.push(oldMessage.id);
+                }
+            }
+        }
+
+        for (const newMessage of nextHistory) {
+            if (newMessage.id === activeStreamingMessageId) {
+                continue;
+            }
+
+            const oldMessage = oldById.get(newMessage.id);
+            if (!oldMessage) {
+                addedIds.push(newMessage.id);
+                if (shouldRenderNewMessageDom(newMessage)) {
+                    await messageRendererApi?.renderMessage?.(newMessage, true);
+                    renderedIds.add(newMessage.id);
+                } else {
+                    memoryOnlyIds.push(newMessage.id);
+                }
+                continue;
+            }
+
+            if (messageDisplaySignature(oldMessage) !== messageDisplaySignature(newMessage)) {
+                updatedIds.push(newMessage.id);
+                if (shouldTouchExistingMessageDom(newMessage.id)) {
+                    messageRendererApi?.updateMessageContent?.(newMessage.id, newMessage.content);
+                } else {
+                    memoryOnlyIds.push(newMessage.id);
+                }
+            }
+        }
+
+        const reorderedIds = diffSafety.requiresRenderedReorder
+            ? (messageRendererApi?.reorderRenderedMessagesById?.(mergedHistory.map((message) => message.id)) || [])
+            : [];
+        messageRendererApi?.syncHistoryWindowHistory?.(mergedHistory);
+        state.currentChatHistory = mergedHistory;
+
+        return {
+            applied: true,
+            removedIds,
+            updatedIds,
+            addedIds,
+            memoryOnlyIds,
+            reorderedIds,
+            skippedActiveStreamingMessageId: activeStreamingMessageId || null,
+        };
     }
 
     async function refreshAgentSecondaryPanels(agentId) {
@@ -1728,6 +1957,7 @@ function createWorkspaceController(deps = {}) {
         deleteTopicFromList,
         showWorkspaceOverview,
         selectTopic,
+        syncCurrentTopicHistoryFromFile,
         selectAgent,
         showSubjectWorkspace,
         showManualNotesLibrary,

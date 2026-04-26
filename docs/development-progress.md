@@ -1,10 +1,10 @@
 # UniStudy 当前开发状态
 
-更新时间: 2026-04-26
+更新时间: 2026-04-27
 仓库路径: `C:\VCP\Eric\edu_chat_project`
 
 ## 当前结论
-UniStudy 当前已完成运行时身份收口，并继续向“个人 AI 学习终端”演进。
+UniStudy 当前已完成运行时身份收口，并继续向“个人 AI 学习终端”演进。本轮重点补强了聊天渲染底层、Source 引用链路、历史差分同步、预览生命周期和长对话资源控制。
 
 ## 产品定位与学习闭环
 UniStudy 的目标不是再做一个普通 AI 聊天软件，而是打造一个本地优先、模型可选、资料驱动、具备长期记忆的个人 AI 学习空间。
@@ -107,6 +107,25 @@ UniStudy 让 AI 帮用户生成理解资料的学习场景。
 - Prompt 在当前版本中固定为单文本模式
 - 正式运行时默认使用 Electron `app.getPath('userData')` 下的 UniStudy 数据目录
 - 应用级显式 override 统一使用 `UNISTUDY_DATA_ROOT`
+
+## 2026-04-27 渲染底层与学习链路补强
+本轮工作目标是让 UniStudy 的核心卖点更稳定: AI 可以边输出边形成可交互学习内容，同时 Source、Notes、学习日志、记忆和长对话渲染不互相打架。
+
+已落地内容:
+- 流式渲染保留 `reasoning / stable / tail` 三个独立 root。原生思维链流式区不再和正文 DOM 争位置，reasoning-only 增量不会重复触发正文 morphdom。
+- 裸 HTML 片段支持在流式阶段直接进入消息 DOM，`<style>` 在流式阶段允许临时生效；最终完成后仍由消息渲染器做 scoped CSS 收口，避免长期污染全局样式。
+- 流式完成后只保留一次最终 DOM 渲染路径，减少“先渲染、再闪一下、又消失”的重灌感。
+- HTML 代码块预览补齐播放 / 返回、iframe 高度回传、加载状态、错误状态和销毁清理；Three.js 预览保留本地 vendor runner，并增加 vendor、WebGL、运行时错误和空白 canvas 诊断。
+- 历史文件 watcher 从整话题重载升级为当前话题 message-id 差分同步: 修改、删除、新增和安全重排都尽量局部更新；正在流式输出或正在编辑的消息会被保护。
+- Source 面板支持更清晰的当前话题资料选择和复用策略，检索返回的引用会进入消息历史，便于后续展示和追溯。
+- Notes 与学习工具链路继续保留: 笔记、测验、闪卡、学习日志、日记投影和记忆相关能力都在现有渲染路径下回归通过。
+- 长对话资源控制继续加固: 可见性优化器增加调试快照和测试覆盖，预览 iframe、动画、media、canvas / Three 相关运行态在 DOM 替换或删除前会主动清理。
+- 内存稳定性补丁已落地: morphdom 元素长度缓存改为 `WeakMap`，头像裁剪和设置页头像预览的 `Blob URL` 会在加载、失败、关闭、重选或页面卸载时释放。
+
+当前验证结果:
+- `npm run test:renderer:logic`: 144 passed
+- `npm run test:renderer:dom`: 3 passed
+- `git diff --check`: clean
 
 ## 当前架构边界
 ### 主运行链

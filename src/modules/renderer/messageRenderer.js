@@ -891,35 +891,36 @@ function prepareAssistantScopedStyles(text, scopeId) {
 
     // Protect blocks that may legally contain <style> content before extracting styles.
     const protectedBlocks = [];
-    let textWithProtectedBlocks = text.replace(TOOL_REGEX, (match) => {
+    const protectBlock = (match) => {
         const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
         protectedBlocks.push(match);
         return placeholder;
-    });
+    };
 
-    textWithProtectedBlocks = textWithProtectedBlocks.replace(/「始」[\s\S]*?(「末」|$)/g, (match) => {
-        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-        protectedBlocks.push(match);
-        return placeholder;
-    });
+    TOOL_RESULT_REGEX.lastIndex = 0;
+    let textWithProtectedBlocks = text.replace(TOOL_RESULT_REGEX, protectBlock);
+    TOOL_RESULT_REGEX.lastIndex = 0;
 
-    textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_REGEX, (match) => {
-        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-        protectedBlocks.push(match);
-        return placeholder;
-    });
+    TOOL_REGEX.lastIndex = 0;
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(TOOL_REGEX, protectBlock);
+    TOOL_REGEX.lastIndex = 0;
 
-    textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_PARTIAL_REGEX, (match) => {
-        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-        protectedBlocks.push(match);
-        return placeholder;
-    });
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(
+        /「始ESCAPE」[\s\S]*?(「末ESCAPE」|$)|「始」[\s\S]*?(「末」|$)/g,
+        protectBlock,
+    );
 
-    textWithProtectedBlocks = textWithProtectedBlocks.replace(CODE_FENCE_REGEX, (match) => {
-        const placeholder = `__STYLE_PROTECT_${protectedBlocks.length}__`;
-        protectedBlocks.push(match);
-        return placeholder;
-    });
+    DESKTOP_PUSH_REGEX.lastIndex = 0;
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_REGEX, protectBlock);
+    DESKTOP_PUSH_REGEX.lastIndex = 0;
+
+    DESKTOP_PUSH_PARTIAL_REGEX.lastIndex = 0;
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(DESKTOP_PUSH_PARTIAL_REGEX, protectBlock);
+    DESKTOP_PUSH_PARTIAL_REGEX.lastIndex = 0;
+
+    CODE_FENCE_REGEX.lastIndex = 0;
+    textWithProtectedBlocks = textWithProtectedBlocks.replace(CODE_FENCE_REGEX, protectBlock);
+    CODE_FENCE_REGEX.lastIndex = 0;
 
     const { processedContent } = processAndInjectScopedCss(textWithProtectedBlocks, scopeId);
 
@@ -1613,6 +1614,87 @@ function removeMessageById(messageId, saveHistory = false) {
     }
 }
 
+function getRenderedMessageIds() {
+    const chatMessagesDiv = mainRendererReferences.chatMessagesDiv;
+    if (!chatMessagesDiv) {
+        return [];
+    }
+
+    return Array.from(chatMessagesDiv.querySelectorAll('.message-item[data-message-id]'))
+        .map((item) => item.dataset.messageId)
+        .filter(Boolean);
+}
+
+function reorderRenderedMessagesById(messageIds = []) {
+    const chatMessagesDiv = mainRendererReferences.chatMessagesDiv;
+    if (!chatMessagesDiv || !Array.isArray(messageIds)) {
+        return [];
+    }
+
+    const messageMap = new Map(
+        Array.from(chatMessagesDiv.querySelectorAll('.message-item[data-message-id]'))
+            .map((item) => [item.dataset.messageId, item])
+    );
+    const fragment = document.createDocumentFragment();
+    const movedIds = [];
+
+    for (const id of messageIds) {
+        const item = messageMap.get(id);
+        if (!item) {
+            continue;
+        }
+
+        fragment.appendChild(item);
+        movedIds.push(id);
+    }
+
+    if (movedIds.length > 0) {
+        chatMessagesDiv.appendChild(fragment);
+    }
+
+    return movedIds;
+}
+
+function isHistoryWindowActive() {
+    return Boolean(historyWindowState);
+}
+
+function getHistoryWindowSnapshot() {
+    if (!historyWindowState) {
+        return {
+            active: false,
+            renderedStartIndex: 0,
+            renderedIds: getRenderedMessageIds(),
+            totalCount: mainRendererReferences.currentChatHistoryRef.get()?.length || 0,
+        };
+    }
+
+    return {
+        active: true,
+        renderedStartIndex: historyWindowState.renderedStartIndex,
+        renderedIds: getRenderedMessageIds(),
+        totalCount: historyWindowState.history?.length || 0,
+    };
+}
+
+function syncHistoryWindowHistory(history = []) {
+    if (!historyWindowState || !Array.isArray(history)) {
+        return;
+    }
+
+    historyWindowState.history = history;
+    const renderedIds = getRenderedMessageIds();
+    const firstRenderedId = renderedIds[0];
+    const nextStartIndex = firstRenderedId
+        ? history.findIndex((message) => message?.id === firstRenderedId)
+        : history.length;
+
+    historyWindowState.renderedStartIndex = nextStartIndex >= 0
+        ? nextStartIndex
+        : Math.max(0, history.length - renderedIds.length);
+    updateHistoryWindowLoader(historyWindowState);
+}
+
 function clearChat(options = {}) {
     const { preserveHistory = false } = options;
     invalidateRenderSession();
@@ -1882,6 +1964,8 @@ function initializeMessageRenderer(refs) {
         runTextHighlights: contentProcessor.highlightAllPatternsInMessage,
         preprocessFullContent: preprocessFullContent,
         prependNativeReasoningBubble: prependNativeReasoningBubble,
+        cleanupPreviewsInContent: contentProcessor.cleanupPreviewsInContent,
+        cleanupAnimationsInContent: cleanupAnimationsInContent,
         removeSpeakerTags: contentProcessor.removeSpeakerTags,
         ensureNewlineAfterCodeBlock: contentProcessor.ensureNewlineAfterCodeBlock,
         ensureSpaceAfterTilde: contentProcessor.ensureSpaceAfterTilde,
@@ -2371,7 +2455,9 @@ function extractAndPushDesktopBlocks(content) {
 
 async function finalizeStreamedMessage(messageId, finishReason, context, finalPayload = null) {
     // streamManager owns stream accumulation and final payload selection.
-    await streamManager.finalizeStreamedMessage(messageId, finishReason, context, finalPayload);
+    await streamManager.finalizeStreamedMessage(messageId, finishReason, context, finalPayload, {
+        deferDomRender: true,
+    });
 
     // Reapply frontend regex rules after the stream finishes so markers split across
     // chunks can still be transformed correctly.
@@ -2562,6 +2648,9 @@ function updateMessageContent(messageId, newContent) {
 
     // --- Post-Render Processing (aligned with renderMessage logic) ---
 
+    contentProcessor.cleanupPreviewsInContent(contentDiv);
+    cleanupAnimationsInContent(contentDiv);
+
     // 1. Set content and process images
     setContentAndProcessImages(contentDiv, rawHtml, messageId);
 
@@ -2588,6 +2677,10 @@ function updateMessageContent(messageId, newContent) {
 
     // 5. Re-run animations/scripts/3D scenes
     processAnimationsInContent(contentDiv);
+}
+
+function getActiveStreamingMessageId() {
+    return streamManager.getActiveStreamingMessageId?.() || null;
 }
 
 function prepareUserMessageText(text) {
@@ -2824,5 +2917,11 @@ export {
     clearChat,
     removeMessageById,
     updateMessageContent,
+    getActiveStreamingMessageId,
+    getRenderedMessageIds,
+    reorderRenderedMessagesById,
+    isHistoryWindowActive,
+    getHistoryWindowSnapshot,
+    syncHistoryWindowHistory,
     extractSpeakableTextFromContentElement,
 };

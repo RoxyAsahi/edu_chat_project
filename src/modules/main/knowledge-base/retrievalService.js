@@ -104,12 +104,36 @@ function createRetrievalService(deps = {}) {
             throw new Error('Knowledge base not found.');
         }
 
+        const documentIds = Array.isArray(payload.documentIds)
+            ? [...new Set(payload.documentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+            : null;
+        const hasDocumentFilter = Array.isArray(payload.documentIds);
         const settings = await runtime.readSettings();
-        const [queryEmbedding] = await requestEmbeddings(settings, [query]);
-        const chunkRows = await repository.listChunkRowsByKnowledgeBase(kbId);
-
         const { topK, scoreThreshold } = resolveRetrievalConfig(settings, payload);
         const { useRerank, rerankModel, candidateTopK } = resolveRerankConfig(settings, payload);
+
+        if (hasDocumentFilter && documentIds.length === 0) {
+            return {
+                kbId,
+                kbName: kb.name,
+                query,
+                refs: [],
+                contextText: '',
+                itemCount: 0,
+                topK,
+                candidateTopK,
+                threshold: scoreThreshold,
+                useRerank,
+                rerankModel,
+                rerankApplied: false,
+                rerankFallbackReason: null,
+                vectorCandidates: [],
+                finalItems: [],
+            };
+        }
+
+        const [queryEmbedding] = await requestEmbeddings(settings, [query]);
+        const chunkRows = await repository.listChunkRowsByKnowledgeBase(kbId, documentIds);
         const vectorCandidates = chunkRows
             .map((row) => mapChunkRowToCandidate(row, cosineSimilarity, queryEmbedding))
             .filter((item) => item.vectorScore >= scoreThreshold)

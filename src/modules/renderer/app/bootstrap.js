@@ -171,6 +171,11 @@ function createAppBootstrap(deps = {}) {
             chatAPI.onHistoryFileUpdated?.(async (payload) => {
                 const session = getSessionSlice(store);
                 if (payload?.agentId === session.currentSelectedItem.id && payload?.topicId === session.currentTopicId) {
+                    if (typeof workspaceController.syncCurrentTopicHistoryFromFile === 'function') {
+                        await workspaceController.syncCurrentTopicHistoryFromFile(payload);
+                        return;
+                    }
+
                     await workspaceController.selectTopic(session.currentTopicId, { fromWatcher: true });
                 }
             }),

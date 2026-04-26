@@ -11,7 +11,7 @@ const reasoningExpandedState = new Map(); // messageId -> boolean
 const reasoningStartTimes = new Map(); // messageId -> performance timestamp
 const streamSegmentStates = new Map(); // messageId -> { stableCutoff, stableHtml, lastTailText }
 let activeStreamingMessageId = null; // Track the currently active streaming message
-const elementContentLengthCache = new Map(); // Track previous DOM content lengths per message.
+const elementContentLengthCache = new WeakMap(); // Track previous DOM content lengths without retaining discarded nodes.
 const TOOL_REQUEST_START = '<<<[TOOL_REQUEST]>>>';
 const TOOL_REQUEST_END = '<<<[END_TOOL_REQUEST]>>>';
 const TOOL_RESULT_MARKERS = [
@@ -23,10 +23,10 @@ const TOOL_RESULT_MARKERS = [
 const DESKTOP_PUSH_START = '<<<[DESKTOP_PUSH]>>>';
 const DESKTOP_PUSH_END = '<<<[DESKTOP_PUSH_END]>>>';
 const CODE_FENCE = '```';
-const STYLE_TAG_REGEX = /<style\b[^>]*>[\s\S]*?<\/style>/gi;
 
 // --- DOM Cache ---
 const messageDomCache = new Map(); // messageId -> { messageItem, contentDiv }
+const streamingTextDirtyMessages = new Set(); // messageId values whose body DOM needs another morphdom pass.
 
 // --- Performance Caches & Throttling ---
 const scrollThrottleTimers = new Map(); // messageId -> timerId
@@ -46,6 +46,10 @@ const messageContextMap = new Map(); // messageId -> { agentId, topicId, ... }
 // --- Local Reference Store ---
 let refs = {};
 let contentPipeline = null;
+
+export function getActiveStreamingMessageId() {
+    return activeStreamingMessageId;
+}
 
 /**
  * Initializes the Stream Manager with necessary dependencies from the main renderer.
@@ -684,6 +688,48 @@ function processStreamTailImages(container) {
     });
 }
 
+function cleanupRuntimeNode(node) {
+    if (!node || node.nodeType !== 1) return;
+
+    try {
+        if (typeof refs.cleanupPreviewsInContent === 'function') {
+            refs.cleanupPreviewsInContent(node);
+        }
+    } catch (error) {
+        console.debug('[StreamManager] Preview cleanup skipped during morphdom discard:', error);
+    }
+
+    try {
+        if (typeof refs.cleanupAnimationsInContent === 'function') {
+            refs.cleanupAnimationsInContent(node);
+        }
+    } catch (error) {
+        console.debug('[StreamManager] Animation cleanup skipped during morphdom discard:', error);
+    }
+}
+
+function isActivePreviewElement(element) {
+    return element?.classList?.contains('unistudy-html-preview-container')
+        && element.classList.contains('preview-mode');
+}
+
+function preserveFormControlState(fromEl, toEl) {
+    const tagName = fromEl.tagName;
+    if (tagName === 'INPUT') {
+        toEl.value = fromEl.value;
+        if (fromEl.type === 'checkbox' || fromEl.type === 'radio') {
+            toEl.checked = fromEl.checked;
+        }
+        toEl.disabled = fromEl.disabled;
+        return;
+    }
+
+    if (tagName === 'TEXTAREA' || tagName === 'SELECT') {
+        toEl.value = fromEl.value;
+        toEl.disabled = fromEl.disabled;
+    }
+}
+
 /**
  * Renders a single frame of the streaming message using morphdom for efficient DOM updates.
  * This version performs minimal processing to keep it fast and avoid destroying JS state.
@@ -711,7 +757,8 @@ function renderStreamFrame(messageId) {
     const segmentState = getOrCreateStreamSegmentState(messageId);
 
     const textForRendering = accumulatedStreamText.get(messageId) || "";
-    const nextStableCutoff = findExplicitStablePrefix(textForRendering, segmentState.stableCutoff);
+    const currentStableCutoff = segmentState.stableCutoff;
+    const nextStableCutoff = findExplicitStablePrefix(textForRendering, currentStableCutoff);
 
     renderStreamingReasoning(reasoningRoot, messageId);
 
@@ -719,9 +766,18 @@ function renderStreamFrame(messageId) {
     const streamingIndicator = contentDiv.querySelector('.streaming-indicator, .thinking-indicator');
     if (streamingIndicator) streamingIndicator.remove();
 
+    const nextTailText = textForRendering.slice(nextStableCutoff > currentStableCutoff ? nextStableCutoff : currentStableCutoff);
+    const bodyNeedsRender = streamingTextDirtyMessages.has(messageId)
+        || nextStableCutoff > currentStableCutoff
+        || nextTailText !== segmentState.lastTailText;
+
+    if (!bodyNeedsRender) {
+        return;
+    }
+
     if (nextStableCutoff > segmentState.stableCutoff) {
         const stableText = textForRendering.slice(0, nextStableCutoff);
-        const processedStableText = applyStreamingPreprocessors(stableText).replace(STYLE_TAG_REGEX, '');
+        const processedStableText = applyStreamingPreprocessors(stableText);
         const stableHtml = refs.markedInstance.parse(processedStableText);
         stableRoot.innerHTML = stableHtml;
         if (typeof refs.processRenderedContent === 'function') {
@@ -732,7 +788,7 @@ function renderStreamFrame(messageId) {
     }
 
     const tailText = textForRendering.slice(segmentState.stableCutoff);
-    const processedText = applyStreamingPreprocessors(tailText).replace(STYLE_TAG_REGEX, '');
+    const processedText = applyStreamingPreprocessors(tailText);
     const rawHtml = refs.markedInstance.parse(processedText);
 
     if (refs.morphdom) {
@@ -743,6 +799,14 @@ function renderStreamFrame(messageId) {
                 onBeforeElUpdated: function(fromEl, toEl) {
                 // Skip identical nodes.
                 if (fromEl.isEqualNode(toEl)) {
+                    return false;
+                }
+
+                if (isActivePreviewElement(fromEl)) {
+                    return false;
+                }
+
+                if (fromEl.tagName === 'IFRAME' && fromEl.closest('.unistudy-html-preview-container.preview-mode')) {
                     return false;
                 }
                 
@@ -774,12 +838,22 @@ function renderStreamFrame(messageId) {
                 }
                 
                 // Preserve interactive button state.
-                if (fromEl.tagName === 'BUTTON' && fromEl.dataset.interactivePreview === 'true') {
+                if (fromEl.tagName === 'BUTTON') {
                     if (fromEl.disabled) {
                         toEl.disabled = true;
                         toEl.style.opacity = fromEl.style.opacity;
                         toEl.textContent = fromEl.textContent; // Preserve completion markers.
                     }
+                    if (fromEl.getAttribute('aria-pressed')) {
+                        toEl.setAttribute('aria-pressed', fromEl.getAttribute('aria-pressed'));
+                    }
+                    if (fromEl.dataset.interacted === 'true') {
+                        toEl.dataset.interacted = 'true';
+                    }
+                }
+
+                if (fromEl.tagName === 'INPUT' || fromEl.tagName === 'TEXTAREA' || fromEl.tagName === 'SELECT') {
+                    preserveFormControlState(fromEl, toEl);
                 }
                 
                 // Preserve active media playback.
@@ -826,9 +900,10 @@ function renderStreamFrame(messageId) {
             
             onBeforeNodeDiscarded: function(node) {
                 // Keep nodes that are explicitly marked as persistent.
-                if (node.classList?.contains('keep-alive')) {
+                if (node.classList?.contains('keep-alive') || isActivePreviewElement(node)) {
                     return false;
                 }
+                cleanupRuntimeNode(node);
                 return true;
             },
             
@@ -863,6 +938,7 @@ function renderStreamFrame(messageId) {
     processStreamTailImages(stableRoot);
     processStreamTailImages(tailRoot);
     segmentState.lastTailText = tailText;
+    streamingTextDirtyMessages.delete(messageId);
 }
 
 /**
@@ -1008,6 +1084,9 @@ export async function startStreamingMessage(message, passedMessageItem = null) {
     
     if (shouldOverwrite) {
         accumulatedStreamText.set(messageId, newText);
+        if (newText) {
+            streamingTextDirtyMessages.add(messageId);
+        }
     }
     
     // Prepare placeholder for history
@@ -1183,6 +1262,7 @@ function cleanupFinalizedMessageState(messageId) {
     reasoningExpandedState.delete(messageId);
     reasoningStartTimes.delete(messageId);
     streamSegmentStates.delete(messageId);
+    streamingTextDirtyMessages.delete(messageId);
     cleanupDesktopPushState(messageId);
 
     setTimeout(() => {
@@ -1246,6 +1326,7 @@ export function appendStreamChunk(messageId, chunkData, context) {
         let currentAccumulated = accumulatedStreamText.get(messageId) || "";
         currentAccumulated += textToAppend; // Preserve full text for final rendering.
         accumulatedStreamText.set(messageId, currentAccumulated);
+        streamingTextDirtyMessages.add(messageId);
     }
 
     if (reasoningToAppend) {
@@ -1289,7 +1370,8 @@ export function appendStreamChunk(messageId, chunkData, context) {
     }
 }
 
-export async function finalizeStreamedMessage(messageId, finishReason, context, finalPayload = null) {
+export async function finalizeStreamedMessage(messageId, finishReason, context, finalPayload = null, options = {}) {
+    const deferDomRender = options?.deferDomRender === true;
     // With the global render loop, we no longer need to manually drain the queue here or clear timers.
     // The loop will continue to process chunks until the queue is empty and the message is finalized, then clean itself up.
     if (activeStreamingMessageId === messageId) {
@@ -1401,34 +1483,37 @@ export async function finalizeStreamedMessage(messageId, finishReason, context, 
             if (messageItem) {
                 messageItem.classList.remove('streaming', 'thinking');
 
-                const contentDiv = messageItem.querySelector('.md-content');
-                if (contentDiv) {
-                    contentDiv.querySelectorAll('.unistudy-stream-reasoning-root, .unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
+                if (!deferDomRender) {
+                    const contentDiv = messageItem.querySelector('.md-content');
+                    if (contentDiv) {
+                        cleanupRuntimeNode(contentDiv);
+                        contentDiv.querySelectorAll('.unistudy-stream-reasoning-root, .unistudy-stream-stable-root, .unistudy-stream-tail-root').forEach((el) => el.remove());
 
-                    // markedInstance is the renderer wrapper; it owns full preprocessing,
-                    // LaTeX protection, and ToolResult restoration for the final render.
-                    let rawHtml = markedInstance.parse(finalFullText);
-                    if (typeof refs.prependNativeReasoningBubble === 'function') {
-                        rawHtml = refs.prependNativeReasoningBubble(rawHtml, message);
-                    }
-
-                    // Perform the final, high-quality render using the original global refresh method.
-                    // This ensures images, KaTeX, code highlighting, etc., are all processed correctly.
-                    refs.setContentAndProcessImages(contentDiv, rawHtml, messageId);
-
-                    // Step 1: Run synchronous processors (KaTeX, hljs, etc.)
-                    refs.processRenderedContent(contentDiv);
-
-                    // Step 2: Defer TreeWalker-based highlighters to ensure DOM is stable
-                    setTimeout(() => {
-                        if (contentDiv && contentDiv.isConnected) {
-                            refs.runTextHighlights(contentDiv);
+                        // markedInstance is the renderer wrapper; it owns full preprocessing,
+                        // LaTeX protection, and ToolResult restoration for the final render.
+                        let rawHtml = markedInstance.parse(finalFullText);
+                        if (typeof refs.prependNativeReasoningBubble === 'function') {
+                            rawHtml = refs.prependNativeReasoningBubble(rawHtml, message);
                         }
-                    }, 0);
 
-                    // Step 3: Process animations, scripts, and 3D scenes
-                    if (refs.processAnimationsInContent) {
-                        refs.processAnimationsInContent(contentDiv);
+                        // Perform the final, high-quality render using the original global refresh method.
+                        // This ensures images, KaTeX, code highlighting, etc., are all processed correctly.
+                        refs.setContentAndProcessImages(contentDiv, rawHtml, messageId);
+
+                        // Step 1: Run synchronous processors (KaTeX, hljs, etc.)
+                        refs.processRenderedContent(contentDiv);
+
+                        // Step 2: Defer TreeWalker-based highlighters to ensure DOM is stable
+                        setTimeout(() => {
+                            if (contentDiv && contentDiv.isConnected) {
+                                refs.runTextHighlights(contentDiv);
+                            }
+                        }, 0);
+
+                        // Step 3: Process animations, scripts, and 3D scenes
+                        if (refs.processAnimationsInContent) {
+                            refs.processAnimationsInContent(contentDiv);
+                        }
                     }
                 }
 

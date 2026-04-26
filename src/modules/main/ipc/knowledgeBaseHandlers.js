@@ -19,6 +19,22 @@ async function updateTopicKnowledgeBase(agentConfigManager, agentId, topicId, kn
     await agentConfigManager.updateTopic(agentId, topicId, (topic) => ({
         ...topic,
         knowledgeBaseId: knowledgeBaseId || null,
+        selectedKnowledgeBaseDocumentIds: null,
+    }));
+}
+
+async function updateTopicSourceSelection(agentConfigManager, agentId, topicId, documentIds) {
+    if (!agentConfigManager) {
+        throw new Error('AgentConfigManager is unavailable.');
+    }
+
+    const selectedKnowledgeBaseDocumentIds = Array.isArray(documentIds)
+        ? [...new Set(documentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+        : null;
+
+    await agentConfigManager.updateTopic(agentId, topicId, (topic) => ({
+        ...topic,
+        selectedKnowledgeBaseDocumentIds,
     }));
 }
 
@@ -85,6 +101,14 @@ function initialize(context = {}) {
         return ok({ knowledgeBaseId: kbId || null });
     }, { knowledgeBaseId: null }));
 
+    registerHandle(['set-topic-source-selection', 'kb:set-topic-source-selection'], withKnowledgeBaseReady(async (_event, agentId, topicId, documentIds) => {
+        const selectedKnowledgeBaseDocumentIds = Array.isArray(documentIds)
+            ? [...new Set(documentIds.map((id) => String(id || '').trim()).filter(Boolean))]
+            : null;
+        await updateTopicSourceSelection(agentConfigManager, agentId, topicId, selectedKnowledgeBaseDocumentIds);
+        return ok({ selectedKnowledgeBaseDocumentIds });
+    }, { selectedKnowledgeBaseDocumentIds: null }));
+
     registerHandle(['get-topic-knowledge-base', 'kb:get-topic-binding'], withKnowledgeBaseReady(async (_event, agentId, topicId) => {
         if (!agentConfigManager) {
             throw new Error('AgentConfigManager is unavailable.');
@@ -97,6 +121,9 @@ function initialize(context = {}) {
 
         return ok({
             knowledgeBaseId: topic?.knowledgeBaseId || null,
+            selectedKnowledgeBaseDocumentIds: Array.isArray(topic?.selectedKnowledgeBaseDocumentIds)
+                ? topic.selectedKnowledgeBaseDocumentIds
+                : null,
         });
     }, { knowledgeBaseId: null }));
 

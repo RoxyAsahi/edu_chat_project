@@ -1409,6 +1409,40 @@ body:not(.light-theme) .mermaid-error {
     /* 🟢 添加透明度过渡，让切换更平滑 */
 }
 
+.unistudy-html-preview-status {
+    position: absolute;
+    left: 10px;
+    right: 86px;
+    top: 8px;
+    z-index: 9;
+    min-height: 24px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.74);
+    color: #e2e8f0;
+    font-size: 12px;
+    line-height: 1.35;
+    pointer-events: none;
+    backdrop-filter: blur(5px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.unistudy-html-preview-status.is-error,
+.unistudy-html-preview-status.is-blank {
+    border-color: rgba(248, 113, 113, 0.55);
+    background: rgba(69, 10, 10, 0.88);
+    color: #fee2e2;
+}
+
+.unistudy-html-preview-status.is-loading {
+    border-color: rgba(56, 189, 248, 0.48);
+    background: rgba(8, 47, 73, 0.82);
+    color: #bae6fd;
+}
+
 /* 确保预览模式下容器不会因为内容切换而剧烈跳动 */
 .unistudy-html-preview-container.preview-mode {
     background: white;

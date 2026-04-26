@@ -109,6 +109,14 @@
             </div>
             <div id="manualNotesLibraryFilters" class="manual-notes-library-page__filters" aria-label="笔记筛选">
               <button
+                id="manualNewNoteBtn"
+                class="accent-button manual-notes-library-page__new-note"
+                type="button"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">note_add</span>
+                <span>新建笔记</span>
+              </button>
+              <button
                 id="manualNotesLibraryFilterAllBtn"
                 class="ghost-button manual-notes-library-page__filter manual-notes-library-page__filter--active"
                 type="button"
@@ -443,13 +451,6 @@
               <div id="notesStudioNotesPanel" class="notes-studio__pane notes-studio__pane--active" role="tabpanel" aria-labelledby="notesStudioNotesTabBtn">
                 <div class="notes-studio__section notes-studio__section--tools">
                   <div class="notes-tool-grid">
-                    <button id="newNoteBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
-                      <span class="notes-tool-tile__icon material-symbols-outlined">edit_note</span>
-                      <span class="notes-tool-tile__body">
-                        <strong>新建笔记</strong>
-                      </span>
-                      <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
-                    </button>
                     <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
                       <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
                       <span class="notes-tool-tile__body">
@@ -516,13 +517,6 @@
                       </div>
                     </div>
                   </section>
-                </div>
-
-                <div class="notes-studio__footer">
-                  <button id="newNoteFabBtn" class="accent-button notes-fab" type="button">
-                    <span class="material-symbols-outlined">note_add</span>
-                    <span>添加笔记</span>
-                  </button>
                 </div>
               </div>
 

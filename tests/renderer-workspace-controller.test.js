@@ -407,3 +407,362 @@ test('createTopic creates a placeholder topic without opening the prompt dialog'
     });
     assert.equal(harness.state.session.currentTopicId, 'topic-new');
   });
+
+test('syncCurrentTopicHistoryFromFile updates one changed message without reloading the topic', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const calls = [];
+    let renderCurrentHistoryCalls = 0;
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getChatHistory(agentId, topicId) {
+                assert.equal(agentId, 'agent-1');
+                assert.equal(topicId, 'topic-1');
+                return [
+                    { id: 'm1', role: 'user', content: 'old question' },
+                    {
+                        id: 'm2',
+                        role: 'assistant',
+                        content: 'new answer',
+                        reasoning_content: 'new reasoning',
+                        kbContextRefs: [{ sourceId: 'kb-1' }],
+                    },
+                ];
+            },
+        },
+    });
+    harness.state.session.currentChatHistory = [
+        { id: 'm1', role: 'user', content: 'old question' },
+        { id: 'm2', role: 'assistant', content: 'old answer' },
+    ];
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        renderCurrentHistory: async () => {
+            renderCurrentHistoryCalls += 1;
+        },
+        messageRendererApi: {
+            updateMessageContent(messageId, content) {
+                calls.push(['update', messageId, content]);
+            },
+            removeMessageById(messageId, saveHistory) {
+                calls.push(['remove', messageId, saveHistory]);
+            },
+            async renderMessage(message, isInitialLoad) {
+                calls.push(['render', message.id, isInitialLoad]);
+            },
+            getActiveStreamingMessageId() {
+                return null;
+            },
+        },
+    });
+
+    const result = await controller.syncCurrentTopicHistoryFromFile({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(result.applied, true);
+    assert.deepEqual(calls, [['update', 'm2', 'new answer']]);
+    assert.equal(renderCurrentHistoryCalls, 0);
+    assert.deepEqual(harness.watcherCalls, []);
+    assert.equal(harness.state.session.currentChatHistory[1].content, 'new answer');
+    assert.equal(harness.state.session.currentChatHistory[1].reasoning_content, 'new reasoning');
+});
+
+test('syncCurrentTopicHistoryFromFile removes deleted messages and appends new tail messages', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const calls = [];
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getChatHistory() {
+                return [
+                    { id: 'm1', role: 'user', content: 'keep' },
+                    { id: 'm3', role: 'assistant', content: 'added' },
+                ];
+            },
+        },
+    });
+    harness.state.session.currentChatHistory = [
+        { id: 'm1', role: 'user', content: 'keep' },
+        { id: 'm2', role: 'assistant', content: 'delete me' },
+    ];
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        messageRendererApi: {
+            updateMessageContent(messageId, content) {
+                calls.push(['update', messageId, content]);
+            },
+            removeMessageById(messageId, saveHistory) {
+                calls.push(['remove', messageId, saveHistory]);
+            },
+            async renderMessage(message, isInitialLoad) {
+                calls.push(['render', message.id, isInitialLoad]);
+            },
+            getActiveStreamingMessageId() {
+                return null;
+            },
+        },
+    });
+
+    const result = await controller.syncCurrentTopicHistoryFromFile({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(result.applied, true);
+    assert.deepEqual(calls, [
+        ['remove', 'm2', false],
+        ['render', 'm3', true],
+    ]);
+    assert.deepEqual(harness.state.session.currentChatHistory.map((message) => message.id), ['m1', 'm3']);
+});
+
+test('syncCurrentTopicHistoryFromFile protects the active streaming message from file changes', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const calls = [];
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getChatHistory() {
+                return [
+                    { id: 'm1', role: 'user', content: 'keep' },
+                    { id: 'm2', role: 'assistant', content: 'disk version' },
+                ];
+            },
+        },
+    });
+    harness.state.session.currentChatHistory = [
+        { id: 'm1', role: 'user', content: 'keep' },
+        { id: 'm2', role: 'assistant', content: 'live streaming text' },
+    ];
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        messageRendererApi: {
+            updateMessageContent(messageId, content) {
+                calls.push(['update', messageId, content]);
+            },
+            removeMessageById(messageId, saveHistory) {
+                calls.push(['remove', messageId, saveHistory]);
+            },
+            async renderMessage(message, isInitialLoad) {
+                calls.push(['render', message.id, isInitialLoad]);
+            },
+            getActiveStreamingMessageId() {
+                return 'm2';
+            },
+        },
+    });
+
+    const result = await controller.syncCurrentTopicHistoryFromFile({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(result.applied, true);
+    assert.deepEqual(calls, []);
+    assert.equal(harness.state.session.currentChatHistory[1].content, 'live streaming text');
+    assert.equal(result.skippedActiveStreamingMessageId, 'm2');
+});
+
+test('syncCurrentTopicHistoryFromFile reorders rendered messages without reloading the topic', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const calls = [];
+    let renderCurrentHistoryCalls = 0;
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getChatHistory() {
+                return [
+                    { id: 'm2', role: 'assistant', content: 'second' },
+                    { id: 'm1', role: 'user', content: 'first' },
+                    { id: 'm3', role: 'assistant', content: 'third' },
+                ];
+            },
+        },
+    });
+    harness.state.session.currentChatHistory = [
+        { id: 'm1', role: 'user', content: 'first' },
+        { id: 'm2', role: 'assistant', content: 'second' },
+        { id: 'm3', role: 'assistant', content: 'third' },
+    ];
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        renderCurrentHistory: async () => {
+            renderCurrentHistoryCalls += 1;
+        },
+        messageRendererApi: {
+            getActiveStreamingMessageId() {
+                return null;
+            },
+            reorderRenderedMessagesById(ids) {
+                calls.push(['reorder', ids]);
+                return ids;
+            },
+        },
+    });
+
+    const result = await controller.syncCurrentTopicHistoryFromFile({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(result.applied, true);
+    assert.deepEqual(calls, [['reorder', ['m2', 'm1', 'm3']]]);
+    assert.deepEqual(result.reorderedIds, ['m2', 'm1', 'm3']);
+    assert.equal(renderCurrentHistoryCalls, 0);
+    assert.deepEqual(harness.state.session.currentChatHistory.map((message) => message.id), ['m2', 'm1', 'm3']);
+});
+
+test('syncCurrentTopicHistoryFromFile keeps non-rendered window messages memory-only', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const calls = [];
+    const oldHistory = Array.from({ length: 100 }, (_value, index) => ({
+        id: `m${index}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `old ${index}`,
+    }));
+    const nextHistory = oldHistory.map((message) => (
+        message.id === 'm10'
+            ? { ...message, content: 'updated old hidden message' }
+            : { ...message }
+    ));
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getChatHistory() {
+                return nextHistory;
+            },
+        },
+    });
+    harness.state.session.currentChatHistory = oldHistory;
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        messageRendererApi: {
+            updateMessageContent(messageId, content) {
+                calls.push(['update', messageId, content]);
+            },
+            getActiveStreamingMessageId() {
+                return null;
+            },
+            isHistoryWindowActive() {
+                return true;
+            },
+            getRenderedMessageIds() {
+                return Array.from({ length: 30 }, (_value, index) => `m${70 + index}`);
+            },
+            getHistoryWindowSnapshot() {
+                return {
+                    active: true,
+                    renderedStartIndex: 70,
+                    renderedIds: Array.from({ length: 30 }, (_value, index) => `m${70 + index}`),
+                    totalCount: 100,
+                };
+            },
+            syncHistoryWindowHistory(history) {
+                calls.push(['sync-window', history.length]);
+            },
+        },
+    });
+
+    const result = await controller.syncCurrentTopicHistoryFromFile({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(result.applied, true);
+    assert.deepEqual(calls, [['sync-window', 100]]);
+    assert.deepEqual(result.memoryOnlyIds, ['m10']);
+    assert.equal(harness.state.session.currentChatHistory[10].content, 'updated old hidden message');
+});
+
+test('syncCurrentTopicHistoryFromFile updates visible window messages locally', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const calls = [];
+    const oldHistory = Array.from({ length: 100 }, (_value, index) => ({
+        id: `m${index}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `old ${index}`,
+    }));
+    const nextHistory = oldHistory.map((message) => (
+        message.id === 'm72'
+            ? { ...message, content: 'updated visible message' }
+            : { ...message }
+    ));
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getChatHistory() {
+                return nextHistory;
+            },
+        },
+    });
+    harness.state.session.currentChatHistory = oldHistory;
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        messageRendererApi: {
+            updateMessageContent(messageId, content) {
+                calls.push(['update', messageId, content]);
+            },
+            getActiveStreamingMessageId() {
+                return null;
+            },
+            isHistoryWindowActive() {
+                return true;
+            },
+            getRenderedMessageIds() {
+                return Array.from({ length: 30 }, (_value, index) => `m${70 + index}`);
+            },
+            getHistoryWindowSnapshot() {
+                return {
+                    active: true,
+                    renderedStartIndex: 70,
+                    renderedIds: Array.from({ length: 30 }, (_value, index) => `m${70 + index}`),
+                    totalCount: 100,
+                };
+            },
+            syncHistoryWindowHistory(history) {
+                calls.push(['sync-window', history.length]);
+            },
+        },
+    });
+
+    const result = await controller.syncCurrentTopicHistoryFromFile({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(result.applied, true);
+    assert.deepEqual(calls, [
+        ['update', 'm72', 'updated visible message'],
+        ['sync-window', 100],
+    ]);
+    assert.deepEqual(result.memoryOnlyIds, []);
+});
+
+test('syncCurrentTopicHistoryFromFile skips while a message is being edited', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const dom = new JSDOM('<body><article class="message-item-editing"></article></body>');
+    let getChatHistoryCalls = 0;
+    const harness = createControllerHarness({
+        chatAPI: {
+            async getChatHistory() {
+                getChatHistoryCalls += 1;
+                return [];
+            },
+        },
+    });
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        documentObj: dom.window.document,
+    });
+
+    const result = await controller.syncCurrentTopicHistoryFromFile({
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.deepEqual(result, { applied: false, skipped: true, reason: 'editing' });
+    assert.equal(getChatHistoryCalls, 0);
+});

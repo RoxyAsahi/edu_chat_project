@@ -35,6 +35,7 @@ function buildDefaultPlaceholderTopic(overrides = {}, existingTopics = []) {
         unread: false,
         creatorSource: 'system',
         knowledgeBaseId: null,
+        selectedKnowledgeBaseDocumentIds: null,
         ...overrides,
     };
 }

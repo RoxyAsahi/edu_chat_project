@@ -17,7 +17,79 @@ function createSourceOperations(deps = {}) {
     const getCurrentTopic = deps.getCurrentTopic || (() => null);
     const getCurrentTopicKnowledgeBaseId = deps.getCurrentTopicKnowledgeBaseId || (() => null);
     const updateTopicKnowledgeBaseBinding = deps.updateTopicKnowledgeBaseBinding || (() => {});
+    const updateTopicSourceSelection = deps.updateTopicSourceSelection || (() => {});
     const getFacade = deps.getFacade || (() => ({}));
+
+    function normalizeDocumentIds(documentIds = []) {
+        return [...new Set((Array.isArray(documentIds) ? documentIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean))];
+    }
+
+    function getTopicSelectedDocumentIds() {
+        const currentTopic = getCurrentTopic();
+        return Array.isArray(currentTopic?.selectedKnowledgeBaseDocumentIds)
+            ? normalizeDocumentIds(currentTopic.selectedKnowledgeBaseDocumentIds)
+            : null;
+    }
+
+    function getAllTopicDocumentIds() {
+        return normalizeDocumentIds(state.topicKnowledgeBaseDocuments.map((item) => item.id));
+    }
+
+    async function persistCurrentTopicSourceSelection(documentIds) {
+        if (!state.currentSelectedItem.id || !state.currentTopicId) {
+            return false;
+        }
+
+        const selectedKnowledgeBaseDocumentIds = Array.isArray(documentIds)
+            ? normalizeDocumentIds(documentIds)
+            : null;
+        const result = await chatAPI.setTopicSourceSelection(
+            state.currentSelectedItem.id,
+            state.currentTopicId,
+            selectedKnowledgeBaseDocumentIds
+        ).catch((error) => ({
+            success: false,
+            error: error.message,
+        }));
+
+        if (!result?.success) {
+            ui.showToastNotification(`更新来源选择失败：${result?.error || '未知错误'}`, 'error');
+            return false;
+        }
+
+        updateTopicSourceSelection(selectedKnowledgeBaseDocumentIds);
+        return true;
+    }
+
+    async function toggleTopicSourceDocument(documentId) {
+        const normalizedDocumentId = String(documentId || '').trim();
+        if (!normalizedDocumentId) {
+            return;
+        }
+
+        const allDocumentIds = getAllTopicDocumentIds();
+        const currentSelection = getTopicSelectedDocumentIds();
+        const selectedSet = new Set(currentSelection || allDocumentIds);
+        if (selectedSet.has(normalizedDocumentId)) {
+            selectedSet.delete(normalizedDocumentId);
+        } else {
+            selectedSet.add(normalizedDocumentId);
+        }
+
+        const nextSelection = allDocumentIds.filter((id) => selectedSet.has(id));
+        if (await persistCurrentTopicSourceSelection(nextSelection)) {
+            getFacade().renderTopicKnowledgeBaseFiles();
+        }
+    }
+
+    async function setAllTopicSourceDocumentsSelected(selected = true) {
+        const nextSelection = selected ? null : [];
+        if (await persistCurrentTopicSourceSelection(nextSelection)) {
+            getFacade().renderTopicKnowledgeBaseFiles();
+        }
+    }
 
     async function refreshKnowledgeBaseSummaries(options = {}) {
         const result = await chatAPI.listKnowledgeBases().catch((error) => ({
@@ -272,11 +344,19 @@ function createSourceOperations(deps = {}) {
             return;
         }
 
+        const importedDocumentIds = Array.isArray(result.items)
+            ? result.items.map((item) => item?.id).filter(Boolean)
+            : [];
+
         if (kbId === state.selectedKnowledgeBaseId) {
             await loadKnowledgeBaseDocuments(kbId, { silent: true });
         }
         if (kbId === getCurrentTopicKnowledgeBaseId()) {
             await loadCurrentTopicKnowledgeBaseDocuments({ silent: true, reuseSelected: false });
+            const currentSelection = getTopicSelectedDocumentIds();
+            if (currentSelection && importedDocumentIds.length > 0) {
+                await persistCurrentTopicSourceSelection([...currentSelection, ...importedDocumentIds]);
+            }
         }
 
         await loadKnowledgeBases({ silent: true });
@@ -369,6 +449,7 @@ function createSourceOperations(deps = {}) {
         }
 
         updateTopicKnowledgeBaseBinding(kbId);
+        updateTopicSourceSelection(null);
         renderTopics();
         getFacade().syncCurrentTopicKnowledgeBaseControls();
         await loadCurrentTopicKnowledgeBaseDocuments({ silent: true, reuseSelected: false });
@@ -449,6 +530,8 @@ function createSourceOperations(deps = {}) {
         renameKnowledgeBase,
         runKnowledgeBaseDebug,
         runKnowledgeBaseSearch,
+        setAllTopicSourceDocumentsSelected,
+        toggleTopicSourceDocument,
     };
 }
 

@@ -64,6 +64,31 @@ test('renderer global surface stays within the three approved bridges', async ()
     assert.doesNotMatch(streamManagerSource, /window\.streamManager\s*=/);
 });
 
+test('stream morphdom element cache does not strongly retain discarded DOM nodes', async () => {
+    const streamManagerSource = await readRepoFile('src/modules/renderer/streamManager.js');
+
+    assert.match(
+        streamManagerSource,
+        /const\s+elementContentLengthCache\s*=\s*new\s+WeakMap\s*\(/,
+    );
+    assert.doesNotMatch(
+        streamManagerSource,
+        /const\s+elementContentLengthCache\s*=\s*new\s+Map\s*\(/,
+    );
+});
+
+test('avatar preview object URLs are released after transient preview use', async () => {
+    const uiHelpersSource = await readRepoFile('src/modules/renderer/ui-helpers.js');
+    const rendererSource = await readRepoFile('src/renderer/renderer.js');
+
+    assert.match(uiHelpersSource, /activeAvatarCropperCleanup/);
+    assert.match(uiHelpersSource, /URL\.revokeObjectURL\(objectUrl\)/);
+    assert.match(uiHelpersSource, /objectUrl\s*=\s*URL\.createObjectURL\(file\)/);
+    assert.match(rendererSource, /let\s+agentAvatarPreviewObjectUrl\s*=\s*null/);
+    assert.match(rendererSource, /function\s+revokeAgentAvatarPreviewObjectUrl/);
+    assert.match(rendererSource, /URL\.revokeObjectURL\(url\)/);
+});
+
 test('package scripts expose renderer logic and dom checks under renderer-specific names', async () => {
     const packageJson = JSON.parse(await readRepoFile('package.json'));
 

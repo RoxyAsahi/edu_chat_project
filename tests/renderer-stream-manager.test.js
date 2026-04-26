@@ -171,6 +171,130 @@ test('streamManager finalizes current-view messages from in-memory history befor
     assert.equal(messageItem.classList.contains('thinking'), false);
 });
 
+test('streamManager can defer final DOM rendering while still finalizing history', async (t) => {
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatMessages">
+            <article class="message-item thinking" data-message-id="assistant-deferred">
+              <div class="name-time-block"></div>
+              <div class="md-content"><div class="unistudy-stream-tail-root">live DOM</div></div>
+            </article>
+          </div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalPerformance = global.performance;
+    const originalSetTimeout = global.setTimeout;
+    const originalClearTimeout = global.clearTimeout;
+
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = () => 1;
+    global.performance = { now: () => Date.now() };
+    global.setTimeout = () => 1;
+    global.clearTimeout = () => {};
+
+    t.after(() => {
+        global.window = originalWindow;
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.performance = originalPerformance;
+        global.setTimeout = originalSetTimeout;
+        global.clearTimeout = originalClearTimeout;
+    });
+
+    const { initStreamManager, startStreamingMessage, finalizeStreamedMessage } = await loadStreamManagerModule();
+
+    let currentHistory = cloneHistory([{
+        id: 'user-deferred',
+        role: 'user',
+        content: 'question',
+        timestamp: 1,
+    }]);
+    let setContentCalls = 0;
+
+    initStreamManager({
+        currentSelectedItemRef: {
+            get: () => ({ id: 'agent-1' }),
+        },
+        currentTopicIdRef: {
+            get: () => 'topic-1',
+        },
+        currentChatHistoryRef: {
+            get: () => currentHistory,
+            set: (value) => {
+                currentHistory = cloneHistory(value);
+            },
+        },
+        globalSettingsRef: {
+            get: () => ({ enableSmoothStreaming: false }),
+        },
+        chatMessagesDiv: dom.window.document.getElementById('chatMessages'),
+        electronAPI: {
+            async getChatHistory() {
+                return cloneHistory(currentHistory);
+            },
+            async saveChatHistory() {
+                return { success: true };
+            },
+        },
+        uiHelper: {
+            scrollToBottom() {},
+        },
+        markedInstance: {
+            parse: (text) => text,
+        },
+        preprocessFullContent: (text) => text,
+        setContentAndProcessImages(contentDiv, rawHtml) {
+            setContentCalls += 1;
+            contentDiv.textContent = rawHtml;
+        },
+        processRenderedContent() {},
+        runTextHighlights() {},
+        processAnimationsInContent() {},
+        prependNativeReasoningBubble: (rawHtml) => rawHtml,
+        renderMessage() {
+            throw new Error('existing DOM node should be reused');
+        },
+    });
+
+    const messageItem = dom.window.document.querySelector('.message-item[data-message-id="assistant-deferred"]');
+    await startStreamingMessage({
+        id: 'assistant-deferred',
+        role: 'assistant',
+        name: 'Agent One',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        content: 'Thinking',
+        isThinking: true,
+        timestamp: 2,
+    }, messageItem);
+
+    await finalizeStreamedMessage('assistant-deferred', 'completed', {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    }, {
+        fullResponse: 'final answer',
+    }, {
+        deferDomRender: true,
+    });
+
+    const finalizedMessage = currentHistory.find((message) => message.id === 'assistant-deferred');
+    assert.equal(finalizedMessage.content, 'final answer');
+    assert.equal(finalizedMessage.isThinking, false);
+    assert.equal(setContentCalls, 0);
+    assert.equal(
+        dom.window.document.querySelector('.message-item[data-message-id="assistant-deferred"] .md-content')?.textContent,
+        'live DOM'
+    );
+    assert.equal(messageItem.classList.contains('streaming'), false);
+    assert.equal(messageItem.classList.contains('thinking'), false);
+});
+
 test('streamManager recovers the active assistant message after current-view history is reloaded mid-stream', async (t) => {
     const dom = new JSDOM(`
         <body>
@@ -503,6 +627,7 @@ test('streamManager renders native reasoning deltas before stream finalization',
         content: 'question',
         timestamp: 1,
     }]);
+    let parseCalls = 0;
 
     initStreamManager({
         currentSelectedItemRef: {
@@ -533,7 +658,10 @@ test('streamManager renders native reasoning deltas before stream finalization',
             scrollToBottom() {},
         },
         markedInstance: {
-            parse: (text) => `<p>${text}</p>`,
+            parse: (text) => {
+                parseCalls += 1;
+                return `<p>${text}</p>`;
+            },
         },
         preprocessFullContent: (text) => text,
         setContentAndProcessImages(contentDiv, rawHtml) {
@@ -569,6 +697,7 @@ test('streamManager renders native reasoning deltas before stream finalization',
     });
 
     const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-reasoning-live"] .md-content');
+    assert.equal(parseCalls, 1);
     assert.match(contentDiv.innerHTML, /native-reasoning-bubble/);
     assert.match(contentDiv.textContent, /live reasoning/);
 
@@ -589,6 +718,7 @@ test('streamManager renders native reasoning deltas before stream finalization',
     assert.ok(contentDiv.querySelector('.native-reasoning-bubble.expanded'));
     assert.equal(contentDiv.querySelector('.unistudy-live-reasoning-header'), header);
     assert.match(contentDiv.textContent, /keeps expanding/);
+    assert.equal(parseCalls, 2);
 });
 
 test('streamManager renders a completed tool request block before stream finalization', async (t) => {
@@ -935,7 +1065,7 @@ test('streamManager streams bare HTML fragments through marked into the message 
     }, messageItem);
 
     appendStreamChunk('assistant-raw-html-live', {
-        content: '<div id="response-root" class="demo"><button>Go</button>',
+        content: '<div id="response-root" class="demo"><style>.demo { color: red; }</style><button>Go</button>',
     }, {
         agentId: 'agent-1',
         topicId: 'topic-1',
@@ -943,6 +1073,7 @@ test('streamManager streams bare HTML fragments through marked into the message 
 
     const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-raw-html-live"] .md-content');
     assert.ok(contentDiv.querySelector('#response-root.demo'));
+    assert.match(contentDiv.querySelector('#response-root.demo style')?.textContent || '', /\.demo \{ color: red; \}/);
     assert.ok(contentDiv.querySelector('button'));
     assert.equal(contentDiv.querySelector('button')?.textContent, 'Go');
     assert.doesNotMatch(contentDiv.innerHTML, /unistudy-live-html-preview/);
@@ -957,4 +1088,158 @@ test('streamManager streams bare HTML fragments through marked into the message 
 
     assert.ok(contentDiv.querySelector('#response-root.demo span'));
     assert.equal(contentDiv.querySelector('#response-root.demo span')?.textContent, 'More');
+});
+
+test('streamManager preserves stateful controls and active previews during morphdom updates', async (t) => {
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatMessages">
+            <article class="message-item thinking" data-message-id="assistant-stateful-morph">
+              <div class="name-time-block"></div>
+              <div class="md-content">
+                <div class="unistudy-stream-reasoning-root"></div>
+                <div class="unistudy-stream-stable-root"></div>
+                <div class="unistudy-stream-tail-root">
+                  <button disabled style="opacity: 0.5;" aria-pressed="true" data-interacted="true">Done</button>
+                  <input value="learner edit">
+                  <div class="unistudy-html-preview-container preview-mode"><iframe data-frame-id="live"></iframe></div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalPerformance = global.performance;
+
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = () => 1;
+    global.performance = { now: () => Date.now() };
+
+    t.after(() => {
+        global.window = originalWindow;
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.performance = originalPerformance;
+    });
+
+    const { initStreamManager, startStreamingMessage, appendStreamChunk } = await loadStreamManagerModule();
+
+    let currentHistory = cloneHistory([{
+        id: 'user-stateful-morph',
+        role: 'user',
+        content: 'stateful render',
+        timestamp: 1,
+    }]);
+    const observed = {};
+
+    initStreamManager({
+        currentSelectedItemRef: {
+            get: () => ({ id: 'agent-1' }),
+        },
+        currentTopicIdRef: {
+            get: () => 'topic-1',
+        },
+        currentChatHistoryRef: {
+            get: () => currentHistory,
+            set: (value) => {
+                currentHistory = cloneHistory(value);
+            },
+        },
+        globalSettingsRef: {
+            get: () => ({ enableSmoothStreaming: false }),
+        },
+        chatMessagesDiv: dom.window.document.getElementById('chatMessages'),
+        electronAPI: {
+            async getChatHistory() {
+                return cloneHistory(currentHistory);
+            },
+            async saveChatHistory() {
+                return { success: true };
+            },
+        },
+        uiHelper: {
+            scrollToBottom() {},
+        },
+        markedInstance: {
+            parse: (text) => text,
+        },
+        morphdom(fromRoot, rawHtml, options) {
+            const template = dom.window.document.createElement('template');
+            template.innerHTML = rawHtml;
+            const toRoot = template.content.firstElementChild;
+
+            const fromButton = fromRoot.querySelector('button');
+            const toButton = toRoot.querySelector('button');
+            options.onBeforeElUpdated(fromButton, toButton);
+            observed.buttonDisabled = toButton.disabled;
+            observed.buttonText = toButton.textContent;
+            observed.buttonOpacity = toButton.style.opacity;
+            observed.buttonPressed = toButton.getAttribute('aria-pressed');
+            observed.buttonInteracted = toButton.dataset.interacted;
+
+            const fromInput = fromRoot.querySelector('input');
+            const toInput = toRoot.querySelector('input');
+            options.onBeforeElUpdated(fromInput, toInput);
+            observed.inputValue = toInput.value;
+
+            const fromPreview = fromRoot.querySelector('.unistudy-html-preview-container');
+            const toPreview = toRoot.querySelector('.unistudy-html-preview-container');
+            observed.previewUpdateAllowed = options.onBeforeElUpdated(fromPreview, toPreview);
+
+            const fromFrame = fromRoot.querySelector('iframe');
+            const toFrame = toRoot.querySelector('iframe');
+            observed.iframeUpdateAllowed = options.onBeforeElUpdated(fromFrame, toFrame);
+        },
+        preprocessFullContent: (text) => text,
+        setContentAndProcessImages(contentDiv, rawHtml) {
+            contentDiv.innerHTML = rawHtml;
+        },
+        processRenderedContent() {},
+        runTextHighlights() {},
+        processAnimationsInContent() {},
+        cleanupPreviewsInContent() {},
+        cleanupAnimationsInContent() {},
+        prependNativeReasoningBubble: (rawHtml) => rawHtml,
+        renderMessage() {
+            throw new Error('existing DOM node should be reused');
+        },
+    });
+
+    const messageItem = dom.window.document.querySelector('.message-item[data-message-id="assistant-stateful-morph"]');
+    await startStreamingMessage({
+        id: 'assistant-stateful-morph',
+        role: 'assistant',
+        name: 'Agent One',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        content: 'Thinking',
+        isThinking: true,
+        timestamp: 2,
+    }, messageItem);
+
+    appendStreamChunk('assistant-stateful-morph', {
+        content: [
+            '<button>Run</button>',
+            '<input value="model value">',
+            '<div class="unistudy-html-preview-container"><iframe data-frame-id="new"></iframe></div>',
+        ].join(''),
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    assert.equal(observed.buttonDisabled, true);
+    assert.equal(observed.buttonText, 'Done');
+    assert.equal(observed.buttonOpacity, '0.5');
+    assert.equal(observed.buttonPressed, 'true');
+    assert.equal(observed.buttonInteracted, 'true');
+    assert.equal(observed.inputValue, 'learner edit');
+    assert.equal(observed.previewUpdateAllowed, false);
+    assert.equal(observed.iframeUpdateAllowed, false);
 });

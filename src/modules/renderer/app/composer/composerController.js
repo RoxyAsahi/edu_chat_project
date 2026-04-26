@@ -521,6 +521,9 @@ function createComposerController(deps = {}) {
         const result = await chatAPI.retrieveKnowledgeBaseContext({
             kbId,
             query,
+            ...(Array.isArray(currentTopic?.selectedKnowledgeBaseDocumentIds)
+                ? { documentIds: currentTopic.selectedKnowledgeBaseDocumentIds }
+                : {}),
         }).catch((error) => ({
             success: false,
             error: error.message,
