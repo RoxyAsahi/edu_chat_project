@@ -22,6 +22,20 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
             english: { topicCount: 0, unreadCount: 0, lastTopicName: '' },
         },
         selectedAgentId: 'math',
+        learningMetrics: {
+            streakDays: 2,
+            activeDaysLast7: 3,
+            totalLearningDays: 9,
+            trendDays: [
+                { dateKey: '2026-04-21', label: '4/21', value: 0, active: false },
+                { dateKey: '2026-04-22', label: '4/22', value: 2, active: true },
+                { dateKey: '2026-04-23', label: '4/23', value: 0, active: false },
+                { dateKey: '2026-04-24', label: '4/24', value: 1, active: true },
+                { dateKey: '2026-04-25', label: '4/25', value: 0, active: false },
+                { dateKey: '2026-04-26', label: '4/26', value: 3, active: true },
+                { dateKey: '2026-04-27', label: '4/27', value: 0, active: false },
+            ],
+        },
         overviewStats: {
             subjectCount: 2,
             topicCount: 3,
@@ -51,7 +65,12 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
     assert.match(result.gridMarkup, /学习结晶/);
     assert.match(result.gridMarkup, /home-diary/);
-    assert.match(result.gridMarkup, /学习力/);
+    assert.match(result.gridMarkup, /home-status-trend/);
+    assert.match(result.gridMarkup, /home-status-trend__chart/);
+    assert.match(result.gridMarkup, /活跃度 3/);
+    assert.doesNotMatch(result.gridMarkup, /近 7 天活跃 3 天，总学习 9 天/);
+    assert.doesNotMatch(result.gridMarkup, /home-status__score/);
+    assert.doesNotMatch(result.gridMarkup, /学习力/);
 });
 
 test('buildSubjectOverviewMarkup keeps the current subject visible when it is the only subject card', async () => {

@@ -209,6 +209,13 @@ function buildCardSelectionKey(card = {}) {
     return [diaryId, notebookId, dateKey, updatedAt, topicName].join('::');
 }
 
+function parseTagInput(value) {
+    return String(value || '')
+        .split(/[,\n|，、]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+}
+
 function groupCardsByAgent(cards = []) {
     const groups = new Map();
 
@@ -252,6 +259,9 @@ function createDiaryWallController(deps = {}) {
         selectedCardKey: '',
         detail: null,
         detailExpanded: false,
+        manageMode: false,
+        selectedCardKeys: new Set(),
+        editingEntry: null,
         noteModalOpen: false,
         lastLoadedAt: 0,
         loadingPromise: null,
@@ -269,6 +279,7 @@ function createDiaryWallController(deps = {}) {
 
     function closeNoteModal() {
         state.noteModalOpen = false;
+        state.editingEntry = null;
         el.diaryWallNoteModal?.classList.add('hidden');
         el.diaryWallNoteModal?.setAttribute('aria-hidden', 'true');
     }
@@ -302,6 +313,31 @@ function createDiaryWallController(deps = {}) {
         if (!state.selectedCardKey || !visibleCards.some((item) => buildCardSelectionKey(item) === state.selectedCardKey)) {
             state.selectedCardKey = '';
         }
+        state.selectedCardKeys = new Set([...state.selectedCardKeys]
+            .filter((key) => visibleCards.some((item) => buildCardSelectionKey(item) === key)));
+    }
+
+    function getCardByKey(key) {
+        return state.cards.find((card) => buildCardSelectionKey(card) === key) || null;
+    }
+
+    function getVisibleSelectedCards() {
+        return getVisibleCards().filter((card) => state.selectedCardKeys.has(buildCardSelectionKey(card)));
+    }
+
+    function setCardSelected(key, selected) {
+        if (!key) {
+            return;
+        }
+        if (selected) {
+            state.selectedCardKeys.add(key);
+        } else {
+            state.selectedCardKeys.delete(key);
+        }
+    }
+
+    function toggleCardSelected(key) {
+        setCardSelected(key, !state.selectedCardKeys.has(key));
     }
 
     function renderAgentNav() {
@@ -387,6 +423,7 @@ function createDiaryWallController(deps = {}) {
         el.diaryWallSummary.innerHTML = `
             <strong>${escapeHtml(`${visibleCards.length} 张日记`)}</strong>
             <span>${escapeHtml(latest ? `最近 ${latest.dateKey || formatTimeOnly(latest.updatedAt)}` : '暂无更新')}</span>
+            ${state.manageMode ? `<span>${escapeHtml(`已选 ${state.selectedCardKeys.size} 张`)}</span>` : ''}
         `;
     }
 
@@ -407,17 +444,85 @@ function createDiaryWallController(deps = {}) {
         }
 
         const sortedCards = [...visibleCards].sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0));
+        const allVisibleSelected = sortedCards.length > 0
+            && sortedCards.every((card) => state.selectedCardKeys.has(buildCardSelectionKey(card)));
+        const managerToolbar = state.manageMode ? `
+            <div class="diary-wall-manager-toolbar">
+              <strong>日记管理</strong>
+              <span>点卡片选择；删除会移除本地学习日志源条目。</span>
+              <button type="button" class="ghost-button icon-text-btn" data-diary-wall-toggle-all>
+                <span class="material-symbols-outlined">${allVisibleSelected ? 'deselect' : 'select_all'}</span>
+                ${allVisibleSelected ? '取消全选' : '全选当前'}
+              </button>
+              <button type="button" class="ghost-button icon-text-btn" data-diary-wall-delete-selected ${state.selectedCardKeys.size === 0 ? 'disabled' : ''}>
+                <span class="material-symbols-outlined">delete</span>
+                删除选中
+              </button>
+              <button type="button" class="ghost-button icon-text-btn" data-diary-wall-exit-manage>
+                <span class="material-symbols-outlined">visibility</span>
+                返回浏览
+              </button>
+            </div>
+        ` : '';
         el.diaryWallCards.innerHTML = `
+              ${managerToolbar}
               <div class="diary-wall-group__grid diary-wall-group__grid--flat">
                 ${sortedCards.map((card) => {
+                    const cardKey = buildCardSelectionKey(card);
                     const preview = buildPlainPreview(card.previewMarkdown || card.contentMarkdown || '', 180);
+                    const entryLabel = Number(card.entryCount || 0) > 0 ? `${Number(card.entryCount || 0)} 条记录` : '日记卡';
+                    const notebookLabel = card.notebookName || (Array.isArray(card.agentNames) ? card.agentNames[0] : '') || '';
+                    const tagMarkup = Array.isArray(card.tags) && card.tags.length > 0
+                        ? `<div class="diary-wall-card__tags">${card.tags.slice(0, 4).map((tag) => `<span class="diary-wall-chip">#${escapeHtml(tag)}</span>`).join('')}</div>`
+                        : '';
+                    if (state.manageMode) {
+                        const isSelected = state.selectedCardKeys.has(cardKey);
+                        return `
+                    <article class="diary-wall-card diary-wall-card--managed ${isSelected ? 'diary-wall-card--selected' : ''} ${cardKey === state.selectedCardKey ? 'diary-wall-card--active' : ''}" data-diary-wall-card="${escapeHtml(cardKey)}" aria-selected="${isSelected ? 'true' : 'false'}">
+                      <div class="diary-wall-card__header diary-wall-card__header--managed">
+                        <div class="diary-wall-card__header-main">
+                          <span class="diary-wall-card__eyebrow">学习日记</span>
+                          <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
+                        </div>
+                        <div class="diary-wall-card__actions">
+                          <button type="button" class="diary-wall-card__check" data-diary-wall-card-select="${escapeHtml(cardKey)}" aria-label="${isSelected ? '取消选择日记' : '选择日记'}" aria-pressed="${isSelected ? 'true' : 'false'}">
+                            <span class="diary-wall-card__check-box" aria-hidden="true">
+                              <span class="material-symbols-outlined">check</span>
+                            </span>
+                          </button>
+                          <button type="button" class="ghost-button icon-btn" data-diary-wall-manage-open="${escapeHtml(cardKey)}" aria-label="查看日记">
+                            <span class="material-symbols-outlined">open_in_new</span>
+                          </button>
+                          <button type="button" class="ghost-button icon-btn danger" data-diary-wall-delete-card="${escapeHtml(cardKey)}" aria-label="删除日记">
+                            <span class="material-symbols-outlined">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                      <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
+                      ${tagMarkup}
+                      <div class="diary-wall-card__meta">
+                        ${notebookLabel ? `<span>${escapeHtml(notebookLabel)}</span>` : ''}
+                        <span>${escapeHtml(card.dateKey || '未记录日期')}</span>
+                        <span>${escapeHtml(entryLabel)}</span>
+                      </div>
+                    </article>
+                `;
+                    }
                     return `
                     <button type="button" class="diary-wall-card ${buildCardSelectionKey(card) === state.selectedCardKey ? 'diary-wall-card--active' : ''}" data-diary-wall-card="${escapeHtml(buildCardSelectionKey(card))}">
-                      <div class="diary-wall-card__body">
-                        <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
-                        <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
+                      <div class="diary-wall-card__header">
+                        <div class="diary-wall-card__header-main">
+                          <span class="diary-wall-card__eyebrow">学习日记</span>
+                          <h3>${escapeHtml(buildCardTitle(card) || '未命名日记')}</h3>
+                        </div>
                       </div>
-                      <span class="diary-wall-card__eyebrow">${escapeHtml(card.dateKey || '未记录日期')}</span>
+                      <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
+                      ${tagMarkup}
+                      <div class="diary-wall-card__meta">
+                        ${notebookLabel ? `<span>${escapeHtml(notebookLabel)}</span>` : ''}
+                        <span>${escapeHtml(card.dateKey || '未记录日期')}</span>
+                        <span>${escapeHtml(entryLabel)}</span>
+                      </div>
                     </button>
                 `;
                 }).join('')}
@@ -452,6 +557,244 @@ function createDiaryWallController(deps = {}) {
             state.detailExpanded = !state.detailExpanded;
             renderDetail();
         });
+        container.querySelectorAll('[data-diary-wall-edit-entry]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const entryId = button.getAttribute('data-diary-wall-edit-entry') || '';
+                const agentId = button.getAttribute('data-diary-wall-entry-agent') || '';
+                const topicId = button.getAttribute('data-diary-wall-entry-topic') || '';
+                openEntryEditor({ entryId, agentId, topicId });
+            });
+        });
+        container.querySelectorAll('[data-diary-wall-delete-entry]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const entryId = button.getAttribute('data-diary-wall-delete-entry') || '';
+                const agentId = button.getAttribute('data-diary-wall-entry-agent') || '';
+                const topicId = button.getAttribute('data-diary-wall-entry-topic') || '';
+                void deleteEntry({ entryId, agentId, topicId });
+            });
+        });
+    }
+
+    function confirmAction(message) {
+        if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
+            return true;
+        }
+        return window.confirm(message);
+    }
+
+    async function openCardDetail(card) {
+        if (!card) {
+            ui.showToastNotification('还没有可以管理的日记。', 'warning');
+            return;
+        }
+
+        state.selectedCardKey = buildCardSelectionKey(card);
+        state.detailExpanded = true;
+        renderCards();
+        await loadDetail();
+        if (state.detail) {
+            openNoteModal();
+        }
+    }
+
+    async function deleteCard(card) {
+        if (!card || typeof chatAPI.deleteStudyDiaryWallCard !== 'function') {
+            ui.showToastNotification('日记删除接口不可用。', 'error');
+            return;
+        }
+        const entryCount = Number(card.entryCount || 0);
+        if (!confirmAction(`确定删除 ${card.dateKey || ''} [${card.notebookName || '默认'}] 的 ${entryCount || 1} 条日记源记录吗？此操作无法从日记墙恢复。`)) {
+            return;
+        }
+
+        const result = await chatAPI.deleteStudyDiaryWallCard({
+            diaryId: card.diaryId,
+            notebookId: card.notebookId,
+            dateKey: card.dateKey,
+            entryRefs: card.entryRefs || [],
+        });
+        if (!result?.success) {
+            ui.showToastNotification(`删除日记失败：${result?.error || '未知错误'}`, 'error');
+            return;
+        }
+
+        state.selectedCardKeys.delete(buildCardSelectionKey(card));
+        state.selectedCardKey = '';
+        state.detail = null;
+        closeNoteModal();
+        await refresh({ force: true });
+        ui.showToastNotification(`已删除 ${Number(result.deletedCount || 0)} 条日记记录。`, 'success');
+    }
+
+    async function deleteSelectedCards() {
+        if (typeof chatAPI.deleteStudyDiaryWallCard !== 'function') {
+            ui.showToastNotification('日记批量删除接口不可用。', 'error');
+            return;
+        }
+        const selectedCards = getVisibleSelectedCards();
+        if (!selectedCards.length) {
+            ui.showToastNotification('请先选择要删除的日记。', 'warning');
+            return;
+        }
+        const totalEntries = selectedCards.reduce((sum, card) => sum + Number(card.entryCount || 0), 0);
+        if (!confirmAction(`确定删除选中的 ${selectedCards.length} 张日记卡、共 ${totalEntries || selectedCards.length} 条源记录吗？此操作无法从日记墙恢复。`)) {
+            return;
+        }
+
+        let deletedCount = 0;
+        let failedCount = 0;
+        for (const card of selectedCards) {
+            const result = await chatAPI.deleteStudyDiaryWallCard({
+                diaryId: card.diaryId,
+                notebookId: card.notebookId,
+                dateKey: card.dateKey,
+                entryRefs: card.entryRefs || [],
+            });
+            if (result?.success) {
+                deletedCount += Number(result.deletedCount || 0);
+            } else {
+                failedCount += 1;
+            }
+        }
+
+        state.selectedCardKeys.clear();
+        state.selectedCardKey = '';
+        state.detail = null;
+        closeNoteModal();
+        await refresh({ force: true });
+        ui.showToastNotification(
+            failedCount > 0
+                ? `已删除 ${deletedCount} 条日记记录，${failedCount} 张删除失败。`
+                : `已删除 ${deletedCount} 条日记记录。`,
+            failedCount > 0 ? 'warning' : 'success'
+        );
+    }
+
+    function openEntryEditor(ref = {}) {
+        const entry = (state.detail?.entries || []).find((item) => (
+            String(item.id || '') === String(ref.entryId || '')
+            && (!ref.agentId || String(item.agentId || '') === String(ref.agentId))
+            && (!ref.topicId || String(item.topicId || '') === String(ref.topicId))
+        ));
+        if (!entry) {
+            ui.showToastNotification('没有找到要编辑的日记条目。', 'warning');
+            return;
+        }
+
+        state.editingEntry = entry;
+        openNoteModal();
+        if (!el.diaryWallNoteContent) {
+            return;
+        }
+        el.diaryWallNoteContent.innerHTML = `
+            <form class="diary-wall-entry-editor" data-diary-wall-entry-editor>
+              <div class="diary-wall-entry-editor__header">
+                <div>
+                  <p class="eyebrow">${escapeHtml(formatTimestamp(entry.createdAt))}</p>
+                  <h3>编辑 DailyNote</h3>
+                </div>
+                <button type="button" class="ghost-button icon-text-btn" data-diary-wall-cancel-entry-edit>
+                  <span class="material-symbols-outlined">arrow_back</span>
+                  返回详情
+                </button>
+              </div>
+              <label class="diary-wall-field">
+                <span>日记本</span>
+                <input name="notebookName" value="${escapeHtml(entry.notebookName || '')}" />
+              </label>
+              <label class="diary-wall-field">
+                <span>日记本 ID</span>
+                <input name="notebookId" value="${escapeHtml(entry.notebookId || '')}" />
+              </label>
+              <label class="diary-wall-field">
+                <span>主题/学科</span>
+                <input name="subjectSignature" value="${escapeHtml(entry.subjectSignature || entry.subjectRaw || '')}" />
+              </label>
+              <label class="diary-wall-field">
+                <span>话题标题</span>
+                <input name="topicNameSnapshot" value="${escapeHtml(entry.topicNameSnapshot || '')}" />
+              </label>
+              <label class="diary-wall-field">
+                <span>标签</span>
+                <input name="tags" value="${escapeHtml((entry.tags || []).join(', '))}" />
+              </label>
+              <label class="diary-wall-field">
+                <span>正文</span>
+                <textarea name="contentMarkdown" rows="14">${escapeHtml(entry.contentMarkdown || '')}</textarea>
+              </label>
+              <div class="diary-wall-entry-editor__actions">
+                <button type="submit" class="primary-button">保存日记</button>
+                <button type="button" class="ghost-button icon-text-btn danger" data-diary-wall-delete-current-entry>
+                  <span class="material-symbols-outlined">delete</span>
+                  删除此条
+                </button>
+              </div>
+            </form>
+        `;
+    }
+
+    async function saveEntryEditor(form) {
+        if (!state.editingEntry || typeof chatAPI.updateStudyLogEntry !== 'function') {
+            ui.showToastNotification('日记编辑接口不可用。', 'error');
+            return;
+        }
+        const FormDataCtor = documentObj.defaultView?.FormData || FormData;
+        const formData = new FormDataCtor(form);
+        const entry = state.editingEntry;
+        const result = await chatAPI.updateStudyLogEntry({
+            agentId: entry.agentId,
+            topicId: entry.topicId,
+            entryId: entry.id,
+            updates: {
+                notebookName: formData.get('notebookName'),
+                notebookId: formData.get('notebookId'),
+                subjectSignature: formData.get('subjectSignature'),
+                subjectRaw: formData.get('subjectSignature'),
+                topicNameSnapshot: formData.get('topicNameSnapshot'),
+                tags: parseTagInput(formData.get('tags')),
+                contentMarkdown: formData.get('contentMarkdown'),
+            },
+        });
+        if (!result?.success) {
+            ui.showToastNotification(`保存日记失败：${result?.error || '未知错误'}`, 'error');
+            return;
+        }
+
+        state.editingEntry = null;
+        await refresh({ force: true });
+        await loadDetail();
+        if (state.detail) {
+            openNoteModal();
+        }
+        ui.showToastNotification('日记已保存。', 'success');
+    }
+
+    async function deleteEntry(ref = {}) {
+        if (!ref.entryId || typeof chatAPI.deleteStudyLogEntry !== 'function') {
+            ui.showToastNotification('日记删除接口不可用。', 'error');
+            return;
+        }
+        if (!confirmAction('确定删除这条 DailyNote 源记录吗？此操作无法从日记墙恢复。')) {
+            return;
+        }
+
+        const result = await chatAPI.deleteStudyLogEntry(ref);
+        if (!result?.success) {
+            ui.showToastNotification(`删除日记条目失败：${result?.error || '未知错误'}`, 'error');
+            return;
+        }
+
+        state.editingEntry = null;
+        await refresh({ force: true });
+        if (state.selectedCardKey) {
+            await loadDetail();
+        }
+        if (state.detail) {
+            openNoteModal();
+        } else {
+            closeNoteModal();
+        }
+        ui.showToastNotification('日记条目已删除。', 'success');
     }
 
     function renderDetail() {
@@ -481,6 +824,16 @@ function createDiaryWallController(deps = {}) {
                   <div class="diary-wall-entry__header">
                     <strong>${escapeHtml(formatTimestamp(entry.createdAt))}</strong>
                     <span>${escapeHtml(`${entry.requestedToolName || 'DailyNote'}.${entry.requestedCommand || 'create'}`)}</span>
+                    ${state.manageMode ? `
+                      <span class="diary-wall-entry__actions">
+                        <button type="button" class="ghost-button icon-btn" data-diary-wall-edit-entry="${escapeHtml(entry.id)}" data-diary-wall-entry-agent="${escapeHtml(entry.agentId || '')}" data-diary-wall-entry-topic="${escapeHtml(entry.topicId || '')}" aria-label="编辑日记条目">
+                          <span class="material-symbols-outlined">edit</span>
+                        </button>
+                        <button type="button" class="ghost-button icon-btn danger" data-diary-wall-delete-entry="${escapeHtml(entry.id)}" data-diary-wall-entry-agent="${escapeHtml(entry.agentId || '')}" data-diary-wall-entry-topic="${escapeHtml(entry.topicId || '')}" aria-label="删除日记条目">
+                          <span class="material-symbols-outlined">delete</span>
+                        </button>
+                      </span>
+                    ` : ''}
                   </div>
                   <div class="diary-wall-entry__meta">${escapeHtml([
                       `[${entry.notebookName || '默认'}]`,
@@ -618,11 +971,17 @@ function createDiaryWallController(deps = {}) {
             return;
         }
 
+        const previousCard = getCardByKey(state.selectedCardKey);
+        const previousDiaryId = previousCard?.diaryId || '';
         state.cards = Array.isArray(result.items) ? result.items : [];
         state.lastLoadedAt = Date.now();
         const tabs = getAgentTabs();
         if (!tabs.some((tab) => tab.id === state.activeAgentFilter)) {
             state.activeAgentFilter = 'all';
+        }
+        if (previousDiaryId && !getCardByKey(state.selectedCardKey)) {
+            const nextSelectedCard = getVisibleCards().find((card) => card.diaryId === previousDiaryId);
+            state.selectedCardKey = nextSelectedCard ? buildCardSelectionKey(nextSelectedCard) : '';
         }
         syncSelectedDiary();
         state.detailExpanded = false;
@@ -708,6 +1067,13 @@ function createDiaryWallController(deps = {}) {
         el.diaryWallRefreshBtn?.addEventListener('click', () => {
             void refresh();
         });
+        el.diaryWallEditBtn?.addEventListener('click', () => {
+            state.manageMode = !state.manageMode;
+            state.selectedCardKeys.clear();
+            renderSummary();
+            renderCards();
+            renderDetail();
+        });
         el.diaryWallAgentNav?.addEventListener('click', (event) => {
             const target = event.target instanceof Element ? event.target.closest('[data-diary-wall-agent-filter]') : null;
             if (!target) {
@@ -730,8 +1096,56 @@ function createDiaryWallController(deps = {}) {
             });
         });
         el.diaryWallCards?.addEventListener('click', (event) => {
+            const actionTarget = event.target instanceof Element ? event.target : null;
+            const deleteSelectedButton = actionTarget?.closest('[data-diary-wall-delete-selected]');
+            if (deleteSelectedButton) {
+                void deleteSelectedCards();
+                return;
+            }
+            if (actionTarget?.closest('[data-diary-wall-toggle-all]')) {
+                const visibleCards = getVisibleCards();
+                const allVisibleSelected = visibleCards.length > 0
+                    && visibleCards.every((card) => state.selectedCardKeys.has(buildCardSelectionKey(card)));
+                visibleCards.forEach((card) => setCardSelected(buildCardSelectionKey(card), !allVisibleSelected));
+                renderSummary();
+                renderCards();
+                return;
+            }
+            if (actionTarget?.closest('[data-diary-wall-exit-manage]')) {
+                state.manageMode = false;
+                state.selectedCardKeys.clear();
+                renderSummary();
+                renderCards();
+                renderDetail();
+                return;
+            }
+            const checkbox = actionTarget?.closest('[data-diary-wall-card-select]');
+            if (checkbox) {
+                const key = checkbox.getAttribute('data-diary-wall-card-select') || '';
+                const isCheckboxInput = checkbox.tagName === 'INPUT' && checkbox.type === 'checkbox';
+                setCardSelected(key, isCheckboxInput ? Boolean(checkbox.checked) : !state.selectedCardKeys.has(key));
+                renderSummary();
+                renderCards();
+                return;
+            }
+            const openButton = actionTarget?.closest('[data-diary-wall-manage-open]');
+            if (openButton) {
+                void openCardDetail(getCardByKey(openButton.getAttribute('data-diary-wall-manage-open') || ''));
+                return;
+            }
+            const deleteButton = actionTarget?.closest('[data-diary-wall-delete-card]');
+            if (deleteButton) {
+                void deleteCard(getCardByKey(deleteButton.getAttribute('data-diary-wall-delete-card') || ''));
+                return;
+            }
             const target = event.target instanceof Element ? event.target.closest('[data-diary-wall-card]') : null;
             if (!target) {
+                return;
+            }
+            if (state.manageMode) {
+                toggleCardSelected(target.getAttribute('data-diary-wall-card') || '');
+                renderSummary();
+                renderCards();
                 return;
             }
             state.selectedCardKey = target.getAttribute('data-diary-wall-card') || '';
@@ -745,6 +1159,29 @@ function createDiaryWallController(deps = {}) {
         });
         el.diaryWallNoteCloseBtn?.addEventListener('click', closeNoteModal);
         el.diaryWallNoteModalBackdrop?.addEventListener('click', closeNoteModal);
+        el.diaryWallNoteContent?.addEventListener('submit', (event) => {
+            const form = event.target instanceof Element ? event.target.closest('[data-diary-wall-entry-editor]') : null;
+            if (!form) {
+                return;
+            }
+            event.preventDefault();
+            void saveEntryEditor(form);
+        });
+        el.diaryWallNoteContent?.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target?.closest('[data-diary-wall-cancel-entry-edit]')) {
+                state.editingEntry = null;
+                renderDetail();
+                return;
+            }
+            if (target?.closest('[data-diary-wall-delete-current-entry]') && state.editingEntry) {
+                void deleteEntry({
+                    agentId: state.editingEntry.agentId,
+                    topicId: state.editingEntry.topicId,
+                    entryId: state.editingEntry.id,
+                });
+            }
+        });
         documentObj.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && state.noteModalOpen) {
                 closeNoteModal();

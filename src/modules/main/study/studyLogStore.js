@@ -285,6 +285,68 @@ function createStudyLogStore(options = {}) {
         return null;
     }
 
+    async function deleteEntry(options = {}) {
+        const entryId = sanitizeText(options.entryId);
+        const agentId = sanitizeText(options.agentId);
+        const topicId = sanitizeText(options.topicId);
+        if (!entryId) {
+            return null;
+        }
+
+        const candidateEntries = agentId && topicId
+            ? [{ agentId, topicId }]
+            : (await listEntries({
+                agentId,
+                topicId,
+                limit: Number(options.limit || 5000),
+            })).map((entry) => ({
+                agentId: entry.agentId,
+                topicId: entry.topicId,
+            }));
+
+        const seen = new Set();
+        for (const candidate of candidateEntries) {
+            const key = `${candidate.agentId}::${candidate.topicId}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+
+            const entries = await readTopicEntries(candidate.agentId, candidate.topicId);
+            const entryIndex = entries.findIndex((entry) => sanitizeText(entry.id) === entryId);
+            if (entryIndex === -1) {
+                continue;
+            }
+
+            const [removed] = entries.splice(entryIndex, 1);
+            await writeTopicEntries(candidate.agentId, candidate.topicId, entries);
+            return normalizeEntry(removed);
+        }
+
+        return null;
+    }
+
+    async function deleteAgentEntries(agentIdInput) {
+        const agentId = sanitizeText(agentIdInput);
+        if (!agentId) {
+            return [];
+        }
+
+        const topicIds = await listTopicIds(agentId);
+        const removedEntries = [];
+        for (const topicId of topicIds) {
+            const entries = await readTopicEntries(agentId, topicId);
+            removedEntries.push(...entries.map((entry) => normalizeEntry(entry)));
+        }
+
+        const agentLogsDir = path.join(logsRoot, agentId);
+        if (await fs.pathExists(agentLogsDir)) {
+            await fs.remove(agentLogsDir);
+        }
+
+        return removedEntries;
+    }
+
     async function markEntriesRecalled(refs = []) {
         const grouped = new Map();
         refs.forEach((ref) => {
@@ -356,6 +418,8 @@ function createStudyLogStore(options = {}) {
     }
 
     return {
+        deleteAgentEntries,
+        deleteEntry,
         getEntry,
         getTopicEntriesFile,
         listAgentIds,

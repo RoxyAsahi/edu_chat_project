@@ -259,6 +259,142 @@ test('renderSubjectOverview starts a single clock timer and clears it when leavi
     assert.deepEqual(clearedIntervals, [1]);
 });
 
+test('loadAgents passes seven-day learning trend metrics to the overview renderer', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const fixedNow = new Date('2026-04-27T12:00:00').getTime();
+    const originalDateNow = Date.now;
+    Date.now = () => fixedNow;
+
+    try {
+        const capturedMetrics = [];
+        const harness = createControllerHarness({
+            chatAPI: {
+                async getAgents() {
+                    return [{ id: 'agent-1', name: '数学' }];
+                },
+                async getAgentTopics() {
+                    return [{ id: 'topic-1', name: '函数', createdAt: fixedNow }];
+                },
+                async listStudyLogDays() {
+                    return {
+                        success: true,
+                        items: [
+                            { dateKey: '2026-04-21', entryCount: 2 },
+                            { dateKey: '2026-04-23', entryCount: 0 },
+                            { dateKey: '2026-04-27', entryCount: 3 },
+                        ],
+                    };
+                },
+                async listStudyDiaryWallCards() {
+                    return { success: true, items: [] };
+                },
+            },
+        });
+        const { window, document, el } = createOverviewDom();
+        const controller = createWorkspaceController({
+            ...harness.deps,
+            el: {
+                ...harness.deps.el,
+                ...el,
+            },
+            windowObj: window,
+            documentObj: document,
+            setIntervalFn: () => 1,
+            clearIntervalFn: () => {},
+            buildSubjectOverviewMarkup: ({ learningMetrics }) => {
+                capturedMetrics.push(learningMetrics);
+                return {
+                    headline: '学习工作台',
+                    summary: '',
+                    gridMarkup: '<section class="overview-subject-wall"></section>',
+                };
+            },
+        });
+
+        await controller.loadAgents();
+
+        const metrics = capturedMetrics.at(-1);
+        assert.equal(metrics.activeDaysLast7, 3);
+        assert.equal(metrics.totalLearningDays, 3);
+        assert.equal(metrics.trendDays.length, 7);
+        assert.deepEqual(metrics.trendDays.map((day) => day.dateKey), [
+            '2026-04-21',
+            '2026-04-22',
+            '2026-04-23',
+            '2026-04-24',
+            '2026-04-25',
+            '2026-04-26',
+            '2026-04-27',
+        ]);
+        assert.deepEqual(metrics.trendDays.map((day) => day.value), [2, 0, 1, 0, 0, 0, 3]);
+    } finally {
+        Date.now = originalDateNow;
+    }
+});
+
+test('loadAgents builds a non-empty fallback trend when study log days are unavailable', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const fixedNow = new Date('2026-04-27T12:00:00').getTime();
+    const originalDateNow = Date.now;
+    Date.now = () => fixedNow;
+
+    try {
+        let capturedMetrics = null;
+        const harness = createControllerHarness({
+            chatAPI: {
+                async getAgents() {
+                    return [{ id: 'agent-1', name: '数学' }];
+                },
+                async getAgentTopics() {
+                    return [
+                        { id: 'topic-1', name: '函数', createdAt: fixedNow },
+                        { id: 'topic-2', name: '几何', createdAt: fixedNow - 1000 },
+                    ];
+                },
+                async listStudyDiaryWallCards() {
+                    return { success: true, items: [] };
+                },
+            },
+        });
+        const { window, document, el } = createOverviewDom();
+        const controller = createWorkspaceController({
+            ...harness.deps,
+            el: {
+                ...harness.deps.el,
+                ...el,
+            },
+            windowObj: window,
+            documentObj: document,
+            setIntervalFn: () => 1,
+            clearIntervalFn: () => {},
+            buildSubjectOverviewMarkup: ({ learningMetrics }) => {
+                capturedMetrics = learningMetrics;
+                return {
+                    headline: '学习工作台',
+                    summary: '',
+                    gridMarkup: '<section class="overview-subject-wall"></section>',
+                };
+            },
+        });
+
+        await controller.loadAgents();
+
+        assert.equal(capturedMetrics.trendDays.length, 7);
+        assert.deepEqual(capturedMetrics.trendDays.map((day) => day.dateKey), [
+            '2026-04-21',
+            '2026-04-22',
+            '2026-04-23',
+            '2026-04-24',
+            '2026-04-25',
+            '2026-04-26',
+            '2026-04-27',
+        ]);
+        assert.ok(capturedMetrics.trendDays.some((day) => day.active));
+    } finally {
+        Date.now = originalDateNow;
+    }
+});
+
 test('showSubjectWorkspace requests a deferred desktop layout reset after leaving overview', async () => {
     const { createWorkspaceController } = await loadWorkspaceModule();
     const harness = createControllerHarness();

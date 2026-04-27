@@ -136,6 +136,7 @@ function collectRootElements(rootDocument = document) {
         diaryWallNotebookInput: rootDocument.getElementById('diaryWallNotebookInput'),
         diaryWallTagInput: rootDocument.getElementById('diaryWallTagInput'),
         diaryWallDateInput: rootDocument.getElementById('diaryWallDateInput'),
+        diaryWallEditBtn: rootDocument.getElementById('diaryWallEditBtn'),
         diaryWallRefreshBtn: rootDocument.getElementById('diaryWallRefreshBtn'),
         diaryWallOpenLogsBtn: rootDocument.getElementById('diaryWallOpenLogsBtn'),
         diaryWallAgentNav: rootDocument.getElementById('diaryWallAgentNav'),

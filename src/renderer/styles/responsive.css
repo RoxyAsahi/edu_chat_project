@@ -1004,8 +1004,9 @@
   }
 
   .manual-notes-library-page__filter {
-    min-height: 36px;
-    padding: 0 12px;
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
   }
 }
 
