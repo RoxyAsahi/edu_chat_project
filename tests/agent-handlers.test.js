@@ -6,6 +6,8 @@ const os = require('os');
 const path = require('path');
 
 const AgentConfigManager = require('../src/modules/main/utils/agentConfigManager');
+const { createStudyLogStore } = require('../src/modules/main/study/studyLogStore');
+const { createStudyDiaryProjector } = require('../src/modules/main/study/studyDiaryProjector');
 
 const AGENT_HANDLERS_PATH = path.resolve(__dirname, '../src/modules/main/ipc/agentHandlers.js');
 
@@ -92,6 +94,7 @@ async function createHarness({
     agentHandlers.initialize({
         AGENT_DIR: agentDir,
         USER_DATA_DIR: userDataDir,
+        DATA_ROOT: tempRoot,
         AVATAR_IMAGE_DIR: null,
         SETTINGS_FILE: path.join(tempRoot, 'settings.json'),
         USER_AVATAR_FILE: path.join(tempRoot, 'user-avatar.png'),
@@ -106,6 +109,7 @@ async function createHarness({
         agentDir,
         handlers,
         settingsState,
+        tempRoot,
         cleanup: () => fs.remove(tempRoot),
     };
 }
@@ -228,4 +232,76 @@ test('get-agents-metadata skips corrupted agents with the same tolerance as get-
             avatarCalculatedColor: '#00aa00',
         },
     ]);
+});
+
+test('delete-agent clears matching study logs and diary wall projections', async (t) => {
+    const harness = await createHarness({
+        agentDefinitions: [
+            {
+                id: 'agent_math',
+                config: {
+                    name: '数学',
+                    topics: [{ id: 'topic_algebra', name: '代数', createdAt: 1 }],
+                },
+            },
+            {
+                id: 'agent_physics',
+                config: {
+                    name: '物理',
+                    topics: [{ id: 'topic_force', name: '力学', createdAt: 1 }],
+                },
+            },
+        ],
+    });
+    t.after(harness.cleanup);
+
+    const store = createStudyLogStore({ dataRoot: harness.tempRoot });
+    const projector = createStudyDiaryProjector({ dataRoot: harness.tempRoot, studyLogStore: store });
+    const privateEntry = await store.writeEntry({
+        agentId: 'agent_math',
+        topicId: 'topic_algebra',
+        dateKey: '2026-04-23',
+        notebookId: 'math',
+        notebookName: '数学',
+        contentMarkdown: '数学私有日记。',
+        tags: ['代数'],
+    });
+    const sharedMathEntry = await store.writeEntry({
+        agentId: 'agent_math',
+        topicId: 'topic_algebra',
+        dateKey: '2026-04-24',
+        notebookId: 'public',
+        notebookName: '公共',
+        contentMarkdown: '数学共享日记。',
+        tags: ['共享'],
+    });
+    const sharedPhysicsEntry = await store.writeEntry({
+        agentId: 'agent_physics',
+        topicId: 'topic_force',
+        dateKey: '2026-04-24',
+        notebookId: 'public',
+        notebookName: '公共',
+        contentMarkdown: '物理共享日记。',
+        tags: ['共享'],
+    });
+    await projector.projectEntry(privateEntry);
+    await projector.projectEntry(sharedMathEntry);
+    await projector.projectEntry(sharedPhysicsEntry);
+
+    const deleteAgent = harness.handlers.get('delete-agent');
+    const result = await deleteAgent(null, 'agent_math');
+
+    assert.equal(result.success, true);
+    assert.equal(result.studyCleanup.deletedCount, 2);
+    assert.equal(await fs.pathExists(path.join(harness.tempRoot, 'StudyLogs', 'agent_math')), false);
+    assert.equal(await fs.pathExists(path.join(harness.tempRoot, 'StudyDiary', 'math', '2026-04-23.json')), false);
+
+    const sharedDiary = await projector.getDiaryDay({
+        notebookId: 'public',
+        dateKey: '2026-04-24',
+    });
+    assert.equal(sharedDiary.entryCount, 1);
+    assert.deepEqual(sharedDiary.agentIds, ['agent_physics']);
+    assert.match(sharedDiary.contentMarkdown, /物理共享日记/);
+    assert.doesNotMatch(sharedDiary.contentMarkdown, /数学共享日记/);
 });

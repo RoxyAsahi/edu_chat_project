@@ -27,11 +27,17 @@ function createDom() {
             <input id="diaryWallNotebookInput" />
             <input id="diaryWallTagInput" />
             <input id="diaryWallDateInput" />
+            <button id="diaryWallEditBtn" type="button">edit</button>
             <button id="diaryWallRefreshBtn" type="button">refresh</button>
             <div id="diaryWallAgentNav"></div>
             <div id="diaryWallSummary"></div>
             <div id="diaryWallCards"></div>
             <div id="diaryWallDetail"></div>
+            <div id="diaryWallNoteModal" class="hidden" aria-hidden="true">
+              <div id="diaryWallNoteModalBackdrop"></div>
+              <button id="diaryWallNoteCloseBtn" type="button">close note</button>
+              <div id="diaryWallNoteContent"></div>
+            </div>
           </div>
           <div class="message-item" data-message-id="msg-1"></div>
         </body>
@@ -49,12 +55,17 @@ function createElementMap(documentObj) {
         diaryWallNotebookInput: documentObj.getElementById('diaryWallNotebookInput'),
         diaryWallTagInput: documentObj.getElementById('diaryWallTagInput'),
         diaryWallDateInput: documentObj.getElementById('diaryWallDateInput'),
+        diaryWallEditBtn: documentObj.getElementById('diaryWallEditBtn'),
         diaryWallRefreshBtn: documentObj.getElementById('diaryWallRefreshBtn'),
         diaryWallOpenLogsBtn: documentObj.getElementById('diaryWallOpenLogsBtn'),
         diaryWallAgentNav: documentObj.getElementById('diaryWallAgentNav'),
         diaryWallSummary: documentObj.getElementById('diaryWallSummary'),
         diaryWallCards: documentObj.getElementById('diaryWallCards'),
         diaryWallDetail: documentObj.getElementById('diaryWallDetail'),
+        diaryWallNoteModal: documentObj.getElementById('diaryWallNoteModal'),
+        diaryWallNoteModalBackdrop: documentObj.getElementById('diaryWallNoteModalBackdrop'),
+        diaryWallNoteCloseBtn: documentObj.getElementById('diaryWallNoteCloseBtn'),
+        diaryWallNoteContent: documentObj.getElementById('diaryWallNoteContent'),
     };
 }
 
@@ -248,6 +259,11 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /Hornet/);
     assert.match(documentObj.getElementById('diaryWallCards').textContent, /初中数学_二次函数/);
     assert.match(documentObj.getElementById('diaryWallCards').textContent, /高中英语_定语从句/);
+    assert.ok(documentObj.querySelector('.diary-wall-card__header-main'));
+    assert.ok(documentObj.querySelector('.diary-wall-card__meta'));
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /学习日记/);
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /2 条记录/);
+    assert.equal(documentObj.getElementById('diaryWallEditBtn') instanceof dom.window.HTMLButtonElement, true);
     assert.match(documentObj.getElementById('diaryWallDetail').textContent, /选择一张日记卡/);
     assert.equal(listPayloads[0].scope, 'global');
     assert.equal(detailPayloads.length, 0);
@@ -291,6 +307,139 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     assert.equal(listPayloads.at(-1).scope, 'topic');
+});
+
+test('diaryWallController manager mode can delete cards and save entry edits', async (t) => {
+    const { createDiaryWallController } = await loadDiaryWallControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousElement = global.Element;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.Element = dom.window.Element;
+    const originalConfirm = dom.window.confirm;
+    dom.window.confirm = () => true;
+
+    t.after(() => {
+        dom.window.confirm = originalConfirm;
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.Element = previousElement;
+        dom.window.close();
+    });
+
+    const documentObj = dom.window.document;
+    let deletedCardPayload = null;
+    let updatedEntryPayload = null;
+    let cardDeleted = false;
+    let listCalls = 0;
+    const controller = createDiaryWallController({
+        el: createElementMap(documentObj),
+        chatAPI: {
+            async listStudyDiaryWallCards() {
+                listCalls += 1;
+                return {
+                    success: true,
+                    items: cardDeleted ? [] : [{
+                        id: 'study_diary_nova_2026-04-14',
+                        diaryId: 'study_diary_nova_2026-04-14',
+                        notebookId: 'nova',
+                        notebookName: 'Nova',
+                        dateKey: '2026-04-14',
+                        updatedAt: Date.UTC(2026, 3, 14, 12, 0, 0),
+                        entryCount: 1,
+                        tags: ['验收'],
+                        agentNames: ['Nova'],
+                        topics: {},
+                        entryRefs: [{
+                            agentId: 'agent-nova',
+                            topicId: 'topic-nova',
+                            entryId: 'entry-1',
+                        }],
+                        previewMarkdown: '# DailyNote\n一次验收。',
+                    }],
+                };
+            },
+            async getStudyDiaryWallDetail() {
+                return {
+                    success: true,
+                    item: {
+                        diaryId: 'study_diary_nova_2026-04-14',
+                        notebookId: 'nova',
+                        notebookName: 'Nova',
+                        dateKey: '2026-04-14',
+                        entryCount: 1,
+                        contentMarkdown: '# DailyNote 2026-04-14\n一次验收。',
+                        entries: [{
+                            id: 'entry-1',
+                            agentId: 'agent-nova',
+                            topicId: 'topic-nova',
+                            createdAt: Date.UTC(2026, 3, 14, 11, 30, 0),
+                            notebookId: 'nova',
+                            notebookName: 'Nova',
+                            subjectSignature: 'Nova',
+                            topicNameSnapshot: '验收话题',
+                            contentMarkdown: '一次验收。',
+                            tags: ['验收'],
+                            sourceMessageIds: [],
+                        }],
+                    },
+                };
+            },
+            async updateStudyLogEntry(payload) {
+                updatedEntryPayload = payload;
+                return { success: true, item: { id: payload.entryId } };
+            },
+            async deleteStudyDiaryWallCard(payload) {
+                deletedCardPayload = payload;
+                cardDeleted = true;
+                return { success: true, deletedCount: 1 };
+            },
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        documentObj,
+        renderMarkdownFragment: (value) => `<article>${String(value)}</article>`,
+    });
+
+    controller.bindEvents();
+    controller.open();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    documentObj.getElementById('diaryWallEditBtn').click();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assert.match(documentObj.getElementById('diaryWallCards').textContent, /日记管理/);
+    assert.ok(documentObj.querySelector('[data-diary-wall-card-select]'));
+
+    documentObj.querySelector('[data-diary-wall-manage-open]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(documentObj.getElementById('diaryWallNoteModal')?.classList.contains('hidden'), false);
+
+    documentObj.querySelector('[data-diary-wall-edit-entry="entry-1"]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const editor = documentObj.querySelector('[data-diary-wall-entry-editor]');
+    assert.ok(editor);
+    editor.querySelector('[name="contentMarkdown"]').value = '保存后的验收。';
+    editor.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    assert.equal(updatedEntryPayload.entryId, 'entry-1');
+    assert.equal(updatedEntryPayload.updates.contentMarkdown, '保存后的验收。');
+
+    documentObj.querySelector('[data-diary-wall-card]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.match(documentObj.getElementById('diaryWallSummary').textContent, /已选 1 张/);
+    assert.equal(documentObj.querySelector('[data-diary-wall-delete-selected]').disabled, false);
+
+    documentObj.querySelector('[data-diary-wall-delete-selected]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    assert.equal(deletedCardPayload.diaryId, 'study_diary_nova_2026-04-14');
+    assert.equal(deletedCardPayload.entryRefs[0].entryId, 'entry-1');
+    assert.ok(listCalls >= 3);
 });
 
 test('diaryWallController can jump back to source messages without handing off to a logs panel', async (t) => {

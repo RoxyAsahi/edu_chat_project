@@ -39,15 +39,16 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-top: 20px;
+  gap: 14px;
+  padding-top: 14px;
 }
 
 .manual-notes-library-page__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 18px;
+  justify-content: flex-start;
+  gap: 8px 10px;
 }
 
 .manual-notes-library-page__header-main {
@@ -88,41 +89,45 @@
 .manual-notes-library-page__filters {
   display: inline-flex;
   align-items: center;
-  grid-column: 3;
-  justify-self: end;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+  order: 2;
+  width: 100%;
 }
 
 .manual-notes-library-page__switch {
-  grid-column: 2;
-  justify-self: center;
+  order: 1;
+  justify-self: flex-start;
 }
 
 .manual-notes-library-page__filter {
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 32px;
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px solid #e0e3e7;
   background: #f8f9fa;
   color: #3c4043;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
   box-shadow: none;
 }
 
 .manual-notes-library-page__new-note {
-  min-height: 38px;
-  padding: 0 16px;
+  min-height: 32px;
+  padding: 0 13px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .manual-notes-library-page__new-note .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .manual-notes-library-page__filter:hover,
@@ -141,7 +146,7 @@
 }
 
 .manual-notes-library-page__filter .material-symbols-outlined {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .manual-notes-library-page__body {
@@ -1662,23 +1667,20 @@
   margin-top: 12px;
 }
 
-.home-status__grid div,
-.home-status__score {
+.home-status__grid div {
   border-radius: 14px;
   background: #f5f7fb;
   padding: 12px;
 }
 
-.home-status__grid span,
-.home-status__score span {
+.home-status__grid span {
   display: block;
   color: #7b8aa6;
   font-size: 11px;
   font-weight: 800;
 }
 
-.home-status__grid strong,
-.home-status__score strong {
+.home-status__grid strong {
   display: inline-flex;
   align-items: baseline;
   margin-top: 4px;
@@ -1693,21 +1695,74 @@
   font-size: 11px;
 }
 
-.home-status__score {
-  margin-top: 8px;
+.home-status-trend {
+  margin-top: 10px;
+  padding: 10px 10px 9px;
+  border: 1px solid rgba(185, 142, 74, 0.12);
+  border-radius: 16px;
   background: #fff7e7;
+  box-shadow: 0 12px 28px rgba(126, 92, 38, 0.07);
+  overflow: hidden;
 }
 
-.home-status__score strong {
-  color: #a55700;
-  font-size: 30px;
+.home-status-trend__chart {
+  display: block;
+  width: 100%;
+  aspect-ratio: 320 / 132;
+  min-height: 112px;
+  overflow: visible;
 }
 
-.home-status__score p {
-  margin: 6px 0 0;
-  color: #7e6a48;
-  font-size: 12px;
-  line-height: 1.45;
+.home-status-trend__tick text {
+  fill: #9a8766;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.home-status-trend__tick line {
+  stroke: rgba(162, 118, 55, 0.13);
+  stroke-width: 1;
+}
+
+.home-status-trend__area {
+  fill: rgba(110, 145, 255, 0.11);
+}
+
+.home-status-trend__line {
+  fill: none;
+  stroke: #6f94ff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-status-trend__point {
+  fill: #6f94ff;
+  stroke: #ffffff;
+  stroke-width: 1.8;
+}
+
+.home-status-trend__point--active {
+  fill: #4778ff;
+}
+
+.home-status-trend__bubble rect {
+  fill: #eef4ff;
+  stroke: rgba(111, 148, 255, 0.18);
+}
+
+.home-status-trend__bubble text {
+  fill: #4778ff;
+  font-size: 9px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.home-status-trend__label {
+  fill: #738198;
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
 }
 
 .home-side .bento-calendar {
@@ -2038,8 +2093,7 @@ body:not(.light-theme) .home-diary__empty p {
     margin-top: 10px;
   }
 
-  .home-status__grid div,
-  .home-status__score {
+  .home-status__grid div {
     padding: 10px;
     border-radius: 12px;
   }
@@ -2048,17 +2102,14 @@ body:not(.light-theme) .home-diary__empty p {
     font-size: 21px;
   }
 
-  .home-status__score {
-    margin-top: 6px;
+  .home-status-trend {
+    margin-top: 8px;
+    padding: 8px 8px 7px;
+    border-radius: 14px;
   }
 
-  .home-status__score strong {
-    font-size: 26px;
-  }
-
-  .home-status__score p {
-    font-size: 11px;
-    line-height: 1.35;
+  .home-status-trend__chart {
+    min-height: 102px;
   }
 
   .home-recent-learning {

@@ -154,6 +154,133 @@ function buildRecentLearningItems({ agents = [], statsByAgent = {}, selectedAgen
     }));
 }
 
+function buildFallbackTrendDays() {
+    const oneDay = 24 * 60 * 60 * 1000;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = today.getTime() - (6 * oneDay);
+
+    return Array.from({ length: 7 }, (_item, index) => {
+        const date = new Date(start + (index * oneDay));
+        return {
+            dateKey: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+            label: `${date.getMonth() + 1}/${date.getDate()}`,
+            value: 0,
+            active: false,
+        };
+    });
+}
+
+function normalizeTrendDays(trendDays = []) {
+    const source = Array.isArray(trendDays) && trendDays.length > 0
+        ? trendDays
+        : buildFallbackTrendDays();
+
+    return source.slice(-7).map((day) => {
+        const value = Math.max(0, Number(day?.value || 0));
+        return {
+            dateKey: String(day?.dateKey || ''),
+            label: String(day?.label || ''),
+            value,
+            active: Boolean(day?.active) || value > 0,
+        };
+    });
+}
+
+function buildSmoothTrendPath(points = []) {
+    if (!Array.isArray(points) || points.length === 0) {
+        return '';
+    }
+    if (points.length === 1) {
+        return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+    }
+
+    const commands = [`M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`];
+    for (let index = 0; index < points.length - 1; index += 1) {
+        const current = points[index];
+        const next = points[index + 1];
+        const previous = points[index - 1] || current;
+        const afterNext = points[index + 2] || next;
+        const tension = 0.18;
+        const cp1x = current.x + ((next.x - previous.x) * tension);
+        const cp1y = current.y + ((next.y - previous.y) * tension);
+        const cp2x = next.x - ((afterNext.x - current.x) * tension);
+        const cp2y = next.y - ((afterNext.y - current.y) * tension);
+
+        commands.push(`C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`);
+    }
+
+    return commands.join(' ');
+}
+
+function buildStudyTrendMarkup({ trendDays = [] } = {}) {
+    const days = normalizeTrendDays(trendDays);
+    const width = 320;
+    const height = 132;
+    const chartLeft = 34;
+    const chartRight = 16;
+    const chartTop = 20;
+    const chartBottom = 30;
+    const chartWidth = width - chartLeft - chartRight;
+    const chartHeight = height - chartTop - chartBottom;
+    const maxValue = Math.max(1, ...days.map((day) => day.value));
+    const topTick = Math.max(4, Math.ceil(maxValue / 2) * 2);
+    const ticks = [topTick, Math.round(topTick / 2), 0];
+
+    const points = days.map((day, index) => {
+        const x = chartLeft + ((chartWidth / Math.max(1, days.length - 1)) * index);
+        const y = chartTop + chartHeight - ((day.value / topTick) * chartHeight);
+        return { ...day, x, y };
+    });
+
+    const linePath = buildSmoothTrendPath(points);
+    const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${chartTop + chartHeight} L ${points[0].x.toFixed(1)} ${chartTop + chartHeight} Z`;
+    const highlightedPoint = [...points].reverse().find((point) => point.active) || points[points.length - 1];
+    const bubbleWidth = 64;
+    const bubbleX = Math.min(width - bubbleWidth - 4, Math.max(4, highlightedPoint.x - (bubbleWidth / 2)));
+    const bubbleY = Math.max(2, highlightedPoint.y - 30);
+    const bubbleText = highlightedPoint.value > 0 ? `活跃度 ${highlightedPoint.value}` : '暂无活跃';
+
+    const tickMarkup = ticks.map((tick) => {
+        const y = chartTop + chartHeight - ((tick / topTick) * chartHeight);
+        return `
+            <g class="home-status-trend__tick">
+                <text x="4" y="${(y + 4).toFixed(1)}">${escapeHtml(String(tick))}</text>
+                <line x1="${chartLeft}" y1="${y.toFixed(1)}" x2="${width - chartRight}" y2="${y.toFixed(1)}"></line>
+            </g>
+        `;
+    }).join('');
+
+    const pointMarkup = points.map((point) => `
+        <circle
+            class="home-status-trend__point${point === highlightedPoint ? ' home-status-trend__point--active' : ''}"
+            cx="${point.x.toFixed(1)}"
+            cy="${point.y.toFixed(1)}"
+            r="${point === highlightedPoint ? 3.6 : 2.4}"
+        ></circle>
+    `).join('');
+
+    const labelMarkup = points.map((point) => `
+        <text class="home-status-trend__label" x="${point.x.toFixed(1)}" y="${height - 8}">${escapeHtml(point.label)}</text>
+    `).join('');
+
+    return `
+        <div class="home-status-trend" aria-label="近 7 天学习活跃度趋势">
+            <svg class="home-status-trend__chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="近 7 天学习活跃度折线图">
+                ${tickMarkup}
+                <path class="home-status-trend__area" d="${areaPath}"></path>
+                <path class="home-status-trend__line" d="${linePath}"></path>
+                ${pointMarkup}
+                <g class="home-status-trend__bubble">
+                    <rect x="${bubbleX.toFixed(1)}" y="${bubbleY.toFixed(1)}" width="${bubbleWidth}" height="22" rx="7"></rect>
+                    <text x="${(bubbleX + bubbleWidth / 2).toFixed(1)}" y="${(bubbleY + 14.5).toFixed(1)}">${escapeHtml(bubbleText)}</text>
+                </g>
+                ${labelMarkup}
+            </svg>
+        </div>
+    `;
+}
+
 function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'violet' } = {}) {
     const agentId = agent?.id || '';
     const agentName = agent?.name || agentId || '未命名学科';
@@ -358,9 +485,11 @@ function buildSubjectOverviewMarkup({
     const currentTopicLabel = currentTopicName || '还没有选中话题';
     const recentLearningItems = buildRecentLearningItems({ agents, statsByAgent, selectedAgentId });
     const streakDays = Math.max(0, Number(learningMetrics?.streakDays || 0));
-    const score = Math.max(0, Number(learningMetrics?.score || 0));
     const activeDaysLast7 = Math.max(0, Number(learningMetrics?.activeDaysLast7 || 0));
     const totalLearningDays = Math.max(0, Number(learningMetrics?.totalLearningDays || 0));
+    const trendMarkup = buildStudyTrendMarkup({
+        trendDays: learningMetrics?.trendDays,
+    });
 
     const hour = new Date().getHours();
     const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
@@ -416,11 +545,7 @@ function buildSubjectOverviewMarkup({
                 <div><span>待整理</span><strong>${totalUnread}</strong></div>
                 <div><span>连续</span><strong>${streakDays}<small>天</small></strong></div>
             </div>
-            <div class="home-status__score">
-                <span>学习力</span>
-                <strong>${escapeHtml(String(score || 0))}</strong>
-                <p>近 7 天活跃 ${activeDaysLast7} 天，总学习 ${totalLearningDays} 天</p>
-            </div>
+            ${trendMarkup}
         </section>
     `;
     const recentLearningSection = `

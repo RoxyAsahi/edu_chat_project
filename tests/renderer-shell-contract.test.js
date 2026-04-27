@@ -68,6 +68,7 @@ test('renderer shell keeps the critical DOM anchors for controller wiring', asyn
         'settingsPanel',
         'noteDetailModal',
         'diaryWallModal',
+        'diaryWallEditBtn',
     ].forEach((id) => {
         assert.ok(document.getElementById(id), `expected #${id} to exist`);
     });
@@ -79,6 +80,20 @@ test('renderer shell tokens reference the shared font assets from the new styles
 
     assert.equal(css.includes("../../assets/font/MavenPro-ExtraBold.ttf"), true);
     assert.equal(css.includes("../../assets/font/MaterialSymbolsOutlined-latin-wght-normal.woff2"), true);
+});
+
+test('manual notes page controls stay compact and left aligned', async () => {
+    const workspaceCssPath = path.resolve(__dirname, '../src/renderer/styles/workspace.css');
+    const sidepanelCssPath = path.resolve(__dirname, '../src/renderer/styles/sidepanel.css');
+    const workspaceCss = await fs.readFile(workspaceCssPath, 'utf8');
+    const sidepanelCss = await fs.readFile(sidepanelCssPath, 'utf8');
+
+    assert.match(workspaceCss, /\.manual-notes-library-page__header\s*\{[\s\S]*justify-content:\s*flex-start;/);
+    assert.match(workspaceCss, /\.manual-notes-library-page__filters\s*\{[\s\S]*order:\s*2;/);
+    assert.match(workspaceCss, /\.manual-notes-library-page__filter\s*\{[\s\S]*min-height:\s*32px;/);
+    assert.match(workspaceCss, /\.manual-notes-library-page__new-note\s*\{[\s\S]*min-height:\s*32px;/);
+    assert.match(sidepanelCss, /\.notes-studio-panel-switch\s*\{[\s\S]*justify-self:\s*flex-start;/);
+    assert.match(sidepanelCss, /\.notes-studio-panel-switch__btn\s*\{[\s\S]*min-height:\s*32px;/);
 });
 
 test('renderer chat stylesheet keeps assistant hover timestamps and bubble-only user messages', async () => {

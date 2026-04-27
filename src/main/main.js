@@ -504,6 +504,7 @@ async function registerDomainIpc() {
     agentHandlers.initialize({
         AGENT_DIR,
         USER_DATA_DIR,
+        DATA_ROOT,
         AVATAR_IMAGE_DIR,
         SETTINGS_FILE,
         USER_AVATAR_FILE,
@@ -540,6 +541,7 @@ async function registerDomainIpc() {
 
     studyHandlers.initialize({
         DATA_ROOT,
+        AGENT_DIR,
         settingsManager,
     });
 

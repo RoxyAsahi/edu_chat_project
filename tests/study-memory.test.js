@@ -131,3 +131,124 @@ test('study log store can mark mixed diary recall refs via entry ownership', asy
     assert.equal(recalledCurrentEntry.recallCount, 1);
     assert.equal(recalledPublicEntry.recallCount, 1);
 });
+
+test('study diary projector edits and deletes source entries then rebuilds diary files', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-study-diary-manage-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const store = createStudyLogStore({ dataRoot: tempRoot });
+    const projector = createStudyDiaryProjector({ dataRoot: tempRoot, studyLogStore: store });
+
+    const firstEntry = await store.writeEntry({
+        agentId: 'agent_math',
+        topicId: 'topic_algebra',
+        topicNameSnapshot: '代数',
+        dateKey: '2026-04-21',
+        notebookId: 'math',
+        notebookName: '数学',
+        contentMarkdown: '整理了一元二次方程。',
+        tags: ['代数'],
+        subjectSignature: '数学',
+    });
+    const secondEntry = await store.writeEntry({
+        agentId: 'agent_math',
+        topicId: 'topic_algebra',
+        topicNameSnapshot: '代数',
+        dateKey: '2026-04-21',
+        notebookId: 'math',
+        notebookName: '数学',
+        contentMarkdown: '复盘了判别式。',
+        tags: ['判别式'],
+        subjectSignature: '数学',
+    });
+
+    await projector.projectEntry(firstEntry);
+    await projector.projectEntry(secondEntry);
+
+    const updated = await projector.updateDiaryEntry({
+        agentId: firstEntry.agentId,
+        topicId: firstEntry.topicId,
+        entryId: firstEntry.id,
+        updates: {
+            contentMarkdown: '整理了一元二次方程和配方法。',
+            tags: ['代数', '配方法'],
+        },
+    });
+    assert.equal(updated.contentMarkdown, '整理了一元二次方程和配方法。');
+
+    let diary = await projector.getDiaryDay({
+        notebookId: 'math',
+        dateKey: '2026-04-21',
+    });
+    assert.match(diary.contentMarkdown, /配方法/);
+    assert.equal(diary.entryCount, 2);
+
+    const removed = await projector.deleteDiaryEntry({
+        agentId: secondEntry.agentId,
+        topicId: secondEntry.topicId,
+        entryId: secondEntry.id,
+    });
+    assert.equal(removed.id, secondEntry.id);
+
+    diary = await projector.getDiaryDay({
+        notebookId: 'math',
+        dateKey: '2026-04-21',
+    });
+    assert.equal(diary.entryCount, 1);
+    assert.doesNotMatch(diary.contentMarkdown, /判别式/);
+
+    const cardDelete = await projector.deleteDiaryWallCard({
+        diaryId: diary.diaryId || diary.id,
+        notebookId: 'math',
+        dateKey: '2026-04-21',
+        entryRefs: diary.entryRefs,
+    });
+    assert.equal(cardDelete.deletedCount, 1);
+    assert.equal(await fs.pathExists(path.join(tempRoot, 'StudyDiary', 'math', '2026-04-21.json')), false);
+
+    const cards = await projector.listDiaryWallCards({ notebookId: 'math', dateKey: '2026-04-21' });
+    assert.equal(cards.length, 0);
+});
+
+test('study diary projector cleans orphan agent logs before diary wall reads', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-study-orphan-cleanup-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const store = createStudyLogStore({ dataRoot: tempRoot });
+    const projector = createStudyDiaryProjector({ dataRoot: tempRoot, studyLogStore: store });
+    const orphanEntry = await store.writeEntry({
+        agentId: 'deleted_agent',
+        topicId: 'topic_old',
+        dateKey: '2026-04-25',
+        notebookId: 'public',
+        notebookName: '公共',
+        contentMarkdown: '已经删除学科留下的日记。',
+        tags: ['旧学科'],
+    });
+    const validEntry = await store.writeEntry({
+        agentId: 'active_agent',
+        topicId: 'topic_live',
+        dateKey: '2026-04-25',
+        notebookId: 'public',
+        notebookName: '公共',
+        contentMarkdown: '仍然存在学科的日记。',
+        tags: ['当前学科'],
+    });
+    await projector.projectEntry(orphanEntry);
+    await projector.projectEntry(validEntry);
+
+    const cleanup = await projector.cleanupMissingAgents(['active_agent']);
+
+    assert.equal(cleanup.deletedCount, 1);
+    assert.deepEqual(cleanup.removedAgentIds, ['deleted_agent']);
+    assert.equal(await fs.pathExists(path.join(tempRoot, 'StudyLogs', 'deleted_agent')), false);
+
+    const diary = await projector.getDiaryDay({
+        notebookId: 'public',
+        dateKey: '2026-04-25',
+    });
+    assert.equal(diary.entryCount, 1);
+    assert.deepEqual(diary.agentIds, ['active_agent']);
+    assert.match(diary.contentMarkdown, /仍然存在学科/);
+    assert.doesNotMatch(diary.contentMarkdown, /已经删除学科/);
+});

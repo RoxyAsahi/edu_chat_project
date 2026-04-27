@@ -5,6 +5,7 @@ const path = require('path');
 const {
     buildDefaultPlaceholderTopic,
 } = require('../utils/topicTitles');
+const { createStudyServices } = require('../study');
 
 let AGENT_DIR_CACHE; // Cache the agent directory path
 let USER_DATA_DIR_CACHE; // Cache the user data directory path
@@ -245,6 +246,7 @@ function initialize(context) {
     const {
         AGENT_DIR,
         USER_DATA_DIR,
+        DATA_ROOT,
         AVATAR_IMAGE_DIR: nextAvatarImageDir,
         SETTINGS_FILE,
         USER_AVATAR_FILE,
@@ -521,10 +523,28 @@ function initialize(context) {
         try {
             const agentDir = path.join(AGENT_DIR, agentId);
             const userDataAgentDir = path.join(USER_DATA_DIR, agentId);
+            let studyCleanup = null;
+            const cleanupErrors = [];
+            if (DATA_ROOT) {
+                try {
+                    const studyServices = createStudyServices({
+                        dataRoot: DATA_ROOT,
+                        settingsManager,
+                    });
+                    studyCleanup = await studyServices.diaryProjector.cleanupAgent({ agentId });
+                } catch (error) {
+                    cleanupErrors.push(`study diary cleanup failed: ${error.message}`);
+                }
+            }
             if (await fs.pathExists(agentDir)) await fs.remove(agentDir);
             if (await fs.pathExists(userDataAgentDir)) await fs.remove(userDataAgentDir);
             invalidateCaches();
-            return { success: true, message: `Agent ${agentId} 已删除。` };
+            return {
+                success: true,
+                message: `Agent ${agentId} 已删除。`,
+                studyCleanup,
+                warning: cleanupErrors.length ? cleanupErrors.join('；') : undefined,
+            };
         } catch (error) {
             console.error(`删除Agent ${agentId} 失败:`, error);
             return { error: error.message };

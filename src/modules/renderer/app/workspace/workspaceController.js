@@ -147,6 +147,7 @@ function createWorkspaceController(deps = {}) {
         streakDays: 0,
         activeDaysLast7: 0,
         totalLearningDays: 0,
+        trendDays: [],
     };
     let overviewDiaryCards = [];
     let overviewClockTimerId = null;
@@ -165,6 +166,19 @@ function createWorkspaceController(deps = {}) {
         const date = new Date(Number(value || Date.now()));
         date.setHours(0, 0, 0, 0);
         return date.getTime();
+    }
+
+    function formatDateKeyFromTimestamp(value) {
+        const date = new Date(Number(value || Date.now()));
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function formatShortDateLabel(value) {
+        const date = new Date(Number(value || Date.now()));
+        return `${date.getMonth() + 1}/${date.getDate()}`;
     }
 
     function parseDateKeyToTimestamp(dateKey = '') {
@@ -195,16 +209,46 @@ function createWorkspaceController(deps = {}) {
         return streak;
     }
 
+    function buildSevenDayTrend(valueByDay = new Map()) {
+        const oneDay = 24 * 60 * 60 * 1000;
+        const start = normalizeDateToDayStart(Date.now()) - (6 * oneDay);
+
+        return Array.from({ length: 7 }, (_item, index) => {
+            const timestamp = start + (index * oneDay);
+            const value = Math.max(0, Number(valueByDay.get(timestamp) || 0));
+            return {
+                dateKey: formatDateKeyFromTimestamp(timestamp),
+                label: formatShortDateLabel(timestamp),
+                value,
+                active: value > 0,
+            };
+        });
+    }
+
     function computeLearningMetricsFromDays(items = []) {
-        const dayTimestamps = (Array.isArray(items) ? items : [])
-            .map((item) => parseDateKeyToTimestamp(item?.dateKey))
-            .filter((value) => Number.isFinite(value));
+        const dayValueMap = new Map();
+        const dayTimestamps = [];
+
+        (Array.isArray(items) ? items : []).forEach((item) => {
+            const timestamp = parseDateKeyToTimestamp(item?.dateKey);
+            if (!Number.isFinite(timestamp)) {
+                return;
+            }
+
+            const dayStart = normalizeDateToDayStart(timestamp);
+            const entryCount = Math.max(0, Number(item?.entryCount || 0));
+            const value = entryCount > 0 ? entryCount : 1;
+            dayTimestamps.push(dayStart);
+            dayValueMap.set(dayStart, Math.max(0, Number(dayValueMap.get(dayStart) || 0)) + value);
+        });
+
         const uniqueDaySet = new Set(dayTimestamps.map((value) => normalizeDateToDayStart(value)));
         const totalLearningDays = uniqueDaySet.size;
         const streakDays = computeStreakDays([...uniqueDaySet]);
 
         const sevenDaysAgo = normalizeDateToDayStart(Date.now()) - (6 * 24 * 60 * 60 * 1000);
         const activeDaysLast7 = [...uniqueDaySet].filter((value) => value >= sevenDaysAgo).length;
+        const trendDays = buildSevenDayTrend(dayValueMap);
 
         const score = Math.min(
             980,
@@ -219,6 +263,7 @@ function createWorkspaceController(deps = {}) {
             streakDays,
             activeDaysLast7,
             totalLearningDays,
+            trendDays,
         };
     }
 
@@ -243,6 +288,15 @@ function createWorkspaceController(deps = {}) {
             streakDays: estimatedStreak,
             activeDaysLast7: estimatedActiveLast7,
             totalLearningDays: estimatedActiveDays,
+            trendDays: buildSevenDayTrend(new Map(
+                buildSevenDayTrend().map((day, index, days) => {
+                    const activeIndexStart = Math.max(0, days.length - estimatedActiveLast7);
+                    const value = index >= activeIndexStart
+                        ? Math.max(1, Math.ceil((totalTopics + totalUnread) / Math.max(1, estimatedActiveLast7)))
+                        : 0;
+                    return [parseDateKeyToTimestamp(day.dateKey), value];
+                }),
+            )),
         };
     }
 

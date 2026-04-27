@@ -491,7 +491,277 @@ function createStudyDiaryProjector(options = {}) {
         }
     }
 
+    function normalizeEntryRef(ref = {}) {
+        return {
+            agentId: sanitizeText(ref.agentId),
+            topicId: sanitizeText(ref.topicId),
+            entryId: sanitizeText(ref.entryId || ref.id),
+        };
+    }
+
+    async function rebuildImpactedDiaryDays(entries = []) {
+        const groups = new Map();
+        entries.forEach((entry) => {
+            const notebookId = sanitizeText(entry?.notebookId);
+            const notebookName = sanitizeText(entry?.notebookName);
+            const dateKey = sanitizeText(entry?.dateKey);
+            if (!notebookId || !dateKey) {
+                return;
+            }
+            const key = `${notebookId}::${dateKey}`;
+            if (!groups.has(key)) {
+                groups.set(key, { notebookId, notebookName, dateKey });
+            }
+        });
+
+        const rebuilt = [];
+        for (const group of groups.values()) {
+            const item = await rebuildDiaryDay(group);
+            if (item) {
+                rebuilt.push(item);
+            }
+        }
+        return rebuilt;
+    }
+
+    async function updateDiaryEntry(options = {}) {
+        const entryId = sanitizeText(options.entryId);
+        const agentId = sanitizeText(options.agentId);
+        const topicId = sanitizeText(options.topicId);
+        const updates = options.updates && typeof options.updates === 'object' ? options.updates : {};
+        if (!entryId || !studyLogStore?.updateEntry) {
+            return null;
+        }
+
+        const before = await studyLogStore.getEntry({
+            agentId,
+            topicId,
+            entryId,
+            limit: Number(options.limit || 5000),
+        });
+        const updated = await studyLogStore.updateEntry({
+            agentId,
+            topicId,
+            entryId,
+            limit: Number(options.limit || 5000),
+            updater(current) {
+                return {
+                    contentMarkdown: sanitizeText(updates.contentMarkdown, current.contentMarkdown),
+                    tags: Array.isArray(updates.tags) ? updates.tags : current.tags,
+                    notebookId: sanitizeText(updates.notebookId, current.notebookId),
+                    notebookName: sanitizeText(updates.notebookName, current.notebookName),
+                    subjectRaw: sanitizeText(updates.subjectRaw, current.subjectRaw),
+                    subjectSignature: sanitizeText(updates.subjectSignature, current.subjectSignature),
+                    topicNameSnapshot: sanitizeText(updates.topicNameSnapshot, current.topicNameSnapshot),
+                    status: sanitizeText(updates.status, current.status),
+                };
+            },
+        });
+        if (!updated) {
+            return null;
+        }
+
+        await rebuildImpactedDiaryDays([before, updated]);
+        return updated;
+    }
+
+    async function deleteDiaryEntry(options = {}) {
+        const entryId = sanitizeText(options.entryId);
+        const agentId = sanitizeText(options.agentId);
+        const topicId = sanitizeText(options.topicId);
+        if (!entryId || !studyLogStore?.deleteEntry) {
+            return null;
+        }
+
+        const removed = await studyLogStore.deleteEntry({
+            agentId,
+            topicId,
+            entryId,
+            limit: Number(options.limit || 5000),
+        });
+        if (!removed) {
+            return null;
+        }
+
+        await rebuildImpactedDiaryDays([removed]);
+        return removed;
+    }
+
+    async function deleteDiaryEntriesByRefs(refs = []) {
+        const normalizedRefs = (Array.isArray(refs) ? refs : [])
+            .map((ref) => normalizeEntryRef(ref))
+            .filter((ref) => ref.agentId && ref.topicId && ref.entryId);
+        const removed = [];
+
+        for (const ref of normalizedRefs) {
+            const item = studyLogStore?.deleteEntry
+                ? await studyLogStore.deleteEntry(ref)
+                : null;
+            if (item) {
+                removed.push(item);
+            }
+        }
+
+        return {
+            deletedCount: removed.length,
+            removed,
+            rebuilt: await rebuildImpactedDiaryDays(removed),
+        };
+    }
+
+    async function deleteDiaryWallCard(options = {}) {
+        const refs = Array.isArray(options.entryRefs) && options.entryRefs.length > 0
+            ? options.entryRefs
+            : [];
+        if (refs.length > 0) {
+            return deleteDiaryEntriesByRefs(refs);
+        }
+
+        const detail = await getDiaryWallDetail(options);
+        return deleteDiaryEntriesByRefs((detail?.entries || []).map((entry) => ({
+            agentId: entry.agentId,
+            topicId: entry.topicId,
+            entryId: entry.id,
+        })));
+    }
+
+    function diaryReferencesAgent(diary = {}, agentId = '') {
+        if (!agentId) {
+            return false;
+        }
+
+        const agentIds = Array.isArray(diary.agentIds) ? diary.agentIds : [];
+        if (agentIds.map((value) => sanitizeText(value)).includes(agentId)) {
+            return true;
+        }
+
+        const entryRefs = Array.isArray(diary.entryRefs) ? diary.entryRefs : [];
+        return entryRefs.some((ref) => sanitizeText(ref?.agentId) === agentId);
+    }
+
+    async function cleanupAgent(options = {}) {
+        const agentId = sanitizeText(options.agentId || options);
+        if (!agentId || !studyLogStore?.deleteAgentEntries) {
+            return {
+                deletedCount: 0,
+                rebuilt: [],
+            };
+        }
+
+        const removedEntries = await studyLogStore.deleteAgentEntries(agentId);
+        const impactedDays = new Map();
+
+        removedEntries.forEach((entry) => {
+            const notebookId = sanitizeText(entry.notebookId);
+            const notebookName = sanitizeText(entry.notebookName);
+            const dateKey = sanitizeText(entry.dateKey);
+            if (notebookId && dateKey) {
+                impactedDays.set(`${notebookId}::${dateKey}`, { notebookId, notebookName, dateKey });
+            }
+        });
+
+        const diaryFiles = await listAllDiaryFiles();
+        for (const fileRef of diaryFiles) {
+            const diary = await readDiaryDayFile(fileRef.notebookId, fileRef.dateKey);
+            if (!diaryReferencesAgent(diary, agentId)) {
+                continue;
+            }
+            impactedDays.set(`${fileRef.notebookId}::${fileRef.dateKey}`, {
+                notebookId: fileRef.notebookId,
+                notebookName: diary?.notebookName || fileRef.notebookId,
+                dateKey: fileRef.dateKey,
+            });
+        }
+
+        const rebuilt = [];
+        for (const day of impactedDays.values()) {
+            const diary = await rebuildDiaryDay(day);
+            if (diary) {
+                rebuilt.push(diary);
+            }
+        }
+
+        return {
+            deletedCount: removedEntries.length,
+            rebuilt,
+        };
+    }
+
+    async function cleanupMissingAgents(validAgentIds = []) {
+        if (!studyLogStore?.listAgentIds || !studyLogStore?.deleteAgentEntries) {
+            return {
+                deletedCount: 0,
+                removedAgentIds: [],
+                rebuilt: [],
+            };
+        }
+
+        const validAgentIdSet = new Set((Array.isArray(validAgentIds) ? validAgentIds : [])
+            .map((agentId) => sanitizeText(agentId))
+            .filter(Boolean));
+        const logAgentIds = await studyLogStore.listAgentIds();
+        const missingAgentIds = logAgentIds
+            .map((agentId) => sanitizeText(agentId))
+            .filter((agentId) => agentId && !validAgentIdSet.has(agentId));
+        const impactedDays = new Map();
+        let deletedCount = 0;
+
+        for (const agentId of missingAgentIds) {
+            const removedEntries = await studyLogStore.deleteAgentEntries(agentId);
+            deletedCount += removedEntries.length;
+            removedEntries.forEach((entry) => {
+                const notebookId = sanitizeText(entry.notebookId);
+                const notebookName = sanitizeText(entry.notebookName);
+                const dateKey = sanitizeText(entry.dateKey);
+                if (notebookId && dateKey) {
+                    impactedDays.set(`${notebookId}::${dateKey}`, { notebookId, notebookName, dateKey });
+                }
+            });
+        }
+
+        const diaryFiles = await listAllDiaryFiles();
+        for (const fileRef of diaryFiles) {
+            const diary = await readDiaryDayFile(fileRef.notebookId, fileRef.dateKey);
+            const diaryAgentIds = Array.isArray(diary?.agentIds)
+                ? diary.agentIds.map((agentId) => sanitizeText(agentId)).filter(Boolean)
+                : [];
+            const entryRefAgentIds = Array.isArray(diary?.entryRefs)
+                ? diary.entryRefs.map((ref) => sanitizeText(ref?.agentId)).filter(Boolean)
+                : [];
+            const hasMissingAgent = [...diaryAgentIds, ...entryRefAgentIds]
+                .some((agentId) => agentId && !validAgentIdSet.has(agentId));
+            if (!hasMissingAgent) {
+                continue;
+            }
+
+            impactedDays.set(`${fileRef.notebookId}::${fileRef.dateKey}`, {
+                notebookId: fileRef.notebookId,
+                notebookName: diary?.notebookName || fileRef.notebookId,
+                dateKey: fileRef.dateKey,
+            });
+        }
+
+        const rebuilt = [];
+        for (const day of impactedDays.values()) {
+            const diary = await rebuildDiaryDay(day);
+            if (diary) {
+                rebuilt.push(diary);
+            }
+        }
+
+        return {
+            deletedCount,
+            removedAgentIds: missingAgentIds,
+            rebuilt,
+        };
+    }
+
     return {
+        cleanupAgent,
+        cleanupMissingAgents,
+        deleteDiaryEntriesByRefs,
+        deleteDiaryEntry,
+        deleteDiaryWallCard,
         getDiaryDay,
         getDiaryDayFile,
         getDiaryWallDetail,
@@ -502,6 +772,7 @@ function createStudyDiaryProjector(options = {}) {
         projectEntry,
         readDiaryDay: readDiaryDayFile,
         rebuildDiaryDay,
+        updateDiaryEntry,
         writeDiaryDay: writeDiaryDayFile,
     };
 }
