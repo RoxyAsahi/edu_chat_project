@@ -517,6 +517,61 @@ test('messageRenderer scopes style tags after streamed finalization', async (t) 
     assert.equal(messageItem.querySelector('style'), null);
 });
 
+test('messageRenderer captures and remounts note render snapshots with fresh scoped CSS', async (t) => {
+    const { chatMessages, history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-note-snapshot',
+        role: 'assistant',
+        name: 'Tutor',
+        content: [
+            '<style>.bubble { color: rgb(220, 38, 38); } button { background: #38bdf8; }</style>',
+            '<div id="snapshot-root" onclick="alert(1)">',
+            '<span class="bubble">Saved Bubble</span>',
+            '<img src="javascript:alert(1)" onerror="alert(2)" alt="bad">',
+            '<script>alert(3)</script>',
+            '</div>',
+        ].join(''),
+        timestamp: Date.UTC(2026, 3, 26, 8, 7),
+    };
+    history.push(message);
+
+    const snapshot = messageRenderer.createMessageRenderSnapshot(message);
+
+    assert.equal(snapshot.schemaVersion, 1);
+    assert.equal(snapshot.renderer, 'unistudy-message-renderer');
+    assert.equal(snapshot.sourceMessageId, 'assistant-note-snapshot');
+    assert.match(snapshot.contentHtml, /snapshot-root/);
+    assert.match(snapshot.contentHtml, /Saved Bubble/);
+    assert.doesNotMatch(snapshot.contentHtml, /<style/i);
+    assert.doesNotMatch(snapshot.contentHtml, /<script/i);
+    assert.doesNotMatch(snapshot.contentHtml, /onclick=/i);
+    assert.doesNotMatch(snapshot.contentHtml, /onerror=/i);
+    assert.doesNotMatch(snapshot.contentHtml, /javascript:/i);
+    assert.match(snapshot.styleText, new RegExp(`#${snapshot.scopeId} \\.bubble\\s*\\{`));
+
+    const target = chatMessages.ownerDocument.createElement('div');
+    chatMessages.ownerDocument.body.appendChild(target);
+    const mounted = messageRenderer.mountRichNotePreview(target, {
+        id: 'note-with-snapshot',
+        contentMarkdown: message.content,
+        renderSnapshot: snapshot,
+    });
+
+    assert.ok(mounted?.scopeId);
+    assert.notEqual(mounted.scopeId, snapshot.scopeId);
+    assert.equal(target.querySelector('#snapshot-root .bubble')?.textContent, 'Saved Bubble');
+    const remountedStyle = chatMessages.ownerDocument.head.querySelector(`style[data-unistudy-note-preview-scope-id="${mounted.scopeId}"]`);
+    assert.ok(remountedStyle);
+    assert.match(remountedStyle.textContent, new RegExp(`#${mounted.scopeId} \\.bubble\\s*\\{`));
+    assert.doesNotMatch(remountedStyle.textContent, new RegExp(`#${snapshot.scopeId} \\.bubble\\s*\\{`));
+
+    messageRenderer.cleanupNotePreviewMount(target);
+    assert.equal(
+        chatMessages.ownerDocument.head.querySelector(`style[data-unistudy-note-preview-scope-id="${mounted.scopeId}"]`),
+        null,
+    );
+});
+
 test('messageRenderer cleans live preview resources before updateMessageContent replaces DOM', async (t) => {
     const { chatMessages, history, messageRenderer } = await createHarness(t);
     const message = {

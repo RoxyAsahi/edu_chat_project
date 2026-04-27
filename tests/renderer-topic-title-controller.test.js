@@ -312,7 +312,64 @@ test('topicTitleController does not overwrite a topic that was manually renamed 
     assert.equal(saveCalls, 0);
 });
 
-test('composerController only triggers topic title generation for the first successful assistant reply', async (t) => {
+test('topicTitleController refreshes topics from a topic-title stream event', async () => {
+    const { createTopicTitleController } = await loadTopicTitleControllerModule();
+    const state = {
+        settings: {
+            settings: {
+                enableTopicTitleGeneration: true,
+            },
+        },
+        session: {
+            currentSelectedItem: { id: 'agent-1' },
+            currentTopicId: 'topic-other',
+            currentChatHistory: [],
+            topics: [
+                { id: 'topic-1', name: '新对话 1' },
+                { id: 'topic-other', name: '别的话题' },
+            ],
+        },
+    };
+    const store = createStore(state);
+    let renderTopicsCalls = 0;
+    let syncWorkspaceCalls = 0;
+
+    const controller = createTopicTitleController({
+        store,
+        chatAPI: {},
+        renderTopics() {
+            renderTopicsCalls += 1;
+        },
+        syncWorkspaceContext() {
+            syncWorkspaceCalls += 1;
+        },
+        getCurrentSelectedItem: () => state.session.currentSelectedItem,
+        getCurrentTopicId: () => state.session.currentTopicId,
+        getCurrentChatHistory: () => state.session.currentChatHistory,
+    });
+
+    const result = await controller.handleTopicTitleEvent({
+        type: 'topic-title',
+        context: {
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+            messageId: 'assistant-1',
+        },
+        title: '📘 线性函数复习',
+        topics: [
+            { id: 'topic-1', name: '📘 线性函数复习' },
+            { id: 'topic-other', name: '别的话题' },
+        ],
+    });
+
+    assert.equal(result, '📘 线性函数复习');
+    assert.equal(state.session.currentTopicId, 'topic-other');
+    assert.equal(state.session.topics.find((topic) => topic.id === 'topic-1')?.name, '📘 线性函数复习');
+    assert.equal(renderTopicsCalls, 1);
+    assert.equal(syncWorkspaceCalls, 1);
+});
+
+test('composerController declares topic title background task only for the first turn', async (t) => {
     const { createComposerController } = await loadComposerControllerModule();
     const dom = new JSDOM(`
         <body>
@@ -358,7 +415,7 @@ test('composerController only triggers topic title generation for the first succ
         },
     };
     const store = createStore(state);
-    const titleCalls = [];
+    const sendPayloads = [];
     const followUpCalls = [];
     let responseCount = 0;
 
@@ -378,7 +435,8 @@ test('composerController only triggers topic title generation for the first succ
             async getActiveSystemPrompt() {
                 return { success: false, systemPrompt: '' };
             },
-            async sendChatRequest() {
+            async sendChatRequest(request) {
+                sendPayloads.push(request);
                 responseCount += 1;
                 return {
                     response: {
@@ -427,10 +485,6 @@ test('composerController only triggers topic title generation for the first succ
             followUpCalls.push(payload);
             return [];
         },
-        generateTopicTitleForAssistantMessage: async (payload) => {
-            titleCalls.push(payload);
-            return '📘 首轮标题';
-        },
         updateCurrentChatHistory: (updater) => {
             state.session.currentChatHistory = updater(state.session.currentChatHistory);
             return state.session.currentChatHistory;
@@ -445,14 +499,18 @@ test('composerController only triggers topic title generation for the first succ
     await controller.handleSend();
 
     assert.equal(followUpCalls.length, 1);
-    assert.equal(titleCalls.length, 1);
-    assert.equal(titleCalls[0].historySnapshot.length, 2);
-    assert.equal(titleCalls[0].historySnapshot[0].role, 'user');
-    assert.equal(titleCalls[0].historySnapshot[1].role, 'assistant');
+    assert.equal(sendPayloads.length, 1);
+    assert.deepEqual(sendPayloads[0].backgroundTasks, {
+        topicTitle: {
+            enabled: true,
+            expectedTopicName: '新对话 1',
+        },
+    });
 
     dom.window.document.getElementById('messageInput').value = '第二问';
     await controller.handleSend();
 
     assert.equal(followUpCalls.length, 2);
-    assert.equal(titleCalls.length, 1);
+    assert.equal(sendPayloads.length, 2);
+    assert.deepEqual(sendPayloads[1].backgroundTasks, {});
 });

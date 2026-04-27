@@ -345,7 +345,8 @@ function initialize(mainWindow, context) {
             parent: currentMainWindow && !currentMainWindow.isDestroyed() ? currentMainWindow : undefined,
             modal: false,
             show: false,
-            backgroundColor: '#28282c',
+            frame: false,
+            backgroundColor: '#f8fafd',
             icon: iconPath,
             webPreferences: {
                 preload: resolveAppPreload(appRoot, PRELOAD_ROLES.VIEWER),
@@ -356,7 +357,7 @@ function initialize(mainWindow, context) {
             },
         });
 
-        const viewerUrl = `file://${imageViewerPath}?src=${encodeURIComponent(imageUrl)}&title=${encodeURIComponent(imageTitle || 'Image Viewer')}`;
+        const viewerUrl = `file://${imageViewerPath}?src=${encodeURIComponent(imageUrl)}&title=${encodeURIComponent(imageTitle || 'Image Viewer')}&theme=light`;
         imageViewerWindow.loadURL(viewerUrl);
         const openChildWindows = getOpenChildWindows();
         if (Array.isArray(openChildWindows)) {

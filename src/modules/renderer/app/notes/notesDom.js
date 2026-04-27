@@ -51,6 +51,7 @@ function createNotesDom(deps = {}) {
     const el = deps.el;
     const documentObj = deps.documentObj || document;
     const windowObj = deps.windowObj || window;
+    const messageRendererApi = deps.messageRendererApi || {};
     const flashcardsApi = deps.flashcardsApi || {
         getFlashcardSourceCount: () => 0,
         getPendingGeneration: () => null,
@@ -65,6 +66,7 @@ function createNotesDom(deps = {}) {
     const getCurrentTopicDisplayName = deps.getCurrentTopicDisplayName || (() => '请选择一个话题');
     const getTopicDisplayLabel = deps.getTopicDisplayLabel || ((topicId) => topicId || '未归类话题');
     const getNoteHighlightId = deps.getNoteHighlightId || (() => null);
+    const getNoteDetailReturnTarget = deps.getNoteDetailReturnTarget || (() => 'studio');
     const openNoteDetail = deps.openNoteDetail || (() => {});
     const toggleNoteSelection = deps.toggleNoteSelection || (() => {});
     const deleteNoteRecord = deps.deleteNoteRecord || (async () => {});
@@ -138,6 +140,14 @@ function createNotesDom(deps = {}) {
         }
         if (el.noteDetailSubtitle) {
             el.noteDetailSubtitle.textContent = subtitle;
+        }
+        const backButton = el.noteDetailBackBtn || el.flashcardsBackToNotesBtn || null;
+        if (backButton) {
+            const fromManualNotes = getNoteDetailReturnTarget() === 'manual-notes';
+            backButton.innerHTML = `
+                <span class="material-symbols-outlined">arrow_back</span> ${fromManualNotes ? '返回我的笔记' : '返回 Studio'}
+            `;
+            backButton.setAttribute('aria-label', fromManualNotes ? '返回我的笔记' : '返回 Studio');
         }
         el.saveNoteBtn?.classList.toggle('hidden', !editable);
         el.analysisEditMarkdownBtn?.classList.toggle('hidden', !(kind === 'analysis' && analysisPreviewMode));
@@ -221,7 +231,12 @@ function createNotesDom(deps = {}) {
 
         el.noteActionMenu.classList.remove('hidden');
         el.noteActionMenu.style.visibility = 'hidden';
-        positionFloatingElement(el.noteActionMenu, state.activeNoteMenu.anchorRect, 'left', windowObj);
+        positionFloatingElement(
+            el.noteActionMenu,
+            state.activeNoteMenu.anchorRect,
+            state.activeNoteMenu.placement || 'left',
+            windowObj,
+        );
         el.noteActionMenu.style.visibility = 'visible';
 
         el.noteActionMenu.querySelectorAll('[data-note-action]').forEach((button) => {
@@ -240,7 +255,7 @@ function createNotesDom(deps = {}) {
         });
     }
 
-    function openNoteItemMenu(note, anchorElement) {
+    function openNoteItemMenu(note, anchorElement, options = {}) {
         if (!note || !anchorElement) {
             return;
         }
@@ -256,7 +271,8 @@ function createNotesDom(deps = {}) {
             noteId: note.id,
             note,
             anchorElement,
-            anchorRect: anchorElement.getBoundingClientRect(),
+            anchorRect: options.anchorRect || anchorElement.getBoundingClientRect(),
+            placement: options.placement || 'left',
         };
         renderNoteActionMenu();
     }
@@ -287,6 +303,29 @@ function createNotesDom(deps = {}) {
         el.notesSelectionSummary.textContent = `${scopeLabel} · 暂无生成内容，普通笔记请到顶部“我的笔记”查看`;
     }
 
+    function cleanupRichPreviews(root) {
+        if (!root || typeof messageRendererApi.cleanupNotePreviewMount !== 'function') {
+            return;
+        }
+        root.querySelectorAll?.('.unistudy-note-rich-preview').forEach((node) => {
+            messageRendererApi.cleanupNotePreviewMount(node);
+        });
+    }
+
+    function renderCompactNotePreview(target, note) {
+        if (!target) {
+            return;
+        }
+        if (typeof messageRendererApi.mountRichNotePreview === 'function') {
+            messageRendererApi.mountRichNotePreview(target, note, {
+                compact: true,
+                emptyText: '暂无内容。',
+            });
+            return;
+        }
+        target.textContent = stripMarkdown(note?.contentMarkdown || '').trim() || '暂无内容。';
+    }
+
     function renderNotesPanel() {
         if (state.notesScope !== 'topic') {
             state.notesScope = 'topic';
@@ -310,6 +349,7 @@ function createNotesDom(deps = {}) {
             return;
         }
 
+        cleanupRichPreviews(el.notesList);
         el.notesList.innerHTML = '';
         const pendingFlashcards = flashcardsApi.getPendingGeneration();
 
@@ -364,7 +404,6 @@ function createNotesDom(deps = {}) {
             card.classList.toggle('note-card--active', normalized.id === getNoteHighlightId());
             card.classList.toggle('note-card--selected', isSelected);
 
-            const preview = escapeHtml(stripMarkdown(normalized.contentMarkdown || '').trim());
             const sourceCount = flashcardsApi.getFlashcardSourceCount(normalized);
             const typeKind = getNormalizedNoteKind(normalized);
             const typeConfig = {
@@ -414,7 +453,7 @@ function createNotesDom(deps = {}) {
                                 <strong>${escapeHtml(normalized.title)}</strong>
                                 ${selectedBadge}
                             </div>
-                            <div class="note-card__studio-preview">${preview || '暂无内容。'}</div>
+                            <div class="note-card__studio-preview" data-note-preview="${escapeHtml(normalized.id)}"></div>
                             <div class="note-card__studio-meta">
                                 <span class="note-card__kind note-card__kind--studio">
                                     <span class="material-symbols-outlined">${escapeHtml(typeConfig.icon)}</span>
@@ -428,6 +467,7 @@ function createNotesDom(deps = {}) {
                         </button>
                     </div>
                 `;
+                renderCompactNotePreview(card.querySelector('.note-card__studio-preview'), normalized);
             }
 
             card.addEventListener('click', (event) => {
@@ -480,6 +520,7 @@ function createNotesDom(deps = {}) {
                 : '选择一个学科后，这里会显示该学科下的所有手写笔记。';
         }
 
+        cleanupRichPreviews(el.manualNotesLibraryGrid);
         el.manualNotesLibraryGrid.innerHTML = '';
         if (!state.currentSelectedItem?.id) {
             setGridEmptyState(true);
@@ -500,7 +541,7 @@ function createNotesDom(deps = {}) {
             empty.innerHTML = `
                 <strong>${state.manualNotesLibraryFilter === 'selected' ? '还没有加入 Studio 的笔记' : '当前学科还没有手写笔记'}</strong>
                 <span>${state.manualNotesLibraryFilter === 'selected'
-                    ? '你可以在卡片右上角把需要的笔记加入 Studio，方便后续生成分析、选择题和闪卡。'
+                    ? '你可以通过卡片右键菜单把需要的笔记加入 Studio，方便后续生成分析、选择题和闪卡。'
                     : '你可以继续使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。'}</span>
             `;
             el.manualNotesLibraryGrid.appendChild(empty);
@@ -511,7 +552,6 @@ function createNotesDom(deps = {}) {
 
         manualNotes.forEach((note) => {
             const normalized = normalizeNote(note);
-            const preview = escapeHtml(stripMarkdown(normalized.contentMarkdown || '').trim());
             const topicLabel = escapeHtml(getTopicDisplayLabel(normalized.topicId));
             const updatedLabel = escapeHtml(formatRelativeTime(normalized.updatedAt) || '');
             const isSelected = state.selectedNoteIds.includes(normalized.id);
@@ -519,34 +559,16 @@ function createNotesDom(deps = {}) {
 
             card.className = 'manual-note-card';
             card.classList.toggle('manual-note-card--selected', isSelected);
+            card.setAttribute('aria-label', `${normalized.title || '未命名笔记'}，右键打开菜单`);
             card.innerHTML = `
-                <div class="manual-note-card__header">
-                    <div class="manual-note-card__header-main">
-                        <span class="manual-note-card__eyebrow">手写笔记</span>
-                        <strong class="manual-note-card__title">${escapeHtml(normalized.title)}</strong>
-                    </div>
-                    <div class="manual-note-card__header-actions">
-                        <button
-                            class="ghost-button manual-note-card__studio-btn ${isSelected ? 'manual-note-card__studio-btn--active' : ''}"
-                            type="button"
-                            data-manual-note-select="${escapeHtml(normalized.id)}"
-                            aria-pressed="${isSelected ? 'true' : 'false'}"
-                        >
-                            <span class="material-symbols-outlined">${isSelected ? 'check_circle' : 'add_circle'}</span>
-                            <span>${isSelected ? '已加入 Studio' : '加入 Studio'}</span>
-                        </button>
-                        <button class="note-card__menu-button manual-note-card__menu" type="button" data-note-menu="${escapeHtml(normalized.id)}" aria-label="打开笔记菜单">
-                            <span class="material-symbols-outlined">more_vert</span>
-                        </button>
-                    </div>
-                </div>
-                <p class="manual-note-card__preview">${preview || '暂无内容。'}</p>
+                <div class="manual-note-card__preview" data-note-preview="${escapeHtml(normalized.id)}"></div>
                 <div class="manual-note-card__meta">
                     <span>${topicLabel}</span>
                     <span>${updatedLabel}</span>
                     ${isSelected ? '<span class="manual-note-card__selection">已选用于生成</span>' : ''}
                 </div>
             `;
+            renderCompactNotePreview(card.querySelector('.manual-note-card__preview'), normalized);
 
             card.addEventListener('click', (event) => {
                 const target = event.target;
@@ -556,14 +578,20 @@ function createNotesDom(deps = {}) {
                 openNoteDetail(normalized, { trigger: card });
             });
 
-            card.querySelector('[data-note-menu]')?.addEventListener('click', (event) => {
+            card.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
                 event.stopPropagation();
-                openNoteItemMenu(normalized, event.currentTarget);
-            });
-
-            card.querySelector('[data-manual-note-select]')?.addEventListener('click', (event) => {
-                event.stopPropagation();
-                toggleNoteSelection(normalized.id);
+                openNoteItemMenu(normalized, card, {
+                    anchorRect: {
+                        left: event.clientX,
+                        right: event.clientX,
+                        top: event.clientY,
+                        bottom: event.clientY,
+                        width: 0,
+                        height: 0,
+                    },
+                    placement: 'right',
+                });
             });
 
             el.manualNotesLibraryGrid.appendChild(card);

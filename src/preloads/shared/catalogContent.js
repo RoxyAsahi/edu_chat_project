@@ -10,6 +10,7 @@ function createContentCatalog(ops) {
         importKnowledgeBaseFiles: query((kbId, files) => ops.invoke('kb:import-files', kbId, files)),
         listKnowledgeBaseDocuments: query((kbId) => ops.invoke('kb:list-documents', kbId)),
         retryKnowledgeBaseDocument: query((documentId) => ops.invoke('kb:retry-document', documentId)),
+        renameKnowledgeBaseDocument: query((documentId, payload) => ops.invoke('kb:rename-document', documentId, payload)),
         setTopicKnowledgeBase: query((agentId, topicId, kbId) => ops.invoke('kb:set-topic-binding', agentId, topicId, kbId)),
         setTopicSourceSelection: query((agentId, topicId, documentIds) => ops.invoke('kb:set-topic-source-selection', agentId, topicId, documentIds)),
         getTopicKnowledgeBase: query((agentId, topicId) => ops.invoke('kb:get-topic-binding', agentId, topicId)),

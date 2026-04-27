@@ -107,6 +107,31 @@ function formatLegacyTokenSuggestions(unresolvedTokens = [], suggestionMap = {})
     ));
 }
 
+const PLACEHOLDER_TOPIC_BASE_NAME = '新对话';
+const LEGACY_PLACEHOLDER_TOPIC_NAMES = new Set([
+    '主要对话',
+    'Main Conversation',
+]);
+
+function normalizeTopicName(name = '') {
+    return String(name || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function isPlaceholderTopicName(name = '') {
+    const normalized = normalizeTopicName(name);
+    if (!normalized) {
+        return false;
+    }
+
+    if (LEGACY_PLACEHOLDER_TOPIC_NAMES.has(normalized)) {
+        return true;
+    }
+
+    return new RegExp(`^${PLACEHOLDER_TOPIC_BASE_NAME}(?:\\s+\\d+)?$`).test(normalized);
+}
+
 function createComposerController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
@@ -126,7 +151,6 @@ function createComposerController(deps = {}) {
     const autoResizeTextarea = deps.autoResizeTextarea || (() => {});
     const decorateChatMessages = deps.decorateChatMessages || (() => {});
     const generateFollowUpsForAssistantMessage = deps.generateFollowUpsForAssistantMessage || (async () => []);
-    const generateTopicTitleForAssistantMessage = deps.generateTopicTitleForAssistantMessage || (async () => '');
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
@@ -657,20 +681,30 @@ function createComposerController(deps = {}) {
             ));
     }
 
-    function shouldAttemptTopicTitleGeneration(messageId = '', historySnapshot = null) {
+    function buildBackgroundTasksForTurn(topic = null, historySnapshot = []) {
         if (state.settings.enableTopicTitleGeneration === false) {
-            return false;
+            return {};
         }
 
-        if (!Array.isArray(historySnapshot)) {
-            return true;
+        if (!isPlaceholderTopicName(topic?.name)) {
+            return {};
         }
 
         const visibleMessages = selectVisibleConversationMessages(historySnapshot);
-        return visibleMessages.length === 2
-            && visibleMessages[0]?.role === 'user'
-            && visibleMessages[1]?.role === 'assistant'
-            && visibleMessages[1]?.id === messageId;
+        if (
+            visibleMessages.length !== 1
+            || visibleMessages[0]?.role !== 'user'
+            || !String(visibleMessages[0]?.content || '').trim()
+        ) {
+            return {};
+        }
+
+        return {
+            topicTitle: {
+                enabled: true,
+                expectedTopicName: normalizeTopicName(topic.name),
+            },
+        };
     }
 
     function triggerPostReplyTasks({
@@ -689,16 +723,6 @@ function createComposerController(deps = {}) {
                 historySnapshot,
             }),
         ];
-
-        if (shouldAttemptTopicTitleGeneration(messageId, historySnapshot)) {
-            tasks.push(generateTopicTitleForAssistantMessage({
-                agentId,
-                topicId,
-                messageId,
-                model,
-                historySnapshot,
-            }));
-        }
 
         void Promise.allSettled(tasks);
     }
@@ -859,6 +883,7 @@ function createComposerController(deps = {}) {
                     ...retrieval.temporarySystemMessages,
                 ],
             });
+            const backgroundTasks = buildBackgroundTasksForTurn(requestTopic, historyForRequest);
             if (finishPreparedRequestIfCancelled(assistantMessage.id)) {
                 return;
             }
@@ -872,6 +897,7 @@ function createComposerController(deps = {}) {
                 messages: apiMessages,
                 modelConfig,
                 context: requestPayloadContext,
+                backgroundTasks,
             });
         } catch (error) {
             const wasPreparing = isPreparingRequest(assistantMessage.id);

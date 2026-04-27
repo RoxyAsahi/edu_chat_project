@@ -2,6 +2,11 @@
 
 .panel__actions, .chat-stage__header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+.chat-stage__header-actions button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .chat-stage {
   min-width: 0;
   background: #ffffff;

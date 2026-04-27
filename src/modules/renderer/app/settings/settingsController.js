@@ -23,10 +23,6 @@ const SETTINGS_MODAL_META = Object.freeze({
         title: '模型服务',
         subtitle: '管理全局连接、检索模型和来源服务参数。',
     },
-    agent: {
-        title: '学科设置',
-        subtitle: '调整当前学科的头像、名称、模型和系统提示词。',
-    },
     'knowledge-base': {
         title: '来源管理',
         subtitle: '统一维护 Source 模型、来源库文档与调试工具。',
@@ -55,6 +51,25 @@ const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
     'Keep answers readable and compact when rich layout is unnecessary.',
     'Only switch to more structured rendering when it clearly helps comprehension.',
 ].join(' ');
+
+function sliceGraphemes(value, limit = 2) {
+    const source = String(value || '').replace(/\s+/g, '').trim();
+    if (!source) {
+        return '';
+    }
+
+    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+        const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+        return Array.from(segmenter.segment(source), (segment) => segment.segment).slice(0, limit).join('');
+    }
+
+    return Array.from(source).slice(0, limit).join('');
+}
+
+function normalizeAgentCardEmoji(value) {
+    return sliceGraphemes(value, 2);
+}
+
 const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
     '你是 UniStudy 的追问生成助手。',
     '请基于下面的对话历史，从用户视角生成 3-5 条自然、简洁、紧贴上下文的后续追问。',
@@ -69,18 +84,26 @@ const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
     '{{CHAT_HISTORY}}',
 ].join('\n');
 const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
-    '你是 UniStudy 的话题命名助手。',
-    '请根据下面的首轮对话，为当前话题生成一个简洁标题。',
-    '要求：',
-    '1. 标题必须包含 1 个合适的 emoji，并搭配简洁文本。',
-    '2. 优先概括主题，不要过度发挥，不要写成长句。',
-    '3. 使用对话的主要语言；如果混合语言明显，优先使用用户最后一次提问的语言。',
-    '4. 不要输出解释、标题、Markdown 或代码块。',
-    '5. 只返回 JSON。',
-    '输出格式：',
-    '{"title":"😀 标题"}',
-    '对话历史：',
-    '{{CHAT_HISTORY}}',
+    '### Task:',
+    'Generate a concise, 3-5 word title with an emoji summarizing the chat history.',
+    '### Guidelines:',
+    '- The title should clearly represent the main theme or subject of the conversation.',
+    '- Use emojis that enhance understanding of the topic, but avoid quotation marks or special formatting.',
+    "- Write the title in the chat's primary language; default to English if multilingual.",
+    '- Prioritize accuracy over excessive creativity; keep it clear and simple.',
+    '- Your entire response must consist solely of the JSON object, without any introductory or concluding text.',
+    '- The output must be a single, raw JSON object, without any markdown code fences or other encapsulating text.',
+    '- Ensure no conversational text, affirmations, or explanations precede or follow the raw JSON output.',
+    '### Output:',
+    'JSON format: { "title": "your concise title here" }',
+    '### Examples:',
+    '- { "title": "📉 Stock Market Trends" }',
+    '- { "title": "🍪 Perfect Chocolate Chip Recipe" }',
+    '- { "title": "🎮 Video Game Development Insights" }',
+    '### Chat History:',
+    '<chat_history>',
+    '{{MESSAGES:END:2}}',
+    '</chat_history>',
 ].join('\n');
 const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
     followUpDefaultModel: '追问默认模型',
@@ -1044,9 +1067,12 @@ function createSettingsController(deps = {}) {
     const syncLayoutSettings = deps.syncLayoutSettings || (() => {});
     const resolvePromptText = deps.resolvePromptText || (async () => '');
     const reloadSelectedAgent = deps.reloadSelectedAgent || (async () => {});
-    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
+    const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session?.currentSelectedItem || {});
     const getBubbleThemePreviewContext = deps.getBubbleThemePreviewContext || (() => ({}));
+    const HTMLElementCtor = windowObj.HTMLElement || globalThis.HTMLElement;
+    const isElementNode = (node) => Boolean(HTMLElementCtor && node instanceof HTMLElementCtor);
     let settingsModalTrigger = null;
+    let subjectSettingsPanelTrigger = null;
     let settingsPageReturnView = 'overview';
     let globalSettingsSaveTimer = null;
     let isSyncingGlobalSettingsForm = false;
@@ -3320,7 +3346,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
     }
 
     function switchSettingsModalSection(section) {
-        const normalizedSection = section === 'global' ? 'services' : section;
+        const normalizedSection = section === 'global' || section === 'agent' ? 'services' : section;
         const nextSection = Object.prototype.hasOwnProperty.call(SETTINGS_MODAL_META, normalizedSection)
             ? normalizedSection
             : 'services';
@@ -3340,7 +3366,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             ['retrieval', el.settingsModalSectionRetrieval],
             ['prompts', el.settingsModalSectionPrompts],
             ['display', el.settingsModalSectionDisplay],
-            ['agent', el.settingsModalSectionAgent],
             ['knowledge-base', el.settingsModalSectionKnowledgeBase],
         ];
         sections.forEach(([name, node]) => {
@@ -3357,7 +3382,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (el.settingsModalSubtitle) {
             el.settingsModalSubtitle.textContent = meta.subtitle;
         }
-        el.settingsModalFooter?.classList.toggle('hidden', nextSection === 'agent');
         if (['services', 'default-model', 'prompts', 'display'].includes(nextSection)) {
             void refreshFinalSystemPromptPreview();
         }
@@ -3374,7 +3398,12 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
     }
 
     function openSettingsModal(section = 'global', trigger = null) {
-        if (trigger instanceof HTMLElement) {
+        if (section === 'agent') {
+            return openSubjectSettingsPanel(trigger);
+        }
+
+        closeSubjectSettingsPanel({ restoreFocus: false });
+        if (isElementNode(trigger)) {
             settingsModalTrigger = trigger;
         }
         settingsPageReturnView = detectCurrentWorkspaceView();
@@ -3403,10 +3432,87 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         documentObj.body.classList.toggle('workspace-view-overview', !returnToSubject && !returnToManualNotes);
         documentObj.body.classList.toggle('workspace-view-subject', returnToSubject);
         documentObj.body.classList.toggle('workspace-view-manual-notes', returnToManualNotes);
-        if (settingsModalTrigger instanceof HTMLElement && documentObj.body.contains(settingsModalTrigger)) {
+        if (isElementNode(settingsModalTrigger) && documentObj.body.contains(settingsModalTrigger)) {
             settingsModalTrigger.focus();
         }
         settingsModalTrigger = null;
+    }
+
+    function resetSubjectSettingsPanelPosition() {
+        const dialog = el.subjectSettingsPanelDialog;
+        el.subjectSettingsPanel?.classList.remove('subject-settings-panel--anchored');
+        if (!dialog) {
+            return;
+        }
+        dialog.style.left = '';
+        dialog.style.top = '';
+        dialog.style.right = '';
+        dialog.style.bottom = '';
+        dialog.style.transform = '';
+    }
+
+    function positionSubjectSettingsPanel(anchorRect = null) {
+        const panel = el.subjectSettingsPanel;
+        const dialog = el.subjectSettingsPanelDialog;
+        const viewportWidth = windowObj.innerWidth || documentObj.documentElement?.clientWidth || 0;
+        const viewportHeight = windowObj.innerHeight || documentObj.documentElement?.clientHeight || 0;
+        if (!panel || !dialog || !anchorRect || viewportWidth < 760) {
+            resetSubjectSettingsPanelPosition();
+            return;
+        }
+
+        panel.classList.add('subject-settings-panel--anchored');
+        const gap = 12;
+        const margin = 12;
+        const dialogRect = dialog.getBoundingClientRect();
+        const dialogWidth = dialogRect.width || Math.min(720, Math.max(320, viewportWidth - margin * 2));
+        const dialogHeight = dialogRect.height || Math.min(720, Math.max(320, viewportHeight - margin * 2));
+        let left = anchorRect.right + gap;
+        if (left + dialogWidth > viewportWidth - margin) {
+            left = anchorRect.left - dialogWidth - gap;
+        }
+        left = Math.max(margin, Math.min(left, viewportWidth - dialogWidth - margin));
+        const preferredTop = anchorRect.top - 18;
+        const top = Math.max(margin, Math.min(preferredTop, viewportHeight - dialogHeight - margin));
+
+        dialog.style.left = `${left}px`;
+        dialog.style.top = `${top}px`;
+        dialog.style.right = 'auto';
+        dialog.style.bottom = 'auto';
+        dialog.style.transform = 'none';
+    }
+
+    function openSubjectSettingsPanel(trigger = null, options = {}) {
+        const currentSelectedItem = getCurrentSelectedItem();
+        if (!currentSelectedItem?.id) {
+            ui.showToastNotification?.('请先选择一个学科。', 'warning');
+            return false;
+        }
+
+        if (el.settingsModal && !el.settingsModal.classList.contains('hidden')) {
+            closeSettingsModal();
+        }
+        if (isElementNode(trigger)) {
+            subjectSettingsPanelTrigger = trigger;
+        }
+        setPromptVisible(true);
+        el.subjectSettingsPanel?.classList.remove('hidden');
+        el.subjectSettingsPanel?.setAttribute('aria-hidden', 'false');
+        documentObj.body.classList.add('subject-settings-panel-open');
+        positionSubjectSettingsPanel(options.anchorRect || null);
+        el.subjectSettingsPanelCloseBtn?.focus?.();
+        return true;
+    }
+
+    function closeSubjectSettingsPanel(options = {}) {
+        resetSubjectSettingsPanelPosition();
+        el.subjectSettingsPanel?.classList.add('hidden');
+        el.subjectSettingsPanel?.setAttribute('aria-hidden', 'true');
+        documentObj.body.classList.remove('subject-settings-panel-open');
+        if (options.restoreFocus !== false && isElementNode(subjectSettingsPanelTrigger) && documentObj.body.contains(subjectSettingsPanelTrigger)) {
+            subjectSettingsPanelTrigger.focus();
+        }
+        subjectSettingsPanelTrigger = null;
     }
 
     function openToolboxDiaryManager(anchorId = '') {
@@ -3432,6 +3538,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         const patch = {
             name: el.agentNameInput.value.trim(),
             model: el.agentModel.value.trim(),
+            cardEmoji: normalizeAgentCardEmoji(el.agentCardEmojiInput?.value || ''),
             promptMode: 'original',
             originalSystemPrompt: promptText,
             systemPrompt: promptText,
@@ -3460,15 +3567,23 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
 
     function bindEvents() {
         el.currentAgentSettingsBtn?.addEventListener('click', () => {
-            openSettingsModal('agent', el.currentAgentSettingsBtn);
+            openSubjectSettingsPanel(el.currentAgentSettingsBtn);
         });
         el.globalSettingsBtn?.addEventListener('click', () => {
             openSettingsModal('global', el.globalSettingsBtn);
         });
-        el.workspaceBackToOverviewBtn?.addEventListener('click', closeSettingsModal);
-        el.workspaceOpenSubjectBtn?.addEventListener('click', closeSettingsModal);
+        el.workspaceBackToOverviewBtn?.addEventListener('click', () => {
+            closeSettingsModal();
+            closeSubjectSettingsPanel({ restoreFocus: false });
+        });
+        el.workspaceOpenSubjectBtn?.addEventListener('click', () => {
+            closeSettingsModal();
+            closeSubjectSettingsPanel({ restoreFocus: false });
+        });
         el.settingsModalCloseBtn?.addEventListener('click', closeSettingsModal);
         el.settingsModalBackdrop?.addEventListener('click', closeSettingsModal);
+        el.subjectSettingsPanelCloseBtn?.addEventListener('click', () => closeSubjectSettingsPanel());
+        el.subjectSettingsPanelBackdrop?.addEventListener('click', () => closeSubjectSettingsPanel());
         el.settingsNavButtons?.forEach((button) => {
             button.addEventListener('click', () => {
                 switchSettingsModalSection(button.dataset.settingsSectionButton || 'global');
@@ -3479,6 +3594,24 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         });
         el.saveAgentSettingsBtn?.addEventListener('click', () => {
             void saveAgentSettings();
+        });
+
+        windowObj.addEventListener?.('resize', () => {
+            closeSubjectSettingsPanel({ restoreFocus: false });
+        });
+        documentObj.addEventListener?.('scroll', (event) => {
+            if (el.subjectSettingsPanel?.classList.contains('hidden')) {
+                return;
+            }
+            if (event.target instanceof windowObj.Node && el.subjectSettingsPanel?.contains(event.target)) {
+                return;
+            }
+            closeSubjectSettingsPanel({ restoreFocus: false });
+        }, true);
+        documentObj.addEventListener?.('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeSubjectSettingsPanel();
+            }
         });
 
         documentObj.querySelectorAll('input[name="themeMode"]').forEach((input) => {
@@ -4108,8 +4241,10 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         saveGlobalSettings,
         switchSettingsModalSection,
         openSettingsModal,
+        openSubjectSettingsPanel,
         openToolboxDiaryManager,
         closeSettingsModal,
+        closeSubjectSettingsPanel,
         setPromptVisible,
         saveAgentSettings,
         bindEvents,

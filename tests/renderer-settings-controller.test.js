@@ -114,18 +114,23 @@ function createDom() {
           <button id="settingsNavRetrievalBtn" type="button" data-settings-section-button="retrieval">retrieval</button>
           <button id="settingsNavPromptsBtn" type="button" data-settings-section-button="prompts">prompts</button>
           <button id="settingsNavDisplayBtn" type="button" data-settings-section-button="display">display</button>
-          <button id="settingsNavAgentBtn" type="button" data-settings-section-button="agent">agent</button>
           <section id="settingsModalSectionServices"></section>
           <section id="settingsModalSectionDefaultModel" class="hidden"></section>
           <section id="settingsModalSectionRetrieval" class="hidden"></section>
           <section id="settingsModalSectionPrompts" class="hidden"></section>
           <section id="settingsModalSectionDisplay" class="hidden"></section>
-          <section id="settingsModalSectionAgent" class="hidden"></section>
           <section id="settingsModalSectionKnowledgeBase" class="hidden"></section>
+          <div id="subjectSettingsPanel" class="hidden" aria-hidden="true">
+            <div id="subjectSettingsPanelBackdrop"></div>
+            <section id="subjectSettingsPanelDialog">
+              <button id="subjectSettingsPanelCloseBtn" type="button">close-subject-settings</button>
+            </section>
+          </div>
           <div id="modal-container"></div>
 
           <input id="editingAgentId" />
           <input id="agentNameInput" />
+          <input id="agentCardEmojiInput" />
           <img id="agentAvatarPreview" />
           <input id="agentAvatarInput" type="file" />
           <input id="agentModel" />
@@ -214,14 +219,18 @@ function createElementMap(documentObj) {
         settingsModalSectionPrompts: documentObj.getElementById('settingsModalSectionPrompts'),
         settingsModalSectionDisplay: documentObj.getElementById('settingsModalSectionDisplay'),
         settingsModalSectionGlobal: null,
-        settingsModalSectionAgent: documentObj.getElementById('settingsModalSectionAgent'),
         settingsModalSectionKnowledgeBase: documentObj.getElementById('settingsModalSectionKnowledgeBase'),
+        subjectSettingsPanel: documentObj.getElementById('subjectSettingsPanel'),
+        subjectSettingsPanelBackdrop: documentObj.getElementById('subjectSettingsPanelBackdrop'),
+        subjectSettingsPanelDialog: documentObj.getElementById('subjectSettingsPanelDialog'),
+        subjectSettingsPanelCloseBtn: documentObj.getElementById('subjectSettingsPanelCloseBtn'),
         settingsModalTitle: documentObj.getElementById('settingsModalTitle'),
 
         settingsModalSubtitle: documentObj.getElementById('settingsModalSubtitle'),
         settingsModalFooter: documentObj.getElementById('settingsModalFooter'),
         editingAgentId: documentObj.getElementById('editingAgentId'),
         agentNameInput: documentObj.getElementById('agentNameInput'),
+        agentCardEmojiInput: documentObj.getElementById('agentCardEmojiInput'),
         agentAvatarPreview: documentObj.getElementById('agentAvatarPreview'),
         agentAvatarInput: documentObj.getElementById('agentAvatarInput'),
         agentModel: documentObj.getElementById('agentModel'),
@@ -244,6 +253,95 @@ function setFieldValue(node, value, dom, eventType = 'input') {
     node.value = value;
     dispatchDomEvent(node, dom, eventType);
 }
+
+test('current subject settings button opens the standalone subject panel', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+    const controller = createSettingsController({
+        store: createStore(),
+        el,
+        chatAPI: {
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+        getCurrentSelectedItem: () => ({ id: 'agent-1', name: '数学' }),
+    });
+
+    controller.bindEvents();
+    el.currentAgentSettingsBtn.click();
+
+    assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), false);
+    assert.equal(el.subjectSettingsPanel.getAttribute('aria-hidden'), 'false');
+    assert.equal(documentObj.body.classList.contains('subject-settings-panel-open'), true);
+    assert.equal(el.agentSettingsContainer.classList.contains('hidden'), false);
+    assert.equal(el.selectAgentPromptForSettings.classList.contains('hidden'), true);
+
+    el.subjectSettingsPanelCloseBtn.click();
+
+    assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), true);
+    assert.equal(el.subjectSettingsPanel.getAttribute('aria-hidden'), 'true');
+});
+
+test('current subject settings button warns when no subject is selected', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    const toasts = [];
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+    const controller = createSettingsController({
+        store: createStore(),
+        el,
+        chatAPI: {
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification(message, type) {
+                toasts.push({ message, type });
+            },
+        },
+        windowObj: dom.window,
+        documentObj,
+        getCurrentSelectedItem: () => ({ id: null }),
+    });
+
+    controller.bindEvents();
+    el.currentAgentSettingsBtn.click();
+
+    assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), true);
+    assert.deepEqual(toasts, [{ message: '请先选择一个学科。', type: 'warning' }]);
+});
 
 async function addModelThroughWorkbench(el, dom, modelId, modelName = modelId) {
     const addButton = el.modelServiceModelsPanel.querySelector('[data-model-service-action="add-model"]');
@@ -751,7 +849,7 @@ test('settingsController shows the default follow-up template in the UI but save
     assert.match(el.emoticonPromptInput.value, /{{GeneralEmoticonPath}}/);
     assert.equal(el.emoticonPromptInput.dataset.usingDefaultPrompt, 'true');
     assert.equal(el.followUpPromptTemplateInput.dataset.usingDefaultPrompt, 'true');
-    assert.match(el.topicTitlePromptTemplateInput.value, /{\"title\":\"😀 标题\"}/);
+    assert.match(el.topicTitlePromptTemplateInput.value, /{{MESSAGES:END:2}}/);
     assert.equal(el.topicTitlePromptTemplateInput.dataset.usingDefaultPrompt, 'true');
 
     await controller.saveGlobalSettings({ showToastOnSuccess: false });
@@ -872,7 +970,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     );
 });
 
-test('settingsController lets the global settings navigation switch into the current agent section', async (t) => {
+test('settingsController lets the global settings navigation switch between modal sections', async (t) => {
     const { createSettingsController } = await loadSettingsControllerModule();
     const dom = createDom();
     const previousWindow = global.window;
@@ -909,17 +1007,16 @@ test('settingsController lets the global settings navigation switch into the cur
     assert.equal(el.settingsModal.classList.contains('hidden'), false);
     assert.equal(el.settingsModalTitle.textContent, '模型服务');
 
-    const agentNavButton = documentObj.getElementById('settingsNavAgentBtn');
-    agentNavButton.click();
+    const displayNavButton = documentObj.getElementById('settingsNavDisplayBtn');
+    displayNavButton.click();
 
-    assert.equal(store.getState().settings.settingsModalSection, 'agent');
-    assert.equal(el.settingsModalSectionAgent.classList.contains('hidden'), false);
+    assert.equal(store.getState().settings.settingsModalSection, 'display');
+    assert.equal(el.settingsModalSectionDisplay.classList.contains('hidden'), false);
     assert.equal(el.settingsModalSectionServices.classList.contains('hidden'), true);
-    assert.equal(agentNavButton.classList.contains('settings-modal__nav-button--active'), true);
-    assert.equal(agentNavButton.getAttribute('aria-current'), 'page');
-    assert.equal(el.settingsModalTitle.textContent, '学科设置');
-    assert.equal(el.settingsModalSubtitle.textContent, '调整当前学科的头像、名称、模型和系统提示词。');
-    assert.equal(el.settingsModalFooter.classList.contains('hidden'), true);
+    assert.equal(displayNavButton.classList.contains('settings-modal__nav-button--active'), true);
+    assert.equal(displayNavButton.getAttribute('aria-current'), 'page');
+    assert.equal(el.settingsModalTitle.textContent, '显示设置');
+    assert.equal(el.settingsModalSubtitle.textContent, '调整聊天字体、宽度和流式显示效果。');
 });
 
 test('settingsController saves agent settings without legacy compatibility fields', async (t) => {
@@ -945,6 +1042,7 @@ test('settingsController saves agent settings without legacy compatibility field
     const el = createElementMap(documentObj);
 
     el.agentNameInput.value = 'Nova Agent';
+    el.agentCardEmojiInput.value = '📐📚extra';
     el.agentModel.value = 'qwen3.5-plus';
 
     const controller = createSettingsController({
@@ -978,10 +1076,15 @@ test('settingsController saves agent settings without legacy compatibility field
         patch: {
             name: 'Nova Agent',
             model: 'qwen3.5-plus',
+            cardEmoji: '📐📚',
             promptMode: 'original',
             originalSystemPrompt: 'Prompt text',
             systemPrompt: 'Prompt text',
         },
     });
     assert.equal(reloadAgentId, 'agent-42');
+
+    el.agentCardEmojiInput.value = '   ';
+    await controller.saveAgentSettings();
+    assert.equal(savedAgentPatch.patch.cardEmoji, '');
 });

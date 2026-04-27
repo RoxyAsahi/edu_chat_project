@@ -7,6 +7,17 @@ const {
 function createKnowledgeBaseRepository(deps = {}) {
     const getDbImpl = deps.getDb || getDb;
 
+    function normalizeDocumentName(name) {
+        const normalized = String(name || '').trim();
+        if (!normalized) {
+            throw new Error('Document name is required.');
+        }
+        if (/[\\/]/.test(normalized)) {
+            throw new Error('Document name cannot contain path separators.');
+        }
+        return normalized;
+    }
+
     function mapDocumentRow(row) {
         const lastError = row.last_error || row.error || null;
         return {
@@ -144,6 +155,28 @@ function createKnowledgeBaseRepository(deps = {}) {
             sql: 'UPDATE knowledge_base SET updated_at = ? WHERE id = ?',
             args: [Date.now(), kbId],
         });
+    }
+
+    async function renameKnowledgeBaseDocument(documentId, payload = {}) {
+        const existing = await getDocumentById(documentId);
+        if (!existing) {
+            throw new Error('Knowledge base document not found.');
+        }
+
+        const name = normalizeDocumentName(payload.name);
+        const updatedAt = Date.now();
+        const db = getDbImpl();
+        await db.execute({
+            sql: 'UPDATE kb_document SET name = ?, updated_at = ? WHERE id = ?',
+            args: [name, updatedAt, documentId],
+        });
+        await touchKnowledgeBase(existing.kbId);
+
+        return {
+            ...existing,
+            name,
+            updatedAt,
+        };
     }
 
     async function listKnowledgeBaseDocuments(kbId) {
@@ -462,6 +495,7 @@ function createKnowledgeBaseRepository(deps = {}) {
         createKnowledgeBase,
         updateKnowledgeBase,
         touchKnowledgeBase,
+        renameKnowledgeBaseDocument,
         listKnowledgeBaseDocuments,
         getDocumentById,
         findDocumentIdByHash,

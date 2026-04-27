@@ -50,6 +50,8 @@ function createWorkspaceController(deps = {}) {
     const setLeftReaderTab = deps.setLeftReaderTab || (() => {});
     const setRightPanelMode = deps.setRightPanelMode || (() => {});
     const openSettingsModal = deps.openSettingsModal || (() => {});
+    const openSubjectSettingsPanel = deps.openSubjectSettingsPanel || ((trigger) => openSettingsModal('agent', trigger));
+    const closeSubjectSettingsPanel = deps.closeSubjectSettingsPanel || (() => {});
     const ensureTopicSource = deps.ensureTopicSource || (async () => null);
     const loadCurrentTopicKnowledgeBaseDocuments = deps.loadCurrentTopicKnowledgeBaseDocuments || (async () => {});
     const loadTopicNotes = deps.loadTopicNotes || (async () => {});
@@ -572,14 +574,15 @@ function createWorkspaceController(deps = {}) {
         return agent?.name || agent?.id || agentId || '未命名学科';
     }
 
-    async function editAgentById(agentId, trigger = null) {
+    async function editAgentById(agentId, trigger = null, options = {}) {
         if (!agentId) {
             return;
         }
 
+        const anchorRect = options.anchorRect || (trigger?.getBoundingClientRect?.() || null);
         closeSubjectActionMenu();
         await selectAgent(agentId, { showSubjectWorkspace: false });
-        openSettingsModal('agent', trigger);
+        openSubjectSettingsPanel(trigger, { anchorRect });
     }
 
     function renderSubjectActionMenu() {
@@ -592,7 +595,7 @@ function createWorkspaceController(deps = {}) {
         const agentId = activeSubjectActionMenu.agentId;
         const agentName = activeSubjectActionMenu.agentName || getAgentOverviewLabel(agentId);
         const actions = [
-            { key: 'edit', label: '编辑', icon: 'edit' },
+            { key: 'manage', label: '学科管理', icon: 'tune' },
             { key: 'delete', label: '删除', icon: 'delete', danger: true },
         ];
 
@@ -617,8 +620,10 @@ function createWorkspaceController(deps = {}) {
             button.addEventListener('click', async (event) => {
                 event.stopPropagation();
                 const action = button.dataset.subjectAction;
-                if (action === 'edit') {
-                    await editAgentById(agentId, activeSubjectActionMenu.trigger || null);
+                if (action === 'manage') {
+                    await editAgentById(agentId, button, {
+                        anchorRect: activeSubjectActionMenu.anchorRect,
+                    });
                 } else if (action === 'delete') {
                     closeSubjectActionMenu();
                     await deleteAgentById(agentId, { agentName });
@@ -739,6 +744,12 @@ function createWorkspaceController(deps = {}) {
         }
         if (el.currentChatAgentName) {
             el.currentChatAgentName.textContent = `当前学科：${agentName}`;
+        }
+        if (el.currentAgentSettingsBtn) {
+            const hasAgent = Boolean(state.currentSelectedItem.id);
+            el.currentAgentSettingsBtn.disabled = !hasAgent;
+            el.currentAgentSettingsBtn.classList.toggle('is-disabled', !hasAgent);
+            el.currentAgentSettingsBtn.title = hasAgent ? `管理学科：${agentName}` : '请选择学科后管理';
         }
     }
 
@@ -1909,6 +1920,7 @@ function createWorkspaceController(deps = {}) {
             });
             syncWorkspaceContext();
             setPromptVisible(false);
+            closeSubjectSettingsPanel({ restoreFocus: false });
         }
 
         await loadAgents();

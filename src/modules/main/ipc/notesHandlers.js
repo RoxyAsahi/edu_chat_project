@@ -5,6 +5,9 @@ const path = require('path');
 let notesRootDir = null;
 let agentConfigManager = null;
 let handlersRegistered = false;
+const NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION = 1;
+const NOTE_RENDER_SNAPSHOT_RENDERER = 'unistudy-message-renderer';
+const SNAPSHOT_ALLOWED_ROLES = new Set(['assistant', 'user', 'system']);
 
 function makeId(prefix) {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -55,6 +58,69 @@ function normalizeSourceDocumentRefs(refs, fallback = []) {
     return Array.isArray(refs)
         ? refs.filter(Boolean)
         : fallback;
+}
+
+function sanitizeSnapshotStyleText(styleText) {
+    return String(styleText || '')
+        .replace(/@import\b[^;{}]*(?:;|$)/gi, '')
+        .replace(/url\(\s*(['"]?)\s*(?:javascript|vbscript):[\s\S]*?\1\s*\)/gi, 'url(about:blank)')
+        .replace(/expression\s*\(/gi, 'blocked-expression(')
+        .trim();
+}
+
+function sanitizeSnapshotHtmlString(html) {
+    return String(html || '')
+        .replace(/<script\b[\s\S]*?<\/script>/gi, '')
+        .replace(/<iframe\b[\s\S]*?<\/iframe>/gi, '')
+        .replace(/<(?:object|embed|link|meta|base)\b[\s\S]*?>/gi, '')
+        .replace(/\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/\s+srcdoc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/\s+(?:href|src|xlink:href|formaction|poster)\s*=\s*(["'])\s*(?:javascript|vbscript):[\s\S]*?\1/gi, '')
+        .replace(/\s+(?:href|xlink:href|formaction)\s*=\s*(["'])\s*data:[\s\S]*?\1/gi, '');
+}
+
+function deriveSnapshotPlainText(html) {
+    return String(html || '')
+        .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function normalizeRenderSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+        return null;
+    }
+    if (Number(snapshot.schemaVersion) !== NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION) {
+        return null;
+    }
+    if (snapshot.renderer !== NOTE_RENDER_SNAPSHOT_RENDERER) {
+        return null;
+    }
+
+    const contentHtml = sanitizeSnapshotHtmlString(snapshot.contentHtml);
+    if (!contentHtml.trim()) {
+        return null;
+    }
+
+    const role = String(snapshot.role || '').trim().toLowerCase();
+    const capturedAt = Number(snapshot.capturedAt);
+
+    return {
+        schemaVersion: NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION,
+        renderer: NOTE_RENDER_SNAPSHOT_RENDERER,
+        sourceMessageId: String(snapshot.sourceMessageId || '').trim(),
+        role: SNAPSHOT_ALLOWED_ROLES.has(role) ? role : 'assistant',
+        contentHtml,
+        styleText: sanitizeSnapshotStyleText(snapshot.styleText || ''),
+        scopeId: String(snapshot.scopeId || '').trim(),
+        plainText: String(snapshot.plainText || deriveSnapshotPlainText(contentHtml))
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 50000),
+        capturedAt: Number.isFinite(capturedAt) && capturedAt > 0 ? capturedAt : Date.now(),
+    };
 }
 
 function normalizeFlashcardDeck(deck, fallbackDocumentRefs = []) {
@@ -342,6 +408,10 @@ function normalizeNote(agentId, topicId, payload = {}, existing = null) {
         payload.flashcardDeck ?? existing?.flashcardDeck ?? null,
         sourceDocumentRefs
     );
+    const hasRenderSnapshotPayload = Object.prototype.hasOwnProperty.call(payload, 'renderSnapshot');
+    const renderSnapshot = hasRenderSnapshotPayload
+        ? normalizeRenderSnapshot(payload.renderSnapshot)
+        : normalizeRenderSnapshot(existing?.renderSnapshot);
 
     return {
         id: String(payload.id || existing?.id || makeId('note')),
@@ -359,6 +429,7 @@ function normalizeNote(agentId, topicId, payload = {}, existing = null) {
             payload.flashcardProgress ?? existing?.flashcardProgress ?? null,
             flashcardDeck
         ),
+        renderSnapshot,
         createdAt: Number(existing?.createdAt || payload.createdAt || now),
         updatedAt: now,
     };
@@ -481,6 +552,7 @@ function initialize(context = {}) {
                 sourceMessageIds,
                 sourceDocumentRefs,
                 kind,
+                renderSnapshot,
             } = payload;
 
             const notePayload = {
@@ -489,6 +561,7 @@ function initialize(context = {}) {
                 sourceMessageIds,
                 sourceDocumentRefs,
                 kind: kind || 'message-note',
+                renderSnapshot,
             };
 
             const notes = await readTopicNotes(agentId, topicId);
@@ -563,4 +636,5 @@ module.exports = {
     initialize,
     searchNotesIndex,
     exportNoteToTempAttachment,
+    normalizeRenderSnapshot,
 };

@@ -89,6 +89,10 @@ function initialize(context = {}) {
         ok({ item: await knowledgeBase.retryKnowledgeBaseDocument(documentId) })
     ), { item: null }));
 
+    registerHandle(['rename-knowledge-base-document', 'kb:rename-document'], withKnowledgeBaseReady(async (_event, documentId, payload) => (
+        ok({ item: await knowledgeBase.renameKnowledgeBaseDocument(documentId, payload) })
+    ), { item: null }));
+
     registerHandle(['set-topic-knowledge-base', 'kb:set-topic-binding'], withKnowledgeBaseReady(async (_event, agentId, topicId, kbId) => {
         if (kbId) {
             const kb = await knowledgeBase.getKnowledgeBaseById(kbId);

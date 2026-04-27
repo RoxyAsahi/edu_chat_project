@@ -7,6 +7,55 @@ function escapeHtml(text) {
         .replace(/'/g, '&#39;');
 }
 
+const SUBJECT_CARD_EMOJIS = ['🎓', '📚', '🧠', '✏️', '🔬', '🌍', '📐', '📝'];
+
+const SUBJECT_CARD_KEYWORD_EMOJIS = [
+    ['数学', '📐'],
+    ['英语', '🔤'],
+    ['语文', '✒️'],
+    ['写作', '✒️'],
+    ['物理', '🧲'],
+    ['化学', '🧪'],
+    ['生物', '🧬'],
+    ['历史', '🏛️'],
+    ['地理', '🌍'],
+    ['编程', '💻'],
+    ['论文', '📄'],
+];
+
+function sliceGraphemes(value, limit = 2) {
+    const source = String(value || '').replace(/\s+/g, '').trim();
+    if (!source) {
+        return '';
+    }
+
+    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+        const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+        return Array.from(segmenter.segment(source), (segment) => segment.segment).slice(0, limit).join('');
+    }
+
+    return Array.from(source).slice(0, limit).join('');
+}
+
+function normalizeSubjectCardEmoji(value) {
+    return sliceGraphemes(value, 2);
+}
+
+function resolveSubjectCardEmoji({ agent, index = 0 } = {}) {
+    const configuredEmoji = normalizeSubjectCardEmoji(agent?.cardEmoji);
+    if (configuredEmoji) {
+        return configuredEmoji;
+    }
+
+    const agentName = String(agent?.name || agent?.id || '');
+    const keywordMatch = SUBJECT_CARD_KEYWORD_EMOJIS.find(([keyword]) => agentName.includes(keyword));
+    if (keywordMatch) {
+        return keywordMatch[1];
+    }
+
+    return SUBJECT_CARD_EMOJIS[index % SUBJECT_CARD_EMOJIS.length];
+}
+
 function formatRelativeTimeShort(value) {
     const timestamp = Number(value || 0);
     if (!Number.isFinite(timestamp) || timestamp <= 0) {
@@ -281,15 +330,11 @@ function buildStudyTrendMarkup({ trendDays = [] } = {}) {
     `;
 }
 
-function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'violet' } = {}) {
+function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'violet', index = 0 } = {}) {
     const agentId = agent?.id || '';
     const agentName = agent?.name || agentId || '未命名学科';
     const topicCount = Math.max(0, Number(stats?.topicCount || 0));
-    const unreadCount = Math.max(0, Number(stats?.unreadCount || 0));
-    const lastTopicName = stats?.lastTopicName || '从一个新话题开始今天的学习';
-    const summaryText = unreadCount > 0
-        ? `${unreadCount} 项待整理`
-        : (topicCount > 0 ? `${topicCount} 个话题` : '准备好开始');
+    const subjectEmoji = resolveSubjectCardEmoji({ agent, index });
 
     return `
         <button
@@ -298,18 +343,11 @@ function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'vi
             data-subject-card
             data-agent-id="${escapeHtml(agentId)}"
         >
-            <div class="subject-overview-card__topline">
-                <span class="subject-overview-card__badge">${isCurrent ? '当前学科' : '学习空间'}</span>
-                ${isCurrent ? '<span class="subject-overview-card__current-dot" aria-hidden="true"></span>' : ''}
-            </div>
-            <div class="subject-overview-card__body">
-                <strong>${escapeHtml(agentName)}</strong>
-                <p>${escapeHtml(lastTopicName)}</p>
-            </div>
-            <div class="subject-overview-card__meta" aria-hidden="true">
-                <span>${escapeHtml(summaryText)}</span>
-                <span class="material-symbols-outlined">arrow_forward</span>
-            </div>
+            <span class="subject-overview-card__emoji" aria-hidden="true">${escapeHtml(subjectEmoji)}</span>
+            <span class="subject-overview-card__content">
+                <strong class="subject-overview-card__title">${escapeHtml(agentName)}</strong>
+                <span class="subject-overview-card__count">${escapeHtml(`${topicCount} 个话题`)}</span>
+            </span>
         </button>
     `;
 }
@@ -371,12 +409,11 @@ function buildSubjectCreateCard(viewMode = 'grid') {
             class="subject-overview-card subject-overview-card--create"
             data-create-subject-card
         >
-            <div class="subject-overview-card__create-body">
-                <span class="subject-overview-card__create-icon" aria-hidden="true">
-                    <span class="material-symbols-outlined">add</span>
-                </span>
-                <strong>新建笔记本</strong>
-            </div>
+            <span class="subject-overview-card__emoji subject-overview-card__emoji--create" aria-hidden="true">✨</span>
+            <span class="subject-overview-card__content">
+                <strong class="subject-overview-card__title">新建学科</strong>
+                <span class="subject-overview-card__count">创建学习空间</span>
+            </span>
         </button>
     `;
 }
@@ -394,6 +431,7 @@ function buildSubjectCollectionMarkup({
             stats: statsByAgent[agent.id] || {},
             isCurrent: agent.id === selectedAgentId,
             tone: subjectTones[index % subjectTones.length],
+            index,
         };
         return viewMode === 'list'
             ? buildSubjectListRow(payload)

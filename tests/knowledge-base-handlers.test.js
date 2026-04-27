@@ -72,6 +72,9 @@ async function createHarness(config, options = {}) {
         async retryKnowledgeBaseDocument() {
             return {};
         },
+        async renameKnowledgeBaseDocument(documentId, payload) {
+            return { id: documentId, name: payload.name };
+        },
         async retrieveKnowledgeBaseContext() {
             return { refs: [], contextText: '', itemCount: 0 };
         },
@@ -91,6 +94,7 @@ async function createHarness(config, options = {}) {
             return { documentId: null, guideStatus: 'idle', guideMarkdown: '' };
         },
     };
+    Object.assign(knowledgeBaseStub, options.knowledgeBaseStub || {});
 
     const agentConfigManager = new AgentConfigManager(agentDir);
     const { knowledgeBaseHandlers, handlers } = loadKnowledgeBaseHandlers(knowledgeBaseStub);
@@ -162,4 +166,29 @@ test('set-topic-knowledge-base updates the requested topic only', async (t) => {
     });
     assert.equal(config.topics.find((topic) => topic.id === 'topic-1').knowledgeBaseId, 'kb-valid');
     assert.equal(config.topics.find((topic) => topic.id === 'topic-2').knowledgeBaseId, 'kb-existing');
+});
+
+test('rename knowledge base document handler delegates to knowledge base service', async (t) => {
+    const calls = [];
+    const harness = await createHarness(
+        { topics: [{ id: 'topic-1', name: 'Topic 1', knowledgeBaseId: null }] },
+        {
+            knowledgeBaseStub: {
+                async renameKnowledgeBaseDocument(documentId, payload) {
+                    calls.push([documentId, payload]);
+                    return { id: documentId, name: payload.name };
+                },
+            },
+        },
+    );
+    t.after(harness.cleanup);
+
+    const renameDocument = harness.handlers.get('kb:rename-document');
+    const result = await renameDocument(null, 'doc-1', { name: '新标题.png' });
+
+    assert.deepEqual(calls, [['doc-1', { name: '新标题.png' }]]);
+    assert.deepEqual(result, {
+        success: true,
+        item: { id: 'doc-1', name: '新标题.png' },
+    });
 });

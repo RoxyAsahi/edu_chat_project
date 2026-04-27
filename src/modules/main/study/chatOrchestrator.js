@@ -353,6 +353,8 @@ function createChatOrchestrator(options = {}) {
             fallbackExecution: request.fallbackExecution || null,
             webContents: request.webContents,
             streamChannel: request.streamChannel,
+            onStreamEnd: request.onStreamEnd,
+            onStreamChunk: request.onStreamChunk,
         });
 
         if (directResult?.error) {

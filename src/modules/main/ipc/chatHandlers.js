@@ -23,6 +23,7 @@ const { createStudyServices } = require('../study');
 const {
     buildDefaultPlaceholderTopic,
     buildPlaceholderTopicName,
+    isPlaceholderTopicName,
 } = require('../utils/topicTitles');
 const {
     extractResponseContent,
@@ -545,6 +546,20 @@ function selectVisibleFollowUpMessages(messages = [], limit = FOLLOW_UP_HISTORY_
     return enforceFollowUpHistoryBudget(visibleMessages);
 }
 
+function selectVisibleTopicTitleSourceMessages(messages = []) {
+    return (Array.isArray(messages) ? messages : [])
+        .filter((message) => (
+            message
+            && (message.role === 'user' || message.role === 'assistant')
+            && message.isThinking !== true
+        ))
+        .map((message) => ({
+            role: message.role,
+            content: flattenFollowUpMessageContent(message.content),
+        }))
+        .filter((message) => message.content);
+}
+
 function formatFollowUpChatHistory(messages = []) {
     return selectVisibleFollowUpMessages(messages)
         .map((message, index) => {
@@ -572,27 +587,102 @@ function buildFollowUpPrompt(template = '', messages = []) {
     return `${promptTemplate.trim()}\n\n${chatHistory}`.trim();
 }
 
+function formatTopicTitleChatHistory(messages = [], limit = TOPIC_TITLE_HISTORY_LIMIT) {
+    return selectVisibleFollowUpMessages(messages, limit)
+        .map((message, index) => {
+            const speaker = message.role === 'user' ? 'User' : 'Assistant';
+            return `[${index + 1}] ${speaker}:\n${message.content}`;
+        })
+        .join('\n\n')
+        .trim();
+}
+
+function replaceMessagesEndVariables(template = '', messages = []) {
+    return String(template || '').replace(/{{\s*MESSAGES:END:(\d+)\s*}}/gi, (_match, rawLimit) => {
+        const limit = Math.max(1, Number.parseInt(rawLimit, 10) || TOPIC_TITLE_HISTORY_LIMIT);
+        return formatTopicTitleChatHistory(messages, limit);
+    });
+}
+
 function buildTopicTitlePrompt(template = '', messages = []) {
-    const chatHistory = formatFollowUpChatHistory(messages);
+    const chatHistory = formatTopicTitleChatHistory(messages);
     const promptTemplate = typeof template === 'string' && template.trim()
         ? template
         : DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE;
+    let prompt = replaceMessagesEndVariables(promptTemplate, messages);
 
     if (!chatHistory) {
-        return promptTemplate.replace(/{{CHAT_HISTORY}}/g, '');
+        return prompt.replace(/{{CHAT_HISTORY}}/g, '');
     }
 
-    if (promptTemplate.includes('{{CHAT_HISTORY}}')) {
-        return promptTemplate.replace(/{{CHAT_HISTORY}}/g, chatHistory);
+    if (prompt.includes('{{CHAT_HISTORY}}')) {
+        return prompt.replace(/{{CHAT_HISTORY}}/g, chatHistory);
     }
 
-    return `${promptTemplate.trim()}\n\n${chatHistory}`.trim();
+    if (prompt !== promptTemplate) {
+        return prompt.trim();
+    }
+
+    return `${prompt.trim()}\n\n${chatHistory}`.trim();
 }
 
 function stripJsonCodeFence(text = '') {
     const trimmed = String(text || '').trim();
     const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
     return fencedMatch ? fencedMatch[1].trim() : trimmed;
+}
+
+function extractFirstJsonObject(text = '') {
+    const source = String(text || '');
+    let startIndex = -1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+
+        if (startIndex === -1) {
+            if (char === '{') {
+                startIndex = index;
+                depth = 1;
+            }
+            continue;
+        }
+
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            escaped = inString;
+            continue;
+        }
+
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+
+        if (inString) {
+            continue;
+        }
+
+        if (char === '{') {
+            depth += 1;
+            continue;
+        }
+
+        if (char === '}') {
+            depth -= 1;
+            if (depth === 0) {
+                return source.slice(startIndex, index + 1).trim();
+            }
+        }
+    }
+
+    return '';
 }
 
 function normalizeFollowUps(followUps = []) {
@@ -606,6 +696,10 @@ function normalizeFollowUps(followUps = []) {
 function extractJsonCandidates(text = '') {
     const normalized = stripJsonCodeFence(text);
     const candidates = [normalized];
+    const firstObject = extractFirstJsonObject(normalized);
+    if (firstObject) {
+        candidates.push(firstObject);
+    }
     const objectStart = normalized.indexOf('{');
     const objectEnd = normalized.lastIndexOf('}');
     if (objectStart !== -1 && objectEnd > objectStart) {
@@ -688,6 +782,297 @@ function parseTopicTitleResponse(responseText = '', fallbackTitle = '') {
     }
 
     return normalizeTopicTitle(fallbackTitle);
+}
+
+function resolveTopicTitleBackgroundTask({
+    backgroundTasks = {},
+    context = {},
+    messages = [],
+    model = '',
+    settings = {},
+} = {}) {
+    const topicTitleTask = backgroundTasks?.topicTitle;
+    if (!topicTitleTask || topicTitleTask.enabled !== true) {
+        return null;
+    }
+
+    if (settings?.enableTopicTitleGeneration === false) {
+        return null;
+    }
+
+    const agentId = String(context?.agentId || '').trim();
+    const topicId = String(context?.topicId || '').trim();
+    const messageId = String(context?.assistantMessageId || context?.messageId || '').trim();
+    const expectedTopicName = normalizeTopicTitle(topicTitleTask.expectedTopicName);
+    if (!agentId || !topicId || !messageId || !isPlaceholderTopicName(expectedTopicName)) {
+        return null;
+    }
+
+    const visibleMessages = selectVisibleTopicTitleSourceMessages(messages);
+    if (visibleMessages.length !== 1 || visibleMessages[0]?.role !== 'user') {
+        return null;
+    }
+
+    return {
+        agentId,
+        topicId,
+        messageId,
+        expectedTopicName,
+        model,
+        userMessage: visibleMessages[0],
+    };
+}
+
+function extractAssistantContentFromCompletion(completion = {}) {
+    if (typeof completion?.content === 'string' && completion.content.trim()) {
+        return completion.content;
+    }
+    if (typeof completion?.fullResponse === 'string' && completion.fullResponse.trim()) {
+        return completion.fullResponse;
+    }
+    if (typeof completion?.partialResponse === 'string' && completion.partialResponse.trim()) {
+        return completion.partialResponse;
+    }
+    return extractResponseContent(completion?.response || {});
+}
+
+function isSuccessfulTopicTitleCompletion(completion = {}) {
+    if (!completion || completion.error) {
+        return false;
+    }
+    if (completion.success === false || completion.interrupted === true || completion.timedOut === true) {
+        return false;
+    }
+
+    const finishReason = String(completion.finishReason || '').trim();
+    if (finishReason === 'cancelled_by_user' || finishReason === 'timed_out') {
+        return false;
+    }
+
+    return Boolean(normalizeTopicTitle(extractAssistantContentFromCompletion(completion)));
+}
+
+async function generateTopicTitleResult({
+    settingsManager,
+    agentConfigManager,
+    requestPayload = {},
+    settings: providedSettings = null,
+} = {}) {
+    const visibleMessages = selectVisibleFollowUpMessages(
+        requestPayload.messages,
+        TOPIC_TITLE_HISTORY_LIMIT
+    );
+    const fallbackTitle = extractFirstUserTitleFallback(requestPayload.messages);
+    if (visibleMessages.length === 0) {
+        return { success: true, generated: false, title: fallbackTitle };
+    }
+
+    const settings = providedSettings || (settingsManager && typeof settingsManager.readSettings === 'function'
+        ? await settingsManager.readSettings()
+        : {});
+    const configuredEndpoint = typeof settings?.chatEndpoint === 'string' ? settings.chatEndpoint.trim() : '';
+    const configuredApiKey = typeof settings?.chatApiKey === 'string' ? settings.chatApiKey.trim() : '';
+
+    const model = await resolveTaskModel({
+        agentId: requestPayload.agentId,
+        requestedModel: requestPayload.model,
+        settings,
+        agentConfigManager,
+        logLabel: 'generate-topic-title',
+        preferredSettingsKeys: ['topicTitleDefaultModel'],
+    });
+    const executionConfig = resolveExecutionConfig(settings, {
+        purpose: 'topicTitle',
+        requestedModel: model,
+        fallbackEndpoint: configuredEndpoint,
+        fallbackApiKey: configuredApiKey,
+        fallbackModel: model,
+    });
+    const endpoint = executionConfig?.endpoint || configuredEndpoint;
+    const apiKey = executionConfig?.apiKey || configuredApiKey;
+    const fallbackExecution = resolveChatFallbackExecution(settings);
+    const prompt = buildTopicTitlePrompt(settings.topicTitlePromptTemplate, visibleMessages);
+    if (!endpoint) {
+        return {
+            success: true,
+            generated: false,
+            title: fallbackTitle,
+            model,
+            prompt,
+            error: '模型服务配置不完整。',
+        };
+    }
+
+    const response = await chatClient.send({
+        requestId: `topic_title_${requestPayload.messageId || Date.now()}_${Date.now()}`,
+        endpoint,
+        apiKey,
+        extraHeaders: executionConfig?.extraHeaders || {},
+        messages: [{
+            role: 'user',
+            content: prompt,
+        }],
+        modelConfig: buildUtilityTaskModelConfig(model, {
+            model,
+            stream: false,
+            temperature: 0.1,
+            max_tokens: 200,
+        }),
+        context: {
+            source: 'topic-title-generation',
+            agentId: requestPayload.agentId || '',
+            topicId: requestPayload.topicId || '',
+            messageId: requestPayload.messageId || '',
+        },
+        timeoutMs: 120000,
+        fallbackExecution,
+    });
+
+    if (response?.error) {
+        return {
+            success: true,
+            generated: false,
+            title: fallbackTitle,
+            model,
+            prompt,
+            error: response.error,
+        };
+    }
+
+    const rawContent = extractResponseContent(response?.response || {});
+    const title = parseTopicTitleResponse(rawContent, fallbackTitle) || fallbackTitle;
+    return {
+        success: true,
+        generated: title !== fallbackTitle,
+        title,
+        model,
+        prompt,
+        rawContent,
+    };
+}
+
+async function persistTopicTitleWithGuard({
+    agentConfigManager,
+    agentId = '',
+    topicId = '',
+    title = '',
+    expectedTopicName = '',
+} = {}) {
+    const normalizedTitle = normalizeTopicTitle(title);
+    const normalizedExpectedTopicName = normalizeTopicTitle(expectedTopicName);
+    if (!agentConfigManager || typeof agentConfigManager.updateTopic !== 'function') {
+        return { persisted: false, error: 'AgentConfigManager is unavailable.' };
+    }
+    if (!agentId || !topicId || !normalizedTitle || !isPlaceholderTopicName(normalizedExpectedTopicName)) {
+        return { persisted: false, error: 'Invalid topic title task.' };
+    }
+
+    let persisted = false;
+    const result = await agentConfigManager.updateTopic(agentId, topicId, (topic) => {
+        const currentName = normalizeTopicTitle(topic?.name);
+        if (!isPlaceholderTopicName(currentName) || currentName !== normalizedExpectedTopicName) {
+            return topic;
+        }
+
+        persisted = true;
+        return {
+            ...topic,
+            name: normalizedTitle,
+        };
+    });
+
+    return {
+        persisted,
+        title: normalizedTitle,
+        topics: Array.isArray(result?.config?.topics) ? result.config.topics : [],
+    };
+}
+
+function emitTopicTitleEvent(webContents, payload = {}) {
+    const isDestroyed = typeof webContents?.isDestroyed === 'function'
+        ? webContents.isDestroyed()
+        : false;
+    if (!webContents || typeof webContents.send !== 'function' || isDestroyed) {
+        return;
+    }
+
+    webContents.send('chat-stream-event', payload);
+}
+
+async function runTopicTitleBackgroundTask({
+    task,
+    completion,
+    settingsManager,
+    agentConfigManager,
+    webContents,
+} = {}) {
+    if (!task || !isSuccessfulTopicTitleCompletion(completion)) {
+        return null;
+    }
+
+    const assistantContent = String(extractAssistantContentFromCompletion(completion) || '').trim();
+    const messages = [
+        task.userMessage,
+        { role: 'assistant', content: assistantContent },
+    ];
+
+    try {
+        const titleResult = await generateTopicTitleResult({
+            settingsManager,
+            agentConfigManager,
+            requestPayload: {
+                agentId: task.agentId,
+                topicId: task.topicId,
+                messageId: task.messageId,
+                model: task.model,
+                messages,
+            },
+        });
+        const title = normalizeTopicTitle(titleResult?.title);
+        if (!title) {
+            return null;
+        }
+
+        const persistResult = await persistTopicTitleWithGuard({
+            agentConfigManager,
+            agentId: task.agentId,
+            topicId: task.topicId,
+            title,
+            expectedTopicName: task.expectedTopicName,
+        });
+        if (!persistResult.persisted) {
+            return {
+                ...titleResult,
+                persisted: false,
+            };
+        }
+
+        const eventPayload = {
+            type: 'topic-title',
+            requestId: task.messageId,
+            context: {
+                agentId: task.agentId,
+                topicId: task.topicId,
+                messageId: task.messageId,
+            },
+            title: persistResult.title,
+            topics: persistResult.topics,
+        };
+        emitTopicTitleEvent(webContents, eventPayload);
+        return {
+            ...titleResult,
+            persisted: true,
+            title: persistResult.title,
+            topics: persistResult.topics,
+        };
+    } catch (error) {
+        console.error('[Main - topic-title-background-task] Failed:', error);
+        return {
+            success: false,
+            persisted: false,
+            error: error.message,
+        };
+    }
 }
 
 async function requestFollowUpsOnce({
@@ -1343,6 +1728,7 @@ function initialize(mainWindow, context) {
             modelConfig = {},
             context = null,
             executionMode: requestExecutionMode = '',
+            backgroundTasks = null,
         } = request || {};
 
         if (!request || typeof request !== 'object' || Array.isArray(request)) {
@@ -1489,6 +1875,27 @@ function initialize(mainWindow, context) {
             currentDate,
         };
 
+        const topicTitleTask = resolveTopicTitleBackgroundTask({
+            backgroundTasks,
+            context: enrichedContext,
+            messages: processedMessages,
+            model: finalModelConfig?.model || '',
+            settings,
+        });
+        const scheduleTopicTitleTask = (completion) => {
+            if (!topicTitleTask) {
+                return;
+            }
+
+            void runTopicTitleBackgroundTask({
+                task: topicTitleTask,
+                completion,
+                settingsManager,
+                agentConfigManager,
+                webContents: event.sender,
+            });
+        };
+
         const orchestrationResult = await studyServices.chatOrchestrator.runRequest({
             requestId,
             endpoint: executionConfig?.endpoint || endpoint,
@@ -1502,6 +1909,9 @@ function initialize(mainWindow, context) {
             webContents: event.sender,
             streamChannel: 'chat-stream-event',
             executionMode: enrichedContext.executionMode,
+            onStreamEnd: (endResult = {}) => {
+                scheduleTopicTitleTask(endResult);
+            },
         });
 
         if (orchestrationResult?.error) {
@@ -1512,6 +1922,14 @@ function initialize(mainWindow, context) {
                 studyMemoryRefs: orchestrationResult.studyMemoryRefs || [],
                 fallbackMeta: orchestrationResult.fallbackMeta || null,
             };
+        }
+
+        const waitsForDirectStreamEnd = enrichedContext.executionMode === 'direct-stream'
+            && finalModelConfig?.stream === true
+            && orchestrationResult?.streamingStarted === true
+            && !orchestrationResult?.fullResponse;
+        if (!waitsForDirectStreamEnd) {
+            scheduleTopicTitleTask(orchestrationResult || {});
         }
 
         return {
@@ -1610,95 +2028,11 @@ function initialize(mainWindow, context) {
             const requestPayload = payload && typeof payload === 'object' && !Array.isArray(payload)
                 ? payload
                 : {};
-            const visibleMessages = selectVisibleFollowUpMessages(
-                requestPayload.messages,
-                TOPIC_TITLE_HISTORY_LIMIT
-            );
-            const fallbackTitle = extractFirstUserTitleFallback(requestPayload.messages);
-            if (visibleMessages.length === 0) {
-                return { success: true, generated: false, title: fallbackTitle };
-            }
-
-            const settings = settingsManager && typeof settingsManager.readSettings === 'function'
-                ? await settingsManager.readSettings()
-                : {};
-            const configuredEndpoint = typeof settings?.chatEndpoint === 'string' ? settings.chatEndpoint.trim() : '';
-            const configuredApiKey = typeof settings?.chatApiKey === 'string' ? settings.chatApiKey.trim() : '';
-
-            const model = await resolveTaskModel({
-                agentId: requestPayload.agentId,
-                requestedModel: requestPayload.model,
-                settings,
+            return await generateTopicTitleResult({
+                settingsManager,
                 agentConfigManager,
-                logLabel: 'generate-topic-title',
-                preferredSettingsKeys: ['topicTitleDefaultModel'],
+                requestPayload,
             });
-            const executionConfig = resolveExecutionConfig(settings, {
-                purpose: 'topicTitle',
-                requestedModel: model,
-                fallbackEndpoint: configuredEndpoint,
-                fallbackApiKey: configuredApiKey,
-                fallbackModel: model,
-            });
-            const endpoint = executionConfig?.endpoint || configuredEndpoint;
-            const apiKey = executionConfig?.apiKey || configuredApiKey;
-            const fallbackExecution = resolveChatFallbackExecution(settings);
-            if (!endpoint) {
-                return {
-                    success: true,
-                    generated: false,
-                    title: fallbackTitle,
-                    error: '模型服务配置不完整。',
-                };
-            }
-
-            const prompt = buildTopicTitlePrompt(settings.topicTitlePromptTemplate, visibleMessages);
-            const response = await chatClient.send({
-                requestId: `topic_title_${requestPayload.messageId || Date.now()}_${Date.now()}`,
-                endpoint,
-                apiKey,
-                extraHeaders: executionConfig?.extraHeaders || {},
-                messages: [{
-                    role: 'user',
-                    content: prompt,
-                }],
-                modelConfig: buildUtilityTaskModelConfig(model, {
-                    model,
-                    stream: false,
-                    temperature: 0.1,
-                    max_tokens: 200,
-                }),
-                context: {
-                    source: 'topic-title-generation',
-                    agentId: requestPayload.agentId || '',
-                    topicId: requestPayload.topicId || '',
-                    messageId: requestPayload.messageId || '',
-                },
-                timeoutMs: 120000,
-                fallbackExecution,
-            });
-
-            if (response?.error) {
-                return {
-                    success: true,
-                    generated: false,
-                    title: fallbackTitle,
-                    model,
-                    prompt,
-                    error: response.error,
-                };
-            }
-
-            const rawContent = extractResponseContent(response?.response || {});
-            const title = parseTopicTitleResponse(rawContent, fallbackTitle) || fallbackTitle;
-            return {
-                success: true,
-                generated: title !== fallbackTitle,
-                title,
-                model,
-                prompt,
-                rawContent,
-            };
         } catch (error) {
             console.error('[Main - generate-topic-title] Failed:', error);
             return {
@@ -1969,8 +2303,13 @@ module.exports = {
         formatFollowUpChatHistory,
         parseFollowUpsResponse,
         parseTopicTitleResponse,
+        generateTopicTitleResult,
+        isSuccessfulTopicTitleCompletion,
+        persistTopicTitleWithGuard,
+        resolveTopicTitleBackgroundTask,
         resolveFollowUpModel,
         resolveTaskModel,
+        runTopicTitleBackgroundTask,
         sanitizeFollowUpText,
         selectVisibleFollowUpMessages,
         requestFollowUpsOnce,

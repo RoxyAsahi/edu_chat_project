@@ -52,9 +52,11 @@ test('chatOrchestrator direct-stream mode forwards the real streaming request wi
             },
         },
         streamChannel: 'chat-stream-event',
+        onStreamEnd() {},
     });
 
     assert.equal(capturedRequest.modelConfig.stream, true);
+    assert.equal(typeof capturedRequest.onStreamEnd, 'function');
     assert.equal(capturedRequest.messages[0].role, 'system');
     assert.match(capturedRequest.messages[0].content, /memory context/);
     assert.equal(result.streamingStarted, true);

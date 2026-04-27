@@ -37,6 +37,42 @@ function createSourceOperations(deps = {}) {
         return normalizeDocumentIds(state.topicKnowledgeBaseDocuments.map((item) => item.id));
     }
 
+    function splitDocumentNameForRename(name = '') {
+        const documentName = String(name || '').trim();
+        const dotIndex = documentName.lastIndexOf('.');
+        if (dotIndex <= 0 || dotIndex === documentName.length - 1) {
+            return {
+                baseName: documentName,
+                extension: '',
+            };
+        }
+
+        return {
+            baseName: documentName.slice(0, dotIndex),
+            extension: documentName.slice(dotIndex),
+        };
+    }
+
+    function replaceDocumentInSourceState(documentId, patch = {}) {
+        const normalizedDocumentId = String(documentId || '').trim();
+        if (!normalizedDocumentId) {
+            return;
+        }
+
+        const applyPatch = (items = []) => items.map((item) => (
+            item.id === normalizedDocumentId
+                ? { ...item, ...patch }
+                : item
+        ));
+
+        state.knowledgeBaseDocuments = applyPatch(state.knowledgeBaseDocuments);
+        state.topicKnowledgeBaseDocuments = applyPatch(state.topicKnowledgeBaseDocuments);
+        syncReaderFromDocuments([
+            ...state.topicKnowledgeBaseDocuments,
+            ...state.knowledgeBaseDocuments,
+        ], { resetIfMissing: false });
+    }
+
     async function persistCurrentTopicSourceSelection(documentIds) {
         if (!state.currentSelectedItem.id || !state.currentTopicId) {
             return false;
@@ -402,6 +438,66 @@ function createSourceOperations(deps = {}) {
         await loadKnowledgeBases({ silent: true });
     }
 
+    async function renameKnowledgeBaseDocument(documentItem = {}) {
+        const documentId = String(documentItem?.id || '').trim();
+        if (!documentId) {
+            return;
+        }
+
+        if (typeof chatAPI.renameKnowledgeBaseDocument !== 'function' || typeof ui.showPromptDialog !== 'function') {
+            ui.showToastNotification('当前版本暂不支持重命名来源文件。', 'warning');
+            return;
+        }
+
+        const { baseName, extension } = splitDocumentNameForRename(documentItem.name || '');
+        const nextBaseName = await ui.showPromptDialog({
+            title: '重命名来源',
+            message: extension ? `原扩展名 ${extension} 会自动保留。` : '更新来源文件名。',
+            placeholder: '文件名',
+            defaultValue: baseName,
+            confirmText: '保存',
+            cancelText: '取消',
+            validate(value) {
+                const trimmed = String(value || '').trim();
+                if (!trimmed) {
+                    return '文件名不能为空。';
+                }
+                if (/[\\/]/.test(trimmed)) {
+                    return '文件名不能包含路径分隔符。';
+                }
+                return '';
+            },
+        });
+        if (!nextBaseName) {
+            return;
+        }
+
+        const nextName = `${String(nextBaseName).trim()}${extension}`;
+        if (nextName === documentItem.name) {
+            return;
+        }
+
+        const result = await chatAPI.renameKnowledgeBaseDocument(documentId, { name: nextName })
+            .catch((error) => ({
+                success: false,
+                error: error.message,
+            }));
+        if (!result?.success) {
+            ui.showToastNotification(`重命名来源文件失败：${result?.error || '未知错误'}`, 'error');
+            return;
+        }
+
+        const renamedDocument = {
+            ...documentItem,
+            ...(result.item || {}),
+            name: result.item?.name || nextName,
+        };
+        replaceDocumentInSourceState(documentId, renamedDocument);
+        getFacade().renderKnowledgeBaseManager();
+        getFacade().renderTopicKnowledgeBaseFiles();
+        ui.showToastNotification('已重命名来源文件。', 'success');
+    }
+
     async function deleteKnowledgeBase() {
         if (!state.selectedKnowledgeBaseId) {
             return;
@@ -528,6 +624,7 @@ function createSourceOperations(deps = {}) {
         refreshKnowledgeBasePollingTargets,
         refreshKnowledgeBaseSummaries,
         renameKnowledgeBase,
+        renameKnowledgeBaseDocument,
         runKnowledgeBaseDebug,
         runKnowledgeBaseSearch,
         setAllTopicSourceDocumentsSelected,

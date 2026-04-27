@@ -121,7 +121,7 @@ const settingsController = createSettingsController({
     ),
     reloadSelectedAgent: async (agentId) => {
         await workspaceController?.loadAgents?.();
-        await workspaceController?.selectAgent?.(agentId);
+        await workspaceController?.selectAgent?.(agentId, { showSubjectWorkspace: false });
     },
     getBubbleThemePreviewContext: () => {
         const session = getSessionSlice();
@@ -144,7 +144,9 @@ const {
     applyRendererSettings,
     loadSettings,
     openSettingsModal,
+    openSubjectSettingsPanel,
     closeSettingsModal,
+    closeSubjectSettingsPanel,
     setPromptVisible,
     bindEvents: bindSettingsEvents,
 } = settingsController;
@@ -178,7 +180,6 @@ composerController = createComposerController({
         notesController?.decorateChatMessages?.(...args);
     },
     generateFollowUpsForAssistantMessage: (...args) => followUpController?.generateForAssistantMessage?.(...args),
-    generateTopicTitleForAssistantMessage: (...args) => topicTitleController?.generateForAssistantMessage?.(...args),
     updateCurrentChatHistory,
 });
 followUpController = createFollowUpController({
@@ -221,6 +222,7 @@ readerController = createReaderController({
     hideSourceFileTooltip: (...args) => sourceController?.hideSourceFileTooltip?.(...args),
     onInjectSelection: (selection) => composerController?.injectSelection?.(selection),
     patchDocumentGuideStateInSource,
+    patchDocumentNameInSource,
 });
 sourceController = createSourceController({
     store,
@@ -277,6 +279,7 @@ notesController = createNotesController({
     chatAPI,
     ui,
     renderMarkdownFragment,
+    messageRendererApi: messageRenderer,
     windowObj: window,
     documentObj: document,
     setSidePanelTab,
@@ -359,6 +362,8 @@ workspaceController = createWorkspaceController({
     setLeftReaderTab,
     setRightPanelMode,
     openSettingsModal,
+    openSubjectSettingsPanel,
+    closeSubjectSettingsPanel,
     ensureTopicSource,
     loadCurrentTopicKnowledgeBaseDocuments,
     loadTopicNotes: (...args) => notesController?.loadTopicNotes?.(...args),
@@ -450,7 +455,14 @@ const { bootstrap } = createAppBootstrap({
     renderReaderPanel: (...args) => readerController?.renderReaderPanel?.(...args),
     renderSelectionContextPreview: (...args) => composerController?.renderSelectionContextPreview?.(...args),
     bindFeatureEvents,
-    handleStreamEvent: (...args) => composerController?.handleStreamEvent?.(...args),
+    handleStreamEvent: async (eventData) => {
+        if (eventData?.type === 'topic-title') {
+            await topicTitleController?.handleTopicTitleEvent?.(eventData);
+            return;
+        }
+
+        await composerController?.handleStreamEvent?.(eventData);
+    },
     setPromptVisible,
     renderNotesPanel: (...args) => notesController?.renderNotesPanel?.(...args),
     renderLogsPanel: (...args) => logsController?.renderLogsPanel?.(...args),
@@ -600,6 +612,30 @@ function patchDocumentGuideStateInSource(documentId, patch = {}) {
     const applyPatch = (items = []) => items.map((item) => (
         item.id === documentId
             ? { ...item, ...patch }
+            : item
+    ));
+
+    store.patchState('source', (current) => ({
+        ...current,
+        knowledgeBaseDocuments: applyPatch(current.knowledgeBaseDocuments),
+        topicKnowledgeBaseDocuments: applyPatch(current.topicKnowledgeBaseDocuments),
+    }));
+}
+
+function patchDocumentNameInSource(documentId, patch = {}) {
+    const normalizedDocumentId = String(documentId || '').trim();
+    if (!normalizedDocumentId) {
+        return;
+    }
+
+    const nextName = String(patch?.name || '').trim();
+    if (!nextName) {
+        return;
+    }
+
+    const applyPatch = (items = []) => items.map((item) => (
+        item.id === normalizedDocumentId
+            ? { ...item, ...patch, name: nextName }
             : item
     ));
 
@@ -803,6 +839,9 @@ async function populateAgentForm(config) {
     const session = getSessionSlice();
     el.editingAgentId.value = session.currentSelectedItem.id;
     el.agentNameInput.value = config.name || '';
+    if (el.agentCardEmojiInput) {
+        el.agentCardEmojiInput.value = config.cardEmoji || '';
+    }
     revokeAgentAvatarPreviewObjectUrl();
     el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';
     el.agentModel.value = config.model || '';

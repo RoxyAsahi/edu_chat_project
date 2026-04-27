@@ -6,6 +6,10 @@ import {
     parseQuizSetFromMarkdown,
 } from '../quiz/quizUtils.js';
 
+const NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION = 1;
+const NOTE_RENDER_SNAPSHOT_RENDERER = 'unistudy-message-renderer';
+const SNAPSHOT_ALLOWED_ROLES = new Set(['assistant', 'user', 'system']);
+
 function normalizeHistory(history) {
     return Array.isArray(history)
         ? history.map((message) => ({
@@ -17,6 +21,38 @@ function normalizeHistory(history) {
             selectionContextRefs: Array.isArray(message.selectionContextRefs) ? message.selectionContextRefs : [],
         }))
         : [];
+}
+
+function normalizeRenderSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+        return null;
+    }
+    if (Number(snapshot.schemaVersion) !== NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION) {
+        return null;
+    }
+    if (snapshot.renderer !== NOTE_RENDER_SNAPSHOT_RENDERER) {
+        return null;
+    }
+
+    const contentHtml = String(snapshot.contentHtml || '');
+    if (!contentHtml.trim()) {
+        return null;
+    }
+
+    const role = String(snapshot.role || '').trim().toLowerCase();
+    const capturedAt = Number(snapshot.capturedAt);
+
+    return {
+        schemaVersion: NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION,
+        renderer: NOTE_RENDER_SNAPSHOT_RENDERER,
+        sourceMessageId: String(snapshot.sourceMessageId || '').trim(),
+        role: SNAPSHOT_ALLOWED_ROLES.has(role) ? role : 'assistant',
+        contentHtml,
+        styleText: String(snapshot.styleText || ''),
+        scopeId: String(snapshot.scopeId || '').trim(),
+        plainText: String(snapshot.plainText || '').replace(/\s+/g, ' ').trim().slice(0, 50000),
+        capturedAt: Number.isFinite(capturedAt) && capturedAt > 0 ? capturedAt : Date.now(),
+    };
 }
 
 function removeDeletedNoteReferencesFromHistory(history, noteId) {
@@ -64,6 +100,7 @@ function normalizeNote(note = {}, options = {}) {
         quizSet,
         flashcardDeck,
         flashcardProgress: normalizeFlashcardProgress(note.flashcardProgress, flashcardDeck),
+        renderSnapshot: normalizeRenderSnapshot(note.renderSnapshot),
         createdAt: Number(note.createdAt || Date.now()),
         updatedAt: Number(note.updatedAt || note.createdAt || Date.now()),
     };
@@ -154,6 +191,11 @@ function buildNoteSaveRequest({
             resolvedTitle || currentNote?.title || '选择题练习',
         )
         : null;
+    const currentContent = String(currentNote?.contentMarkdown || '');
+    const bodyUnchanged = Boolean(currentNote?.id) && resolvedContent === currentContent;
+    const renderSnapshot = bodyUnchanged
+        ? normalizeRenderSnapshot(currentNote?.renderSnapshot)
+        : null;
 
     return {
         targetTopicId: currentNote?.topicId || currentTopicId || '',
@@ -165,6 +207,7 @@ function buildNoteSaveRequest({
             sourceDocumentRefs: Array.isArray(currentNote?.sourceDocumentRefs) ? currentNote.sourceDocumentRefs : [],
             kind,
             quizSet,
+            renderSnapshot,
             createdAt: currentNote?.createdAt,
         },
     };
@@ -215,5 +258,6 @@ export {
     isGeneratedNote,
     isManualNote,
     normalizeNote,
+    normalizeRenderSnapshot,
     removeDeletedNoteReferencesFromHistory,
 };
