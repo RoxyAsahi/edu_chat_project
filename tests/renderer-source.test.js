@@ -226,7 +226,7 @@ function createStore(initialState) {
     };
 }
 
-function createUiStub() {
+function createUiStub(overrides = {}) {
     return {
         toasts: [],
         showToastNotification(message, type) {
@@ -235,6 +235,7 @@ function createUiStub() {
         async showConfirmDialog() {
             return true;
         },
+        ...overrides,
     };
 }
 
@@ -279,6 +280,15 @@ test('document visual and status helpers preserve current source presentation ru
             status: 'processing',
         }),
         { icon: 'progress_activity', tone: 'loading', spinning: true }
+    );
+    assert.deepEqual(
+        getKnowledgeBaseDocumentVisual({
+            name: '道法海报.png',
+            mimeType: 'image/png',
+            contentType: 'markdown',
+            status: 'done',
+        }),
+        { icon: 'image', tone: 'image', spinning: false }
     );
 });
 
@@ -467,6 +477,132 @@ test('loadKnowledgeBaseDocuments delegates reader synchronization through inject
     });
 });
 
+test('topic source file menu includes rename action', async () => {
+    const { createSourceController } = await loadSourceModule();
+    const { window, document, el } = createDomElements();
+    const state = createBaseState({
+        session: {
+            currentSelectedItem: { id: 'agent-1', name: '数学' },
+            currentTopicId: 'topic-1',
+            topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-topic' }],
+        },
+        source: {
+            knowledgeBases: [],
+            knowledgeBaseDocuments: [],
+            topicKnowledgeBaseDocuments: [
+                { id: 'doc-1', name: 'chapter.png', status: 'done', contentType: 'markdown', mimeType: 'image/png' },
+            ],
+            knowledgeBaseDebugResult: null,
+            selectedKnowledgeBaseId: 'kb-topic',
+            activeSourceFileMenu: null,
+        },
+    });
+    const store = createStore(state);
+    const controller = createSourceController({
+        store,
+        el,
+        chatAPI: {},
+        ui: createUiStub(),
+        windowObj: window,
+        documentObj: document,
+    });
+
+    controller.renderTopicKnowledgeBaseFiles();
+    el.topicKnowledgeBaseFiles.querySelector('[data-doc-menu-button]').click();
+
+    const renameAction = el.sourceFileActionMenu.querySelector('[data-source-file-action="rename"]');
+    assert.ok(renameAction);
+    assert.match(renameAction.textContent, /重命名/);
+});
+
+test('renameKnowledgeBaseDocument preserves extension and updates source state', async () => {
+    const { createSourceController } = await loadSourceModule();
+    const { window, document, el } = createDomElements();
+    const originalDocument = {
+        id: 'doc-1',
+        name: 'chapter.png',
+        status: 'done',
+        contentType: 'markdown',
+        mimeType: 'image/png',
+    };
+    const state = createBaseState({
+        session: {
+            currentSelectedItem: { id: 'agent-1', name: '数学' },
+            currentTopicId: 'topic-1',
+            topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-topic' }],
+        },
+        source: {
+            knowledgeBases: [],
+            knowledgeBaseDocuments: [originalDocument],
+            topicKnowledgeBaseDocuments: [originalDocument],
+            knowledgeBaseDebugResult: null,
+            selectedKnowledgeBaseId: 'kb-topic',
+            activeSourceFileMenu: null,
+        },
+    });
+    const store = createStore(state);
+    const apiCalls = [];
+    const syncCalls = [];
+    const renderCalls = [];
+    const ui = createUiStub({
+        promptCalls: [],
+        async showPromptDialog(options) {
+            this.promptCalls.push(options);
+            return '新标题';
+        },
+    });
+    const controller = createSourceController({
+        store,
+        el,
+        chatAPI: {
+            async renameKnowledgeBaseDocument(documentId, payload) {
+                apiCalls.push([documentId, payload]);
+                return {
+                    success: true,
+                    item: { id: documentId, name: payload.name, renamedAt: 'now' },
+                };
+            },
+        },
+        ui,
+        windowObj: window,
+        documentObj: document,
+        syncReaderFromDocuments(items, options) {
+            syncCalls.push({ items, options });
+        },
+    });
+    controller.renderKnowledgeBaseManager = () => {
+        renderCalls.push('manager');
+    };
+    controller.renderTopicKnowledgeBaseFiles = () => {
+        renderCalls.push('topic');
+    };
+
+    await controller.renameKnowledgeBaseDocument(originalDocument);
+
+    assert.equal(ui.promptCalls.length, 1);
+    assert.equal(ui.promptCalls[0].defaultValue, 'chapter');
+    assert.match(ui.promptCalls[0].message, /\.png/);
+    assert.deepEqual(apiCalls, [
+        ['doc-1', { name: '新标题.png' }],
+    ]);
+    assert.equal(state.source.knowledgeBaseDocuments[0].name, '新标题.png');
+    assert.equal(state.source.topicKnowledgeBaseDocuments[0].name, '新标题.png');
+    assert.equal(state.source.knowledgeBaseDocuments[0].renamedAt, 'now');
+    assert.deepEqual(syncCalls, [
+        {
+            items: [
+                state.source.topicKnowledgeBaseDocuments[0],
+                state.source.knowledgeBaseDocuments[0],
+            ],
+            options: { resetIfMissing: false },
+        },
+    ]);
+    assert.deepEqual(renderCalls, ['manager', 'topic']);
+    assert.deepEqual(ui.toasts, [
+        { message: '已重命名来源文件。', type: 'success' },
+    ]);
+});
+
 test('createSourceController keeps the public facade stable after source surface reduction', async () => {
     const { createSourceController } = await loadSourceModule();
     const { window, document, el } = createDomElements();
@@ -484,6 +620,7 @@ test('createSourceController keeps the public facade stable after source surface
         'loadKnowledgeBaseDocuments',
         'loadCurrentTopicKnowledgeBaseDocuments',
         'renderTopicKnowledgeBaseFiles',
+        'renameKnowledgeBaseDocument',
         'syncCurrentTopicKnowledgeBaseControls',
         'syncKnowledgeBasePolling',
         'bindEvents',

@@ -3,6 +3,7 @@ import {
     buildNoteSaveRequest,
     deriveDeletedNoteState,
     getNormalizedNoteKind,
+    normalizeRenderSnapshot,
     removeDeletedNoteReferencesFromHistory,
 } from './notesUtils.js';
 import {
@@ -10,11 +11,165 @@ import {
     parseQuizSetFromResponse,
 } from '../quiz/quizUtils.js';
 
+const QUIZ_COUNT_PRESETS = {
+    less: 5,
+    standard: 8,
+    more: 12,
+};
+
+const QUIZ_DIFFICULTY_LABELS = {
+    easy: '简单',
+    medium: '中等',
+    hard: '困难',
+};
+
+const QUIZ_DIFFICULTY_DESCRIPTIONS = {
+    easy: '偏基础理解，主要考查核心概念、定义和直接应用。',
+    medium: '兼顾概念理解、常见应用和必要辨析，适合作为默认练习。',
+    hard: '提高综合性和辨析度，覆盖易错点、跨概念判断和更细的干扰项。',
+};
+
+const DEFAULT_QUIZ_GENERATION_CONFIG = {
+    countPreset: 'standard',
+    questionCount: QUIZ_COUNT_PRESETS.standard,
+    difficulty: 'medium',
+    focus: '',
+    includeChatContext: false,
+};
+
+const RECENT_CHAT_CONTEXT_LIMIT = 12;
+
+function normalizeQuizGenerationOptions(options = {}) {
+    const requestedPreset = String(options.countPreset || '').trim();
+    const countPreset = Object.prototype.hasOwnProperty.call(QUIZ_COUNT_PRESETS, requestedPreset)
+        ? requestedPreset
+        : DEFAULT_QUIZ_GENERATION_CONFIG.countPreset;
+    const requestedCount = Number(options.questionCount);
+    const questionCount = Number.isFinite(requestedCount) && requestedCount > 0
+        ? Math.max(1, Math.min(30, Math.round(requestedCount)))
+        : QUIZ_COUNT_PRESETS[countPreset];
+    const requestedDifficulty = String(options.difficulty || '').trim();
+    const difficulty = Object.prototype.hasOwnProperty.call(QUIZ_DIFFICULTY_LABELS, requestedDifficulty)
+        ? requestedDifficulty
+        : DEFAULT_QUIZ_GENERATION_CONFIG.difficulty;
+
+    return {
+        countPreset,
+        questionCount,
+        difficulty,
+        focus: String(options.focus || '').trim(),
+        includeChatContext: options.includeChatContext === true,
+    };
+}
+
+function getMessageTextContent(message = {}) {
+    const content = message.content;
+    if (typeof content === 'string') {
+        return content.trim();
+    }
+    if (Array.isArray(content)) {
+        return content
+            .map((part) => {
+                if (part?.type === 'text' && typeof part.text === 'string') {
+                    return part.text;
+                }
+                return typeof part?.text === 'string' ? part.text : '';
+            })
+            .filter(Boolean)
+            .join('\n')
+            .trim();
+    }
+    if (content && typeof content === 'object' && typeof content.text === 'string') {
+        return content.text.trim();
+    }
+    if (content && typeof content === 'object') {
+        try {
+            return JSON.stringify(content, null, 2).trim();
+        } catch {
+            return '';
+        }
+    }
+    return '';
+}
+
+function buildRecentChatContext(history = []) {
+    const messages = Array.isArray(history)
+        ? history
+            .filter((message) => (
+                message
+                && message.isThinking !== true
+                && (message.role === 'user' || message.role === 'assistant')
+                && getMessageTextContent(message)
+            ))
+            .slice(-RECENT_CHAT_CONTEXT_LIMIT)
+        : [];
+
+    if (messages.length === 0) {
+        return { text: '', sourceMessageIds: [] };
+    }
+
+    return {
+        text: [
+            `# 当前对话摘录（最近 ${messages.length} 条）`,
+            ...messages.map((message, index) => {
+                const roleLabel = message.role === 'user' ? '用户' : 'AI';
+                return `## ${index + 1}. ${roleLabel}\n\n${getMessageTextContent(message)}`;
+            }),
+        ].join('\n\n'),
+        sourceMessageIds: messages.map((message) => message.id).filter(Boolean),
+    };
+}
+
+function buildQuizInstruction(options = {}) {
+    const config = normalizeQuizGenerationOptions(options);
+    const difficultyLabel = QUIZ_DIFFICULTY_LABELS[config.difficulty];
+    const difficultyDescription = QUIZ_DIFFICULTY_DESCRIPTIONS[config.difficulty];
+    const requirements = [
+        `1. 生成 ${config.questionCount} 道题。`,
+        '2. 每题必须且只能有 4 个选项，label 必须严格为 A/B/C/D。',
+        '3. correctOptionId 必须严格对应某个 option.id。',
+        '4. 题干、选项、答案、解析全部使用简体中文。',
+        '5. title 使用简洁的练习名称，不要带时间戳。',
+        `6. 难度等级：${difficultyLabel}。${difficultyDescription}`,
+    ];
+
+    if (config.focus) {
+        requirements.push(`7. 主题范围：${config.focus}。请优先围绕这个主题出题，不要偏离学习材料。`);
+    }
+
+    return [
+        '请基于以下学习材料生成一组结构化选择题练习。',
+        '你必须只返回严格 JSON，不要输出 JSON 之外的任何文字。',
+        '禁止输出寒暄、前言、分隔线、时间戳标题、Markdown 标题或额外说明。',
+        'JSON 结构如下：',
+        '{',
+        '  "title": "测验标题",',
+        '  "items": [',
+        '    {',
+        '      "id": "quiz_1",',
+        '      "stem": "题干",',
+        '      "options": [',
+        '        { "id": "option_a", "label": "A", "text": "选项内容" },',
+        '        { "id": "option_b", "label": "B", "text": "选项内容" },',
+        '        { "id": "option_c", "label": "C", "text": "选项内容" },',
+        '        { "id": "option_d", "label": "D", "text": "选项内容" }',
+        '      ],',
+        '      "correctOptionId": "option_a",',
+        '      "explanation": "简明解析"',
+        '    }',
+        '  ]',
+        '}',
+        '要求：',
+        ...requirements,
+    ].join('\n');
+}
+
 function createNotesOperations(deps = {}) {
     const state = deps.state || {};
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
+    const messageRendererApi = deps.messageRendererApi || {};
     const flashcardsApi = deps.flashcardsApi || {
         beginPendingGeneration: () => {},
         buildGeneratedFlashcardContent: () => null,
@@ -259,6 +414,15 @@ function createNotesOperations(deps = {}) {
         }
 
         const noteBase = buildMessageNoteContent(message);
+        let renderSnapshot = null;
+        if (typeof messageRendererApi.createMessageRenderSnapshot === 'function') {
+            try {
+                renderSnapshot = normalizeRenderSnapshot(messageRendererApi.createMessageRenderSnapshot(message));
+            } catch (error) {
+                console.warn('[Notes] Failed to capture message render snapshot:', error);
+                renderSnapshot = null;
+            }
+        }
         const timestamp = new Date(message.timestamp || Date.now()).toLocaleString('zh-CN', {
             month: '2-digit',
             day: '2-digit',
@@ -274,6 +438,7 @@ function createNotesOperations(deps = {}) {
             sourceMessageIds: [message.id],
             sourceDocumentRefs: Array.isArray(message.kbContextRefs) ? message.kbContextRefs : [],
             kind: 'message-note',
+            renderSnapshot,
         });
 
         if (!result?.success) {
@@ -342,17 +507,39 @@ function createNotesOperations(deps = {}) {
         return favoriteNote;
     }
 
-    async function resolveStudyInputText() {
+    async function resolveStudyInputText(options = {}) {
+        const appendChatContext = (studyInput) => {
+            if (!options.includeChatContext || !studyInput?.text) {
+                return studyInput;
+            }
+
+            const chatContext = buildRecentChatContext(state.currentChatHistory);
+            if (!chatContext.text) {
+                return studyInput;
+            }
+
+            return {
+                ...studyInput,
+                text: `${studyInput.text}\n\n---\n\n${chatContext.text}`,
+                sourceMessageIds: [
+                    ...new Set([
+                        ...(Array.isArray(studyInput.sourceMessageIds) ? studyInput.sourceMessageIds : []),
+                        ...chatContext.sourceMessageIds,
+                    ]),
+                ],
+            };
+        };
+
         const selectedNotes = getSelectedNotes();
         if (selectedNotes.length > 0) {
-            return {
+            return appendChatContext({
                 sourceLabel: 'selected-notes',
                 text: selectedNotes
                     .map((note) => `# ${note.title}\n\n${note.contentMarkdown}`)
                     .join('\n\n---\n\n'),
                 sourceMessageIds: [...new Set(selectedNotes.flatMap((note) => note.sourceMessageIds || []))],
                 sourceDocumentRefs: selectedNotes.flatMap((note) => note.sourceDocumentRefs || []),
-            };
+            });
         }
 
         const currentTopic = getCurrentTopic();
@@ -363,30 +550,36 @@ function createNotesOperations(deps = {}) {
         const sourceResult = await chatAPI.retrieveKnowledgeBaseContext({
             kbId: currentTopic.knowledgeBaseId,
             query: '请概览当前来源资料的核心知识点、重点概念和常见考点。',
+            ...(Array.isArray(currentTopic.selectedKnowledgeBaseDocumentIds)
+                ? { documentIds: currentTopic.selectedKnowledgeBaseDocumentIds }
+                : {}),
         }).catch(() => null);
 
         if (!sourceResult?.success || !sourceResult.contextText) {
             return null;
         }
 
-        return {
+        return appendChatContext({
             sourceLabel: 'topic-source',
             text: sourceResult.contextText,
             sourceMessageIds: [],
             sourceDocumentRefs: Array.isArray(sourceResult.refs) ? sourceResult.refs : [],
-        };
+        });
     }
 
-    async function runNotesTool(kind) {
+    async function runNotesTool(kind, options = {}) {
         if (!state.currentSelectedItem.id || !state.currentTopicId) {
             ui.showToastNotification('请先选择一个智能体和话题。', 'warning');
-            return;
+            return false;
         }
 
-        const studyInput = await resolveStudyInputText();
+        const quizOptions = kind === 'quiz'
+            ? normalizeQuizGenerationOptions(options)
+            : DEFAULT_QUIZ_GENERATION_CONFIG;
+        const studyInput = await resolveStudyInputText(quizOptions);
         if (!studyInput?.text) {
             ui.showToastNotification('请先选择笔记，或为当前话题绑定并导入来源资料。', 'warning');
-            return;
+            return false;
         }
 
         const prompts = {
@@ -397,35 +590,7 @@ function createNotesOperations(deps = {}) {
             },
             quiz: {
                 title: '选择题练习',
-                instruction: [
-                    '请基于以下学习材料生成一组结构化选择题练习。',
-                    '你必须只返回严格 JSON，不要输出 JSON 之外的任何文字。',
-                    '禁止输出寒暄、前言、分隔线、时间戳标题、Markdown 标题或额外说明。',
-                    'JSON 结构如下：',
-                    '{',
-                    '  "title": "测验标题",',
-                    '  "items": [',
-                    '    {',
-                    '      "id": "quiz_1",',
-                    '      "stem": "题干",',
-                    '      "options": [',
-                    '        { "id": "option_a", "label": "A", "text": "选项内容" },',
-                    '        { "id": "option_b", "label": "B", "text": "选项内容" },',
-                    '        { "id": "option_c", "label": "C", "text": "选项内容" },',
-                    '        { "id": "option_d", "label": "D", "text": "选项内容" }',
-                    '      ],',
-                    '      "correctOptionId": "option_a",',
-                    '      "explanation": "简明解析"',
-                    '    }',
-                    '  ]',
-                    '}',
-                    '要求：',
-                    '1. 生成 8 道题。',
-                    '2. 每题必须且只能有 4 个选项，label 必须严格为 A/B/C/D。',
-                    '3. correctOptionId 必须严格对应某个 option.id。',
-                    '4. 题干、选项、答案、解析全部使用简体中文。',
-                    '5. title 使用简洁的练习名称，不要带时间戳。',
-                ].join('\n'),
+                instruction: buildQuizInstruction(quizOptions),
                 kind: 'quiz',
             },
             flashcards: {
@@ -452,7 +617,7 @@ function createNotesOperations(deps = {}) {
 
         const prompt = prompts[kind];
         if (!prompt) {
-            return;
+            return false;
         }
 
         if (prompt.kind === 'flashcards') {
@@ -494,7 +659,7 @@ function createNotesOperations(deps = {}) {
                 renderNotesPanel();
             }
             ui.showToastNotification(`生成失败：${response.error}`, 'error');
-            return;
+            return false;
         }
 
         const responseContent = response?.response?.choices?.[0]?.message?.content || '';
@@ -505,7 +670,7 @@ function createNotesOperations(deps = {}) {
                 renderNotesPanel();
             }
             ui.showToastNotification('模型没有返回可保存的内容。', 'warning');
-            return;
+            return false;
         }
 
         let contentMarkdown = responseContent;
@@ -517,7 +682,7 @@ function createNotesOperations(deps = {}) {
             quizSet = parseQuizSetFromResponse(responseContent, prompt.title);
             if (!quizSet) {
                 ui.showToastNotification('选择题生成结果格式无效，请重试。', 'error');
-                return;
+                return false;
             }
 
             contentMarkdown = buildQuizSummaryMarkdown(quizSet);
@@ -533,7 +698,7 @@ function createNotesOperations(deps = {}) {
                 setRightPanelMode('notes');
                 renderNotesPanel();
                 ui.showToastNotification('闪卡生成结果格式无效，请重试。', 'error');
-                return;
+                return false;
             }
 
             flashcardDeck = generated.flashcardDeck;
@@ -561,7 +726,7 @@ function createNotesOperations(deps = {}) {
                 renderNotesPanel();
             }
             ui.showToastNotification(`保存生成结果失败：${saveResult?.error || '未知错误'}`, 'error');
-            return;
+            return false;
         }
 
         await refreshNotesData();
@@ -581,6 +746,7 @@ function createNotesOperations(deps = {}) {
 
         setSidePanelTab('notes');
         ui.showToastNotification('已生成并保存到当前话题笔记。', 'success');
+        return true;
     }
 
     return {

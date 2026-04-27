@@ -124,6 +124,7 @@ function createInitialReaderState() {
         status: 'idle',
         isIndexed: false,
         view: null,
+        imagePreviewUrl: null,
         activePageNumber: null,
         activeParagraphIndex: null,
         activeSectionTitle: null,
@@ -198,6 +199,13 @@ function createInitialAppState() {
             pendingFlashcardGeneration: null,
             studioPomodoroVisible: false,
             studioPomodoroExpanded: true,
+            quizGenerationConfig: {
+                countPreset: 'standard',
+                questionCount: 8,
+                difficulty: 'medium',
+                focus: '',
+                includeChatContext: false,
+            },
             quizPractice: {
                 noteId: null,
                 currentIndex: 0,

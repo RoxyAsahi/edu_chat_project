@@ -126,6 +126,10 @@ function createSourceDom(deps = {}) {
 
                 if (action === 'open') {
                     await openReaderDocument(activeMenu.documentItem.id);
+                } else if (action === 'rename') {
+                    closeSourceFileActionMenu();
+                    await getFacade().renameKnowledgeBaseDocument(activeMenu.documentItem);
+                    return;
                 } else if (action === 'retry') {
                     await onRetryDocument(activeMenu.documentItem.id);
                 }

@@ -9,12 +9,50 @@ import { createNotesDom } from './notesDom.js';
 import { createNotesOperations } from './notesOperations.js';
 import { hasStructuredQuiz } from '../quiz/quizUtils.js';
 
+const QUIZ_COUNT_PRESETS = {
+    less: 5,
+    standard: 8,
+    more: 12,
+};
+
+const DEFAULT_QUIZ_GENERATION_CONFIG = {
+    countPreset: 'standard',
+    questionCount: QUIZ_COUNT_PRESETS.standard,
+    difficulty: 'medium',
+    focus: '',
+    includeChatContext: false,
+};
+
+const QUIZ_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+
+function normalizeQuizGenerationConfig(config = {}) {
+    const requestedPreset = String(config.countPreset || '').trim();
+    const countPreset = Object.prototype.hasOwnProperty.call(QUIZ_COUNT_PRESETS, requestedPreset)
+        ? requestedPreset
+        : DEFAULT_QUIZ_GENERATION_CONFIG.countPreset;
+    const questionCount = Number.isFinite(Number(config.questionCount))
+        ? Math.max(1, Math.min(30, Math.round(Number(config.questionCount))))
+        : QUIZ_COUNT_PRESETS[countPreset];
+    const difficulty = QUIZ_DIFFICULTIES.has(String(config.difficulty || '').trim())
+        ? String(config.difficulty).trim()
+        : DEFAULT_QUIZ_GENERATION_CONFIG.difficulty;
+
+    return {
+        countPreset,
+        questionCount,
+        difficulty,
+        focus: String(config.focus || '').trim(),
+        includeChatContext: config.includeChatContext === true,
+    };
+}
+
 function createNotesController(deps = {}) {
     const store = deps.store;
     const el = deps.el;
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
     const renderMarkdownFragment = deps.renderMarkdownFragment || ((value) => value);
+    const messageRendererApi = deps.messageRendererApi || {};
     const windowObj = deps.windowObj || window;
     const documentObj = deps.documentObj || document;
     const setSidePanelTab = deps.setSidePanelTab || (() => {});
@@ -47,6 +85,8 @@ function createNotesController(deps = {}) {
     const HTMLElementCtor = windowObj.HTMLElement || globalThis.HTMLElement;
     const ElementCtor = windowObj.Element || globalThis.Element;
     let noteDetailTrigger = null;
+    let noteDetailReturnTarget = 'studio';
+    let quizConfigTrigger = null;
     let manualNotesLibraryTrigger = null;
     let notesDomApi = null;
     let notesOperationsApi = null;
@@ -142,6 +182,10 @@ function createNotesController(deps = {}) {
         studioPomodoroExpanded: {
             get: () => getNotesSlice().studioPomodoroExpanded !== false,
             set: (value) => patchNotes({ studioPomodoroExpanded: value !== false }),
+        },
+        quizGenerationConfig: {
+            get: () => normalizeQuizGenerationConfig(getNotesSlice().quizGenerationConfig),
+            set: (value) => patchNotes({ quizGenerationConfig: normalizeQuizGenerationConfig(value) }),
         },
         quizPractice: {
             get: () => getNotesSlice().quizPractice || {
@@ -278,6 +322,49 @@ function createNotesController(deps = {}) {
         }
     }
 
+    function renderRichNotePreview(target, normalized, markdown, emptyText) {
+        if (!target) {
+            return;
+        }
+
+        const contentMarkdown = String(markdown || '');
+        const useSavedSnapshot = Boolean(
+            normalized?.renderSnapshot
+            && contentMarkdown === String(normalized.contentMarkdown || '')
+        );
+        const previewNote = {
+            ...(normalized || {}),
+            contentMarkdown,
+            renderSnapshot: useSavedSnapshot ? normalized.renderSnapshot : null,
+        };
+
+        if (contentMarkdown.trim() && typeof messageRendererApi.mountRichNotePreview === 'function') {
+            messageRendererApi.mountRichNotePreview(target, previewNote, {
+                compact: false,
+                emptyText,
+            });
+            return;
+        }
+
+        if (typeof messageRendererApi.cleanupNotePreviewMount === 'function') {
+            messageRendererApi.cleanupNotePreviewMount(target);
+        }
+        target.innerHTML = contentMarkdown.trim()
+            ? renderMarkdownFragment(contentMarkdown)
+            : `<p>${emptyText}</p>`;
+        if (contentMarkdown.trim() && typeof windowObj.renderMathInElement === 'function') {
+            windowObj.renderMathInElement(target, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '\\[', right: '\\]', display: true },
+                    { left: '$', right: '$', display: false },
+                    { left: '\\(', right: '\\)', display: false },
+                ],
+                throwOnError: false,
+            });
+        }
+    }
+
     function buildAnalysisPreviewMeta(note = null) {
         if (!note?.id) {
             return '未保存的草稿预览。';
@@ -300,20 +387,7 @@ function createNotesController(deps = {}) {
             el.analysisPreviewTitle.textContent = title;
         }
         if (el.analysisPreviewContent) {
-            el.analysisPreviewContent.innerHTML = markdown.trim()
-                ? renderMarkdownFragment(markdown)
-                : '<p>当前报告暂无内容。</p>';
-            if (markdown.trim() && typeof windowObj.renderMathInElement === 'function') {
-                windowObj.renderMathInElement(el.analysisPreviewContent, {
-                    delimiters: [
-                        { left: '$$', right: '$$', display: true },
-                        { left: '\\[', right: '\\]', display: true },
-                        { left: '$', right: '$', display: false },
-                        { left: '\\(', right: '\\)', display: false },
-                    ],
-                    throwOnError: false,
-                });
-            }
+            renderRichNotePreview(el.analysisPreviewContent, normalized, markdown, '当前报告暂无内容。');
         }
         if (el.analysisPreviewMeta) {
             el.analysisPreviewMeta.textContent = buildAnalysisPreviewMeta(normalized);
@@ -331,20 +405,7 @@ function createNotesController(deps = {}) {
             el.noteMarkdownPreviewTitle.textContent = title;
         }
         if (el.noteMarkdownPreviewContent) {
-            el.noteMarkdownPreviewContent.innerHTML = markdown.trim()
-                ? renderMarkdownFragment(markdown)
-                : '<p>当前笔记暂无内容。</p>';
-            if (markdown.trim() && typeof windowObj.renderMathInElement === 'function') {
-                windowObj.renderMathInElement(el.noteMarkdownPreviewContent, {
-                    delimiters: [
-                        { left: '$$', right: '$$', display: true },
-                        { left: '\\[', right: '\\]', display: true },
-                        { left: '$', right: '$', display: false },
-                        { left: '\\(', right: '\\)', display: false },
-                    ],
-                    throwOnError: false,
-                });
-            }
+            renderRichNotePreview(el.noteMarkdownPreviewContent, normalized, markdown, '当前笔记暂无内容。');
         }
         if (el.noteMarkdownPreviewMeta) {
             el.noteMarkdownPreviewMeta.textContent = buildAnalysisPreviewMeta(normalized);
@@ -582,6 +643,14 @@ function createNotesController(deps = {}) {
             noteDetailTrigger = options.trigger;
         }
 
+        const openedFromManualNotes = options.returnTo === 'manual-notes'
+            || state.manualNotesLibraryOpen === true
+            || (
+                options.trigger instanceof ElementCtor
+                && Boolean(options.trigger.closest?.('.manual-note-card'))
+            );
+        noteDetailReturnTarget = openedFromManualNotes ? 'manual-notes' : 'studio';
+
         if (state.manualNotesLibraryOpen) {
             closeManualNotesLibrary({ restoreFocus: false });
         }
@@ -644,6 +713,7 @@ function createNotesController(deps = {}) {
     }
 
     function closeNoteDetail(options = {}) {
+        const returnTarget = options.returnTarget || noteDetailReturnTarget;
         state.notesStudioView = 'overview';
         state.noteDetailKind = null;
         state.noteDetailMode = 'edit';
@@ -655,13 +725,18 @@ function createNotesController(deps = {}) {
         documentObj.body?.classList.remove('note-detail-open');
         if (
             options.restoreFocus !== false
+            && returnTarget !== 'manual-notes'
             && noteDetailTrigger instanceof HTMLElementCtor
             && documentObj.body?.contains(noteDetailTrigger)
         ) {
             noteDetailTrigger.focus();
         }
         noteDetailTrigger = null;
+        noteDetailReturnTarget = 'studio';
         notesDomApi.closeNoteActionMenu();
+        if (options.restoreReturnTarget !== false && returnTarget === 'manual-notes') {
+            void openManualNotesLibrary({ restoreFocus: false, skipDetailClose: true });
+        }
     }
 
     function revealNote(note) {
@@ -727,7 +802,11 @@ function createNotesController(deps = {}) {
             return;
         }
 
-        if (el.noteDetailModal && !el.noteDetailModal.classList.contains('hidden')) {
+        if (
+            options.skipDetailClose !== true
+            && el.noteDetailModal
+            && !el.noteDetailModal.classList.contains('hidden')
+        ) {
             closeNoteDetail({ restoreFocus: false });
         }
 
@@ -779,7 +858,7 @@ function createNotesController(deps = {}) {
         const clearFlashcards = options.clearFlashcards !== false;
 
         if (closeDetailView) {
-            closeNoteDetail({ restoreFocus: false });
+            closeNoteDetail({ restoreFocus: false, restoreReturnTarget: false });
         } else {
             notesDomApi.closeNoteActionMenu();
         }
@@ -802,6 +881,9 @@ function createNotesController(deps = {}) {
         if (state.manualNotesLibraryOpen) {
             closeManualNotesLibrary({ restoreFocus: false });
         }
+        if (el.quizConfigModal && !el.quizConfigModal.classList.contains('hidden')) {
+            closeQuizConfigModal({ restoreFocus: false });
+        }
         state.noteDetailMode = 'edit';
         resetQuizPracticeState(null);
 
@@ -823,6 +905,129 @@ function createNotesController(deps = {}) {
         }
     }
 
+    function syncQuizConfigControls() {
+        const config = state.quizGenerationConfig;
+        Array.from(el.quizCountPresetBtns || []).forEach((button) => {
+            const preset = button.getAttribute('data-quiz-count-preset');
+            const active = preset === config.countPreset;
+            button.classList.toggle('quiz-config-segment__btn--active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        Array.from(el.quizDifficultyBtns || []).forEach((button) => {
+            const difficulty = button.getAttribute('data-quiz-difficulty');
+            const active = difficulty === config.difficulty;
+            button.classList.toggle('quiz-config-segment__btn--active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        if (el.quizFocusInput && el.quizFocusInput.value !== config.focus) {
+            el.quizFocusInput.value = config.focus;
+        }
+        if (el.quizIncludeChatContextInput) {
+            el.quizIncludeChatContextInput.checked = config.includeChatContext === true;
+        }
+    }
+
+    function setQuizConfigGenerating(isGenerating) {
+        const generating = isGenerating === true;
+        el.quizConfigModal?.classList.toggle('quiz-config-modal--generating', generating);
+        [
+            el.quizConfigCloseBtn,
+            el.quizConfigCancelBtn,
+            el.quizConfigGenerateBtn,
+            el.quizFocusInput,
+            el.quizIncludeChatContextInput,
+            ...Array.from(el.quizCountPresetBtns || []),
+            ...Array.from(el.quizDifficultyBtns || []),
+        ].forEach((control) => {
+            control?.toggleAttribute('disabled', generating);
+        });
+        if (el.quizConfigGenerateBtn) {
+            el.quizConfigGenerateBtn.innerHTML = generating
+                ? '<span class="material-symbols-outlined">hourglass_top</span> 生成中'
+                : '<span class="material-symbols-outlined">auto_awesome</span> 生成';
+        }
+    }
+
+    function readQuizConfigFromControls() {
+        return normalizeQuizGenerationConfig({
+            ...state.quizGenerationConfig,
+            focus: el.quizFocusInput?.value || '',
+            includeChatContext: el.quizIncludeChatContextInput?.checked === true,
+        });
+    }
+
+    function openQuizConfigModal(options = {}) {
+        if (options.trigger instanceof HTMLElementCtor) {
+            quizConfigTrigger = options.trigger;
+        }
+        state.quizGenerationConfig = normalizeQuizGenerationConfig(state.quizGenerationConfig);
+        syncQuizConfigControls();
+        closeTopicActionMenu();
+        closeSourceFileActionMenu();
+        notesDomApi.closeNoteActionMenu();
+        el.quizConfigModal?.classList.remove('hidden');
+        el.quizConfigModal?.setAttribute('aria-hidden', 'false');
+        documentObj.body?.classList.add('quiz-config-open');
+        setQuizConfigGenerating(false);
+        (el.quizFocusInput || el.quizConfigGenerateBtn || el.quizConfigCloseBtn)?.focus?.();
+    }
+
+    function closeQuizConfigModal(options = {}) {
+        el.quizConfigModal?.classList.add('hidden');
+        el.quizConfigModal?.classList.remove('quiz-config-modal--generating');
+        el.quizConfigModal?.setAttribute('aria-hidden', 'true');
+        documentObj.body?.classList.remove('quiz-config-open');
+        setQuizConfigGenerating(false);
+        if (
+            options.restoreFocus !== false
+            && quizConfigTrigger instanceof HTMLElementCtor
+            && documentObj.body?.contains(quizConfigTrigger)
+        ) {
+            quizConfigTrigger.focus();
+        }
+        quizConfigTrigger = null;
+    }
+
+    function updateQuizCountPreset(preset) {
+        if (!Object.prototype.hasOwnProperty.call(QUIZ_COUNT_PRESETS, preset)) {
+            return;
+        }
+        state.quizGenerationConfig = normalizeQuizGenerationConfig({
+            ...state.quizGenerationConfig,
+            countPreset: preset,
+            questionCount: QUIZ_COUNT_PRESETS[preset],
+        });
+        syncQuizConfigControls();
+    }
+
+    function updateQuizDifficulty(difficulty) {
+        if (!QUIZ_DIFFICULTIES.has(String(difficulty || ''))) {
+            return;
+        }
+        state.quizGenerationConfig = normalizeQuizGenerationConfig({
+            ...state.quizGenerationConfig,
+            difficulty,
+        });
+        syncQuizConfigControls();
+    }
+
+    async function submitQuizConfigModal() {
+        const config = readQuizConfigFromControls();
+        state.quizGenerationConfig = config;
+        syncQuizConfigControls();
+        setQuizConfigGenerating(true);
+        try {
+            const success = await notesOperationsApi.runNotesTool('quiz', config);
+            if (success) {
+                closeQuizConfigModal({ restoreFocus: false });
+            }
+        } catch (error) {
+            ui.showToastNotification(`生成失败：${error?.message || String(error)}`, 'error');
+        } finally {
+            setQuizConfigGenerating(false);
+        }
+    }
+
     function bindEvents() {
         documentObj.addEventListener('click', (event) => {
             const target = event.target;
@@ -841,6 +1046,10 @@ function createNotesController(deps = {}) {
             }
             if (state.activeNoteMenu) {
                 notesDomApi.closeNoteActionMenu();
+            }
+            if (el.quizConfigModal && !el.quizConfigModal.classList.contains('hidden')) {
+                closeQuizConfigModal();
+                return;
             }
             if (state.manualNotesLibraryOpen) {
                 closeManualNotesLibrary();
@@ -894,8 +1103,30 @@ function createNotesController(deps = {}) {
         el.analyzeNotesBtn?.addEventListener('click', () => {
             void notesOperationsApi.runNotesTool('analysis');
         });
-        el.generateQuizBtn?.addEventListener('click', () => {
-            void notesOperationsApi.runNotesTool('quiz');
+        el.generateQuizBtn?.addEventListener('click', (event) => {
+            openQuizConfigModal({ trigger: event.currentTarget });
+        });
+        el.quizConfigCloseBtn?.addEventListener('click', () => closeQuizConfigModal());
+        el.quizConfigCancelBtn?.addEventListener('click', () => closeQuizConfigModal());
+        el.quizConfigModalBackdrop?.addEventListener('click', () => closeQuizConfigModal());
+        el.quizConfigGenerateBtn?.addEventListener('click', () => {
+            void submitQuizConfigModal();
+        });
+        el.quizFocusInput?.addEventListener('input', () => {
+            state.quizGenerationConfig = readQuizConfigFromControls();
+        });
+        el.quizIncludeChatContextInput?.addEventListener('change', () => {
+            state.quizGenerationConfig = readQuizConfigFromControls();
+        });
+        Array.from(el.quizCountPresetBtns || []).forEach((button) => {
+            button.addEventListener('click', () => {
+                updateQuizCountPreset(button.getAttribute('data-quiz-count-preset'));
+            });
+        });
+        Array.from(el.quizDifficultyBtns || []).forEach((button) => {
+            button.addEventListener('click', () => {
+                updateQuizDifficulty(button.getAttribute('data-quiz-difficulty'));
+            });
         });
         el.generateFlashcardsBtn?.addEventListener('click', () => {
             void notesOperationsApi.runNotesTool('flashcards');
@@ -973,6 +1204,7 @@ function createNotesController(deps = {}) {
         el,
         documentObj,
         windowObj,
+        messageRendererApi,
         flashcardsApi,
         normalizeNote,
         getVisibleNotes,
@@ -982,6 +1214,7 @@ function createNotesController(deps = {}) {
         getCurrentTopicDisplayName,
         getTopicDisplayLabel,
         getNoteHighlightId,
+        getNoteDetailReturnTarget: () => noteDetailReturnTarget,
         closeTopicActionMenu,
         closeSourceFileActionMenu,
         openNoteDetail,
@@ -994,6 +1227,7 @@ function createNotesController(deps = {}) {
         el,
         chatAPI,
         ui,
+        messageRendererApi,
         flashcardsApi,
         persistHistory,
         buildTopicContext,
@@ -1033,6 +1267,8 @@ function createNotesController(deps = {}) {
         normalizeNote,
         openManualNotesLibrary,
         openNoteDetail,
+        openQuizConfigModal,
+        closeQuizConfigModal,
         refreshNotesData: (...args) => notesOperationsApi.refreshNotesData(...args),
         renderManualNotesLibrary: (...args) => notesDomApi.renderManualNotesLibrary(...args),
         renderNotesPanel: (...args) => notesDomApi.renderNotesPanel(...args),

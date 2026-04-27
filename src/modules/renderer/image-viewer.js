@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const copyButton = document.getElementById('copyButton');
     const downloadButton = document.getElementById('downloadButton');
     const saveEditedButton = document.getElementById('saveEditedButton');
+    const moreMenuButton = document.getElementById('moreMenuButton');
+    const moreMenu = document.getElementById('moreMenu');
+    const annotationToggleButton = document.getElementById('annotationToggleButton');
     const canvas = document.getElementById('drawingCanvas');
     const ctx = canvas.getContext('2d');
     const imageContainer = document.getElementById('imageContainer');
@@ -42,6 +45,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let history = [];
     let historyStep = -1;
     const maxHistory = 50;
+    let isMoreMenuOpen = false;
+    let isAnnotationPanelOpen = false;
 
     let currentScale = 1;
     const minScale = 0.2;
@@ -74,7 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(window.location.search);
     const imageUrl = params.get('src');
     const imageTitle = params.get('title') || '图片预览';
-    const initialTheme = params.get('theme') || 'dark';
+    const initialTheme = params.get('theme') || 'light';
     const decodedTitle = safeDecodeURIComponent(imageTitle, '图片预览');
 
     applyTheme(initialTheme);
@@ -318,10 +323,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    function setMoreMenuOpen(open) {
+        isMoreMenuOpen = Boolean(open);
+        moreMenu.classList.toggle('open', isMoreMenuOpen);
+        moreMenuButton.classList.toggle('active', isMoreMenuOpen);
+        moreMenuButton.setAttribute('aria-expanded', String(isMoreMenuOpen));
+    }
+
+    function setButtonFeedback(button, iconSvg, label) {
+        button.innerHTML = `${iconSvg}<span class="button-label">${label}</span>`;
+    }
+
+    function createCheckIconSvg() {
+        return '<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>';
+    }
+
+    function createCopyIconSvg() {
+        return '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M5 16H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+    }
+
+    function setAnnotationPanelOpen(open) {
+        isAnnotationPanelOpen = Boolean(open);
+        toolbar.classList.toggle('hidden', !isAnnotationPanelOpen);
+        document.body.classList.toggle('annotation-panel-open', isAnnotationPanelOpen);
+        annotationToggleButton.classList.toggle('active', isAnnotationPanelOpen);
+        annotationToggleButton.querySelector('.button-label').textContent = isAnnotationPanelOpen ? '完成标注' : '标注/编辑';
+
+        if (!isAnnotationPanelOpen) {
+            setTool('select');
+        }
+
+        setMoreMenuOpen(false);
+        updateToolbarLayout();
+    }
+
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing);
     canvas.addEventListener('mouseleave', stopDrawing);
+
+    moreMenuButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setMoreMenuOpen(!isMoreMenuOpen);
+    });
+
+    moreMenu.addEventListener('click', (event) => {
+        event.stopPropagation();
+    });
+
+    annotationToggleButton.addEventListener('click', () => {
+        setAnnotationPanelOpen(!isAnnotationPanelOpen);
+    });
 
     selectTool.addEventListener('click', () => setTool('select'));
     brushTool.addEventListener('click', () => setTool('brush'));
@@ -404,8 +456,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             imageContainer.addEventListener('contextmenu', (event) => {
                 event.preventDefault();
-                toolbar.classList.toggle('hidden');
                 imageControls.classList.toggle('active');
+                setMoreMenuOpen(false);
             });
 
             imgElement.addEventListener('wheel', (event) => {
@@ -474,12 +526,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     saveEditedButton.addEventListener('click', async () => {
         try {
+            setMoreMenuOpen(false);
             const blob = await buildMergedImageBlob();
             const item = new ClipboardItem({ 'image/png': blob });
             await navigator.clipboard.write([item]);
 
             const originalHtml = saveEditedButton.innerHTML;
-            saveEditedButton.innerHTML = '<svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path></svg> 已保存';
+            setButtonFeedback(saveEditedButton, createCheckIconSvg(), '已保存');
             setTimeout(() => {
                 saveEditedButton.innerHTML = originalHtml;
             }, 2000);
@@ -498,13 +551,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const blob = await buildMergedImageBlob();
             const item = new ClipboardItem({ 'image/png': blob });
             await navigator.clipboard.write([item]);
-            copyButton.innerHTML = '<svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path></svg> 已复制';
+            setButtonFeedback(copyButton, createCheckIconSvg(), '已复制');
             setTimeout(() => {
                 copyButton.innerHTML = originalHtml;
             }, 2000);
         } catch (error) {
             console.error('Failed to copy edited image:', error);
-            copyButton.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg> 复制失败';
+            setButtonFeedback(copyButton, createCopyIconSvg(), '复制失败');
             setTimeout(() => {
                 copyButton.innerHTML = originalHtml;
             }, 2000);
@@ -534,8 +587,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        setMoreMenuOpen(false);
         const originalHtml = ocrButton.innerHTML;
-        ocrButton.innerHTML = '识别中...';
+        setButtonFeedback(ocrButton, '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 10h8"></path><path d="M8 14h5"></path></svg>', '识别中...');
         ocrButton.disabled = true;
 
         try {
@@ -544,7 +598,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log(message);
                     if (message.status === 'recognizing text') {
                         const progress = (message.progress * 100).toFixed(0);
-                        ocrButton.innerHTML = `识别中 ${progress}%`;
+                        setButtonFeedback(ocrButton, '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 10h8"></path><path d="M8 14h5"></path></svg>', `识别中 ${progress}%`);
                     }
                 },
             });
@@ -570,6 +624,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (event.target === ocrResultModal) {
             ocrResultModal.style.display = 'none';
         }
+
+        if (isMoreMenuOpen && !imageControls.contains(event.target)) {
+            setMoreMenuOpen(false);
+        }
     });
 
     copyOcrText.addEventListener('click', async () => {
@@ -587,8 +645,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
-            if (currentTool !== 'select') {
+            if (isMoreMenuOpen) {
+                setMoreMenuOpen(false);
+            } else if (currentTool !== 'select') {
                 setTool('select');
+            } else if (isAnnotationPanelOpen) {
+                setAnnotationPanelOpen(false);
             } else if (viewerAPI?.closeWindow) {
                 viewerAPI.closeWindow();
             } else {
@@ -615,24 +677,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 setTool('select');
                 break;
             case 'b':
+                setAnnotationPanelOpen(true);
                 setTool('brush');
                 break;
             case 'e':
+                setAnnotationPanelOpen(true);
                 setTool('eraser');
                 break;
             case 'i':
+                setAnnotationPanelOpen(true);
                 setTool('eyedropper');
                 break;
             case 'l':
+                setAnnotationPanelOpen(true);
                 setTool('line');
                 break;
             case 'r':
+                setAnnotationPanelOpen(true);
                 setTool('rect');
                 break;
             case 'c':
+                setAnnotationPanelOpen(true);
                 setTool('circle');
                 break;
             case 'a':
+                setAnnotationPanelOpen(true);
                 setTool('arrow');
                 break;
             default:

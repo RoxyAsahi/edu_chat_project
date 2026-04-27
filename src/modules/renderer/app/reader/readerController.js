@@ -36,6 +36,40 @@ function renderReaderMarkdown(markdown, renderMarkdownToSafeHtml, getMarkedInsta
     );
 }
 
+function renderReaderImagePreviewMarkup(reader = {}) {
+    const imagePreviewUrl = String(reader.imagePreviewUrl || reader.view?.imagePreviewUrl || '').trim();
+    if (!imagePreviewUrl) {
+        return '';
+    }
+
+    return `
+        <figure class="reader-image-preview">
+            <img
+                src="${escapeHtml(imagePreviewUrl)}"
+                alt="${escapeHtml(reader.documentName || '图片预览')}"
+                loading="lazy"
+                data-reader-image-preview
+            />
+        </figure>
+    `;
+}
+
+function splitDocumentNameForRename(name = '') {
+    const documentName = String(name || '').trim();
+    const dotIndex = documentName.lastIndexOf('.');
+    if (dotIndex <= 0 || dotIndex === documentName.length - 1) {
+        return {
+            baseName: documentName,
+            extension: '',
+        };
+    }
+
+    return {
+        baseName: documentName.slice(0, dotIndex),
+        extension: documentName.slice(dotIndex),
+    };
+}
+
 function enhanceReaderRenderedContent(container, windowObj) {
     if (!container || !windowObj?.renderMathInElement) {
         return;
@@ -72,6 +106,7 @@ function createReaderController(deps = {}) {
     const hideSourceFileTooltip = deps.hideSourceFileTooltip || (() => {});
     const onInjectSelection = deps.onInjectSelection || (() => {});
     const patchDocumentGuideStateInSource = deps.patchDocumentGuideStateInSource || (() => {});
+    const patchDocumentNameInSource = deps.patchDocumentNameInSource || (() => {});
     const getLeftReaderActiveTab = deps.getLeftReaderActiveTab || (() => store.getState().layout.leftReaderActiveTab);
 
     const scheduleFrame = typeof windowObj.requestAnimationFrame === 'function'
@@ -81,6 +116,7 @@ function createReaderController(deps = {}) {
         ? windowObj.getSelection.bind(windowObj)
         : () => null;
     const NodeCtor = windowObj.Node || globalThis.Node;
+    let activeReaderTitleRename = null;
 
     function getReaderSlice() {
         return store.getState().reader;
@@ -140,6 +176,16 @@ function createReaderController(deps = {}) {
         patchDocumentGuideStateInSource(documentId, patch);
     }
 
+    function bindReaderImagePreviewFallback() {
+        const image = el.readerContent?.querySelector?.('[data-reader-image-preview]');
+        if (!image) {
+            return;
+        }
+        image.addEventListener('error', () => {
+            image.closest('.reader-image-preview')?.remove();
+        }, { once: true });
+    }
+
     function mergeActiveDocumentIntoReader(documentItem = {}) {
         if (!documentItem || documentItem.id !== state.reader.documentId) {
             return false;
@@ -149,6 +195,7 @@ function createReaderController(deps = {}) {
             ...state.reader,
             status: documentItem.status || state.reader.status,
             isIndexed: documentItem.status === 'done',
+            documentName: documentItem.name || state.reader.documentName,
             contentType: documentItem.contentType || state.reader.contentType,
             guideStatus: documentItem.guideStatus || state.reader.guideStatus || 'idle',
             guideMarkdown: documentItem.guideMarkdown || '',
@@ -172,8 +219,16 @@ function createReaderController(deps = {}) {
             failed: '指南生成失败',
         };
 
-        if (el.readerDocumentTitle) {
+        if (el.readerDocumentTitle && !activeReaderTitleRename) {
             el.readerDocumentTitle.textContent = reader.documentName || '选择一份资料开始阅读';
+            el.readerDocumentTitle.classList.toggle('reader-document-title--editable', Boolean(reader.documentId));
+            if (reader.documentId) {
+                el.readerDocumentTitle.tabIndex = 0;
+                el.readerDocumentTitle.title = '点击重命名';
+            } else {
+                el.readerDocumentTitle.removeAttribute('tabindex');
+                el.readerDocumentTitle.removeAttribute('title');
+            }
         }
         if (el.readerDocumentMeta) {
             el.readerDocumentMeta.textContent = reader.documentId
@@ -324,7 +379,9 @@ function createReaderController(deps = {}) {
                 <article class="reader-markdown-doc">
                     ${renderedMarkdown}
                 </article>
+                ${renderReaderImagePreviewMarkup(reader)}
             `;
+            bindReaderImagePreviewFallback();
             enhanceReaderRenderedContent(el.readerContent, windowObj);
             return;
         }
@@ -345,7 +402,7 @@ function createReaderController(deps = {}) {
         });
 
         el.readerContent.className = 'reader-content reader-content--docx';
-        el.readerContent.innerHTML = grouped.map((group) => `
+        el.readerContent.innerHTML = `${grouped.map((group) => `
             <article class="reader-docx-block ${group.paragraphs.some((paragraph) => Number(paragraph.index) === Number(reader.activeParagraphIndex)) ? 'reader-docx-block--active' : ''}" data-reader-section-title="${escapeHtml(group.sectionTitle)}">
                 <header class="reader-docx-block__header">
                     <strong>${escapeHtml(group.sectionTitle)}</strong>
@@ -357,7 +414,8 @@ function createReaderController(deps = {}) {
                     `).join('')}
                 </div>
             </article>
-        `).join('');
+        `).join('')}${renderReaderImagePreviewMarkup(reader)}`;
+        bindReaderImagePreviewFallback();
     }
 
     function scrollReaderToLocator(locator = {}) {
@@ -537,6 +595,7 @@ function createReaderController(deps = {}) {
             status: documentItem.status || 'done',
             isIndexed: documentItem.isIndexed === true,
             view,
+            imagePreviewUrl: view.imagePreviewUrl || null,
             activePageNumber: initialLocation.activePageNumber,
             activeParagraphIndex: initialLocation.activeParagraphIndex,
             activeSectionTitle: initialLocation.activeSectionTitle,
@@ -628,6 +687,142 @@ function createReaderController(deps = {}) {
         return Boolean(state.reader.pendingSelection);
     }
 
+    function startReaderTitleRename() {
+        const reader = state.reader;
+        if (!reader.documentId || activeReaderTitleRename || !el.readerDocumentTitle) {
+            return;
+        }
+
+        if (typeof chatAPI.renameKnowledgeBaseDocument !== 'function') {
+            ui.showToastNotification?.('当前版本暂不支持重命名来源文件。', 'warning');
+            return;
+        }
+
+        const titleElement = el.readerDocumentTitle;
+        const { baseName, extension } = splitDocumentNameForRename(reader.documentName);
+        const session = {
+            documentId: reader.documentId,
+            originalName: reader.documentName || '',
+            extension,
+            committing: false,
+            cancelled: false,
+        };
+        activeReaderTitleRename = session;
+
+        titleElement.classList.add('reader-document-title--editing');
+        titleElement.innerHTML = '';
+
+        const input = documentObj.createElement('input');
+        input.className = 'reader-document-title__input';
+        input.type = 'text';
+        input.value = baseName;
+        input.setAttribute('aria-label', '重命名来源文件');
+
+        titleElement.appendChild(input);
+        if (extension) {
+            const suffix = documentObj.createElement('span');
+            suffix.className = 'reader-document-title__extension';
+            suffix.textContent = extension;
+            titleElement.appendChild(suffix);
+        }
+
+        const restoreTitle = () => {
+            if (activeReaderTitleRename === session) {
+                activeReaderTitleRename = null;
+            }
+            renderReaderPanel();
+        };
+
+        const validateBaseName = (value) => {
+            const nextBaseName = String(value || '').trim();
+            if (!nextBaseName) {
+                return '文件名不能为空。';
+            }
+            if (/[\\/]/.test(nextBaseName)) {
+                return '文件名不能包含路径分隔符。';
+            }
+            return '';
+        };
+
+        const commitRename = async () => {
+            if (activeReaderTitleRename !== session || session.committing || session.cancelled) {
+                return;
+            }
+
+            const validationMessage = validateBaseName(input.value);
+            if (validationMessage) {
+                ui.showToastNotification?.(validationMessage, 'warning');
+                scheduleFrame(() => {
+                    input.focus();
+                    input.select();
+                });
+                return;
+            }
+
+            const nextName = `${input.value.trim()}${session.extension}`;
+            if (nextName === session.originalName) {
+                restoreTitle();
+                return;
+            }
+
+            session.committing = true;
+            input.disabled = true;
+            const result = await chatAPI.renameKnowledgeBaseDocument(session.documentId, { name: nextName })
+                .catch((error) => ({
+                    success: false,
+                    error: error.message,
+                }));
+            session.committing = false;
+            input.disabled = false;
+
+            if (activeReaderTitleRename !== session || session.cancelled) {
+                return;
+            }
+
+            if (!result?.success) {
+                ui.showToastNotification?.(`重命名来源文件失败：${result?.error || '未知错误'}`, 'error');
+                scheduleFrame(() => {
+                    input.focus();
+                    input.select();
+                });
+                return;
+            }
+
+            const renamedDocument = result.item || {
+                id: session.documentId,
+                name: nextName,
+            };
+            state.reader.documentName = renamedDocument.name || nextName;
+            activeReaderTitleRename = null;
+            patchDocumentNameInSource(session.documentId, renamedDocument);
+            renderReaderPanel();
+            renderTopicKnowledgeBaseFiles();
+            ui.showToastNotification?.('已重命名来源文件。', 'success');
+        };
+
+        input.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                void commitRename();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                session.cancelled = true;
+                restoreTitle();
+            }
+        });
+        input.addEventListener('blur', () => {
+            void commitRename();
+        });
+
+        scheduleFrame(() => {
+            input.focus();
+            input.select();
+        });
+    }
+
     function bindEvents() {
         el.workspaceReaderBackBtn?.addEventListener('click', () => {
             setLeftSidebarMode('source-list');
@@ -646,6 +841,15 @@ function createReaderController(deps = {}) {
         el.readerNextBtn?.addEventListener('click', () => navigateReader(1));
         el.clearReaderSelectionBtn?.addEventListener('click', clearPendingSelection);
         el.injectReaderSelectionBtn?.addEventListener('click', injectReaderSelectionIntoComposer);
+        el.readerDocumentTitle?.addEventListener('click', () => {
+            startReaderTitleRename();
+        });
+        el.readerDocumentTitle?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === 'F2') {
+                event.preventDefault();
+                startReaderTitleRename();
+            }
+        });
         el.readerContent?.addEventListener('mouseup', () => {
             scheduleFrame(() => {
                 syncReaderSelectionFromDom();

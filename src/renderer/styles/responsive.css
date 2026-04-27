@@ -201,6 +201,50 @@
     padding: 16px;
   }
 
+  .quiz-config-modal {
+    padding: 12px;
+  }
+
+  .quiz-config-modal__dialog {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 24px;
+  }
+
+  .quiz-config-modal__header,
+  .quiz-config-modal__actions {
+    padding: 18px 16px;
+  }
+
+  .quiz-config-modal__body {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 18px 16px;
+  }
+
+  .subject-settings-panel {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .subject-settings-panel__dialog,
+  .subject-settings-panel--anchored .subject-settings-panel__dialog {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 22px 22px 0 0;
+    transform: none !important;
+  }
+
+  .subject-settings-panel__header,
+  .subject-settings-panel__body {
+    padding-inline: 16px;
+  }
+
   .manual-notes-library-page {
     padding: 0 16px 16px;
   }
@@ -220,6 +264,63 @@
 }
 
 @media (max-width: 620px) {
+  .quiz-config-modal {
+    padding: 0;
+  }
+
+  .quiz-config-modal__dialog {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .quiz-config-modal__title-block {
+    gap: 10px;
+  }
+
+  .quiz-config-modal__title-block h2 {
+    font-size: 22px;
+  }
+
+  .quiz-config-modal__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .quiz-config-segment {
+    gap: 8px;
+  }
+
+  .quiz-config-segment__btn {
+    min-height: 56px;
+    padding: 8px 6px;
+  }
+
+  .quiz-config-modal__actions {
+    align-items: stretch;
+  }
+
+  .quiz-config-modal__actions button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .subject-settings-panel__title-block h2 {
+    font-size: 20px;
+  }
+
+  .subject-settings-panel .settings-agent-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .subject-settings-panel .settings-agent-actions__save,
+  .subject-settings-panel .settings-agent-actions__delete {
+    width: 100%;
+    min-width: 0;
+  }
+
   .overview-subject-wall {
     grid-template-columns: 1fr;
   }

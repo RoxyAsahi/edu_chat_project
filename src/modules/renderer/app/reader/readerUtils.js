@@ -13,6 +13,7 @@ function createInitialReaderState() {
         status: 'idle',
         isIndexed: false,
         view: null,
+        imagePreviewUrl: null,
         activePageNumber: null,
         activeParagraphIndex: null,
         activeSectionTitle: null,

@@ -1,4 +1,5 @@
 const fs = require('fs-extra');
+const { pathToFileURL } = require('url');
 const { chunkText } = require('./chunking');
 const { requestEmbeddings, cosineSimilarity, resolveRetrievalConfig } = require('./embeddings');
 const { requestRerank, resolveRerankConfig } = require('./rerank');
@@ -128,6 +129,10 @@ async function getKnowledgeBaseDocumentViewData(documentId) {
 
     const parsed = await parseKnowledgeBaseDocument(document);
     const view = buildReaderViewFromParsedDocument(parsed);
+    const resolvedMimeType = String(parsed?.mimeType || inferMimeType(document) || '').toLowerCase();
+    if (isImageMimeType(resolvedMimeType) && document.storedPath) {
+        view.imagePreviewUrl = pathToFileURL(document.storedPath).href;
+    }
 
     return {
         document: {
@@ -148,6 +153,7 @@ module.exports = {
     deleteKnowledgeBase,
     importKnowledgeBaseFiles: documentStore.importKnowledgeBaseFiles,
     listKnowledgeBaseDocuments: repository.listKnowledgeBaseDocuments,
+    renameKnowledgeBaseDocument: repository.renameKnowledgeBaseDocument,
     retryKnowledgeBaseDocument: processingQueue.retryKnowledgeBaseDocument,
     retrieveKnowledgeBaseContext: retrievalService.retrieveKnowledgeBaseContext,
     searchKnowledgeBase: retrievalService.searchKnowledgeBase,

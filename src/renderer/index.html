@@ -346,8 +346,10 @@
               <p id="currentChatAgentName" class="chat-stage__subtitle hidden">当前学科：未选择</p>
               <p id="currentTopicKnowledgeBaseStatus" class="chat-stage__status hidden">每个话题会自动准备独立 Source</p>
             </div>
-            <div class="chat-stage__header-actions hidden">
-              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn"><span class="material-symbols-outlined">tune</span> 学科设置</button>
+            <div class="chat-stage__header-actions">
+              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn" type="button" title="请选择学科后管理" disabled>
+                <span class="material-symbols-outlined">tune</span> 学科管理
+              </button>
             </div>
           </header>
 
@@ -701,6 +703,80 @@
       </div>
     </div>
 
+    <div id="quizConfigModal" class="quiz-config-modal hidden" aria-hidden="true">
+      <div id="quizConfigModalBackdrop" class="quiz-config-modal__backdrop"></div>
+      <section class="quiz-config-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="quizConfigModalTitle">
+        <header class="quiz-config-modal__header">
+          <div class="quiz-config-modal__title-block">
+            <span class="material-symbols-outlined quiz-config-modal__icon" aria-hidden="true">quiz</span>
+            <div>
+              <p class="eyebrow">自定义测验</p>
+              <h2 id="quizConfigModalTitle">生成选择题</h2>
+              <p class="settings-caption">设置本次练习的题量、难度和主题范围。</p>
+            </div>
+          </div>
+          <button id="quizConfigCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭自定义测验">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </header>
+
+        <div class="quiz-config-modal__body">
+          <section class="quiz-config-fieldset" aria-labelledby="quizCountLabel">
+            <p id="quizCountLabel" class="quiz-config-label">问题数量</p>
+            <div class="quiz-config-segment" role="group" aria-label="问题数量">
+              <button class="quiz-config-segment__btn" type="button" data-quiz-count-preset="less" data-question-count="5" aria-pressed="false">
+                <span>更少</span>
+                <small>5 题</small>
+              </button>
+              <button class="quiz-config-segment__btn quiz-config-segment__btn--active" type="button" data-quiz-count-preset="standard" data-question-count="8" aria-pressed="true">
+                <span>标准</span>
+                <small>8 题</small>
+              </button>
+              <button class="quiz-config-segment__btn" type="button" data-quiz-count-preset="more" data-question-count="12" aria-pressed="false">
+                <span>更多</span>
+                <small>12 题</small>
+              </button>
+            </div>
+          </section>
+
+          <section class="quiz-config-fieldset" aria-labelledby="quizDifficultyLabel">
+            <p id="quizDifficultyLabel" class="quiz-config-label">难度等级</p>
+            <div class="quiz-config-segment" role="group" aria-label="难度等级">
+              <button class="quiz-config-segment__btn" type="button" data-quiz-difficulty="easy" aria-pressed="false">
+                <span>简单</span>
+              </button>
+              <button class="quiz-config-segment__btn quiz-config-segment__btn--active" type="button" data-quiz-difficulty="medium" aria-pressed="true">
+                <span>中等</span>
+              </button>
+              <button class="quiz-config-segment__btn" type="button" data-quiz-difficulty="hard" aria-pressed="false">
+                <span>困难</span>
+              </button>
+            </div>
+          </section>
+
+          <label class="quiz-config-field" for="quizFocusInput">
+            <span>主题应该是什么？</span>
+            <textarea id="quizFocusInput" rows="5" placeholder="例如：只考察第三章的关键概念、围绕这次聊天中的易错点、专注某一篇 Source 的内容。"></textarea>
+          </label>
+
+          <label class="quiz-config-check">
+            <input id="quizIncludeChatContextInput" type="checkbox" />
+            <span>
+              <strong>包含当前对话</strong>
+              <small>追加最近 12 条有效提问和回答，适合把刚讨论过的重点纳入练习。</small>
+            </span>
+          </label>
+        </div>
+
+        <footer class="quiz-config-modal__actions">
+          <button id="quizConfigCancelBtn" class="ghost-button" type="button">取消</button>
+          <button id="quizConfigGenerateBtn" class="accent-button icon-text-btn" type="button">
+            <span class="material-symbols-outlined">auto_awesome</span> 生成
+          </button>
+        </footer>
+      </section>
+    </div>
+
     <div id="settingsModal" class="settings-modal hidden" aria-hidden="true">
       <div id="settingsModalBackdrop" class="settings-modal__backdrop"></div>
       <div class="settings-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
@@ -738,10 +814,6 @@
                 <button id="settingsNavDisplayBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="display">
                   <span class="material-symbols-outlined">brush</span>
                   <span>显示设置</span>
-                </button>
-                <button id="settingsNavAgentBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="agent">
-                  <span class="material-symbols-outlined">school</span>
-                  <span>当前学科</span>
                 </button>
               </div>
             </div>
@@ -912,53 +984,6 @@
               </section>
             </section>
 
-            <section id="settingsModalSectionAgent" class="settings-modal__section hidden" data-settings-section="agent">
-              <div class="settings-panel__header settings-modal__agent-header">
-                <div>
-                  <h2 id="agentSettingsContainerTitle">学科设置</h2>
-                  <p id="selectedAgentNameForSettings" class="settings-caption hidden"></p>
-                </div>
-              </div>
-
-              <div id="selectAgentPromptForSettings" class="empty-state">
-                <span class="material-symbols-outlined empty-icon">smart_toy</span>
-                <p>请选择一个智能体以进行配置</p>
-              </div>
-
-              <div id="agentSettingsContainer" class="settings-stack settings-stack--agent hidden">
-                <section class="settings-list-card">
-                  <h3>学科信息</h3>
-                  <div class="settings-list">
-                    <div class="settings-row settings-row--avatar">
-                      <div class="settings-row__main"><strong>头像</strong><span>点击图片更换当前学科头像。</span></div>
-                      <div class="avatar-editor settings-row__avatar" title="点击上传头像">
-                      <img id="agentAvatarPreview" src="../assets/default_avatar.png" alt="avatar" />
-                      <input id="agentAvatarInput" type="file" accept="image/*" />
-                      </div>
-                    </div>
-                    <div class="settings-row">
-                      <div class="settings-row__main"><strong>名称</strong><span>显示在学科列表和聊天顶部。</span></div>
-                      <input id="agentNameInput" class="settings-row__control" type="text" />
-                    </div>
-                    <div class="settings-row">
-                      <div class="settings-row__main"><strong>模型</strong><span>当前学科优先使用的聊天模型。</span></div>
-                      <input id="agentModel" class="settings-row__control" type="text" />
-                    </div>
-                    <div class="settings-row settings-row--editor settings-row--agent-prompt">
-                      <div class="settings-row__main"><strong>系统提示词</strong><span>定义这个学科的回答方式和教学风格。</span></div>
-                      <div id="systemPromptContainer"></div>
-                    </div>
-                  </div>
-                  <input id="editingAgentId" type="hidden" />
-                </section>
-
-                <div class="settings-agent-actions">
-                  <button id="saveAgentSettingsBtn" class="accent-button settings-agent-actions__save">保存学科设置</button>
-                  <button id="deleteAgentBtn" class="ghost-button ghost-button--danger settings-agent-actions__delete" type="button">删除学科</button>
-                </div>
-              </div>
-            </section>
-
             <section id="settingsModalSectionKnowledgeBase" class="settings-modal__section hidden" data-settings-section="knowledge-base">
               <section class="settings-card settings-card--modal">
                 <h3><span class="material-symbols-outlined bento-icon">database</span> 来源管理</h3>
@@ -1011,6 +1036,69 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <div id="subjectSettingsPanel" class="subject-settings-panel hidden" aria-hidden="true">
+    <div id="subjectSettingsPanelBackdrop" class="subject-settings-panel__backdrop"></div>
+    <section id="subjectSettingsPanelDialog" class="subject-settings-panel__dialog" role="dialog" aria-modal="true" aria-labelledby="agentSettingsContainerTitle">
+      <header class="subject-settings-panel__header">
+        <div class="subject-settings-panel__title-block">
+          <span class="material-symbols-outlined subject-settings-panel__icon" aria-hidden="true">school</span>
+          <div>
+            <p class="eyebrow">学科管理</p>
+            <h2 id="agentSettingsContainerTitle">学科设置</h2>
+            <p id="selectedAgentNameForSettings" class="settings-caption hidden"></p>
+          </div>
+        </div>
+        <button id="subjectSettingsPanelCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭学科管理">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </header>
+
+      <div class="subject-settings-panel__body">
+        <div id="selectAgentPromptForSettings" class="empty-state">
+          <span class="material-symbols-outlined empty-icon">smart_toy</span>
+          <p>请选择一个学科以进行配置</p>
+        </div>
+
+        <div id="agentSettingsContainer" class="settings-stack settings-stack--agent hidden">
+          <section class="settings-list-card">
+            <h3>学科信息</h3>
+            <div class="settings-list">
+              <div class="settings-row settings-row--avatar">
+                <div class="settings-row__main"><strong>头像</strong><span>点击图片更换当前学科头像。</span></div>
+                <div class="avatar-editor settings-row__avatar" title="点击上传头像">
+                  <img id="agentAvatarPreview" src="../assets/default_avatar.png" alt="avatar" />
+                  <input id="agentAvatarInput" type="file" accept="image/*" />
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row__main"><strong>名称</strong><span>显示在学科列表和聊天顶部。</span></div>
+                <input id="agentNameInput" class="settings-row__control" type="text" />
+              </div>
+              <div class="settings-row">
+                <div class="settings-row__main"><strong>卡片 Emoji</strong><span>显示在首页学科卡片上，留空使用默认图标。</span></div>
+                <input id="agentCardEmojiInput" class="settings-row__control settings-row__emoji" type="text" maxlength="8" placeholder="🎓" />
+              </div>
+              <div class="settings-row">
+                <div class="settings-row__main"><strong>模型</strong><span>当前学科优先使用的聊天模型。</span></div>
+                <input id="agentModel" class="settings-row__control" type="text" />
+              </div>
+              <div class="settings-row settings-row--editor settings-row--agent-prompt">
+                <div class="settings-row__main"><strong>系统提示词</strong><span>定义这个学科的回答方式和教学风格。</span></div>
+                <div id="systemPromptContainer"></div>
+              </div>
+            </div>
+            <input id="editingAgentId" type="hidden" />
+          </section>
+
+          <div class="settings-agent-actions">
+            <button id="saveAgentSettingsBtn" class="accent-button settings-agent-actions__save" type="button">保存学科设置</button>
+            <button id="deleteAgentBtn" class="ghost-button ghost-button--danger settings-agent-actions__delete" type="button">删除学科</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
   <div id="floating-toast-notifications-container"></div>

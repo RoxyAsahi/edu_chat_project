@@ -427,7 +427,7 @@ test('showSubjectWorkspace requests a deferred desktop layout reset after leavin
     }]);
 });
 
-test('overview subject cards expose edit from the right-click menu', async () => {
+test('overview subject cards open subject management from the right-click menu', async () => {
     const { createWorkspaceController } = await loadWorkspaceModule();
     const harness = createControllerHarness({
         chatAPI: {
@@ -446,6 +446,7 @@ test('overview subject cards expose edit from the right-click menu', async () =>
     });
     const { window, document, el } = createOverviewDom();
     const settingsCalls = [];
+    const subjectPanelCalls = [];
     harness.state.session.agents = [{ id: 'math', name: '数学' }];
     harness.state.session.currentSelectedItem = {
         id: null,
@@ -478,6 +479,12 @@ test('overview subject cards expose edit from the right-click menu', async () =>
         openSettingsModal: (section) => {
             settingsCalls.push(section);
         },
+        openSubjectSettingsPanel: (trigger, options = {}) => {
+            subjectPanelCalls.push({
+                triggerText: trigger?.textContent || '',
+                anchorRect: options.anchorRect || null,
+            });
+        },
     });
 
     controller.renderSubjectOverview();
@@ -491,14 +498,22 @@ test('overview subject cards expose edit from the right-click menu', async () =>
 
     const menu = document.querySelector('.subject-action-menu');
     assert.ok(menu);
-    assert.match(menu.textContent, /编辑/);
+    assert.match(menu.textContent, /学科管理/);
     assert.match(menu.textContent, /删除/);
 
-    menu.querySelector('[data-subject-action="edit"]').click();
+    menu.querySelector('[data-subject-action="manage"]').click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    assert.deepEqual(settingsCalls, ['agent']);
+    assert.deepEqual(settingsCalls, []);
+    assert.equal(subjectPanelCalls.length, 1);
+    assert.match(subjectPanelCalls[0].triggerText, /学科管理/);
+    assert.deepEqual(subjectPanelCalls[0].anchorRect, {
+        left: 80,
+        right: 80,
+        top: 90,
+        bottom: 90,
+    });
     assert.equal(harness.state.session.currentSelectedItem.id, 'math');
 });
 

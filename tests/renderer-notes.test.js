@@ -75,6 +75,13 @@ function createBaseState(overrides = {}) {
             activeNoteMenu: null,
             activeFlashcardNoteId: null,
             pendingFlashcardGeneration: null,
+            quizGenerationConfig: {
+                countPreset: 'standard',
+                questionCount: 8,
+                difficulty: 'medium',
+                focus: '',
+                includeChatContext: false,
+            },
             quizPractice: {
                 noteId: null,
                 currentIndex: 0,
@@ -136,6 +143,24 @@ function createStore(initialState) {
     };
 }
 
+function buildQuizResponse(title = '函数测验') {
+    return JSON.stringify({
+        title,
+        items: [{
+            id: 'quiz_1',
+            stem: '函数连续性的核心判断是什么？',
+            options: [
+                { id: 'option_a', label: 'A', text: '函数值与极限一致' },
+                { id: 'option_b', label: 'B', text: '函数一定单调递增' },
+                { id: 'option_c', label: 'C', text: '函数没有定义域' },
+                { id: 'option_d', label: 'D', text: '函数图像必须为直线' },
+            ],
+            correctOptionId: 'option_a',
+            explanation: '连续要求该点函数值等于该点极限。',
+        }],
+    });
+}
+
 function createNotesDom() {
     const dom = new JSDOM(`
         <body>
@@ -150,12 +175,26 @@ function createNotesDom() {
             <button id="deleteNoteBtn"></button>
             <button id="analyzeNotesBtn"></button>
             <button id="generateQuizBtn"></button>
+            <div id="quizConfigModal" class="hidden" aria-hidden="true"></div>
+            <div id="quizConfigModalBackdrop"></div>
+            <button id="quizConfigCloseBtn"></button>
+            <button id="quizConfigCancelBtn"></button>
+            <button id="quizConfigGenerateBtn"></button>
+            <textarea id="quizFocusInput"></textarea>
+            <input id="quizIncludeChatContextInput" type="checkbox" />
+            <button data-quiz-count-preset="less" data-question-count="5"></button>
+            <button data-quiz-count-preset="standard" data-question-count="8"></button>
+            <button data-quiz-count-preset="more" data-question-count="12"></button>
+            <button data-quiz-difficulty="easy"></button>
+            <button data-quiz-difficulty="medium"></button>
+            <button data-quiz-difficulty="hard"></button>
             <button id="generateFlashcardsBtn"></button>
             <button id="analysisViewReportBtn"></button>
             <button id="analysisEditMarkdownBtn"></button>
             <button id="quizViewPracticeBtn"></button>
             <button id="quizEditSourceBtn"></button>
             <div id="noteDetailModal" class="hidden"></div>
+            <button id="flashcardsBackToNotesBtn">返回 Studio</button>
             <button id="noteDetailCloseBtn"></button>
             <div id="noteDetailModalBackdrop"></div>
             <div id="noteActionMenu"></div>
@@ -175,6 +214,10 @@ function createNotesDom() {
             <div id="analysisPreviewTitle"></div>
             <div id="analysisPreviewContent"></div>
             <div id="analysisPreviewMeta"></div>
+            <div id="noteMarkdownPreviewCard"></div>
+            <div id="noteMarkdownPreviewTitle"></div>
+            <div id="noteMarkdownPreviewContent"></div>
+            <div id="noteMarkdownPreviewMeta"></div>
             <div id="noteEditorCard"></div>
             <div id="flashcardsPracticeCard"></div>
             <div id="quizPracticeCard"></div>
@@ -213,12 +256,23 @@ function createNotesDom() {
             deleteNoteBtn: window.document.getElementById('deleteNoteBtn'),
             analyzeNotesBtn: window.document.getElementById('analyzeNotesBtn'),
             generateQuizBtn: window.document.getElementById('generateQuizBtn'),
+            quizConfigModal: window.document.getElementById('quizConfigModal'),
+            quizConfigModalBackdrop: window.document.getElementById('quizConfigModalBackdrop'),
+            quizConfigCloseBtn: window.document.getElementById('quizConfigCloseBtn'),
+            quizConfigCancelBtn: window.document.getElementById('quizConfigCancelBtn'),
+            quizConfigGenerateBtn: window.document.getElementById('quizConfigGenerateBtn'),
+            quizFocusInput: window.document.getElementById('quizFocusInput'),
+            quizIncludeChatContextInput: window.document.getElementById('quizIncludeChatContextInput'),
+            quizCountPresetBtns: window.document.querySelectorAll('[data-quiz-count-preset]'),
+            quizDifficultyBtns: window.document.querySelectorAll('[data-quiz-difficulty]'),
             generateFlashcardsBtn: window.document.getElementById('generateFlashcardsBtn'),
             analysisViewReportBtn: window.document.getElementById('analysisViewReportBtn'),
             analysisEditMarkdownBtn: window.document.getElementById('analysisEditMarkdownBtn'),
             quizViewPracticeBtn: window.document.getElementById('quizViewPracticeBtn'),
             quizEditSourceBtn: window.document.getElementById('quizEditSourceBtn'),
             noteDetailModal: window.document.getElementById('noteDetailModal'),
+            noteDetailBackBtn: window.document.getElementById('flashcardsBackToNotesBtn'),
+            flashcardsBackToNotesBtn: window.document.getElementById('flashcardsBackToNotesBtn'),
             noteDetailCloseBtn: window.document.getElementById('noteDetailCloseBtn'),
             noteDetailModalBackdrop: window.document.getElementById('noteDetailModalBackdrop'),
             noteActionMenu: window.document.getElementById('noteActionMenu'),
@@ -238,6 +292,10 @@ function createNotesDom() {
             analysisPreviewTitle: window.document.getElementById('analysisPreviewTitle'),
             analysisPreviewContent: window.document.getElementById('analysisPreviewContent'),
             analysisPreviewMeta: window.document.getElementById('analysisPreviewMeta'),
+            noteMarkdownPreviewCard: window.document.getElementById('noteMarkdownPreviewCard'),
+            noteMarkdownPreviewTitle: window.document.getElementById('noteMarkdownPreviewTitle'),
+            noteMarkdownPreviewContent: window.document.getElementById('noteMarkdownPreviewContent'),
+            noteMarkdownPreviewMeta: window.document.getElementById('noteMarkdownPreviewMeta'),
             noteEditorCard: window.document.getElementById('noteEditorCard'),
             flashcardsPracticeCard: window.document.getElementById('flashcardsPracticeCard'),
             quizPracticeCard: window.document.getElementById('quizPracticeCard'),
@@ -297,6 +355,9 @@ function createNotesControllerHarness(createNotesController, options = {}) {
                 sourceMessageIds: payload.sourceMessageIds,
                 sourceDocumentRefs: payload.sourceDocumentRefs,
                 kind: payload.kind,
+                quizSet: payload.quizSet,
+                flashcardDeck: payload.flashcardDeck,
+                flashcardProgress: payload.flashcardProgress,
             },
         }),
         ...(options.chatApiOverrides || {}),
@@ -654,11 +715,15 @@ test('manual notes library opens from the top button and only renders manual not
 
     assert.equal(store.getState().notes.manualNotesLibraryOpen, true);
     assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), false);
-    assert.match(el.manualNotesLibraryGrid.textContent, /手写笔记 A/);
-    assert.match(el.manualNotesLibraryGrid.textContent, /摘录笔记/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /普通内容 B/);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /手写笔记 A/);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /摘录笔记/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析报告/);
     assert.match(el.manualNotesLibraryGrid.textContent, /函数/);
     assert.match(el.manualNotesLibraryGrid.textContent, /极限/);
+    assert.equal(el.manualNotesLibraryGrid.querySelector('[data-manual-note-select]'), null);
+    assert.equal(el.manualNotesLibraryGrid.querySelector('[data-note-menu]'), null);
 });
 
 test('manual notes library close button hides the modal and clears the open state', async () => {
@@ -683,10 +748,41 @@ test('manual notes library close button hides the modal and clears the open stat
     assert.equal(el.manualNotesLibraryModal.getAttribute('aria-hidden'), 'true');
 });
 
-test('manual notes library can add a note into Studio selection directly from the card', async () => {
+test('note detail opened from manual notes returns to the manual notes library', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 
     const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', topicId: 'topic-1' },
+                ],
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNotesLibraryBtn.click();
+    const card = el.manualNotesLibraryGrid.querySelector('.manual-note-card');
+    card.click();
+
+    assert.equal(store.getState().notes.manualNotesLibraryOpen, false);
+    assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), true);
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), false);
+    assert.match(el.noteDetailBackBtn.textContent, /返回我的笔记/);
+
+    controller.closeNoteDetail();
+
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), true);
+    assert.equal(store.getState().notes.manualNotesLibraryOpen, true);
+    assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), false);
+    assert.equal(store.getState().layout.workspaceViewMode, 'manual-notes');
+});
+
+test('manual notes library can add a note into Studio selection from the right-click menu', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store, window } = createNotesControllerHarness(createNotesController, {
         stateOverrides: {
             notes: {
                 notesScope: 'topic',
@@ -699,7 +795,14 @@ test('manual notes library can add a note into Studio selection directly from th
 
     controller.bindEvents();
     el.manualNotesLibraryBtn.click();
-    el.manualNotesLibraryGrid.querySelector('[data-manual-note-select="note-1"]').click();
+    const card = el.manualNotesLibraryGrid.querySelector('.manual-note-card');
+    card.dispatchEvent(new window.MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 120,
+        clientY: 120,
+    }));
+    el.noteActionMenu.querySelector('[data-note-action="toggle-select"]').click();
 
     assert.deepEqual(store.getState().notes.selectedNoteIds, ['note-1']);
     assert.match(el.manualNotesLibrarySubtitle.textContent, /已选 1 条可直接用于 Studio/);
@@ -824,4 +927,388 @@ test('notes tool actions can consume selected manual notes from the agent librar
 
     assert.match(upstreamPayload.messages[1].content, /跨话题手写笔记/);
     assert.match(upstreamPayload.messages[1].content, /这里是跨话题整理的重点内容/);
+});
+
+test('quiz config modal opens with defaults and injects custom count difficulty and focus into the prompt', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '极限与连续',
+                    sourceMessageIds: ['msg-from-note'],
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: buildQuizResponse() } }],
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+
+    assert.equal(el.quizConfigModal.classList.contains('hidden'), false);
+    assert.equal(el.quizConfigModal.getAttribute('aria-hidden'), 'false');
+    assert.equal(el.quizCountPresetBtns[1].getAttribute('aria-pressed'), 'true');
+    assert.equal(el.quizDifficultyBtns[1].getAttribute('aria-pressed'), 'true');
+    assert.equal(el.quizIncludeChatContextInput.checked, false);
+
+    el.quizCountPresetBtns[2].click();
+    el.quizDifficultyBtns[2].click();
+    el.quizFocusInput.value = '只考察第三章的关键概念';
+    el.quizFocusInput.dispatchEvent(new el.quizFocusInput.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    el.quizConfigGenerateBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const prompt = upstreamPayload.messages[1].content;
+    assert.match(prompt, /生成 12 道题/);
+    assert.match(prompt, /难度等级：困难/);
+    assert.match(prompt, /主题范围：只考察第三章的关键概念/);
+    assert.match(prompt, /你必须只返回严格 JSON/);
+    assert.match(prompt, /极限与连续/);
+    assert.equal(el.quizConfigModal.classList.contains('hidden'), true);
+});
+
+test('quiz generation can append the recent chat context and source message ids', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let savedPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+    const chatMessages = Array.from({ length: 15 }, (_, index) => ({
+        id: `msg-${index + 1}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `对话内容 ${index + 1}`,
+        timestamp: index + 1,
+    }));
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [
+                    ...chatMessages.slice(0, 7),
+                    { id: 'thinking-msg', role: 'assistant', content: 'Thinking', isThinking: true },
+                    { id: 'empty-msg', role: 'user', content: '   ' },
+                    ...chatMessages.slice(7),
+                ],
+            },
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '课堂笔记内容',
+                    sourceMessageIds: ['msg-from-note'],
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: buildQuizResponse() } }],
+                    },
+                };
+            },
+            saveTopicNote: async (_agentId, _topicId, payload) => {
+                savedPayload = payload;
+                return {
+                    success: true,
+                    item: {
+                        id: 'saved-quiz',
+                        agentId: 'agent-1',
+                        topicId: 'topic-1',
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        quizSet: payload.quizSet,
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+    el.quizIncludeChatContextInput.checked = true;
+    el.quizIncludeChatContextInput.dispatchEvent(new el.quizIncludeChatContextInput.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    el.quizConfigGenerateBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const prompt = upstreamPayload.messages[1].content;
+    assert.match(prompt, /课堂笔记内容/);
+    assert.match(prompt, /当前对话摘录（最近 12 条）/);
+    assert.doesNotMatch(prompt, /对话内容 3/);
+    assert.match(prompt, /对话内容 4/);
+    assert.match(prompt, /对话内容 15/);
+    assert.doesNotMatch(prompt, /Thinking/);
+    assert.deepEqual(savedPayload.sourceMessageIds, [
+        'msg-from-note',
+        'msg-4',
+        'msg-5',
+        'msg-6',
+        'msg-7',
+        'msg-8',
+        'msg-9',
+        'msg-10',
+        'msg-11',
+        'msg-12',
+        'msg-13',
+        'msg-14',
+        'msg-15',
+    ]);
+});
+
+test('quiz source fallback passes selected knowledge base document ids into retrieval', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let retrievalPayload = null;
+    let upstreamPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        chatApiOverrides: {
+            retrieveKnowledgeBaseContext: async (payload) => {
+                retrievalPayload = payload;
+                return {
+                    success: true,
+                    contextText: 'Source 检索内容',
+                    refs: [{ documentId: 'doc-a', chunkId: 'chunk-a' }],
+                };
+            },
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: buildQuizResponse() } }],
+                    },
+                };
+            },
+        },
+        depsOverrides: {
+            getCurrentTopic: () => ({
+                knowledgeBaseId: 'kb-1',
+                selectedKnowledgeBaseDocumentIds: ['doc-a', 'doc-b'],
+            }),
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+    el.quizConfigGenerateBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(retrievalPayload.documentIds, ['doc-a', 'doc-b']);
+    assert.match(upstreamPayload.messages[1].content, /Source 检索内容/);
+});
+
+test('note normalization preserves valid render snapshots and clears them when body changes', async () => {
+    const { buildNoteSaveRequest, normalizeNote } = await loadNotesUtilsModule();
+    const snapshot = {
+        schemaVersion: 1,
+        renderer: 'unistudy-message-renderer',
+        sourceMessageId: 'msg-1',
+        role: 'assistant',
+        contentHtml: '<div class="bubble">富文本气泡</div>',
+        styleText: '#scope-1 .bubble { color: red; }',
+        scopeId: 'scope-1',
+        plainText: '富文本气泡',
+        capturedAt: 10,
+        ignored: true,
+    };
+
+    const normalized = normalizeNote({
+        id: 'note-1',
+        title: '收藏',
+        contentMarkdown: '<div class="bubble">富文本气泡</div>',
+        renderSnapshot: snapshot,
+    });
+
+    assert.equal(normalized.renderSnapshot.renderer, 'unistudy-message-renderer');
+    assert.equal(normalized.renderSnapshot.contentHtml, '<div class="bubble">富文本气泡</div>');
+    assert.equal(normalized.renderSnapshot.ignored, undefined);
+    assert.equal(normalizeNote({ renderSnapshot: { ...snapshot, renderer: 'other' } }).renderSnapshot, null);
+
+    const titleOnlyRequest = buildNoteSaveRequest({
+        currentNote: normalized,
+        currentTopicId: 'topic-1',
+        title: '新标题',
+        contentMarkdown: normalized.contentMarkdown,
+    });
+    assert.equal(titleOnlyRequest.payload.renderSnapshot.contentHtml, snapshot.contentHtml);
+
+    const editedBodyRequest = buildNoteSaveRequest({
+        currentNote: normalized,
+        currentTopicId: 'topic-1',
+        title: '新标题',
+        contentMarkdown: '手动改过的新正文',
+    });
+    assert.equal(editedBodyRequest.payload.renderSnapshot, null);
+});
+
+test('favoriting a chat message sends renderSnapshot through create-note-from-message IPC payload', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const snapshot = {
+        schemaVersion: 1,
+        renderer: 'unistudy-message-renderer',
+        sourceMessageId: 'assistant-msg',
+        role: 'assistant',
+        contentHtml: '<div class="bubble">快照气泡</div>',
+        styleText: '#scope-1 .bubble { color: red; }',
+        scopeId: 'scope-1',
+        plainText: '快照气泡',
+        capturedAt: 10,
+    };
+    let createdPayload = null;
+
+    const { controller } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [{
+                    id: 'assistant-msg',
+                    role: 'assistant',
+                    content: '<div class="bubble">快照气泡</div>',
+                    timestamp: Date.UTC(2026, 3, 26, 8, 0),
+                    kbContextRefs: ['doc-1'],
+                }],
+            },
+        },
+        chatApiOverrides: {
+            createNoteFromMessage: async (payload) => {
+                createdPayload = payload;
+                return {
+                    success: true,
+                    item: {
+                        id: 'note-from-message',
+                        agentId: payload.agentId,
+                        topicId: payload.topicId,
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        renderSnapshot: payload.renderSnapshot,
+                    },
+                };
+            },
+            listTopicNotes: async () => ({ success: true, items: [] }),
+            listAgentNotes: async () => ({ success: true, items: [] }),
+        },
+        depsOverrides: {
+            messageRendererApi: {
+                createMessageRenderSnapshot: () => snapshot,
+            },
+        },
+    });
+
+    await controller.createNoteFromMessage('assistant-msg');
+
+    assert.equal(createdPayload.renderSnapshot.contentHtml, snapshot.contentHtml);
+    assert.deepEqual(createdPayload.sourceMessageIds, ['assistant-msg']);
+    assert.deepEqual(createdPayload.sourceDocumentRefs, ['doc-1']);
+});
+
+test('note detail and cards use rich preview renderer instead of raw HTML text', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const mountCalls = [];
+    const richRenderer = {
+        cleanupNotePreviewMount() {},
+        mountRichNotePreview(target, note, options) {
+            mountCalls.push({ targetClass: target.className, noteId: note.id, compact: options.compact === true });
+            target.innerHTML = '<div class="rich-bubble"><span>富文本气泡</span></div>';
+            target.classList.add('unistudy-note-rich-preview');
+        },
+    };
+    const snapshot = {
+        schemaVersion: 1,
+        renderer: 'unistudy-message-renderer',
+        sourceMessageId: 'msg-1',
+        role: 'assistant',
+        contentHtml: '<div class="rich-bubble">富文本气泡</div>',
+        styleText: '',
+        scopeId: 'scope-1',
+        plainText: '富文本气泡',
+        capturedAt: 10,
+    };
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                topics: [{ id: 'topic-1', name: '函数' }],
+            },
+            notes: {
+                topicNotes: [{
+                    id: 'analysis-1',
+                    title: '分析报告',
+                    contentMarkdown: '<div style="color:red">富文本气泡</div>',
+                    kind: 'analysis',
+                    topicId: 'topic-1',
+                    renderSnapshot: snapshot,
+                }],
+                agentNotes: [{
+                    id: 'message-note-1',
+                    title: 'AI 回答摘录',
+                    contentMarkdown: '<div style="color:red">富文本气泡</div>',
+                    kind: 'message-note',
+                    topicId: 'topic-1',
+                    renderSnapshot: snapshot,
+                }],
+            },
+        },
+        depsOverrides: {
+            messageRendererApi: richRenderer,
+        },
+    });
+
+    controller.renderNotesPanel();
+    assert.ok(el.notesList.querySelector('.note-card__studio-preview .rich-bubble'));
+    assert.doesNotMatch(el.notesList.textContent, /<div style=/);
+
+    controller.openManualNotesLibrary();
+    assert.ok(el.manualNotesLibraryGrid.querySelector('.manual-note-card__preview .rich-bubble'));
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /<div style=/);
+
+    controller.openNoteDetail({
+        id: 'message-note-1',
+        title: 'AI 回答摘录',
+        contentMarkdown: '<div style="color:red">富文本气泡</div>',
+        kind: 'message-note',
+        topicId: 'topic-1',
+        renderSnapshot: snapshot,
+    });
+    assert.ok(el.noteMarkdownPreviewContent.querySelector('.rich-bubble'));
+    assert.doesNotMatch(el.noteMarkdownPreviewContent.textContent, /<div style=/);
+    assert.ok(mountCalls.some((call) => call.compact === true && call.targetClass.includes('note-card__studio-preview')));
+    assert.ok(mountCalls.some((call) => call.compact === true && call.targetClass.includes('manual-note-card__preview')));
+    assert.ok(mountCalls.some((call) => call.compact === false));
 });

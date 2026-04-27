@@ -7,6 +7,7 @@ const fs = require('fs-extra');
 const { parseKnowledgeBaseDocument } = require('../src/modules/main/knowledge-base/parserAdapter');
 const { createDocumentProcessor } = require('../src/modules/main/knowledge-base/documentProcessor');
 const { createDocumentStore } = require('../src/modules/main/knowledge-base/documentStore');
+const { createKnowledgeBaseRepository } = require('../src/modules/main/knowledge-base/repository');
 
 test('parseKnowledgeBaseDocument reuses cached extracted markdown for image documents', async () => {
     const parsed = await parseKnowledgeBaseDocument({
@@ -264,4 +265,57 @@ test('documentStore requeues failed duplicate imports instead of keeping stale f
     assert.equal(items.length, 1);
     assert.equal(items[0].status, 'pending');
     assert.deepEqual(queued, ['doc-existing']);
+});
+
+test('repository renames documents, validates display names, and touches the parent source', async () => {
+    const calls = [];
+    const row = {
+        id: 'doc-image',
+        kb_id: 'kb-1',
+        name: 'old.png',
+        stored_path: 'C:\\fixtures\\old.png',
+        mime_type: 'image/png',
+        file_size: 128,
+        file_hash: 'hash-1',
+        status: 'done',
+        error: null,
+        chunk_count: 1,
+        created_at: 1,
+        updated_at: 1,
+    };
+    const repository = createKnowledgeBaseRepository({
+        getDb: () => ({
+            async execute(statement) {
+                calls.push(statement);
+                const sql = typeof statement === 'string' ? statement : statement.sql;
+                if (/SELECT id, kb_id, name, stored_path/.test(sql)) {
+                    return { rows: [row] };
+                }
+                return { rows: [] };
+            },
+        }),
+    });
+
+    const renamed = await repository.renameKnowledgeBaseDocument('doc-image', { name: '新标题.png' });
+
+    assert.equal(renamed.name, '新标题.png');
+    assert.equal(
+        calls.some((statement) => statement.sql === 'UPDATE kb_document SET name = ?, updated_at = ? WHERE id = ?'
+            && statement.args[0] === '新标题.png'
+            && statement.args[2] === 'doc-image'),
+        true,
+    );
+    assert.equal(
+        calls.some((statement) => statement.sql === 'UPDATE knowledge_base SET updated_at = ? WHERE id = ?'
+            && statement.args[1] === 'kb-1'),
+        true,
+    );
+    await assert.rejects(
+        repository.renameKnowledgeBaseDocument('doc-image', { name: 'bad/name.png' }),
+        /path separators/,
+    );
+    await assert.rejects(
+        repository.renameKnowledgeBaseDocument('doc-image', { name: '   ' }),
+        /required/,
+    );
 });

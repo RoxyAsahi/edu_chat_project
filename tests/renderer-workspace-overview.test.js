@@ -14,7 +14,7 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
 
     const result = buildSubjectOverviewMarkup({
         agents: [
-            { id: 'math', name: '数学' },
+            { id: 'math', name: '数学', cardEmoji: '📐' },
             { id: 'english', name: '英语' },
         ],
         statsByAgent: {
@@ -58,7 +58,14 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
     assert.match(result.gridMarkup, /把每个学科当作一个长期学习空间/);
     assert.match(result.gridMarkup, /home-subjects/);
     assert.match(result.gridMarkup, /subject-overview-card--current/);
+    assert.match(result.gridMarkup, /subject-overview-card__emoji/);
+    assert.match(result.gridMarkup, /📐/);
+    assert.match(result.gridMarkup, /3 个话题/);
+    assert.match(result.gridMarkup, /0 个话题/);
     assert.match(result.gridMarkup, /函数复习/);
+    assert.doesNotMatch(result.gridMarkup, /subject-overview-card__badge/);
+    assert.doesNotMatch(result.gridMarkup, /subject-overview-card__body/);
+    assert.doesNotMatch(result.gridMarkup, /subject-overview-card__meta/);
     assert.equal((result.gridMarkup.match(/\bdata-subject-card\b/g) || []).length, 2);
     assert.match(result.gridMarkup, /data-agent-id="math"/);
     assert.match(result.gridMarkup, /data-agent-id="english"/);
@@ -94,7 +101,9 @@ test('buildSubjectOverviewMarkup keeps the current subject visible when it is th
     assert.equal(result.headline, '学习工作台');
     assert.match(result.gridMarkup, /app-home--learning/);
     assert.match(result.gridMarkup, /subject-overview-card--current/);
+    assert.match(result.gridMarkup, /subject-overview-card__emoji/);
     assert.match(result.gridMarkup, /单学科/);
+    assert.match(result.gridMarkup, /2 个话题/);
     assert.match(result.gridMarkup, /data-agent-id="solo"/);
     assert.equal((result.gridMarkup.match(/\bdata-subject-card\b/g) || []).length, 1);
     assert.doesNotMatch(result.gridMarkup, /subject-overview-browser-empty/);
@@ -113,7 +122,6 @@ test('buildSubjectOverviewMarkup renders the onboarding empty state when there a
     assert.equal(result.headline, '学习工作台');
     assert.match(result.gridMarkup, /app-home--learning/);
     assert.match(result.gridMarkup, /个人 AI 学习中心/);
-    assert.match(result.gridMarkup, /写作业\.svg/);
     assert.match(result.gridMarkup, /data-home-action="create-subject"/);
     assert.match(result.gridMarkup, /新建学科/);
     assert.match(result.gridMarkup, /创建第一个学科工作台/);

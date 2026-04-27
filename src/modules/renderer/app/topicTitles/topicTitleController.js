@@ -121,6 +121,37 @@ function createTopicTitleController(deps = {}) {
         syncWorkspaceContext();
     }
 
+    async function handleTopicTitleEvent(eventData = {}) {
+        const agentId = String(eventData?.context?.agentId || '').trim();
+        const topicId = String(eventData?.context?.topicId || '').trim();
+        const title = normalizeTopicTitle(eventData?.title);
+        if (!agentId || !topicId || !title) {
+            return '';
+        }
+
+        const eventTopics = Array.isArray(eventData?.topics)
+            ? eventData.topics.map(normalizeTopic)
+            : null;
+        if (eventTopics) {
+            refreshSessionTopics(agentId, eventTopics);
+            return title;
+        }
+
+        if (getCurrentSelectedItem()?.id !== agentId) {
+            return title;
+        }
+
+        const currentTopics = Array.isArray(store.getState().session?.topics)
+            ? store.getState().session.topics
+            : [];
+        refreshSessionTopics(agentId, currentTopics.map((topic) => (
+            topic?.id === topicId
+                ? { ...topic, name: title }
+                : topic
+        )));
+        return title;
+    }
+
     async function persistGeneratedTitle({
         agentId,
         topicId,
@@ -214,6 +245,7 @@ function createTopicTitleController(deps = {}) {
 
     return {
         generateForAssistantMessage,
+        handleTopicTitleEvent,
         isInitialTopicTitleTurn,
         isPlaceholderTopicName,
         selectVisibleTopicTitleMessages,

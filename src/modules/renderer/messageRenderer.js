@@ -127,6 +127,10 @@ const CONVENTIONAL_THOUGHT_REGEX = /<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/g
 const ROLE_DIVIDER_REGEX = /<<<\[(END_)?ROLE_DIVIDE_(SYSTEM|ASSISTANT|USER)\]>>>/g;
 const DESKTOP_PUSH_REGEX = /(?<!`)<<<\[DESKTOP_PUSH\]>>>([\s\S]*?)<<<\[DESKTOP_PUSH_END\]>>>(?!`)/gs;
 const DESKTOP_PUSH_PARTIAL_REGEX = /(?<!`)<<<\[DESKTOP_PUSH\]>>>([\s\S]*)$/s; // Handles unfinished blocks while streaming.
+const NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION = 1;
+const NOTE_RENDER_SNAPSHOT_RENDERER = 'unistudy-message-renderer';
+const NOTE_PREVIEW_STYLE_ATTR = 'data-unistudy-note-preview-scope-id';
+const SNAPSHOT_ALLOWED_ROLES = new Set(['assistant', 'user', 'system']);
 
 
 // --- Enhanced Rendering Styles (from UserScript) ---
@@ -911,9 +915,40 @@ function processAndInjectScopedCss(content, scopeId) {
     return { processedContent, styleInjected };
 }
 
-function prepareAssistantScopedStyles(text, scopeId) {
+function sanitizeSnapshotStyleText(styleText) {
+    return String(styleText || '')
+        .replace(/@import\b[^;{}]*(?:;|$)/gi, '')
+        .replace(/url\(\s*(['"]?)\s*(?:javascript|vbscript):[\s\S]*?\1\s*\)/gi, 'url(about:blank)')
+        .replace(/expression\s*\(/gi, 'blocked-expression(')
+        .trim();
+}
+
+function extractScopedCssForSnapshot(content, scopeId) {
+    let cssContent = '';
+    const processedContent = String(content || '').replace(STYLE_REGEX, (match, css) => {
+        cssContent += String(css || '').trim() + '\n';
+        return '';
+    });
+
+    if (!cssContent.trim()) {
+        return { processedContent, styleText: '' };
+    }
+
+    try {
+        const scopedCss = contentProcessor.scopeCss(cssContent, scopeId);
+        return {
+            processedContent,
+            styleText: sanitizeSnapshotStyleText(scopedCss),
+        };
+    } catch (error) {
+        console.error(`[ScopedCSS] Failed to scope snapshot CSS for ID: ${scopeId}`, error);
+        return { processedContent, styleText: '' };
+    }
+}
+
+function extractAssistantScopedStyles(text, scopeId, options = {}) {
     if (!scopeId || typeof text !== 'string' || !/<style\b/i.test(text)) {
-        return text;
+        return { content: text, styleText: '' };
     }
 
     // Protect blocks that may legally contain <style> content before extracting styles.
@@ -949,14 +984,20 @@ function prepareAssistantScopedStyles(text, scopeId) {
     textWithProtectedBlocks = textWithProtectedBlocks.replace(CODE_FENCE_REGEX, protectBlock);
     CODE_FENCE_REGEX.lastIndex = 0;
 
-    const { processedContent } = processAndInjectScopedCss(textWithProtectedBlocks, scopeId);
+    const { processedContent, styleText = '' } = options.injectStyles === false
+        ? extractScopedCssForSnapshot(textWithProtectedBlocks, scopeId)
+        : { ...processAndInjectScopedCss(textWithProtectedBlocks, scopeId), styleText: '' };
 
     let restoredContent = processedContent;
     protectedBlocks.forEach((block, i) => {
         restoredContent = restoredContent.replace(`__STYLE_PROTECT_${i}__`, block);
     });
 
-    return restoredContent;
+    return { content: restoredContent, styleText };
+}
+
+function prepareAssistantScopedStyles(text, scopeId) {
+    return extractAssistantScopedStyles(text, scopeId, { injectStyles: true }).content;
 }
 
 
@@ -1285,6 +1326,383 @@ function restoreRenderedToolResults(html, toolResultMap) {
         result = result.split(placeholder).join(renderedHtml);
     }
     return result;
+}
+
+function getMessageTextContent(message = {}) {
+    if (typeof message.content === 'string') {
+        return message.content;
+    }
+    if (message.content && typeof message.content.text === 'string') {
+        return message.content.text;
+    }
+    if (message.content === null || message.content === undefined) {
+        return '';
+    }
+    try {
+        return JSON.stringify(message.content, null, 2);
+    } catch {
+        return String(message.content || '');
+    }
+}
+
+function normalizeSnapshotRole(role) {
+    const normalized = String(role || '').trim().toLowerCase();
+    return SNAPSHOT_ALLOWED_ROLES.has(normalized) ? normalized : 'assistant';
+}
+
+function isDangerousSnapshotUrl(value, attributeName = '', tagName = '') {
+    const normalized = String(value || '')
+        .replace(/[\u0000-\u001F\u007F\s]+/g, '')
+        .toLowerCase();
+    if (!normalized) {
+        return false;
+    }
+    if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:')) {
+        return true;
+    }
+    if (!normalized.startsWith('data:')) {
+        return false;
+    }
+
+    const attr = String(attributeName || '').toLowerCase();
+    const tag = String(tagName || '').toLowerCase();
+    if ((attr === 'src' || attr === 'poster') && ['img', 'video', 'audio', 'source'].includes(tag)) {
+        return !/^data:(?:image|video|audio)\//i.test(String(value || '').trim());
+    }
+    return true;
+}
+
+function stripUnsafeSnapshotMarkup(html) {
+    const unsafeHtml = String(html || '');
+    if (typeof document === 'undefined' || !document.createElement) {
+        return unsafeHtml
+            .replace(/<script\b[\s\S]*?<\/script>/gi, '')
+            .replace(/\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+            .replace(/\s+(?:href|src|xlink:href|formaction|srcdoc)\s*=\s*(["'])\s*(?:javascript|vbscript):[\s\S]*?\1/gi, '');
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = unsafeHtml;
+    template.content.querySelectorAll('script, iframe, object, embed, link, meta, base').forEach((node) => node.remove());
+    template.content.querySelectorAll('*').forEach((node) => {
+        Array.from(node.attributes || []).forEach((attr) => {
+            const attrName = attr.name;
+            const attrNameLower = attrName.toLowerCase();
+            if (attrNameLower.startsWith('on') || attrNameLower === 'srcdoc') {
+                node.removeAttribute(attrName);
+                return;
+            }
+            if (['href', 'src', 'xlink:href', 'formaction', 'poster'].includes(attrNameLower)
+                && isDangerousSnapshotUrl(attr.value, attrNameLower, node.tagName)) {
+                node.removeAttribute(attrName);
+                return;
+            }
+            if (attrNameLower === 'style') {
+                const safeStyle = sanitizeSnapshotStyleText(attr.value);
+                if (safeStyle) {
+                    node.setAttribute(attrName, safeStyle);
+                } else {
+                    node.removeAttribute(attrName);
+                }
+            }
+        });
+    });
+    return template.innerHTML;
+}
+
+function sanitizeSnapshotHtml(html) {
+    const sanitized = sanitizeHtml(html, {
+        config: {
+            FORBID_TAGS: ['script'],
+            FORBID_ATTR: ['srcdoc'],
+        },
+    });
+    return stripUnsafeSnapshotMarkup(sanitized);
+}
+
+function derivePlainTextFromHtml(html) {
+    const source = String(html || '');
+    if (typeof document !== 'undefined' && document.createElement) {
+        const template = document.createElement('template');
+        template.innerHTML = source;
+        template.content.querySelectorAll('style, script').forEach((node) => node.remove());
+        return (template.content.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+    return source
+        .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function normalizeMessageRenderSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+        return null;
+    }
+    if (Number(snapshot.schemaVersion) !== NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION) {
+        return null;
+    }
+    if (snapshot.renderer !== NOTE_RENDER_SNAPSHOT_RENDERER) {
+        return null;
+    }
+
+    const contentHtml = sanitizeSnapshotHtml(snapshot.contentHtml);
+    if (!contentHtml.trim()) {
+        return null;
+    }
+
+    const styleText = sanitizeSnapshotStyleText(snapshot.styleText || '');
+    const plainText = String(snapshot.plainText || derivePlainTextFromHtml(contentHtml))
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 50000);
+    const capturedAt = Number(snapshot.capturedAt);
+
+    return {
+        schemaVersion: NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION,
+        renderer: NOTE_RENDER_SNAPSHOT_RENDERER,
+        sourceMessageId: String(snapshot.sourceMessageId || '').trim(),
+        role: normalizeSnapshotRole(snapshot.role),
+        contentHtml,
+        styleText,
+        scopeId: String(snapshot.scopeId || '').trim() || generateUniqueId(),
+        plainText,
+        capturedAt: Number.isFinite(capturedAt) && capturedAt > 0 ? capturedAt : Date.now(),
+    };
+}
+
+function renderMessageContentHtml({
+    textToRender = '',
+    message = {},
+    role = 'assistant',
+    settings = {},
+    depth = 0,
+} = {}) {
+    const markedInstance = mainRendererReferences.markedInstance;
+    const { text: processedContent, toolResultMap } = preprocessFullContent(textToRender, settings, role, depth);
+    const { text: protectedContent, map: latexMap } = protectLatexBlocks(processedContent);
+    let rawHtml = markedInstance && typeof markedInstance.parse === 'function'
+        ? markedInstance.parse(protectedContent)
+        : `<p>${escapeHtml(protectedContent).replace(/\n/g, '<br>')}</p>`;
+    rawHtml = restoreLatexBlocks(rawHtml, latexMap);
+    rawHtml = restoreRenderedToolResults(rawHtml, toolResultMap);
+    rawHtml = prependNativeReasoningBubble(rawHtml, message);
+    return rawHtml.replace(/viewBox="0 "/g, 'viewBox="0 0 24 24"');
+}
+
+function createMessageRenderSnapshot(message = {}, options = {}) {
+    if (!message || typeof message !== 'object' || message.isThinking) {
+        return null;
+    }
+
+    const role = normalizeSnapshotRole(options.role || message.role || 'assistant');
+    const scopeId = String(options.scopeId || generateUniqueId()).trim() || generateUniqueId();
+    const settings = options.settings || mainRendererReferences.globalSettingsRef.get();
+    const history = Array.isArray(options.history)
+        ? options.history
+        : (mainRendererReferences.currentChatHistoryRef.get() || []);
+    const sourceMessageId = String(options.sourceMessageId || message.id || '').trim();
+    let textToRender = getMessageTextContent(message);
+    let styleText = '';
+
+    if (role === 'user') {
+        textToRender = prepareUserMessageText(textToRender);
+    } else if (role === 'assistant') {
+        const scoped = extractAssistantScopedStyles(textToRender, scopeId, { injectStyles: false });
+        textToRender = scoped.content;
+        styleText = scoped.styleText;
+    }
+
+    const historyForDepthCalc = message.id && history.some((item) => item?.id === message.id)
+        ? [...history]
+        : [...history, { ...message, id: message.id || sourceMessageId || scopeId, role }];
+    const depth = Number.isFinite(options.depth)
+        ? options.depth
+        : calculateDepthByTurns(message.id || sourceMessageId || scopeId, historyForDepthCalc);
+    const currentSelectedItem = options.currentSelectedItem || mainRendererReferences.currentSelectedItemRef.get();
+    const agentConfigForRegex = options.agentConfig || currentSelectedItem?.config || currentSelectedItem;
+    if (agentConfigForRegex?.stripRegexes && Array.isArray(agentConfigForRegex.stripRegexes)) {
+        textToRender = applyFrontendRegexRules(textToRender, agentConfigForRegex.stripRegexes, role, depth);
+    }
+
+    const contentHtml = sanitizeSnapshotHtml(renderMessageContentHtml({
+        textToRender,
+        message: { ...message, role, id: message.id || sourceMessageId || scopeId },
+        role,
+        settings,
+        depth,
+    }));
+    if (!contentHtml.trim()) {
+        return null;
+    }
+
+    return normalizeMessageRenderSnapshot({
+        schemaVersion: NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION,
+        renderer: NOTE_RENDER_SNAPSHOT_RENDERER,
+        sourceMessageId,
+        role,
+        contentHtml,
+        styleText,
+        scopeId,
+        plainText: derivePlainTextFromHtml(contentHtml) || textToRender.replace(/\s+/g, ' ').trim(),
+        capturedAt: options.capturedAt || Date.now(),
+    });
+}
+
+function removeNotePreviewStyle(scopeId) {
+    if (!scopeId || typeof document === 'undefined') {
+        return;
+    }
+    document.querySelectorAll(`style[${NOTE_PREVIEW_STYLE_ATTR}]`).forEach((styleElement) => {
+        if (styleElement.getAttribute(NOTE_PREVIEW_STYLE_ATTR) === scopeId) {
+            styleElement.remove();
+        }
+    });
+}
+
+function cleanupNotePreviewMount(container) {
+    if (!container) {
+        return;
+    }
+    const scopeId = container.dataset?.unistudyNotePreviewScopeId || '';
+    removeNotePreviewStyle(scopeId);
+    try {
+        contentProcessor.cleanupPreviewsInContent(container);
+        cleanupAnimationsInContent(container);
+    } catch (error) {
+        console.warn('[MessageRenderer] Failed to clean note preview resources:', error);
+    }
+    if (container.dataset) {
+        delete container.dataset.unistudyNotePreviewScopeId;
+    }
+}
+
+function rewriteSnapshotContentScopeId(html, previousScopeId, nextScopeId) {
+    const source = String(html || '');
+    if (!previousScopeId || previousScopeId === nextScopeId || !source.includes(previousScopeId)) {
+        return source;
+    }
+    if (typeof document === 'undefined' || !document.createElement) {
+        const escapedPrevious = previousScopeId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return source.replace(
+            new RegExp(`id=(["'])${escapedPrevious}\\1`, 'g'),
+            (_match, quote) => `id=${quote}${nextScopeId}${quote}`,
+        );
+    }
+    const template = document.createElement('template');
+    template.innerHTML = source;
+    template.content.querySelectorAll('[id]').forEach((node) => {
+        if (node.id === previousScopeId) {
+            node.id = nextScopeId;
+        }
+    });
+    return template.innerHTML;
+}
+
+function rewriteSnapshotStyleScope(styleText, previousScopeId, nextScopeId) {
+    const source = String(styleText || '');
+    if (!source.trim()) {
+        return '';
+    }
+    if (!previousScopeId || previousScopeId === nextScopeId) {
+        return sanitizeSnapshotStyleText(source);
+    }
+    return sanitizeSnapshotStyleText(source.split(`#${previousScopeId}`).join(`#${nextScopeId}`));
+}
+
+function injectNotePreviewStyle(scopeId, styleText) {
+    if (!scopeId || !styleText || typeof document === 'undefined') {
+        return false;
+    }
+    removeNotePreviewStyle(scopeId);
+    const styleElement = document.createElement('style');
+    styleElement.type = 'text/css';
+    styleElement.setAttribute(NOTE_PREVIEW_STYLE_ATTR, scopeId);
+    styleElement.textContent = styleText;
+    document.head.appendChild(styleElement);
+    return true;
+}
+
+function escapeAttribute(value) {
+    return escapeHtml(String(value || ''));
+}
+
+function resolveNotePreviewSnapshot(note = {}, options = {}) {
+    const savedSnapshot = normalizeMessageRenderSnapshot(note.renderSnapshot);
+    if (savedSnapshot) {
+        return savedSnapshot;
+    }
+
+    const contentMarkdown = String(
+        options.contentMarkdown !== undefined
+            ? options.contentMarkdown
+            : (note.contentMarkdown || '')
+    );
+    if (!contentMarkdown.trim()) {
+        return null;
+    }
+
+    return createMessageRenderSnapshot({
+        id: note.id || options.sourceMessageId || generateUniqueId(),
+        role: options.role || 'assistant',
+        content: contentMarkdown,
+        timestamp: note.updatedAt || note.createdAt || Date.now(),
+    }, {
+        sourceMessageId: Array.isArray(note.sourceMessageIds) ? note.sourceMessageIds[0] : '',
+        capturedAt: Date.now(),
+        depth: options.depth,
+    });
+}
+
+function mountRichNotePreview(container, note = {}, options = {}) {
+    if (!container) {
+        return null;
+    }
+
+    cleanupNotePreviewMount(container);
+    const compact = options.compact === true;
+    const snapshot = resolveNotePreviewSnapshot(note, options);
+    container.classList.add('unistudy-note-rich-preview');
+    container.classList.toggle('unistudy-note-rich-preview--compact', compact);
+    container.classList.toggle('unistudy-note-rich-preview--full', !compact);
+
+    if (!snapshot) {
+        const emptyText = options.emptyText || '暂无内容。';
+        container.innerHTML = `<p class="unistudy-note-rich-preview__empty">${escapeHtml(emptyText)}</p>`;
+        return null;
+    }
+
+    const nextScopeId = generateUniqueId();
+    const role = normalizeSnapshotRole(snapshot.role);
+    const contentHtml = rewriteSnapshotContentScopeId(snapshot.contentHtml, snapshot.scopeId, nextScopeId);
+    const styleText = rewriteSnapshotStyleScope(snapshot.styleText, snapshot.scopeId, nextScopeId);
+    if (styleText) {
+        injectNotePreviewStyle(nextScopeId, styleText);
+    }
+
+    container.dataset.unistudyNotePreviewScopeId = nextScopeId;
+    container.innerHTML = `
+        <div id="${escapeAttribute(nextScopeId)}" class="message-item ${escapeAttribute(role)} unistudy-note-preview-message">
+            <div class="md-content unistudy-note-preview-content"></div>
+        </div>
+    `;
+
+    const contentDiv = container.querySelector('.unistudy-note-preview-content');
+    if (!contentDiv) {
+        return null;
+    }
+
+    setContentAndProcessImages(contentDiv, contentHtml, note.id || snapshot.sourceMessageId || nextScopeId);
+    contentProcessor.processRenderedContent(contentDiv, mainRendererReferences.globalSettingsRef.get());
+    if (!compact) {
+        void renderMermaidDiagrams(contentDiv);
+    }
+
+    return {
+        scopeId: nextScopeId,
+        snapshot,
+    };
 }
 
 /**
@@ -3009,4 +3427,8 @@ export {
     getHistoryWindowSnapshot,
     syncHistoryWindowHistory,
     extractSpeakableTextFromContentElement,
+    createMessageRenderSnapshot,
+    mountRichNotePreview,
+    cleanupNotePreviewMount,
+    normalizeMessageRenderSnapshot,
 };

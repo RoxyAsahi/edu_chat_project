@@ -6,6 +6,7 @@ import {
     canReuseSelectedKnowledgeBaseDocuments,
     formatDocumentStatus,
     getKnowledgeBaseDocumentVisual,
+    isImageDocument,
     shouldPollKnowledgeBaseItems,
 } from './sourceModel.js';
 import { createSourceOperations } from './sourceOperations.js';
@@ -131,6 +132,7 @@ function createSourceController(deps = {}) {
         if (readable) {
             actions.push({ key: 'open', label: '打开阅读区', icon: 'menu_book', disabled: false });
         }
+        actions.push({ key: 'rename', label: '重命名', icon: 'edit', disabled: false });
         if (documentItem.status === 'failed') {
             actions.push({ key: 'retry', label: '重试导入', icon: 'refresh', disabled: false });
         }
@@ -326,6 +328,7 @@ function createSourceController(deps = {}) {
         refreshKnowledgeBasePollingTargets: operations.refreshKnowledgeBasePollingTargets,
         refreshKnowledgeBaseSummaries: operations.refreshKnowledgeBaseSummaries,
         renameKnowledgeBase: operations.renameKnowledgeBase,
+        renameKnowledgeBaseDocument: operations.renameKnowledgeBaseDocument,
         renderKnowledgeBaseDebugResults: dom.renderKnowledgeBaseDebugResults,
         renderKnowledgeBaseManager: dom.renderKnowledgeBaseManager,
         renderTopicKnowledgeBaseFiles: dom.renderTopicKnowledgeBaseFiles,
@@ -348,5 +351,6 @@ export {
     createSourceController,
     formatDocumentStatus,
     getKnowledgeBaseDocumentVisual,
+    isImageDocument,
     shouldPollKnowledgeBaseItems,
 };

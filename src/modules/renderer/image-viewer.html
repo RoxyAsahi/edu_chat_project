@@ -8,61 +8,67 @@
         content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: file: http: https:; connect-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
     >
     <title>图片预览</title>
-    <link rel="stylesheet" href="../../styles/themes.css">
     <style>
         :root {
-            --image-viewer-border-transparent: rgba(58, 50, 75, 0.2);
-            --tool-active-bg: rgba(100, 150, 255, 0.3);
-            --tool-active-border: rgba(100, 150, 255, 0.8);
-        }
-
-        body.light-theme {
-            --image-viewer-border-transparent: rgba(212, 196, 176, 0.2);
+            --viewer-bg: #f8fafd;
+            --viewer-surface: #ffffff;
+            --viewer-surface-alt: #eef3f8;
+            --viewer-primary: #1a73e8;
+            --viewer-primary-container: #d3e3fd;
+            --viewer-on-primary: #ffffff;
+            --viewer-on-primary-container: #041e49;
+            --viewer-text: #202124;
+            --viewer-muted: #5f6368;
+            --viewer-hover: rgba(26, 115, 232, 0.08);
+            --viewer-focus: rgba(26, 115, 232, 0.14);
+            --viewer-danger: #d93025;
+            --viewer-danger-hover: #fce8e6;
+            --viewer-scrim: rgba(32, 33, 36, 0.28);
         }
 
         body {
             margin: 0;
-            background-color: var(--secondary-bg);
+            background: var(--viewer-bg);
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             overflow: hidden;
-            font-family: sans-serif;
-            color: var(--primary-text);
-            transition: background-color 0.3s ease, color 0.3s ease;
-            padding-top: 40px;
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--viewer-text);
+            padding: 52px 24px 88px;
             box-sizing: border-box;
         }
 
-        body::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: inherit;
-            filter: blur(10px) brightness(0.8);
-            z-index: -1;
+        body.annotation-panel-open {
+            padding-left: 288px;
         }
 
-        /* Image container */
         .image-container {
             position: relative;
             display: inline-block;
-            max-width: 98vw;
-            max-height: 90vh;
+            max-width: calc(100vw - 48px);
+            max-height: calc(100vh - 140px);
+            transform-origin: center center;
+        }
+
+        body.annotation-panel-open .image-container {
+            max-width: calc(100vw - 320px);
         }
 
         img {
-            max-width: 98vw;
-            max-height: 90vh;
+            max-width: calc(100vw - 48px);
+            max-height: calc(100vh - 140px);
             object-fit: contain;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
             border-radius: 4px;
             display: block;
             transition: transform 0.1s ease-out;
         }
 
-        /* Drawing canvas */
+        body.annotation-panel-open img {
+            max-width: calc(100vw - 320px);
+        }
+
         #drawingCanvas {
             position: absolute;
             top: 0;
@@ -75,29 +81,37 @@
         }
 
         .error-message {
-            padding: 20px;
-            background-color: var(--tool-bubble-bg);
-            border-radius: 5px;
-            font-size: 1.2em;
+            max-width: 560px;
+            padding: 20px 24px;
+            background: var(--viewer-surface-alt);
+            border-radius: 8px;
+            color: var(--viewer-muted);
+            font-size: 18px;
+            line-height: 1.5;
+            text-align: center;
         }
 
-        /* Toolbar */
         .toolbar {
             position: absolute;
-            top: 60px;
-            left: 20px;
+            top: 68px;
+            left: 16px;
             display: flex;
             flex-direction: column;
             gap: 8px;
-            padding: 10px;
-            background-color: var(--tool-bubble-bg);
+            width: 240px;
+            padding: 8px;
+            background: var(--viewer-surface);
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px) saturate(110%);
-            -webkit-backdrop-filter: blur(10px) saturate(110%);
-            border: 1px solid var(--image-viewer-border-transparent);
             z-index: 100;
             transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .toolbar::before {
+            content: "标注";
+            color: var(--viewer-muted);
+            font-size: 12px;
+            font-weight: 500;
+            padding: 2px 4px 0;
         }
 
         .toolbar.hidden {
@@ -108,14 +122,19 @@
 
         .toolbar-section {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
+            flex-wrap: wrap;
             gap: 8px;
-            padding: 6px 0;
-            border-bottom: 1px solid var(--image-viewer-border-transparent);
+            padding: 4px 0;
+        }
+
+        .toolbar-section.stackable {
+            display: grid;
+            grid-template-columns: repeat(4, 40px);
         }
 
         .toolbar-section:last-child {
-            border-bottom: none;
+            padding-bottom: 0;
         }
 
         .toolbar-section.stacked {
@@ -127,31 +146,31 @@
         .tool-btn {
             width: 40px;
             height: 40px;
-            background-color: var(--button-bg);
-            color: var(--text-on-accent);
-            border: 2px solid transparent;
-            border-radius: 6px;
+            background: transparent;
+            color: var(--viewer-muted);
+            border: 0;
+            border-radius: 8px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
+            transition: background-color 0.18s ease, color 0.18s ease;
             position: relative;
         }
 
         .tool-btn:hover {
-            background-color: var(--button-hover-bg);
+            background: var(--viewer-hover);
+            color: var(--viewer-primary);
         }
 
         .tool-btn.active {
-            background-color: var(--tool-active-bg);
-            border-color: var(--tool-active-border);
-            color: var(--primary-text);
+            background: var(--viewer-primary-container);
+            color: var(--viewer-on-primary-container);
         }
 
         .tool-btn svg {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             fill: currentColor;
         }
 
@@ -160,9 +179,9 @@
             content: attr(data-tooltip);
             position: absolute;
             left: 55px;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 6px 10px;
+            background: #3c4043;
+            color: #ffffff;
+            padding: 6px 8px;
             border-radius: 4px;
             white-space: nowrap;
             opacity: 0;
@@ -181,15 +200,16 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 0 4px;
+            width: 100%;
+            padding: 4px 0;
         }
 
         #colorCodeDisplay {
             font-family: monospace;
             font-size: 13px;
-            background-color: var(--button-bg);
-            color: var(--text-on-accent);
-            padding: 5px 8px;
+            background: var(--viewer-primary-container);
+            color: var(--viewer-on-primary-container);
+            padding: 7px 9px;
             border-radius: 4px;
             cursor: pointer;
             user-select: none;
@@ -197,26 +217,31 @@
         }
 
         #colorCodeDisplay:hover {
-            background-color: var(--button-hover-bg);
+            background: var(--viewer-focus);
         }
 
         #colorPicker {
             width: 40px;
             height: 40px;
-            border: 2px solid var(--image-viewer-border-transparent);
+            border: 0;
             border-radius: 6px;
             cursor: pointer;
-            background: none;
-            padding: 0;
+            background: transparent;
+            padding: 2px;
         }
 
-        /* Brush size */
         .brush-size-wrapper {
-            padding: 8px;
+            display: grid;
+            grid-template-columns: 1fr 40px;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 4px 0 0;
         }
 
         #brushSize {
             width: 100%;
+            accent-color: var(--viewer-primary);
         }
 
         .brush-preview {
@@ -225,34 +250,31 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-top: 6px;
+            margin-top: 0;
         }
 
         .brush-preview-dot {
-            background-color: var(--primary-text);
+            background: var(--viewer-text);
             border-radius: 50%;
             transition: all 0.2s;
         }
 
-        /* Bottom controls */
         .controls {
             position: absolute;
-            bottom: 20px;
+            bottom: 18px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 15px;
-            padding: 10px;
-            background-color: var(--tool-bubble-bg);
+            flex-wrap: nowrap;
+            gap: 8px;
+            padding: 8px;
+            background: var(--viewer-surface);
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
             pointer-events: none;
-            backdrop-filter: blur(10px) saturate(110%);
-            -webkit-backdrop-filter: blur(10px) saturate(110%);
-            border: 1px solid var(--image-viewer-border-transparent);
+            z-index: 120;
         }
 
         .controls.active {
@@ -262,41 +284,111 @@
         }
 
         .control-button {
-            background-color: var(--button-bg);
-            color: var(--text-on-accent);
-            border: 1px solid var(--image-viewer-border-transparent);
-            padding: 10px 15px;
-            border-radius: 5px;
+            min-height: 40px;
+            white-space: nowrap;
+            background: var(--viewer-primary-container);
+            color: var(--viewer-on-primary-container);
+            border: 0;
+            padding: 0 16px;
+            border-radius: 8px;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.9em;
+            font-size: 14px;
+            font-weight: 500;
             transition: background-color 0.2s ease;
         }
 
         .control-button:hover {
-            background-color: var(--button-hover-bg);
+            background: var(--viewer-focus);
+        }
+
+        .control-button.active {
+            background: var(--viewer-primary-container);
+            color: var(--viewer-on-primary-container);
+        }
+
+        .control-button:disabled {
+            color: var(--viewer-muted);
+            background: var(--viewer-surface-alt);
+            cursor: default;
         }
 
         .control-button svg {
-            width: 18px;
-            height: 18px;
-            fill: currentColor;
+            width: 20px;
+            height: 20px;
+            flex: 0 0 auto;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 2;
         }
 
-        /* Custom title bar */
+        .more-menu {
+            position: absolute;
+            right: 8px;
+            bottom: calc(100% + 8px);
+            display: none;
+            min-width: 184px;
+            padding: 8px;
+            background: var(--viewer-surface);
+            border-radius: 8px;
+        }
+
+        .more-menu.open {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .menu-item {
+            width: 100%;
+            min-height: 40px;
+            justify-content: flex-start;
+            background: transparent;
+            color: var(--viewer-text);
+            padding: 0 12px;
+            text-align: left;
+        }
+
+        .menu-item:hover {
+            background: var(--viewer-hover);
+        }
+
+        .menu-item svg {
+            width: 20px;
+            height: 20px;
+            flex: 0 0 auto;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 2;
+        }
+
+        .menu-divider {
+            height: 1px;
+            margin: 4px 8px;
+            background: var(--viewer-surface-alt);
+        }
+
+        .button-label {
+            min-width: 0;
+        }
+
         #custom-title-bar {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            height: 40px;
+            height: 48px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 10px 0 20px;
-            background-color: transparent;
+            padding: 0 8px 0 20px;
+            background: var(--viewer-surface);
             z-index: 1000;
             -webkit-app-region: drag;
             user-select: none;
@@ -316,23 +408,22 @@
 
         #custom-title-bar .title {
             font-size: 14px;
-            font-weight: 600;
-            color: var(--primary-text);
-            opacity: 0.7;
+            font-weight: 500;
+            color: var(--viewer-text);
         }
 
         #custom-title-bar .window-controls {
             display: flex;
-            gap: 10px;
+            gap: 4px;
             -webkit-app-region: no-drag;
         }
 
         .window-control-btn {
-            width: 30px;
-            height: 30px;
+            width: 40px;
+            height: 36px;
             border: none;
-            background-color: transparent;
-            color: var(--secondary-text);
+            background: transparent;
+            color: var(--viewer-muted);
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -342,57 +433,62 @@
         }
 
         .window-control-btn:hover {
-            background-color: var(--button-hover-bg);
-            color: var(--text-on-accent);
+            background: var(--viewer-hover);
+            color: var(--viewer-primary);
         }
 
         #close-viewer-btn:hover {
-            background-color: #e81123;
-            color: white;
+            background: var(--viewer-danger-hover);
+            color: var(--viewer-danger);
         }
 
-        /* OCR modal */
         .ocr-modal {
             display: none;
             position: fixed;
             z-index: 1001;
             inset: 0;
             overflow: auto;
-            background-color: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            background: var(--viewer-scrim);
         }
 
         .ocr-modal-content {
-            background-color: var(--secondary-bg);
-            margin: 10% auto;
+            background: var(--viewer-surface);
+            margin: 10vh auto;
             padding: 20px;
-            border: 1px solid var(--image-viewer-border-transparent);
             width: 60%;
             max-width: 700px;
+            min-width: 320px;
             border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
             display: flex;
             flex-direction: column;
         }
 
         .ocr-modal-close {
-            color: var(--secondary-text);
+            color: var(--viewer-muted);
             align-self: flex-end;
-            font-size: 28px;
-            font-weight: bold;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: 400;
             cursor: pointer;
         }
 
         .ocr-modal-close:hover,
         .ocr-modal-close:focus {
-            color: var(--primary-text);
+            background: var(--viewer-hover);
+            color: var(--viewer-primary);
             text-decoration: none;
         }
 
         .ocr-modal h3 {
             margin-top: 0;
-            color: var(--primary-text);
+            color: var(--viewer-text);
+            font-size: 20px;
+            font-weight: 500;
         }
 
         #ocrResultText {
@@ -400,18 +496,94 @@
             height: 250px;
             margin-top: 10px;
             margin-bottom: 15px;
-            background-color: var(--primary-bg);
-            color: var(--primary-text);
-            border: 1px solid var(--image-viewer-border-transparent);
-            border-radius: 4px;
-            padding: 10px;
+            background: var(--viewer-surface-alt);
+            color: var(--viewer-text);
+            border: 0;
+            border-radius: 8px;
+            padding: 12px;
             font-family: monospace;
             resize: vertical;
             box-sizing: border-box;
+            outline: none;
         }
 
         #copyOcrText {
             align-self: flex-end;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 56px 12px 92px;
+            }
+
+            body.annotation-panel-open {
+                padding-left: 256px;
+            }
+
+            .toolbar {
+                left: 8px;
+                width: 224px;
+            }
+
+            .image-container,
+            img {
+                max-width: calc(100vw - 24px);
+            }
+
+            body.annotation-panel-open .image-container,
+            body.annotation-panel-open img {
+                max-width: calc(100vw - 272px);
+            }
+
+            .controls {
+                max-width: calc(100vw - 24px);
+                overflow: visible;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .control-button {
+                width: 40px;
+                min-width: 40px;
+                padding: 0;
+                justify-content: center;
+            }
+
+            .controls {
+                gap: 6px;
+            }
+
+            .button-label {
+                display: none;
+            }
+
+            .menu-item .button-label {
+                display: inline;
+            }
+
+            #colorCodeDisplay {
+                display: none;
+            }
+        }
+
+        @media (max-width: 520px) {
+            #custom-title-bar {
+                padding-left: 12px;
+            }
+
+            .title-text-container {
+                max-width: calc(100vw - 148px);
+            }
+
+            .controls {
+                left: 50%;
+                right: auto;
+                transform: translateX(-50%);
+            }
+
+            .more-menu {
+                right: 0;
+            }
         }
     </style>
 </head>
@@ -435,7 +607,7 @@
     </div>
 
     <!-- Toolbar -->
-    <div class="toolbar" id="toolbar">
+    <div class="toolbar hidden" id="toolbar" aria-label="标注工具">
         <div class="toolbar-section stackable">
             <button class="tool-btn" id="selectTool" data-tooltip="选择/移动" title="选择">
                 <svg viewBox="0 0 24 24"><path d="M3,3v18l7-5l4,8l3-2l-4-8h8L3,3z"/></svg>
@@ -500,22 +672,33 @@
 
     <!-- Bottom controls -->
     <div class="controls active" id="imageControls" style="display:none;">
-        <button id="copyButton" class="control-button">
-            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg>
-            复制
+        <button id="copyButton" class="control-button" title="复制">
+            <svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M5 16H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span class="button-label">复制</span>
         </button>
-        <button id="saveEditedButton" class="control-button">
-            <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"></path></svg>
-            保存编辑
+        <button id="downloadButton" class="control-button" title="下载">
+            <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+            <span class="button-label">下载</span>
         </button>
-        <button id="downloadButton" class="control-button">
-            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>
-            下载
+        <button id="moreMenuButton" class="control-button" title="更多" aria-expanded="false" aria-haspopup="true">
+            <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>
+            <span class="button-label">更多</span>
         </button>
-        <button id="ocrButton" class="control-button">
-            <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 18V6h16v12H4zm2-8h2v2H6v-2zm4 0h8v2h-8v-2zm0 4h6v2h-6v-2z"></path></svg>
-            识别文字
-        </button>
+        <div id="moreMenu" class="more-menu" role="menu">
+            <button id="annotationToggleButton" class="control-button menu-item" title="标注/编辑" role="menuitem">
+                <svg viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"></path><path d="m13.5 8.5 2 2"></path></svg>
+                <span class="button-label">标注/编辑</span>
+            </button>
+            <button id="saveEditedButton" class="control-button menu-item" title="保存编辑" role="menuitem">
+                <svg viewBox="0 0 24 24"><path d="M5 4h12l2 2v14H5V4Z"></path><path d="M8 4v6h8"></path><path d="M8 17h8"></path></svg>
+                <span class="button-label">保存编辑</span>
+            </button>
+            <div class="menu-divider" aria-hidden="true"></div>
+            <button id="ocrButton" class="control-button menu-item" title="识别文字" role="menuitem">
+                <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 10h8"></path><path d="M8 14h5"></path></svg>
+                <span class="button-label">识别文字</span>
+            </button>
+        </div>
     </div>
 
     <div id="errorMessage" class="error-message" style="display:none;">无法加载图片。</div>

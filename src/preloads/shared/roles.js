@@ -92,6 +92,7 @@ const CONTENT_KEYS = [
     'importKnowledgeBaseFiles',
     'listKnowledgeBaseDocuments',
     'retryKnowledgeBaseDocument',
+    'renameKnowledgeBaseDocument',
     'setTopicKnowledgeBase',
     'setTopicSourceSelection',
     'getTopicKnowledgeBase',

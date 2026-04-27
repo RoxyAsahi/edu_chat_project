@@ -1,4 +1,5 @@
 const TOPIC_SOURCE_FILE_LIMIT = 50;
+const IMAGE_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'];
 
 function escapeHtml(text) {
     return String(text || '')
@@ -45,6 +46,13 @@ function formatDocumentStatus(documentItem = {}) {
     return detailParts.join(' · ');
 }
 
+function isImageDocument(documentItem = {}) {
+    const name = String(documentItem.name || '').toLowerCase();
+    const mimeType = String(documentItem.mimeType || '').toLowerCase();
+    return mimeType.startsWith('image/')
+        || IMAGE_FILE_EXTENSIONS.some((extension) => name.endsWith(extension));
+}
+
 function getKnowledgeBaseDocumentVisual(documentItem = {}) {
     const name = String(documentItem.name || '').toLowerCase();
     const contentType = String(documentItem.contentType || '').toLowerCase();
@@ -57,6 +65,10 @@ function getKnowledgeBaseDocumentVisual(documentItem = {}) {
 
     if (contentType === 'pdf-text' || mimeType === 'application/pdf' || name.endsWith('.pdf')) {
         return { icon: 'picture_as_pdf', tone: 'pdf', spinning: false };
+    }
+
+    if (isImageDocument(documentItem)) {
+        return { icon: 'image', tone: 'image', spinning: false };
     }
 
     if (
@@ -81,10 +93,6 @@ function getKnowledgeBaseDocumentVisual(documentItem = {}) {
         || name.endsWith('.htm')
     ) {
         return { icon: 'article', tone: 'text', spinning: false };
-    }
-
-    if (mimeType.startsWith('image/')) {
-        return { icon: 'image', tone: 'text', spinning: false };
     }
 
     return { icon: 'draft', tone: 'neutral', spinning: false };
@@ -120,5 +128,6 @@ export {
     escapeHtml,
     formatDocumentStatus,
     getKnowledgeBaseDocumentVisual,
+    isImageDocument,
     shouldPollKnowledgeBaseItems,
 };

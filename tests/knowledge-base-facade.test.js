@@ -15,6 +15,7 @@ const EXPECTED_EXPORT_KEYS = [
     'deleteKnowledgeBase',
     'importKnowledgeBaseFiles',
     'listKnowledgeBaseDocuments',
+    'renameKnowledgeBaseDocument',
     'retryKnowledgeBaseDocument',
     'retrieveKnowledgeBaseContext',
     'searchKnowledgeBase',
@@ -66,8 +67,18 @@ function loadKnowledgeBaseFacade() {
             callLog.push(['repository.getDocumentById', documentId]);
             return {
                 id: documentId,
+                name: documentId === 'doc-image' ? 'diagram.png' : 'fixture.txt',
                 status: 'done',
                 fileName: 'fixture.txt',
+                storedPath: documentId === 'doc-image' ? path.join('C:/fixtures', 'diagram.png') : path.join('C:/fixtures', 'fixture.txt'),
+            };
+        },
+        async renameKnowledgeBaseDocument(documentId, payload) {
+            callLog.push(['repository.renameKnowledgeBaseDocument', documentId, payload]);
+            return {
+                id: documentId,
+                name: payload.name,
+                status: 'done',
             };
         },
         async listStoredPathsByKnowledgeBase(kbId) {
@@ -129,9 +140,16 @@ function loadKnowledgeBaseFacade() {
             callLog.push(['parserAdapter.parseKnowledgeBaseDocument', document.id]);
             return {
                 documentId: document.id,
+                mimeType: document.id === 'doc-image' ? 'image/png' : 'text/plain',
                 contentType: 'text/plain',
                 paragraphs: [{ index: 0, text: 'hello world' }],
             };
+        },
+        inferMimeType(document) {
+            return document.id === 'doc-image' ? 'image/png' : 'text/plain';
+        },
+        isImageMimeType(mimeType) {
+            return String(mimeType || '').startsWith('image/');
         },
     };
     const readerProjection = {
@@ -274,8 +292,10 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
     const search = await facade.searchKnowledgeBase({ query: 'NEWTON-101' });
     const debug = await facade.getKnowledgeBaseRetrievalDebug({ query: 'debug me' });
     const view = await facade.getKnowledgeBaseDocumentViewData('doc-1');
+    const imageView = await facade.getKnowledgeBaseDocumentViewData('doc-image');
     const guide = await facade.getKnowledgeBaseDocumentGuide('doc-1');
     const generatedGuide = await facade.generateKnowledgeBaseDocumentGuide('doc-1', { forceRefresh: false });
+    const renamedDocument = await facade.renameKnowledgeBaseDocument('doc-1', { name: 'renamed.txt' });
     const retried = await facade.retryKnowledgeBaseDocument('doc-1');
     const deleted = await facade.deleteKnowledgeBase('kb-1');
     await facade.shutdownKnowledgeBase();
@@ -298,14 +318,18 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
     assert.deepEqual(view, {
         document: {
             id: 'doc-1',
+            name: 'fixture.txt',
             status: 'done',
             fileName: 'fixture.txt',
+            storedPath: path.join('C:/fixtures', 'fixture.txt'),
             isIndexed: true,
         },
         view: {
             blocks: [{ id: 'block-1', text: 'hello world' }],
         },
     });
+    assert.equal(imageView.document.name, 'diagram.png');
+    assert.equal(imageView.view.imagePreviewUrl.startsWith('file:'), true);
     assert.deepEqual(guide, {
         documentId: 'doc-1',
         guideStatus: 'done',
@@ -315,6 +339,11 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
         documentId: 'doc-1',
         guideStatus: 'done',
         guideMarkdown: '# generated guide',
+    });
+    assert.deepEqual(renamedDocument, {
+        id: 'doc-1',
+        name: 'renamed.txt',
+        status: 'done',
     });
     assert.deepEqual(retried, {
         id: 'doc-1',
