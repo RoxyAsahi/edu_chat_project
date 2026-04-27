@@ -820,9 +820,10 @@ async function renderCurrentHistory() {
     try {
         messageRenderer.clearChat({ preserveHistory: true });
         if (session.currentChatHistory.length === 0) {
-            el.chatMessages.innerHTML = `<div class="empty-state" style="margin-top: 100px; background: transparent; border: none;">
-  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4; color:var(--accent); margin-bottom:12px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-  <p style="font-size: 16px; font-weight: 500; color: var(--muted);">暂无消息，开始对话吧。</p>
+            el.chatMessages.innerHTML = `<div class="empty-state" style="margin-top: 48px; background: transparent; border: none; gap: 6px;">
+  <img src="../assets/拍照片.png" alt="" style="width: 136px; height: 136px; object-fit: contain; margin-bottom: 4px;" />
+  <strong style="font-size: 24px; font-weight: 700; line-height: 1.25; color: var(--ink);">上传学习资料，开始专属对话</strong>
+  <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 1.55; color: var(--muted);">把课本、试卷、图片或笔记放进来，我会陪你一起梳理重点~</p>
 </div>`;
             return;
         }

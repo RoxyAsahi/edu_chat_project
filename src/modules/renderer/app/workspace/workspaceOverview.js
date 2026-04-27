@@ -632,7 +632,7 @@ function buildSubjectOverviewMarkup({
                     <div class="home-left">
                         <section class="home-hero">
                             <div class="home-hero__visual" aria-hidden="true">
-                                <img src="../assets/写作业.svg" alt="" />
+                                <img src="../assets/logo.png" alt="" />
                             </div>
                             <div class="home-hero__copy">
                                 <h2>${escapeHtml(heroTitle)}</h2>
