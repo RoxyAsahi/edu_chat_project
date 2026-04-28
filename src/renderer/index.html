@@ -967,7 +967,7 @@
                   <div class="settings-row">
                     <div class="settings-row__main"><strong>代码字体</strong><span>控制代码块和等宽内容的字体。</span></div>
                     <select id="chatCodeFontPreset" class="settings-row__control">
-                      <option value="consolas">Consolas</option>
+                      <option value="cascadia">Cascadia Code</option>
                       <option value="monospace">等宽</option>
                       <option value="system">系统</option>
                     </select>
@@ -1078,7 +1078,20 @@
               </div>
               <div class="settings-row">
                 <div class="settings-row__main"><strong>卡片 Emoji</strong><span>显示在首页学科卡片上，留空使用默认图标。</span></div>
-                <input id="agentCardEmojiInput" class="settings-row__control settings-row__emoji" type="text" maxlength="8" placeholder="🎓" />
+                <div id="agentCardEmojiPickerRoot" class="settings-row__control subject-emoji-picker">
+                  <button id="agentCardEmojiPickerBtn" class="subject-emoji-picker__trigger" type="button" aria-haspopup="dialog" aria-expanded="false" title="选择卡片 Emoji">
+                    <span id="agentCardEmojiPreview" class="subject-emoji-picker__preview" aria-hidden="true">🎓</span>
+                    <span class="subject-emoji-picker__label">选择</span>
+                  </button>
+                  <button id="agentCardEmojiClearBtn" class="subject-emoji-picker__clear hidden" type="button" aria-label="清除卡片 Emoji">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                  </button>
+                  <div id="agentCardEmojiPickerPopover" class="subject-emoji-picker__popover hidden" role="dialog" aria-label="选择卡片 Emoji" aria-hidden="true">
+                    <span class="subject-emoji-picker__arrow" aria-hidden="true"></span>
+                    <emoji-picker id="agentCardEmojiPicker" class="light"></emoji-picker>
+                  </div>
+                  <input id="agentCardEmojiInput" type="hidden" />
+                </div>
               </div>
               <div class="settings-row">
                 <div class="settings-row__main"><strong>模型</strong><span>当前学科优先使用的聊天模型。</span></div>
@@ -1120,6 +1133,7 @@
   <script src="../../vendor/anime.min.js"></script>
   <script src="../../vendor/three.min.js"></script>
   <script src="../../vendor/morphdom.min.js"></script>
+  <script type="module" src="../../vendor/emoji-picker-element.bundle.js"></script>
   <script src="../modules/renderer/ui-helpers.js"></script>
   <script src="../Promptmodules/original-prompt-module.js"></script>
   <script type="module" src="../modules/renderer/pretext.bundle.js"></script>

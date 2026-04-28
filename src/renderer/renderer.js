@@ -841,6 +841,7 @@ async function populateAgentForm(config) {
     el.agentNameInput.value = config.name || '';
     if (el.agentCardEmojiInput) {
         el.agentCardEmojiInput.value = config.cardEmoji || '';
+        el.agentCardEmojiInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     revokeAgentAvatarPreviewObjectUrl();
     el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';

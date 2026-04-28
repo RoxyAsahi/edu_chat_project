@@ -482,7 +482,7 @@ test('overview subject cards open subject management from the right-click menu',
         openSubjectSettingsPanel: (trigger, options = {}) => {
             subjectPanelCalls.push({
                 triggerText: trigger?.textContent || '',
-                anchorRect: options.anchorRect || null,
+                optionKeys: Object.keys(options),
             });
         },
     });
@@ -508,12 +508,7 @@ test('overview subject cards open subject management from the right-click menu',
     assert.deepEqual(settingsCalls, []);
     assert.equal(subjectPanelCalls.length, 1);
     assert.match(subjectPanelCalls[0].triggerText, /学科管理/);
-    assert.deepEqual(subjectPanelCalls[0].anchorRect, {
-        left: 80,
-        right: 80,
-        top: 90,
-        bottom: 90,
-    });
+    assert.deepEqual(subjectPanelCalls[0].optionKeys, []);
     assert.equal(harness.state.session.currentSelectedItem.id, 'math');
 });
 

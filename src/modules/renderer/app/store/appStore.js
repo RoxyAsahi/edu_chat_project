@@ -82,7 +82,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     enableWideChatLayout: true,
     enableSmoothStreaming: true,
     chatFontPreset: 'system',
-    chatCodeFontPreset: 'consolas',
+    chatCodeFontPreset: 'cascadia',
     chatBubbleMaxWidthWideDefault: 92,
     layoutLeftWidth: 410,
     layoutRightWidth: 400,

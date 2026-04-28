@@ -73,7 +73,7 @@ function createDom() {
           <input id="enableEmoticonPromptInput" type="checkbox" />
           <input id="enableAdaptiveBubbleTipInput" type="checkbox" />
           <select id="chatFontPreset"><option value="system">system</option></select>
-          <select id="chatCodeFontPreset"><option value="consolas">consolas</option></select>
+          <select id="chatCodeFontPreset"><option value="cascadia">cascadia</option></select>
           <input id="chatBubbleMaxWidthWideDefault" />
           <input id="enableAgentBubbleTheme" type="checkbox" />
           <textarea id="agentBubbleThemePrompt"></textarea>
@@ -130,7 +130,15 @@ function createDom() {
 
           <input id="editingAgentId" />
           <input id="agentNameInput" />
-          <input id="agentCardEmojiInput" />
+          <div id="agentCardEmojiPickerRoot">
+            <button id="agentCardEmojiPickerBtn" type="button" aria-expanded="false">emoji</button>
+            <span id="agentCardEmojiPreview"></span>
+            <button id="agentCardEmojiClearBtn" type="button">clear</button>
+            <div id="agentCardEmojiPickerPopover" class="hidden" aria-hidden="true">
+              <div id="agentCardEmojiPicker"></div>
+            </div>
+            <input id="agentCardEmojiInput" />
+          </div>
           <img id="agentAvatarPreview" />
           <input id="agentAvatarInput" type="file" />
           <input id="agentModel" />
@@ -231,6 +239,12 @@ function createElementMap(documentObj) {
         editingAgentId: documentObj.getElementById('editingAgentId'),
         agentNameInput: documentObj.getElementById('agentNameInput'),
         agentCardEmojiInput: documentObj.getElementById('agentCardEmojiInput'),
+        agentCardEmojiPickerRoot: documentObj.getElementById('agentCardEmojiPickerRoot'),
+        agentCardEmojiPickerBtn: documentObj.getElementById('agentCardEmojiPickerBtn'),
+        agentCardEmojiPreview: documentObj.getElementById('agentCardEmojiPreview'),
+        agentCardEmojiClearBtn: documentObj.getElementById('agentCardEmojiClearBtn'),
+        agentCardEmojiPickerPopover: documentObj.getElementById('agentCardEmojiPickerPopover'),
+        agentCardEmojiPicker: documentObj.getElementById('agentCardEmojiPicker'),
         agentAvatarPreview: documentObj.getElementById('agentAvatarPreview'),
         agentAvatarInput: documentObj.getElementById('agentAvatarInput'),
         agentModel: documentObj.getElementById('agentModel'),
@@ -292,6 +306,8 @@ test('current subject settings button opens the standalone subject panel', async
     assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), false);
     assert.equal(el.subjectSettingsPanel.getAttribute('aria-hidden'), 'false');
     assert.equal(documentObj.body.classList.contains('subject-settings-panel-open'), true);
+    assert.equal(el.subjectSettingsPanel.classList.contains('subject-settings-panel--anchored'), false);
+    assert.equal(el.subjectSettingsPanelDialog.getAttribute('style'), null);
     assert.equal(el.agentSettingsContainer.classList.contains('hidden'), false);
     assert.equal(el.selectAgentPromptForSettings.classList.contains('hidden'), true);
 
@@ -341,6 +357,100 @@ test('current subject settings button warns when no subject is selected', async 
 
     assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), true);
     assert.deepEqual(toasts, [{ message: '请先选择一个学科。', type: 'warning' }]);
+});
+
+test('subject card emoji picker syncs selection, clearing, and save payload', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+    const configureCalls = [];
+    dom.window.UniStudyEmojiPicker = {
+        configure(picker, options) {
+            configureCalls.push({ picker, options });
+        },
+    };
+
+    const savedPatches = [];
+    const controller = createSettingsController({
+        store: createStore(),
+        el,
+        chatAPI: {
+            saveAgentConfig(agentId, patch) {
+                savedPatches.push({ agentId, patch });
+                return Promise.resolve({ success: true });
+            },
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+        getCurrentSelectedItem: () => ({ id: 'agent-1', name: '数学' }),
+        resolvePromptText: async () => 'Prompt text',
+        reloadSelectedAgent: async () => {},
+    });
+
+    el.agentNameInput.value = '数学';
+    el.agentModel.value = 'qwen-plus';
+    controller.bindEvents();
+
+    assert.equal(el.agentCardEmojiPreview.textContent, '🎓');
+    assert.equal(el.agentCardEmojiClearBtn.classList.contains('hidden'), true);
+
+    el.agentCardEmojiPickerBtn.click();
+
+    assert.equal(el.agentCardEmojiPickerPopover.classList.contains('hidden'), false);
+    assert.equal(el.agentCardEmojiPickerPopover.getAttribute('aria-hidden'), 'false');
+    assert.equal(el.agentCardEmojiPickerBtn.getAttribute('aria-expanded'), 'true');
+    assert.equal(configureCalls.length, 1);
+
+    el.agentCardEmojiPicker.dispatchEvent(new dom.window.CustomEvent('emoji-click', {
+        bubbles: true,
+        detail: { unicode: '🧪' },
+    }));
+
+    assert.equal(el.agentCardEmojiInput.value, '🧪');
+    assert.equal(el.agentCardEmojiPreview.textContent, '🧪');
+    assert.equal(el.agentCardEmojiClearBtn.classList.contains('hidden'), false);
+    assert.equal(el.agentCardEmojiPickerPopover.classList.contains('hidden'), true);
+
+    await controller.saveAgentSettings();
+
+    assert.deepEqual(savedPatches.at(-1), {
+        agentId: 'agent-1',
+        patch: {
+            name: '数学',
+            model: 'qwen-plus',
+            cardEmoji: '🧪',
+            promptMode: 'original',
+            originalSystemPrompt: 'Prompt text',
+            systemPrompt: 'Prompt text',
+        },
+    });
+
+    el.agentCardEmojiClearBtn.click();
+    assert.equal(el.agentCardEmojiInput.value, '');
+    assert.equal(el.agentCardEmojiPreview.textContent, '🎓');
+    assert.equal(el.agentCardEmojiClearBtn.classList.contains('hidden'), true);
+
+    await controller.saveAgentSettings();
+
+    assert.equal(savedPatches.at(-1).patch.cardEmoji, '');
 });
 
 async function addModelThroughWorkbench(el, dom, modelId, modelName = modelId) {
