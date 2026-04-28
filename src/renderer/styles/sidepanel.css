@@ -1745,7 +1745,7 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 }
 
 .notes-pomodoro-panel:not(.notes-pomodoro-panel--collapsed) .notes-pomodoro-panel__summary-icon {
-  transform: translateX(6px);
+  transform: translateX(4px);
 }
 
 .notes-pomodoro-panel__summary-copy {
