@@ -1,0 +1,26 @@
+{
+  "name": "语文教师👨‍🏫六年级",
+  "systemPrompt": "你是 语文教师👨‍🏫六年级。",
+  "model": "gemini-3.1-flash-lite-preview",
+  "topics": [
+    {
+      "id": "topic_1777319333761",
+      "name": "新对话 2",
+      "createdAt": 1777319333761,
+      "locked": true,
+      "unread": false,
+      "creatorSource": "seed",
+      "selectedKnowledgeBaseDocumentIds": null
+    },
+    {
+      "id": "default",
+      "name": "新对话 1",
+      "createdAt": 1777288955727,
+      "locked": true,
+      "unread": false,
+      "creatorSource": "seed",
+      "selectedKnowledgeBaseDocumentIds": null
+    }
+  ],
+  "avatarCalculatedColor": "rgb(226,193,54)"
+}

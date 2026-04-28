@@ -1073,6 +1073,7 @@ function createSettingsController(deps = {}) {
     const isElementNode = (node) => Boolean(HTMLElementCtor && node instanceof HTMLElementCtor);
     let settingsModalTrigger = null;
     let subjectSettingsPanelTrigger = null;
+    let isAgentEmojiPickerConfigured = false;
     let settingsPageReturnView = 'overview';
     let globalSettingsSaveTimer = null;
     let isSyncingGlobalSettingsForm = false;
@@ -2466,13 +2467,14 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         const chatFonts = {
             system: '"Segoe UI", "PingFang SC", sans-serif',
             serif: 'Georgia, "Noto Serif SC", serif',
+            cascadia: '"Cascadia Code", "Consolas", monospace',
             monospace: '"Cascadia Code", "Consolas", monospace',
             consolas: '"Cascadia Code", "Consolas", monospace',
         };
 
         documentObj.documentElement.style.setProperty('--unistudy-chat-max-width', `${Number(settings.chatBubbleMaxWidthWideDefault || 92)}%`);
         documentObj.documentElement.style.setProperty('--unistudy-chat-font', chatFonts[settings.chatFontPreset] || chatFonts.system);
-        documentObj.documentElement.style.setProperty('--unistudy-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.consolas);
+        documentObj.documentElement.style.setProperty('--unistudy-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.cascadia);
     }
 
     function syncPromptTextareaState(node, enabled) {
@@ -3105,7 +3107,9 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             el.enableAdaptiveBubbleTipInput.checked = settings.enableAdaptiveBubbleTip !== false;
         }
         el.chatFontPreset.value = settings.chatFontPreset || 'system';
-        el.chatCodeFontPreset.value = settings.chatCodeFontPreset || 'consolas';
+        el.chatCodeFontPreset.value = settings.chatCodeFontPreset === 'consolas'
+            ? 'cascadia'
+            : (settings.chatCodeFontPreset || 'cascadia');
         el.chatBubbleMaxWidthWideDefault.value = settings.chatBubbleMaxWidthWideDefault ?? 92;
         el.enableAgentBubbleTheme.checked = settings.enableAgentBubbleTheme === true;
         const storedBubbleThemePrompt = typeof settings.agentBubbleThemePrompt === 'string'
@@ -3438,51 +3442,94 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         settingsModalTrigger = null;
     }
 
-    function resetSubjectSettingsPanelPosition() {
-        const dialog = el.subjectSettingsPanelDialog;
-        el.subjectSettingsPanel?.classList.remove('subject-settings-panel--anchored');
-        if (!dialog) {
+    function configureAgentEmojiPicker() {
+        const picker = el.agentCardEmojiPicker;
+        if (!picker) {
             return;
         }
-        dialog.style.left = '';
-        dialog.style.top = '';
-        dialog.style.right = '';
-        dialog.style.bottom = '';
-        dialog.style.transform = '';
+        picker.classList.toggle('dark', documentObj.body.classList.contains('dark-theme'));
+        picker.classList.toggle('light', !documentObj.body.classList.contains('dark-theme'));
+        if (isAgentEmojiPickerConfigured) {
+            return;
+        }
+        windowObj.UniStudyEmojiPicker?.configure?.(picker, {
+            locale: windowObj.navigator?.language || 'zh-CN',
+        });
+        isAgentEmojiPickerConfigured = true;
     }
 
-    function positionSubjectSettingsPanel(anchorRect = null) {
-        const panel = el.subjectSettingsPanel;
-        const dialog = el.subjectSettingsPanelDialog;
-        const viewportWidth = windowObj.innerWidth || documentObj.documentElement?.clientWidth || 0;
-        const viewportHeight = windowObj.innerHeight || documentObj.documentElement?.clientHeight || 0;
-        if (!panel || !dialog || !anchorRect || viewportWidth < 760) {
-            resetSubjectSettingsPanelPosition();
+    function isAgentEmojiPickerOpen() {
+        return Boolean(el.agentCardEmojiPickerPopover && !el.agentCardEmojiPickerPopover.classList.contains('hidden'));
+    }
+
+    function syncAgentCardEmojiPicker() {
+        const input = el.agentCardEmojiInput;
+        const preview = el.agentCardEmojiPreview;
+        const clearBtn = el.agentCardEmojiClearBtn;
+        const trigger = el.agentCardEmojiPickerBtn;
+        const value = normalizeAgentCardEmoji(input?.value || '');
+        if (input && input.value !== value) {
+            input.value = value;
+        }
+        if (preview) {
+            preview.textContent = value || '🎓';
+        }
+        clearBtn?.classList.toggle('hidden', !value);
+        trigger?.classList.toggle('subject-emoji-picker__trigger--empty', !value);
+        if (trigger) {
+            trigger.title = value ? `当前卡片 Emoji：${value}` : '选择卡片 Emoji';
+        }
+    }
+
+    function closeAgentEmojiPicker(options = {}) {
+        el.agentCardEmojiPickerPopover?.classList.add('hidden');
+        el.agentCardEmojiPickerPopover?.setAttribute('aria-hidden', 'true');
+        el.agentCardEmojiPickerBtn?.setAttribute('aria-expanded', 'false');
+        if (options.restoreFocus !== false) {
+            el.agentCardEmojiPickerBtn?.focus?.();
+        }
+    }
+
+    function openAgentEmojiPicker() {
+        configureAgentEmojiPicker();
+        syncAgentCardEmojiPicker();
+        el.agentCardEmojiPickerPopover?.classList.remove('hidden');
+        el.agentCardEmojiPickerPopover?.setAttribute('aria-hidden', 'false');
+        el.agentCardEmojiPickerBtn?.setAttribute('aria-expanded', 'true');
+        el.agentCardEmojiPicker?.focus?.();
+    }
+
+    function toggleAgentEmojiPicker() {
+        if (isAgentEmojiPickerOpen()) {
+            closeAgentEmojiPicker();
             return;
         }
+        openAgentEmojiPicker();
+    }
 
-        panel.classList.add('subject-settings-panel--anchored');
-        const gap = 12;
-        const margin = 12;
-        const dialogRect = dialog.getBoundingClientRect();
-        const dialogWidth = dialogRect.width || Math.min(720, Math.max(320, viewportWidth - margin * 2));
-        const dialogHeight = dialogRect.height || Math.min(720, Math.max(320, viewportHeight - margin * 2));
-        let left = anchorRect.right + gap;
-        if (left + dialogWidth > viewportWidth - margin) {
-            left = anchorRect.left - dialogWidth - gap;
+    function setAgentCardEmoji(value) {
+        if (el.agentCardEmojiInput) {
+            el.agentCardEmojiInput.value = normalizeAgentCardEmoji(value);
         }
-        left = Math.max(margin, Math.min(left, viewportWidth - dialogWidth - margin));
-        const preferredTop = anchorRect.top - 18;
-        const top = Math.max(margin, Math.min(preferredTop, viewportHeight - dialogHeight - margin));
+        syncAgentCardEmojiPicker();
+    }
 
-        dialog.style.left = `${left}px`;
-        dialog.style.top = `${top}px`;
-        dialog.style.right = 'auto';
-        dialog.style.bottom = 'auto';
-        dialog.style.transform = 'none';
+    function getEmojiFromPickerEvent(event) {
+        const detail = event?.detail || {};
+        if (typeof detail.unicode === 'string' && detail.unicode) {
+            return detail.unicode;
+        }
+        if (typeof detail.emoji === 'string' && detail.emoji) {
+            return detail.emoji;
+        }
+        if (typeof detail.emoji?.unicode === 'string' && detail.emoji.unicode) {
+            return detail.emoji.unicode;
+        }
+        return '';
     }
 
     function openSubjectSettingsPanel(trigger = null, options = {}) {
+        void options;
         const currentSelectedItem = getCurrentSelectedItem();
         if (!currentSelectedItem?.id) {
             ui.showToastNotification?.('请先选择一个学科。', 'warning');
@@ -3496,16 +3543,16 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             subjectSettingsPanelTrigger = trigger;
         }
         setPromptVisible(true);
+        syncAgentCardEmojiPicker();
         el.subjectSettingsPanel?.classList.remove('hidden');
         el.subjectSettingsPanel?.setAttribute('aria-hidden', 'false');
         documentObj.body.classList.add('subject-settings-panel-open');
-        positionSubjectSettingsPanel(options.anchorRect || null);
         el.subjectSettingsPanelCloseBtn?.focus?.();
         return true;
     }
 
     function closeSubjectSettingsPanel(options = {}) {
-        resetSubjectSettingsPanelPosition();
+        closeAgentEmojiPicker({ restoreFocus: false });
         el.subjectSettingsPanel?.classList.add('hidden');
         el.subjectSettingsPanel?.setAttribute('aria-hidden', 'true');
         documentObj.body.classList.remove('subject-settings-panel-open');
@@ -3584,6 +3631,25 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         el.settingsModalBackdrop?.addEventListener('click', closeSettingsModal);
         el.subjectSettingsPanelCloseBtn?.addEventListener('click', () => closeSubjectSettingsPanel());
         el.subjectSettingsPanelBackdrop?.addEventListener('click', () => closeSubjectSettingsPanel());
+        el.agentCardEmojiPickerBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            toggleAgentEmojiPicker();
+        });
+        el.agentCardEmojiClearBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            setAgentCardEmoji('');
+            closeAgentEmojiPicker({ restoreFocus: false });
+        });
+        el.agentCardEmojiInput?.addEventListener('input', syncAgentCardEmojiPicker);
+        el.agentCardEmojiPicker?.addEventListener('emoji-click', (event) => {
+            event.stopPropagation();
+            const emoji = getEmojiFromPickerEvent(event);
+            if (!emoji) {
+                return;
+            }
+            setAgentCardEmoji(emoji);
+            closeAgentEmojiPicker();
+        });
         el.settingsNavButtons?.forEach((button) => {
             button.addEventListener('click', () => {
                 switchSettingsModalSection(button.dataset.settingsSectionButton || 'global');
@@ -3595,21 +3661,27 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         el.saveAgentSettingsBtn?.addEventListener('click', () => {
             void saveAgentSettings();
         });
+        syncAgentCardEmojiPicker();
 
         windowObj.addEventListener?.('resize', () => {
-            closeSubjectSettingsPanel({ restoreFocus: false });
+            closeAgentEmojiPicker({ restoreFocus: false });
         });
-        documentObj.addEventListener?.('scroll', (event) => {
-            if (el.subjectSettingsPanel?.classList.contains('hidden')) {
+        documentObj.addEventListener?.('click', (event) => {
+            if (!isAgentEmojiPickerOpen()) {
                 return;
             }
-            if (event.target instanceof windowObj.Node && el.subjectSettingsPanel?.contains(event.target)) {
+            const target = event.target;
+            if (target instanceof windowObj.Node && el.agentCardEmojiPickerRoot?.contains(target)) {
                 return;
             }
-            closeSubjectSettingsPanel({ restoreFocus: false });
-        }, true);
+            closeAgentEmojiPicker({ restoreFocus: false });
+        });
         documentObj.addEventListener?.('keydown', (event) => {
             if (event.key === 'Escape') {
+                if (isAgentEmojiPickerOpen()) {
+                    closeAgentEmojiPicker();
+                    return;
+                }
                 closeSubjectSettingsPanel();
             }
         });

@@ -149,7 +149,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     chatBubbleMaxWidthWideNarrow: 92,
     chatFontPreset: 'system',
     chatFontCustom: '',
-    chatCodeFontPreset: 'consolas',
+    chatCodeFontPreset: 'cascadia',
     chatCodeFontCustom: '',
     chatDiaryFontPreset: 'serif',
     chatDiaryFontCustom: '',

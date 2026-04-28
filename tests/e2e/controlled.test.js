@@ -122,6 +122,21 @@ async function waitForReloadIncrement(app, previousCount, timeoutMs = 15000) {
     throw new Error('Timed out waiting for a reload shortcut to trigger navigation.');
 }
 
+async function waitForDevToolsOpen(app, timeoutMs = 15000) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+        const devToolsOpen = await app.evaluate(({ BrowserWindow }) => {
+            const win = BrowserWindow.getAllWindows()[0];
+            return win?.webContents.isDevToolsOpened() || false;
+        });
+        if (devToolsOpen) {
+            return true;
+        }
+        await delay(250);
+    }
+    throw new Error('Timed out waiting for the DevTools shortcut to open DevTools.');
+}
+
 async function triggerShortcut(app, keyCode, modifiers = []) {
     await app.evaluate(({ BrowserWindow }, payload) => {
         const win = BrowserWindow.getAllWindows()[0];
@@ -175,12 +190,7 @@ test('controlled Electron E2E covers shortcuts, viewer flow, topic KB binding, a
         await delay(500);
 
         await triggerShortcut(app, 'I', [commandOrControl, 'shift']);
-        await delay(1000);
-
-        const devToolsOpen = await app.evaluate(({ BrowserWindow }) => {
-            const win = BrowserWindow.getAllWindows()[0];
-            return win?.webContents.isDevToolsOpened() || false;
-        });
+        const devToolsOpen = await waitForDevToolsOpen(app);
         assert.equal(devToolsOpen, true);
 
         const bindingResult = await page.evaluate(async () => {
@@ -208,6 +218,7 @@ test('controlled Electron E2E covers shortcuts, viewer flow, topic KB binding, a
         assert.deepEqual(bindingResult.readback, {
             success: true,
             knowledgeBaseId: bindingResult.kbId,
+            selectedKnowledgeBaseDocumentIds: null,
         });
         assert.deepEqual(bindingResult.invalidWatcher, {
             success: false,

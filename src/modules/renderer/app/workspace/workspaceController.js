@@ -574,15 +574,14 @@ function createWorkspaceController(deps = {}) {
         return agent?.name || agent?.id || agentId || '未命名学科';
     }
 
-    async function editAgentById(agentId, trigger = null, options = {}) {
+    async function editAgentById(agentId, trigger = null) {
         if (!agentId) {
             return;
         }
 
-        const anchorRect = options.anchorRect || (trigger?.getBoundingClientRect?.() || null);
         closeSubjectActionMenu();
         await selectAgent(agentId, { showSubjectWorkspace: false });
-        openSubjectSettingsPanel(trigger, { anchorRect });
+        openSubjectSettingsPanel(trigger);
     }
 
     function renderSubjectActionMenu() {
@@ -621,9 +620,7 @@ function createWorkspaceController(deps = {}) {
                 event.stopPropagation();
                 const action = button.dataset.subjectAction;
                 if (action === 'manage') {
-                    await editAgentById(agentId, button, {
-                        anchorRect: activeSubjectActionMenu.anchorRect,
-                    });
+                    await editAgentById(agentId, button);
                 } else if (action === 'delete') {
                     closeSubjectActionMenu();
                     await deleteAgentById(agentId, { agentName });

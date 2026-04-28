@@ -92,10 +92,12 @@ const modelUsageTracker = require('../modules/main/modelUsageTracker');
 const SettingsManager = require('../modules/main/utils/appSettingsManager');
 const AgentConfigManager = require('../modules/main/utils/agentConfigManager');
 const { resolveDataRootPaths } = require('../modules/main/utils/dataRootResolver');
+const { seedDefaultDataRoot } = require('../modules/main/utils/defaultDataSeeder');
 const { PRELOAD_ROLES, resolveProjectPreload } = require('../modules/main/services/preloadPaths');
 
 const SRC_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(SRC_ROOT, '..');
+const DEFAULT_DATA_SEED_ROOT = path.join(SRC_ROOT, 'seed', 'default-data-root');
 let DATA_ROOT_PATHS = null;
 let DATA_ROOT = null;
 let AGENT_DIR = null;
@@ -191,7 +193,14 @@ const fileWatcher = {
 async function bootstrapIndependentDataRoot() {
     ensureDataRootPaths();
     await fs.ensureDir(DATA_ROOT);
+    const seedResult = await seedDefaultDataRoot({
+        dataRoot: DATA_ROOT,
+        seedRoot: DEFAULT_DATA_SEED_ROOT,
+    });
     console.log(`[UniStudyBootstrap] Data root: ${DATA_ROOT}`);
+    if (seedResult.copiedFiles > 0) {
+        console.log(`[UniStudyBootstrap] Seeded ${seedResult.copiedFiles} default data file(s).`);
+    }
     if (DATA_ROOT_PATHS.source === 'env-override') {
         console.log('[UniStudyBootstrap] Using UNISTUDY_DATA_ROOT override.');
     } else {
