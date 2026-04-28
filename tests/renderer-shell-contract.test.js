@@ -61,6 +61,25 @@ test('renderer shell uses the app logo as the subject avatar fallback', async ()
     assert.equal(preview?.getAttribute('src'), '../assets/brand-logo.png');
 });
 
+test('renderer shell keeps the subject settings modal close action and soft backdrop contract', async () => {
+    const { html, document } = await loadRendererShell();
+    const sidepanelCssPath = path.resolve(__dirname, '../src/renderer/styles/sidepanel.css');
+    const css = await fs.readFile(sidepanelCssPath, 'utf8');
+
+    assert.equal(document.getElementById('subjectSettingsPanelCloseBtn')?.hasAttribute('data-subject-settings-close'), true);
+    assert.equal(document.getElementById('subjectSettingsPanelCloseBtn')?.getAttribute('onpointerdown'), 'window.__unistudyCloseSubjectSettingsPanel?.(event)');
+    assert.equal(document.getElementById('subjectSettingsPanelCloseBtn')?.getAttribute('onclick'), 'window.__unistudyCloseSubjectSettingsPanel?.(event)');
+    assert.equal(html.includes('window.__unistudyCloseSubjectSettingsPanel'), true);
+    assert.match(css, /\.subject-settings-panel__backdrop\s*\{[\s\S]*background:\s*rgba\(248,\s*250,\s*252,\s*0\.42\);/);
+    assert.match(css, /\.subject-settings-panel__backdrop\s*\{[\s\S]*backdrop-filter:\s*blur\(6px\)\s*saturate\(106%\);/);
+    assert.match(css, /\.subject-settings-panel__dialog\s*\{[\s\S]*z-index:\s*1;/);
+    assert.match(css, /\.subject-settings-panel\s*\{[\s\S]*-webkit-app-region:\s*no-drag;/);
+    assert.match(css, /\.subject-settings-panel,\s*\.subject-settings-panel \*\s*\{[\s\S]*-webkit-app-region:\s*no-drag !important;/);
+    assert.match(css, /\.subject-settings-panel__close\s*\{[\s\S]*position:\s*absolute;[\s\S]*width:\s*40px;[\s\S]*height:\s*40px;/);
+    assert.match(css, /\.subject-settings-panel__close \.material-symbols-outlined\s*\{[\s\S]*pointer-events:\s*none;/);
+    assert.match(css, /body\.dark-theme \.subject-settings-panel__backdrop\s*\{[\s\S]*background:\s*rgba\(15,\s*23,\s*42,\s*0\.42\);/);
+});
+
 test('renderer shell keeps the critical DOM anchors for controller wiring', async () => {
     const { document } = await loadRendererShell();
 

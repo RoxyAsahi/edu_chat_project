@@ -123,7 +123,7 @@ function createDom() {
           <div id="subjectSettingsPanel" class="hidden" aria-hidden="true">
             <div id="subjectSettingsPanelBackdrop"></div>
             <section id="subjectSettingsPanelDialog">
-              <button id="subjectSettingsPanelCloseBtn" type="button">close-subject-settings</button>
+              <button id="subjectSettingsPanelCloseBtn" type="button" data-subject-settings-close><span>close-subject-settings</span></button>
             </section>
           </div>
           <div id="modal-container"></div>
@@ -313,6 +313,108 @@ test('current subject settings button opens the standalone subject panel', async
     assert.equal(el.selectAgentPromptForSettings.classList.contains('hidden'), true);
 
     el.subjectSettingsPanelCloseBtn.click();
+
+    assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), true);
+    assert.equal(el.subjectSettingsPanel.getAttribute('aria-hidden'), 'true');
+});
+
+test('standalone subject panel closes from nested close action targets', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+
+    const controller = createSettingsController({
+        store: createStore(),
+        el,
+        windowObj: dom.window,
+        documentObj,
+        chatAPI: {
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        getCurrentSelectedItem: () => ({ id: 'agent-1', name: '数学' }),
+    });
+
+    controller.bindEvents();
+    el.currentAgentSettingsBtn.click();
+    assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), false);
+
+    el.subjectSettingsPanelCloseBtn.querySelector('span').click();
+
+    assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), true);
+    assert.equal(el.subjectSettingsPanel.getAttribute('aria-hidden'), 'true');
+});
+
+test('standalone subject panel closes when pointerdown lands inside the close button bounds', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+
+    const controller = createSettingsController({
+        store: createStore(),
+        el,
+        chatAPI: {
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+        getCurrentSelectedItem: () => ({ id: 'agent-1', name: '数学' }),
+    });
+
+    controller.bindEvents();
+    el.currentAgentSettingsBtn.click();
+    assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), false);
+
+    el.subjectSettingsPanelCloseBtn.getBoundingClientRect = () => ({
+        left: 20,
+        top: 30,
+        right: 52,
+        bottom: 62,
+        width: 32,
+        height: 32,
+        x: 20,
+        y: 30,
+        toJSON() {
+            return this;
+        },
+    });
+    el.subjectSettingsPanelBackdrop.dispatchEvent(new dom.window.MouseEvent('pointerdown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 36,
+        clientY: 46,
+    }));
 
     assert.equal(el.subjectSettingsPanel.classList.contains('hidden'), true);
     assert.equal(el.subjectSettingsPanel.getAttribute('aria-hidden'), 'true');

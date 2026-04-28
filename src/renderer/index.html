@@ -1039,8 +1039,16 @@
             <p id="selectedAgentNameForSettings" class="settings-caption hidden"></p>
           </div>
         </div>
-        <button id="subjectSettingsPanelCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭学科管理">
-          <span class="material-symbols-outlined">close</span>
+        <button
+          id="subjectSettingsPanelCloseBtn"
+          class="ghost-button icon-btn subject-settings-panel__close"
+          type="button"
+          aria-label="关闭学科管理"
+          data-subject-settings-close
+          onpointerdown="window.__unistudyCloseSubjectSettingsPanel?.(event)"
+          onclick="window.__unistudyCloseSubjectSettingsPanel?.(event)"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
         </button>
       </header>
 
@@ -1114,6 +1122,38 @@
   <input id="hiddenKnowledgeBaseFileInput" type="file" multiple hidden />
   <input id="hiddenTopicKnowledgeBaseFileInput" type="file" multiple hidden />
 
+  <script>
+    (() => {
+      function closeSubjectSettingsPanelFallback(event) {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        event?.stopImmediatePropagation?.();
+        const panel = document.getElementById('subjectSettingsPanel');
+        const emojiPopover = document.getElementById('agentCardEmojiPickerPopover');
+        const emojiButton = document.getElementById('agentCardEmojiPickerBtn');
+        panel?.classList.add('hidden');
+        panel?.setAttribute('aria-hidden', 'true');
+        document.body?.classList.remove('subject-settings-panel-open');
+        emojiPopover?.classList.add('hidden');
+        emojiPopover?.setAttribute('aria-hidden', 'true');
+        emojiButton?.setAttribute('aria-expanded', 'false');
+      }
+
+      window.__unistudyCloseSubjectSettingsPanel = (event) => {
+        if (typeof window.__unistudySubjectSettingsCloseHandler === 'function') {
+          window.__unistudySubjectSettingsCloseHandler(event);
+          return;
+        }
+        closeSubjectSettingsPanelFallback(event);
+      };
+
+      document.addEventListener('click', (event) => {
+        if (event.target instanceof Element && event.target.closest('[data-subject-settings-close]')) {
+          window.__unistudyCloseSubjectSettingsPanel(event);
+        }
+      }, true);
+    })();
+  </script>
   <script src="../../vendor/purify.min.js"></script>
   <script src="../../vendor/marked.min.js"></script>
   <script src="../../vendor/highlight.min.js"></script>

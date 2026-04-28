@@ -3688,6 +3688,44 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         subjectSettingsPanelTrigger = null;
     }
 
+    function handleSubjectSettingsCloseAction(event) {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        event?.stopImmediatePropagation?.();
+        closeSubjectSettingsPanel();
+    }
+
+    function isSubjectSettingsPanelOpen() {
+        return Boolean(el.subjectSettingsPanel && !el.subjectSettingsPanel.classList.contains('hidden'));
+    }
+
+    function isEventInCloseButtonBounds(event) {
+        if (!el.subjectSettingsPanelCloseBtn || typeof event?.clientX !== 'number' || typeof event?.clientY !== 'number') {
+            return false;
+        }
+        const rect = el.subjectSettingsPanelCloseBtn.getBoundingClientRect?.();
+        if (!rect) {
+            return false;
+        }
+        return event.clientX >= rect.left
+            && event.clientX <= rect.right
+            && event.clientY >= rect.top
+            && event.clientY <= rect.bottom;
+    }
+
+    function handleSubjectSettingsClosePointer(event) {
+        if (!isSubjectSettingsPanelOpen()) {
+            return;
+        }
+        const target = event.target;
+        const isCloseAction = target instanceof windowObj.Element
+            && Boolean(target.closest('[data-subject-settings-close]'));
+        if (!isCloseAction && !isEventInCloseButtonBounds(event)) {
+            return;
+        }
+        handleSubjectSettingsCloseAction(event);
+    }
+
     function openToolboxDiaryManager(anchorId = '') {
         openSettingsModal('global', el.globalSettingsBtn || null);
         const target = anchorId ? documentObj.getElementById(anchorId) : null;
@@ -3739,6 +3777,9 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
     }
 
     function bindEvents() {
+        if (windowObj) {
+            windowObj.__unistudySubjectSettingsCloseHandler = handleSubjectSettingsCloseAction;
+        }
         el.currentAgentSettingsBtn?.addEventListener('click', () => {
             openSubjectSettingsPanel(el.currentAgentSettingsBtn);
         });
@@ -3755,8 +3796,17 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         });
         el.settingsModalCloseBtn?.addEventListener('click', closeSettingsModal);
         el.settingsModalBackdrop?.addEventListener('click', closeSettingsModal);
-        el.subjectSettingsPanelCloseBtn?.addEventListener('click', () => closeSubjectSettingsPanel());
+        el.subjectSettingsPanelCloseBtn?.addEventListener('click', handleSubjectSettingsCloseAction);
         el.subjectSettingsPanelBackdrop?.addEventListener('click', () => closeSubjectSettingsPanel());
+        el.subjectSettingsPanel?.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof windowObj.Element)) {
+                return;
+            }
+            if (target.closest('[data-subject-settings-close]')) {
+                handleSubjectSettingsCloseAction(event);
+            }
+        });
         el.agentCardEmojiPickerBtn?.addEventListener('click', (event) => {
             event.stopPropagation();
             void toggleAgentEmojiPicker();
@@ -3803,6 +3853,8 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             }
             closeAgentEmojiPicker({ restoreFocus: false });
         });
+        documentObj.addEventListener?.('pointerdown', handleSubjectSettingsClosePointer, true);
+        documentObj.addEventListener?.('mousedown', handleSubjectSettingsClosePointer, true);
         documentObj.addEventListener?.('keydown', (event) => {
             if (event.key === 'Escape') {
                 if (isAgentEmojiPickerOpen()) {

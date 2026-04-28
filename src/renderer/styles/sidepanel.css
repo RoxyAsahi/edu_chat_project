@@ -264,17 +264,24 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
+  -webkit-app-region: no-drag;
+}
+
+.subject-settings-panel,
+.subject-settings-panel * {
+  -webkit-app-region: no-drag !important;
 }
 
 .subject-settings-panel__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(248, 250, 252, 0.7);
-  backdrop-filter: blur(10px) saturate(110%);
+  background: rgba(248, 250, 252, 0.42);
+  backdrop-filter: blur(6px) saturate(106%);
 }
 
 .subject-settings-panel__dialog {
   position: relative;
+  z-index: 1;
   width: min(820px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   display: flex;
@@ -287,12 +294,29 @@
 }
 
 .subject-settings-panel__header {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 20px;
+  padding: 18px 72px 18px 20px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+}
+
+.subject-settings-panel__close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 6;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  color: color-mix(in srgb, var(--muted) 86%, var(--ink));
+  pointer-events: auto;
+}
+
+.subject-settings-panel__close .material-symbols-outlined {
+  pointer-events: none;
 }
 
 .subject-settings-panel__title-block {
@@ -458,7 +482,7 @@
 }
 
 body.dark-theme .subject-settings-panel__backdrop {
-  background: rgba(15, 23, 42, 0.62);
+  background: rgba(15, 23, 42, 0.42);
 }
 
 body.dark-theme .subject-emoji-picker__popover emoji-picker {
@@ -1668,7 +1692,7 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 .notes-pomodoro-panel {
   margin: 2px 2px 18px;
   width: min(100%, 352px);
-  padding: 10px 18px 12px;
+  padding: 0 0 12px;
   box-sizing: border-box;
   border-radius: 22px;
   background: #f5f7fb;
@@ -1684,8 +1708,8 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 
 .notes-pomodoro-panel__summary {
   width: 100%;
-  min-height: 22px;
-  padding: 0;
+  min-height: 52px;
+  padding: 0 16px;
   border-radius: 999px;
   background: transparent;
   color: #202124;
@@ -1718,6 +1742,10 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   flex: 0 0 auto;
   font-size: 22px;
   color: currentColor;
+}
+
+.notes-pomodoro-panel:not(.notes-pomodoro-panel--collapsed) .notes-pomodoro-panel__summary-icon {
+  transform: translateX(6px);
 }
 
 .notes-pomodoro-panel__summary-copy {
@@ -1760,7 +1788,8 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 0;
+  margin-top: -28px;
+  padding: 0 18px;
 }
 
 .notes-pomodoro-panel__header {
