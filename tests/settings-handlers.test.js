@@ -151,14 +151,17 @@ test('save-settings verifies dedicated task model fields persist correctly', asy
     const saveSettings = handleHandlers.get('save-settings');
     const result = await saveSettings({}, {
         followUpDefaultModel: 'follow-up-model',
+        studyToolDefaultModel: 'study-tool-model',
         topicTitleDefaultModel: 'topic-title-model',
     });
 
     const rawSettings = await fs.readJson(settingsPath);
     assert.equal(result.success, true);
     assert.equal(rawSettings.followUpDefaultModel, 'follow-up-model');
+    assert.equal(rawSettings.studyToolDefaultModel, 'study-tool-model');
     assert.equal(rawSettings.topicTitleDefaultModel, 'topic-title-model');
     assert.equal(result.persistenceCheck.fieldChecks.followUpDefaultModel.matched, true);
+    assert.equal(result.persistenceCheck.fieldChecks.studyToolDefaultModel.matched, true);
     assert.equal(result.persistenceCheck.fieldChecks.topicTitleDefaultModel.matched, true);
     assert.deepEqual(result.persistenceCheck.mismatchedFields, []);
 });

@@ -1,3 +1,5 @@
+import { normalizeSubjectCardEmoji, resolveSubjectCardEmoji } from '../workspace/subjectEmoji.js';
+
 const SETTINGS_MODAL_META = Object.freeze({
     services: {
         title: '模型服务',
@@ -52,22 +54,8 @@ const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
     'Only switch to more structured rendering when it clearly helps comprehension.',
 ].join(' ');
 
-function sliceGraphemes(value, limit = 2) {
-    const source = String(value || '').replace(/\s+/g, '').trim();
-    if (!source) {
-        return '';
-    }
-
-    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-        const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-        return Array.from(segmenter.segment(source), (segment) => segment.segment).slice(0, limit).join('');
-    }
-
-    return Array.from(source).slice(0, limit).join('');
-}
-
 function normalizeAgentCardEmoji(value) {
-    return sliceGraphemes(value, 2);
+    return normalizeSubjectCardEmoji(value);
 }
 
 const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
@@ -107,6 +95,7 @@ const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
 ].join('\n');
 const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
     followUpDefaultModel: '追问默认模型',
+    studyToolDefaultModel: '学习工具默认模型',
     followUpPromptTemplate: '追问提示词模板',
     enableTopicTitleGeneration: '自动命名话题',
     topicTitleDefaultModel: '话题命名默认模型',
@@ -123,6 +112,7 @@ const MODEL_SERVICE_TASK_META = Object.freeze({
     chat: { label: '默认聊天模型', capability: 'chat', description: '普通对话与大部分聊天任务的兜底模型。' },
     chatFallback: { label: '聊天回退模型', capability: 'chat', description: '聊天上游失败时自动切换，覆盖普通聊天、追问、命名、来源指南与图片转写等聊天用途任务。' },
     followUp: { label: '追问模型', capability: 'chat', description: '自动生成追问时优先使用。' },
+    studyTool: { label: '学习工具模型', capability: 'chat', description: '右侧功能区生成选择题、闪卡和深度分析时优先使用。' },
     topicTitle: { label: '话题命名模型', capability: 'chat', description: '首轮回复后的自动命名任务使用。' },
     embedding: { label: 'Embedding 模型', capability: 'embedding', description: '知识库向量化时使用，可独立于聊天 Provider。' },
     rerank: { label: 'Rerank 模型', capability: 'rerank', description: '知识库重排时使用，可独立于聊天 Provider。' },
@@ -143,7 +133,8 @@ const AIP_TEST_PROVIDER_PRESET_ID = 'aip-innovation-practice-test';
 const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
 const AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
 const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
-const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B';
+const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
+const AIP_TEST_AUXILIARY_DEFAULT_MODEL = 'Qwen/Qwen3.5-122B-A10B';
 const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
     {
         id: 'Qwen/Qwen3.6-35B-A3B',
@@ -175,6 +166,36 @@ const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
         group: 'rerank',
         capabilities: { chat: false, embedding: false, rerank: true, vision: true, reasoning: false },
     },
+    {
+        id: 'Qwen/Qwen3.5-4B',
+        name: 'Qwen/Qwen3.5-4B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: false },
+    },
+    {
+        id: 'Qwen/Qwen3.5-35B-A3B',
+        name: 'Qwen/Qwen3.5-35B-A3B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: false },
+    },
+    {
+        id: 'Qwen/Qwen3.5-397B-A17B',
+        name: 'Qwen/Qwen3.5-397B-A17B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
+    },
+    {
+        id: 'deepseek-ai/DeepSeek-V4-Flash',
+        name: 'new-model',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Qwen/Qwen3.5-122B-A10B',
+        name: 'Qwen/Qwen3.5-122B-A10B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: false },
+    },
 ]);
 const MODEL_SERVICE_PRESETS = Object.freeze([
     { presetId: AIP_TEST_PROVIDER_PRESET_ID, name: AIP_TEST_PROVIDER_NAME, apiBaseUrl: AIP_TEST_API_BASE_URL },
@@ -197,6 +218,7 @@ function createDefaultModelService() {
             chat: null,
             chatFallback: null,
             followUp: null,
+            studyTool: null,
             topicTitle: null,
             embedding: null,
             rerank: null,
@@ -556,6 +578,30 @@ function createBuiltInTestModelServiceProvider() {
     });
 }
 
+function createBuiltInTestProviderDefaults(provider = {}) {
+    const refFor = (modelId) => (
+        findModelServiceModel(provider, modelId)
+            ? { providerId: provider.id, modelId }
+            : null
+    );
+    return {
+        chat: refFor(AIP_TEST_DEFAULT_MODEL),
+        chatFallback: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        followUp: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        studyTool: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        topicTitle: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        embedding: refFor('Qwen/Qwen3-VL-Embedding-8B'),
+        rerank: refFor('Qwen/Qwen3-VL-Reranker-8B'),
+    };
+}
+
+function mergeDefaultsPreservingConfigured(fallbackDefaults = {}, configuredDefaults = {}) {
+    return Object.keys(MODEL_SERVICE_TASK_META).reduce((acc, key) => {
+        acc[key] = configuredDefaults?.[key] || fallbackDefaults?.[key] || null;
+        return acc;
+    }, {});
+}
+
 function ensureBuiltInTestProvider(service = {}) {
     const normalizedService = normalizeModelService(service);
     if (!Array.isArray(normalizedService.providers) || normalizedService.providers.length === 0) {
@@ -597,9 +643,18 @@ function ensureBuiltInTestProvider(service = {}) {
         ]),
     });
 
-    return normalizeModelService({
+    const serviceWithProvider = normalizeModelService({
         ...normalizedService,
         providers,
+    });
+    const currentBuiltInProvider = serviceWithProvider.providers[existingIndex];
+
+    return normalizeModelService({
+        ...serviceWithProvider,
+        defaults: mergeDefaultsPreservingConfigured(
+            createBuiltInTestProviderDefaults(currentBuiltInProvider),
+            serviceWithProvider.defaults
+        ),
     });
 }
 
@@ -669,6 +724,7 @@ function buildModelServiceMirror(service = {}, currentSettings = {}) {
     const normalizedService = normalizeModelService(service);
     const chatDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.chat);
     const followUpDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.followUp) || chatDefault;
+    const studyToolDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.studyTool) || chatDefault;
     const topicTitleDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.topicTitle) || chatDefault;
     const embeddingDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.embedding);
     const rerankDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.rerank);
@@ -679,6 +735,7 @@ function buildModelServiceMirror(service = {}, currentSettings = {}) {
         chatApiKey: chatDefault ? String(chatDefault.provider.apiKeys?.[0] || '') : '',
         defaultModel: chatDefault?.model?.id || '',
         followUpDefaultModel: followUpDefault?.model?.id || '',
+        studyToolDefaultModel: studyToolDefault?.model?.id || '',
         topicTitleDefaultModel: topicTitleDefault?.model?.id || '',
         kbBaseUrl: kbDefault?.provider?.apiBaseUrl || normalizeModelServiceBaseUrl(currentSettings.kbBaseUrl || ''),
         kbApiKey: kbDefault ? String(kbDefault.provider.apiKeys?.[0] || '') : '',
@@ -780,6 +837,7 @@ function buildBootstrapModelService(settings = {}) {
     const chatModels = [
         settings.defaultModel,
         settings.followUpDefaultModel,
+        settings.studyToolDefaultModel,
         settings.topicTitleDefaultModel,
         settings.lastModel,
         settings.guideModel,
@@ -890,6 +948,9 @@ function buildBootstrapModelService(settings = {}) {
         : null;
     service.defaults.followUp = primaryProvider && normalizeModelServiceText(settings.followUpDefaultModel)
         ? { providerId: primaryProvider.id, modelId: settings.followUpDefaultModel }
+        : null;
+    service.defaults.studyTool = primaryProvider && normalizeModelServiceText(settings.studyToolDefaultModel)
+        ? { providerId: primaryProvider.id, modelId: settings.studyToolDefaultModel }
         : null;
     service.defaults.topicTitle = primaryProvider && normalizeModelServiceText(settings.topicTitleDefaultModel)
         ? { providerId: primaryProvider.id, modelId: settings.topicTitleDefaultModel }
@@ -1074,6 +1135,7 @@ function createSettingsController(deps = {}) {
     let settingsModalTrigger = null;
     let subjectSettingsPanelTrigger = null;
     let isAgentEmojiPickerConfigured = false;
+    let agentEmojiPickerConfigurePromise = null;
     let settingsPageReturnView = 'overview';
     let globalSettingsSaveTimer = null;
     let isSyncingGlobalSettingsForm = false;
@@ -1133,6 +1195,7 @@ function createSettingsController(deps = {}) {
         if (el.kbRerankModel) el.kbRerankModel.value = mirrors.kbRerankModel || '';
         if (el.defaultModelInput) el.defaultModelInput.value = mirrors.defaultModel || '';
         if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = mirrors.followUpDefaultModel || '';
+        if (el.studyToolDefaultModelInput) el.studyToolDefaultModelInput.value = mirrors.studyToolDefaultModel || '';
         if (el.topicTitleDefaultModelInput) el.topicTitleDefaultModelInput.value = mirrors.topicTitleDefaultModel || '';
     }
 
@@ -3070,6 +3133,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         el.userNameInput.value = settings.userName || '';
         if (el.defaultModelInput) el.defaultModelInput.value = settings.defaultModel || '';
         if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = settings.followUpDefaultModel || '';
+        if (el.studyToolDefaultModelInput) el.studyToolDefaultModelInput.value = settings.studyToolDefaultModel || '';
         if (el.topicTitleDefaultModelInput) el.topicTitleDefaultModelInput.value = settings.topicTitleDefaultModel || '';
         if (el.studentNameInput) el.studentNameInput.value = settings.studyProfile?.studentName || '';
         if (el.studyCityInput) el.studyCityInput.value = settings.studyProfile?.city || '';
@@ -3229,6 +3293,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             modelService,
             defaultModel: modelServiceMirror.defaultModel || '',
             followUpDefaultModel: modelServiceMirror.followUpDefaultModel || '',
+            studyToolDefaultModel: modelServiceMirror.studyToolDefaultModel || '',
             topicTitleDefaultModel: modelServiceMirror.topicTitleDefaultModel || '',
             studyProfile: {
                 studentName: el.studentNameInput?.value.trim() || '',
@@ -3442,20 +3507,80 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         settingsModalTrigger = null;
     }
 
-    function configureAgentEmojiPicker() {
+    function getCurrentAgentEmojiFallbackContext() {
+        const currentSelectedItem = getCurrentSelectedItem() || {};
+        const session = store.getState().session || {};
+        const agents = Array.isArray(session.agents) ? session.agents : [];
+        const agentIndex = agents.findIndex((agent) => agent?.id === currentSelectedItem.id);
+        const listAgent = agentIndex >= 0 ? agents[agentIndex] : {};
+        const config = currentSelectedItem.config || {};
+        const nameFromInput = el.agentNameInput?.value?.trim?.() || '';
+
+        return {
+            agent: {
+                ...listAgent,
+                ...config,
+                id: currentSelectedItem.id || config.id || listAgent.id,
+                name: nameFromInput || config.name || currentSelectedItem.name || listAgent.name || currentSelectedItem.id || '',
+                cardEmoji: normalizeAgentCardEmoji(el.agentCardEmojiInput?.value || ''),
+            },
+            index: agentIndex >= 0 ? agentIndex : 0,
+        };
+    }
+
+    function resolveCurrentAgentEmojiPreview(value) {
+        const normalizedValue = normalizeAgentCardEmoji(value);
+        if (normalizedValue) {
+            return normalizedValue;
+        }
+
+        return resolveSubjectCardEmoji(getCurrentAgentEmojiFallbackContext());
+    }
+
+    async function configureAgentEmojiPicker() {
         const picker = el.agentCardEmojiPicker;
         if (!picker) {
-            return;
+            return false;
         }
         picker.classList.toggle('dark', documentObj.body.classList.contains('dark-theme'));
         picker.classList.toggle('light', !documentObj.body.classList.contains('dark-theme'));
         if (isAgentEmojiPickerConfigured) {
-            return;
+            return true;
         }
-        windowObj.UniStudyEmojiPicker?.configure?.(picker, {
-            locale: windowObj.navigator?.language || 'zh-CN',
-        });
-        isAgentEmojiPickerConfigured = true;
+
+        const applyConfig = () => {
+            const configure = windowObj.UniStudyEmojiPicker?.configure;
+            if (typeof configure !== 'function') {
+                return false;
+            }
+            configure(picker, {
+                locale: windowObj.navigator?.language || 'zh-CN',
+            });
+            isAgentEmojiPickerConfigured = true;
+            return true;
+        };
+
+        if (applyConfig()) {
+            return true;
+        }
+
+        if (!agentEmojiPickerConfigurePromise) {
+            agentEmojiPickerConfigurePromise = Promise.resolve()
+                .then(() => windowObj.customElements?.whenDefined?.('emoji-picker'))
+                .then(() => new Promise((resolve) => {
+                    windowObj.requestAnimationFrame?.(() => resolve()) || windowObj.setTimeout?.(resolve, 0) || resolve();
+                }))
+                .then(() => applyConfig())
+                .catch((error) => {
+                    console.error('[UniStudyEmojiPicker] Failed to configure picker:', error);
+                    return false;
+                })
+                .finally(() => {
+                    agentEmojiPickerConfigurePromise = null;
+                });
+        }
+
+        return agentEmojiPickerConfigurePromise;
     }
 
     function isAgentEmojiPickerOpen() {
@@ -3472,12 +3597,13 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             input.value = value;
         }
         if (preview) {
-            preview.textContent = value || '🎓';
+            preview.textContent = resolveCurrentAgentEmojiPreview(value);
         }
         clearBtn?.classList.toggle('hidden', !value);
         trigger?.classList.toggle('subject-emoji-picker__trigger--empty', !value);
         if (trigger) {
-            trigger.title = value ? `当前卡片 Emoji：${value}` : '选择卡片 Emoji';
+            const fallback = resolveCurrentAgentEmojiPreview('');
+            trigger.title = value ? `当前卡片 Emoji：${value}` : `选择卡片 Emoji，当前使用默认图标：${fallback}`;
         }
     }
 
@@ -3490,8 +3616,8 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         }
     }
 
-    function openAgentEmojiPicker() {
-        configureAgentEmojiPicker();
+    async function openAgentEmojiPicker() {
+        await configureAgentEmojiPicker();
         syncAgentCardEmojiPicker();
         el.agentCardEmojiPickerPopover?.classList.remove('hidden');
         el.agentCardEmojiPickerPopover?.setAttribute('aria-hidden', 'false');
@@ -3499,12 +3625,12 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         el.agentCardEmojiPicker?.focus?.();
     }
 
-    function toggleAgentEmojiPicker() {
+    async function toggleAgentEmojiPicker() {
         if (isAgentEmojiPickerOpen()) {
             closeAgentEmojiPicker();
             return;
         }
-        openAgentEmojiPicker();
+        await openAgentEmojiPicker();
     }
 
     function setAgentCardEmoji(value) {
@@ -3633,7 +3759,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         el.subjectSettingsPanelBackdrop?.addEventListener('click', () => closeSubjectSettingsPanel());
         el.agentCardEmojiPickerBtn?.addEventListener('click', (event) => {
             event.stopPropagation();
-            toggleAgentEmojiPicker();
+            void toggleAgentEmojiPicker();
         });
         el.agentCardEmojiClearBtn?.addEventListener('click', (event) => {
             event.stopPropagation();
@@ -3641,6 +3767,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             closeAgentEmojiPicker({ restoreFocus: false });
         });
         el.agentCardEmojiInput?.addEventListener('input', syncAgentCardEmojiPicker);
+        el.agentNameInput?.addEventListener('input', syncAgentCardEmojiPicker);
         el.agentCardEmojiPicker?.addEventListener('emoji-click', (event) => {
             event.stopPropagation();
             const emoji = getEmojiFromPickerEvent(event);
@@ -4271,6 +4398,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             el.userNameInput,
             el.defaultModelInput,
             el.followUpDefaultModelInput,
+            el.studyToolDefaultModelInput,
             el.topicTitleDefaultModelInput,
             el.studentNameInput,
             el.studyCityInput,

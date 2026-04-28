@@ -25,6 +25,12 @@ const NOTE_DETAIL_META = Object.freeze({
     },
 });
 
+const QUIZ_DIFFICULTY_LABELS = Object.freeze({
+    easy: '简单',
+    medium: '中等',
+    hard: '困难',
+});
+
 function escapeHtml(text) {
     return String(text || '')
         .replace(/&/g, '&amp;')
@@ -326,12 +332,59 @@ function createNotesDom(deps = {}) {
         target.textContent = stripMarkdown(note?.contentMarkdown || '').trim() || '暂无内容。';
     }
 
+    function getPendingQuizGenerationsForCurrentTopic() {
+        const agentId = String(state.currentSelectedItem?.id || '').trim();
+        const topicId = String(state.currentTopicId || '').trim();
+        if (!agentId || !topicId || !Array.isArray(state.pendingQuizGenerations)) {
+            return [];
+        }
+
+        return state.pendingQuizGenerations.filter((pending) => (
+            pending
+            && String(pending.agentId || '') === agentId
+            && String(pending.topicId || '') === topicId
+        ));
+    }
+
+    function renderPendingQuizCard(pending) {
+        const pendingCard = documentObj.createElement('div');
+        const questionCount = Number(pending?.questionCount || 0);
+        const difficultyLabel = QUIZ_DIFFICULTY_LABELS[pending?.difficulty] || '中等';
+        const sourceCount = Number(pending?.sourceCount || 0);
+        const focus = String(pending?.focus || '').trim();
+        const metaParts = [
+            questionCount > 0 ? `${questionCount} 题` : '选择题',
+            difficultyLabel,
+            sourceCount > 0 ? `${sourceCount} 个来源` : '当前学习材料',
+        ];
+        pendingCard.className = 'note-card note-card--studio note-card--pending note-card--quiz-pending note-card--active';
+        pendingCard.innerHTML = `
+            <div class="note-card__studio-main">
+                <div class="note-card__studio-icon note-card__quiz-icon note-card__quiz-icon--pending">
+                    <span class="material-symbols-outlined">hourglass_top</span>
+                </div>
+                <div class="note-card__studio-body">
+                    <div class="note-card__studio-heading">
+                        <strong>正在生成选择题...</strong>
+                    </div>
+                    <div class="note-card__studio-preview">${escapeHtml(focus ? `主题：${focus}` : '正在整理题目、选项和解析')}</div>
+                    <div class="note-card__studio-meta">
+                        ${metaParts.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        return pendingCard;
+    }
+
     function renderNotesPanel() {
         if (state.notesScope !== 'topic') {
             state.notesScope = 'topic';
         }
 
         const notes = getGeneratedVisibleNotes();
+        const pendingQuizzes = getPendingQuizGenerationsForCurrentTopic();
+        const hasPendingQuiz = pendingQuizzes.length > 0;
         closeNoteActionMenu();
 
         el.topicNotesScopeBtn?.classList.toggle('notes-scope-btn--active', state.notesScope === 'topic');
@@ -341,6 +394,15 @@ function createNotesDom(deps = {}) {
             const pomodoroArrow = el.openPomodoroBtn.querySelector('.notes-tool-tile__arrow');
             if (pomodoroArrow) {
                 pomodoroArrow.textContent = state.studioPomodoroVisible === true ? 'expand_more' : 'chevron_right';
+            }
+        }
+        if (el.generateQuizBtn) {
+            el.generateQuizBtn.classList.toggle('notes-tool-tile--active', hasPendingQuiz);
+            el.generateQuizBtn.toggleAttribute('disabled', hasPendingQuiz);
+            el.generateQuizBtn.setAttribute('aria-busy', hasPendingQuiz ? 'true' : 'false');
+            const quizArrow = el.generateQuizBtn.querySelector('.notes-tool-tile__arrow');
+            if (quizArrow) {
+                quizArrow.textContent = hasPendingQuiz ? 'hourglass_top' : 'chevron_right';
             }
         }
         updateNotesSelectionSummary();
@@ -361,6 +423,10 @@ function createNotesDom(deps = {}) {
             el.notesList.appendChild(el.studioPomodoroPanel);
         }
 
+        pendingQuizzes.forEach((pending) => {
+            el.notesList.appendChild(renderPendingQuizCard(pending));
+        });
+
         if (pendingFlashcards) {
             const pendingCard = documentObj.createElement('div');
             pendingCard.className = 'note-card note-card--studio note-card--flashcard-entry note-card--pending note-card--active';
@@ -380,7 +446,7 @@ function createNotesDom(deps = {}) {
             el.notesList.appendChild(pendingCard);
         }
 
-        if (notes.length === 0 && !pendingFlashcards) {
+        if (notes.length === 0 && !pendingFlashcards && !hasPendingQuiz) {
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state';
             empty.innerHTML = `
@@ -496,33 +562,49 @@ function createNotesDom(deps = {}) {
             return;
         }
 
+        const agents = Array.isArray(state.agents) ? state.agents : [];
         const allManualNotes = getManualLibraryNotes();
-        const manualNotes = state.manualNotesLibraryFilter === 'selected'
-            ? allManualNotes.filter((note) => state.selectedNoteIds.includes(note.id))
-            : allManualNotes;
-        const currentAgentName = state.currentSelectedItem?.name || '当前学科';
+        const manualNotes = allManualNotes;
+        const currentFilter = String(state.manualNotesLibraryFilter || 'all');
+        const currentAgent = currentFilter === 'all'
+            ? null
+            : agents.find((agent) => String(agent?.id || '') === currentFilter);
+        const currentAgentName = currentAgent?.name || state.currentSelectedItem?.name || '当前学科';
         const setGridEmptyState = (empty) => {
             el.manualNotesLibraryGrid.classList.toggle('manual-notes-library-grid--empty', empty);
         };
 
-        el.manualNotesLibraryFilterAllBtn?.classList.toggle('manual-notes-library-page__filter--active', state.manualNotesLibraryFilter !== 'selected');
-        el.manualNotesLibraryFilterAllBtn?.setAttribute('aria-pressed', state.manualNotesLibraryFilter !== 'selected' ? 'true' : 'false');
-        el.manualNotesLibraryFilterSelectedBtn?.classList.toggle('manual-notes-library-page__filter--active', state.manualNotesLibraryFilter === 'selected');
-        el.manualNotesLibraryFilterSelectedBtn?.setAttribute('aria-pressed', state.manualNotesLibraryFilter === 'selected' ? 'true' : 'false');
+        if (el.manualNotesLibrarySubjectFilterSelect) {
+            const options = [
+                '<option value="all">全部学科</option>',
+                ...agents.map((agent) => {
+                    const agentId = String(agent?.id || '').trim();
+                    if (!agentId) {
+                        return '';
+                    }
+                    return `<option value="${escapeHtml(agentId)}">${escapeHtml(agent?.name || agentId)}</option>`;
+                }),
+            ].filter(Boolean);
+            el.manualNotesLibrarySubjectFilterSelect.innerHTML = options.join('');
+            el.manualNotesLibrarySubjectFilterSelect.value = currentFilter;
+            if (el.manualNotesLibrarySubjectFilterSelect.value !== currentFilter) {
+                el.manualNotesLibrarySubjectFilterSelect.value = 'all';
+            }
+        }
 
         if (el.manualNotesLibraryTitle) {
-            el.manualNotesLibraryTitle.textContent = `${currentAgentName} · 我的笔记`;
+            el.manualNotesLibraryTitle.textContent = `${currentFilter === 'all' ? '全部学科' : currentAgentName} · 我的笔记`;
         }
         if (el.manualNotesLibrarySubtitle) {
             const selectedCount = allManualNotes.filter((note) => state.selectedNoteIds.includes(note.id)).length;
-            el.manualNotesLibrarySubtitle.textContent = state.currentSelectedItem?.id
-                ? `这里收纳当前学科下的 ${allManualNotes.length} 条手写笔记，已选 ${selectedCount} 条可直接用于 Studio。`
-                : '选择一个学科后，这里会显示该学科下的所有手写笔记。';
+            el.manualNotesLibrarySubtitle.textContent = currentFilter === 'all'
+                ? `这里收纳全部学科收藏的 ${allManualNotes.length} 条手写笔记，已选 ${selectedCount} 条。`
+                : `这里收纳 ${currentAgentName} 的 ${allManualNotes.length} 条手写笔记，已选 ${selectedCount} 条。`;
         }
 
         cleanupRichPreviews(el.manualNotesLibraryGrid);
         el.manualNotesLibraryGrid.innerHTML = '';
-        if (!state.currentSelectedItem?.id) {
+        if (!state.currentSelectedItem?.id && currentFilter !== 'all') {
             setGridEmptyState(true);
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
@@ -539,10 +621,8 @@ function createNotesDom(deps = {}) {
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
             empty.innerHTML = `
-                <strong>${state.manualNotesLibraryFilter === 'selected' ? '还没有加入 Studio 的笔记' : '当前学科还没有手写笔记'}</strong>
-                <span>${state.manualNotesLibraryFilter === 'selected'
-                    ? '你可以通过卡片右键菜单把需要的笔记加入 Studio，方便后续生成分析、选择题和闪卡。'
-                    : '你可以继续使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。'}</span>
+                <strong>${currentFilter === 'all' ? '还没有收藏的手写笔记' : '当前学科还没有手写笔记'}</strong>
+                <span>你可以使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。</span>
             `;
             el.manualNotesLibraryGrid.appendChild(empty);
             return;

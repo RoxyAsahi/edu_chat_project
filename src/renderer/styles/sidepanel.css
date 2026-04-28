@@ -528,6 +528,19 @@ body.dark-theme .subject-emoji-picker__popover emoji-picker {
   background: linear-gradient(180deg, rgba(248, 246, 244, 0.98), rgba(244, 241, 238, 0.96));
 }
 
+.note-card--quiz-pending {
+  color: #7c4a03;
+}
+
+.note-card__quiz-icon {
+  color: #7c4a03;
+  background: rgba(245, 236, 209, 0.88);
+}
+
+.note-card__quiz-icon--pending .material-symbols-outlined {
+  animation: flashcardSpin 1.2s linear infinite;
+}
+
 .note-card__flashcard-entry {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1655,13 +1668,13 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 .notes-pomodoro-panel {
   margin: 2px 2px 18px;
   width: min(100%, 352px);
-  padding: 14px 14px 12px;
+  padding: 10px 18px 12px;
   box-sizing: border-box;
   border-radius: 22px;
   background: #f5f7fb;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .notes-pomodoro-panel--collapsed {
@@ -1671,17 +1684,23 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 
 .notes-pomodoro-panel__summary {
   width: 100%;
-  min-height: 52px;
-  padding: 0 16px;
+  min-height: 22px;
+  padding: 0;
   border-radius: 999px;
-  background: #eceff3;
+  background: transparent;
   color: #202124;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   flex-wrap: nowrap;
+}
+
+.notes-pomodoro-panel--collapsed .notes-pomodoro-panel__summary {
+  min-height: 52px;
+  padding: 0 16px;
+  background: #eceff3;
 }
 
 .notes-pomodoro-panel__summary-main {
@@ -1704,11 +1723,15 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 .notes-pomodoro-panel__summary-copy {
   min-width: 0;
   flex: 1 1 auto;
-  display: flex;
+  display: none;
   align-items: baseline;
   gap: 10px;
   flex-wrap: nowrap;
   overflow: hidden;
+}
+
+.notes-pomodoro-panel--collapsed .notes-pomodoro-panel__summary-copy {
+  display: flex;
 }
 
 .notes-pomodoro-panel__summary-copy strong {
@@ -1736,8 +1759,8 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 .notes-pomodoro-panel__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 0;
 }
 
 .notes-pomodoro-panel__header {
@@ -1758,13 +1781,13 @@ body.dark-theme .quiz-practice__feedback--incorrect {
 }
 
 .notes-pomodoro-panel__display-input {
-  width: min(100%, 172px);
+  width: min(100%, 154px);
   min-width: 0;
   padding: 0;
   border: none;
   background: transparent;
   color: #202124;
-  font-size: clamp(48px, 7vw, 68px);
+  font-size: clamp(42px, 5.7vw, 54px);
   font-weight: 500;
   line-height: 0.96;
   letter-spacing: -0.06em;
@@ -1787,6 +1810,51 @@ body.dark-theme .quiz-practice__feedback--incorrect {
   gap: 10px;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.notes-pomodoro-panel__actions .dynamic-island__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 84px;
+  width: 84px;
+  min-width: 84px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  box-shadow: none;
+  transform: none;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color var(--motion-standard), color var(--motion-standard);
+}
+
+.notes-pomodoro-panel__actions .accent-button {
+  background: #2f6de0;
+  box-shadow: none;
+}
+
+.notes-pomodoro-panel__actions .accent-button:hover,
+.notes-pomodoro-panel__actions .accent-button:focus-visible {
+  background: #2f6de0;
+  box-shadow: none;
+  transform: none;
+}
+
+.notes-pomodoro-panel__actions .ghost-button {
+  background: #ffffff;
+  color: #2f6de0;
+  box-shadow: none;
+}
+
+.notes-pomodoro-panel__actions .ghost-button:hover,
+.notes-pomodoro-panel__actions .ghost-button:focus-visible {
+  background: #ffffff;
+  box-shadow: none;
+  transform: none;
 }
 
 .note-card--studio {
@@ -5189,60 +5257,50 @@ body.diary-wall-open {
 }
 
 .diary-wall-agent-nav {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
   min-width: 0;
 }
 
-.diary-wall-agent-tab {
+.diary-wall-agent-filter {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 12px;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
   border-radius: 999px;
-  border: none;
-  background: #f1f3f4;
-  color: #5f6368;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  border: 1px solid #e0e3e7;
+  background: #ffffff;
+  color: #202124;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.08);
 }
 
-.diary-wall-agent-tab span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.4rem;
-  min-height: 1.4rem;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgba(26, 115, 232, 0.12);
-  color: #1a73e8;
-  font-size: 12px;
-}
-
-.diary-wall-agent-tab:hover,
-.diary-wall-agent-tab:focus-visible {
+.diary-wall-agent-filter:hover,
+.diary-wall-agent-filter:focus-within {
   transform: none;
-  background: #e8eaed;
+  background: #f1f3f4;
+  border-color: #dadce0;
   color: #202124;
   outline: none;
-}
-
-.diary-wall-agent-tab--active {
-  background: color-mix(in srgb, var(--accent-soft) 64%, white 36%);
-  color: var(--accent-strong);
   box-shadow: none;
 }
 
-.diary-wall-agent-tab--active span {
-  background: rgba(11, 87, 208, 0.12);
-  color: var(--accent-strong);
+.diary-wall-agent-filter .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.diary-wall-agent-select {
+  appearance: none;
+  border: 0;
+  outline: 0;
+  min-width: 48px;
+  max-width: 136px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .diary-wall-sidebar__group {
@@ -5871,26 +5929,10 @@ body.dark-theme .diary-wall-entry__tool summary {
   color: var(--muted);
 }
 
-body.dark-theme .diary-wall-agent-tab {
-  border-color: transparent;
+body.dark-theme .diary-wall-agent-filter {
+  border-color: rgba(255, 255, 255, 0.08);
   background: rgba(30, 30, 32, 0.94);
-  color: var(--muted);
-}
-
-body.dark-theme .diary-wall-agent-tab span {
-  background: rgba(168, 199, 250, 0.18);
-  color: #d3e3fd;
-}
-
-body.dark-theme .diary-wall-agent-tab--active {
-  background: rgba(168, 199, 250, 0.2);
-  border-color: transparent;
-  color: #d3e3fd;
-}
-
-body.dark-theme .diary-wall-agent-tab--active span {
-  background: rgba(168, 199, 250, 0.16);
-  color: #d3e3fd;
+  color: var(--ink);
 }
 
 body.dark-theme .diary-wall-field input,

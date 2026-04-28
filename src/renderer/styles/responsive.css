@@ -1025,6 +1025,10 @@
     padding-right: 52px;
   }
 
+  .chat-stage__header > div:first-child {
+    padding-right: 50px;
+  }
+
   .workspace-card__header .workspace-card__cta,
   .logs-studio__actions .icon-text-btn,
   .diary-wall-actions .icon-text-btn,
@@ -1116,10 +1120,9 @@
     gap: 8px;
   }
 
-  .manual-notes-library-page__filter {
-    min-height: 30px;
-    padding: 0 10px;
-    font-size: 12px;
+  .manual-notes-library-page__subject-filter,
+  .manual-notes-library-page__new-note {
+    min-height: 32px;
   }
 }
 

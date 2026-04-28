@@ -14,6 +14,7 @@ const {
 } = require('../utils/settingsSchema');
 const {
     TASK_KEY_BY_LEGACY_SETTINGS_KEY,
+    MODEL_SERVICE_DEFAULT_KEYS,
     normalizeModelService,
     resolveDefaultModelRef,
     resolveChatFallbackExecution,
@@ -1754,9 +1755,14 @@ function initialize(mainWindow, context) {
             console.error('[Main - sendChatRequest] Failed to read settings:', error);
         }
 
+        const requestedPurpose = typeof modelConfig?.purpose === 'string'
+            && MODEL_SERVICE_DEFAULT_KEYS.includes(modelConfig.purpose.trim())
+            ? modelConfig.purpose.trim()
+            : 'chat';
         const executionConfig = resolveExecutionConfig(settings, {
-            purpose: 'chat',
+            purpose: requestedPurpose,
             requestedModel: modelConfig?.model,
+            requestedRef: modelConfig?.modelRef,
             fallbackEndpoint: endpoint,
             fallbackApiKey: apiKey,
             fallbackModel: modelConfig?.model,

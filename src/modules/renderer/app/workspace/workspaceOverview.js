@@ -1,3 +1,5 @@
+import { resolveSubjectCardEmoji } from './subjectEmoji.js';
+
 function escapeHtml(text) {
     return String(text || '')
         .replace(/&/g, '&amp;')
@@ -5,55 +7,6 @@ function escapeHtml(text) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-}
-
-const SUBJECT_CARD_EMOJIS = ['🎓', '📚', '🧠', '✏️', '🔬', '🌍', '📐', '📝'];
-
-const SUBJECT_CARD_KEYWORD_EMOJIS = [
-    ['数学', '📐'],
-    ['英语', '🔤'],
-    ['语文', '✒️'],
-    ['写作', '✒️'],
-    ['物理', '🧲'],
-    ['化学', '🧪'],
-    ['生物', '🧬'],
-    ['历史', '🏛️'],
-    ['地理', '🌍'],
-    ['编程', '💻'],
-    ['论文', '📄'],
-];
-
-function sliceGraphemes(value, limit = 2) {
-    const source = String(value || '').replace(/\s+/g, '').trim();
-    if (!source) {
-        return '';
-    }
-
-    if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-        const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-        return Array.from(segmenter.segment(source), (segment) => segment.segment).slice(0, limit).join('');
-    }
-
-    return Array.from(source).slice(0, limit).join('');
-}
-
-function normalizeSubjectCardEmoji(value) {
-    return sliceGraphemes(value, 2);
-}
-
-function resolveSubjectCardEmoji({ agent, index = 0 } = {}) {
-    const configuredEmoji = normalizeSubjectCardEmoji(agent?.cardEmoji);
-    if (configuredEmoji) {
-        return configuredEmoji;
-    }
-
-    const agentName = String(agent?.name || agent?.id || '');
-    const keywordMatch = SUBJECT_CARD_KEYWORD_EMOJIS.find(([keyword]) => agentName.includes(keyword));
-    if (keywordMatch) {
-        return keywordMatch[1];
-    }
-
-    return SUBJECT_CARD_EMOJIS[index % SUBJECT_CARD_EMOJIS.length];
 }
 
 function formatRelativeTimeShort(value) {
@@ -352,67 +305,21 @@ function buildSubjectWallCard({ agent, stats = {}, isCurrent = false, tone = 'vi
     `;
 }
 
-function buildSubjectListRow({ agent, stats = {}, isCurrent = false, tone = 'violet' } = {}) {
-    const agentId = agent?.id || '';
-    const agentName = agent?.name || agentId || '未命名学科';
-    const topicCount = Math.max(0, Number(stats?.topicCount || 0));
-    const unreadCount = Math.max(0, Number(stats?.unreadCount || 0));
-    const lastTopicName = stats?.lastTopicName || '从一个新话题开始今天的学习';
-    const toneClass = `subject-overview-list__item--${escapeHtml(tone)}`;
-
-    return `
-        <button
-            type="button"
-            class="subject-overview-list__item ${toneClass}${isCurrent ? ' subject-overview-list__item--current' : ''}"
-            data-subject-card
-            data-agent-id="${escapeHtml(agentId)}"
-        >
-            <span class="subject-overview-list__badge">${isCurrent ? '当前' : '学科'}</span>
-            <div class="subject-overview-list__main">
-                <strong>${escapeHtml(agentName)}</strong>
-                <p>${escapeHtml(lastTopicName)}</p>
-            </div>
-            <div class="subject-overview-list__stats">
-                <span>${topicCount} 话题</span>
-                <span>${unreadCount} 待处理</span>
-            </div>
-            <span class="subject-overview-list__cta">
-                <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-            </span>
-        </button>
-    `;
-}
-
-function buildSubjectCreateCard(viewMode = 'grid') {
-    if (viewMode === 'list') {
-        return `
-            <button
-                type="button"
-                class="subject-overview-list__item subject-overview-list__item--create"
-                data-create-subject-card
-            >
-                <span class="subject-overview-list__badge subject-overview-list__badge--create">
-                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                </span>
-                <div class="subject-overview-list__main">
-                    <strong>新建笔记本</strong>
-                    <p>创建一个新的学科学习空间</p>
-                </div>
-                <span class="subject-overview-list__cta">创建</span>
-            </button>
-        `;
-    }
-
+function buildSubjectCreateCard() {
     return `
         <button
             type="button"
             class="subject-overview-card subject-overview-card--create"
             data-create-subject-card
         >
-            <span class="subject-overview-card__emoji subject-overview-card__emoji--create" aria-hidden="true">✨</span>
-            <span class="subject-overview-card__content">
-                <strong class="subject-overview-card__title">新建学科</strong>
-                <span class="subject-overview-card__count">创建学习空间</span>
+            <span class="subject-overview-card__create-body">
+                <span class="subject-overview-card__create-icon" aria-hidden="true">
+                    <span class="material-symbols-outlined">add</span>
+                </span>
+                <span class="subject-overview-card__content">
+                    <strong class="subject-overview-card__title">新建学科</strong>
+                    <span class="subject-overview-card__count">创建学习空间</span>
+                </span>
             </span>
         </button>
     `;
@@ -422,7 +329,6 @@ function buildSubjectCollectionMarkup({
     agents = [],
     statsByAgent = {},
     selectedAgentId = null,
-    viewMode = 'grid',
 } = {}) {
     const subjectTones = ['violet', 'green', 'warm', 'rose', 'slate'];
     const subjectItemsMarkup = agents.map((agent, index) => {
@@ -433,15 +339,11 @@ function buildSubjectCollectionMarkup({
             tone: subjectTones[index % subjectTones.length],
             index,
         };
-        return viewMode === 'list'
-            ? buildSubjectListRow(payload)
-            : buildSubjectWallCard(payload);
+        return buildSubjectWallCard(payload);
     }).join('');
-    const itemsMarkup = `${buildSubjectCreateCard(viewMode)}${subjectItemsMarkup}`;
+    const itemsMarkup = `${buildSubjectCreateCard()}${subjectItemsMarkup}`;
 
-    return viewMode === 'list'
-        ? `<div class="subject-overview-list" data-subject-collection data-view-mode="list">${itemsMarkup}</div>`
-        : `<div class="overview-subject-wall" data-subject-collection data-view-mode="grid">${itemsMarkup}</div>`;
+    return `<div class="overview-subject-wall" data-subject-collection data-view-mode="grid">${itemsMarkup}</div>`;
 }
 
 
@@ -618,14 +520,6 @@ function buildSubjectOverviewMarkup({
             <div class="home-section-header">
                 <h3>学习空间</h3>
                 <div class="home-subjects__actions">
-                    <div class="overview-subject-browser__view-toggle" role="tablist" aria-label="学科视图切换">
-                        <button type="button" class="overview-subject-browser__toggle-btn is-active" data-subject-view="grid" aria-pressed="true">
-                            <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>
-                        </button>
-                        <button type="button" class="overview-subject-browser__toggle-btn" data-subject-view="list" aria-pressed="false">
-                            <span class="material-symbols-outlined" aria-hidden="true">view_list</span>
-                        </button>
-                    </div>
                     <button type="button" class="overview-subject-browser__create" id="subjectOverviewCreateCard">
                         <span class="material-symbols-outlined" aria-hidden="true">add</span>
                         <span>新建</span>
@@ -644,7 +538,6 @@ function buildSubjectOverviewMarkup({
                     agents,
                     statsByAgent,
                     selectedAgentId,
-                    viewMode: 'grid',
                 })}
             </div>
         </section>

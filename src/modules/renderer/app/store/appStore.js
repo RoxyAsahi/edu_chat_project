@@ -6,6 +6,7 @@ function createDefaultModelService() {
             chat: null,
             chatFallback: null,
             followUp: null,
+            studyTool: null,
             topicTitle: null,
             embedding: null,
             rerank: null,
@@ -15,7 +16,8 @@ function createDefaultModelService() {
 
 const AIP_TEST_CHAT_ENDPOINT = 'https://api.uniquest.top/v1/chat/completions';
 const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
-const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B';
+const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
+const AIP_TEST_AUXILIARY_DEFAULT_MODEL = 'Qwen/Qwen3.5-122B-A10B';
 
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{RenderingGuide}}
 
@@ -65,8 +67,9 @@ const DEFAULT_SETTINGS = Object.freeze({
     kbScoreThreshold: 0.25,
     currentThemeMode: 'system',
     defaultModel: AIP_TEST_DEFAULT_MODEL,
-    followUpDefaultModel: '',
-    topicTitleDefaultModel: '',
+    followUpDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+    studyToolDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+    topicTitleDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
     enableRenderingPrompt: true,
     enableEmoticonPrompt: true,
     enableAdaptiveBubbleTip: true,
@@ -186,6 +189,7 @@ function createInitialAppState() {
         notes: {
             topicNotes: [],
             agentNotes: [],
+            allAgentManualNotes: [],
             notesScope: 'topic',
             activeNoteId: null,
             selectedNoteIds: [],
@@ -197,6 +201,7 @@ function createInitialAppState() {
             activeNoteMenu: null,
             activeFlashcardNoteId: null,
             pendingFlashcardGeneration: null,
+            pendingQuizGenerations: [],
             studioPomodoroVisible: false,
             studioPomodoroExpanded: true,
             quizGenerationConfig: {

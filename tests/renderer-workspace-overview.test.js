@@ -1,13 +1,27 @@
 const test = require('node:test');
 const assert = require('assert/strict');
-const fs = require('fs/promises');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 async function loadOverviewModule() {
     const modulePath = path.resolve(__dirname, '..', 'src/modules/renderer/app/workspace/workspaceOverview.js');
-    const source = await fs.readFile(modulePath, 'utf8');
-    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+    return import(`${pathToFileURL(modulePath).href}?test=${Date.now()}${Math.random()}`);
 }
+
+async function loadSubjectEmojiModule() {
+    const modulePath = path.resolve(__dirname, '..', 'src/modules/renderer/app/workspace/subjectEmoji.js');
+    return import(`${pathToFileURL(modulePath).href}?test=${Date.now()}${Math.random()}`);
+}
+
+test('resolveSubjectCardEmoji uses configured values before keyword and index fallbacks', async () => {
+    const { resolveSubjectCardEmoji } = await loadSubjectEmojiModule();
+
+    assert.equal(resolveSubjectCardEmoji({ agent: { name: '语文教师', cardEmoji: '📝' }, index: 0 }), '📝');
+    assert.equal(resolveSubjectCardEmoji({ agent: { name: '语文教师', config: { cardEmoji: '😀' } }, index: 0 }), '😀');
+    assert.equal(resolveSubjectCardEmoji({ agent: { name: '语文教师', cardEmoji: '', config: { cardEmoji: '😀' } }, index: 0 }), '✒️');
+    assert.equal(resolveSubjectCardEmoji({ agent: { name: '语文教师', cardEmoji: '' }, index: 0 }), '✒️');
+    assert.equal(resolveSubjectCardEmoji({ agent: { name: '无关键词' }, index: 2 }), '🧠');
+});
 
 test('buildSubjectOverviewMarkup renders the learning home flow, status, and subject wall for populated overview', async () => {
     const { buildSubjectOverviewMarkup } = await loadOverviewModule();

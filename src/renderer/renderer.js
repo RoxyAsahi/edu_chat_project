@@ -18,7 +18,7 @@ import { createReaderController } from '../modules/renderer/app/reader/readerCon
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
 import { createSourceController } from '../modules/renderer/app/source/sourceController.js';
 import { createTopicTitleController } from '../modules/renderer/app/topicTitles/topicTitleController.js';
-import { createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
+import { DEFAULT_AGENT_AVATAR, createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
 import { buildSubjectCollectionMarkup, buildSubjectOverviewMarkup } from '../modules/renderer/app/workspace/workspaceOverview.js';
 import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime } from '../modules/renderer/app/bootstrap.js';
 import {
@@ -844,7 +844,7 @@ async function populateAgentForm(config) {
         el.agentCardEmojiInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     revokeAgentAvatarPreviewObjectUrl();
-    el.agentAvatarPreview.src = config.avatarUrl || '../assets/default_avatar.png';
+    el.agentAvatarPreview.src = config.avatarUrl || DEFAULT_AGENT_AVATAR;
     el.agentModel.value = config.model || '';
 
     await syncPromptModule(session.currentSelectedItem.id, config);

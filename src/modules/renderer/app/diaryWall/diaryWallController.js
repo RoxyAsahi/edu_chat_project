@@ -346,16 +346,26 @@ function createDiaryWallController(deps = {}) {
         }
 
         const tabs = getAgentTabs();
-        el.diaryWallAgentNav.innerHTML = tabs.map((tab) => `
-            <button
-              type="button"
-              class="diary-wall-agent-tab ${tab.id === state.activeAgentFilter ? 'diary-wall-agent-tab--active' : ''}"
-              data-diary-wall-agent-filter="${escapeHtml(tab.id)}"
-            >
-              ${escapeHtml(tab.label)}
-              <span>${escapeHtml(String(tab.count))}</span>
-            </button>
+        const options = tabs.map((tab) => `
+            <option value="${escapeHtml(tab.id)}">
+              ${escapeHtml(tab.id === 'all' ? '全部' : tab.label)}
+            </option>
         `).join('');
+        el.diaryWallAgentNav.innerHTML = `
+            <label class="diary-wall-agent-filter" aria-label="按学科筛选日记墙">
+              <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+              <select class="diary-wall-agent-select" data-diary-wall-agent-filter>
+                ${options}
+              </select>
+            </label>
+        `;
+        const select = el.diaryWallAgentNav.querySelector('[data-diary-wall-agent-filter]');
+        if (select) {
+            select.value = state.activeAgentFilter;
+            if (select.value !== state.activeAgentFilter) {
+                select.value = 'all';
+            }
+        }
     }
 
     function getFilters() {
@@ -1074,12 +1084,12 @@ function createDiaryWallController(deps = {}) {
             renderCards();
             renderDetail();
         });
-        el.diaryWallAgentNav?.addEventListener('click', (event) => {
+        el.diaryWallAgentNav?.addEventListener('change', (event) => {
             const target = event.target instanceof Element ? event.target.closest('[data-diary-wall-agent-filter]') : null;
             if (!target) {
                 return;
             }
-            const nextFilter = target.getAttribute('data-diary-wall-agent-filter') || 'all';
+            const nextFilter = target.value || 'all';
             if (state.activeAgentFilter === nextFilter) {
                 return;
             }

@@ -16,6 +16,7 @@ test('buildModelServiceFromSettings and buildSettingsMirrorFromModelService pres
         chatApiKey: 'chat-key',
         defaultModel: 'gpt-4o',
         followUpDefaultModel: 'gpt-4.1-mini',
+        studyToolDefaultModel: 'gpt-4.1-study',
         topicTitleDefaultModel: 'gpt-4.1-nano',
         guideModel: 'guide-model',
         lastModel: 'last-model',
@@ -34,6 +35,7 @@ test('buildModelServiceFromSettings and buildSettingsMirrorFromModelService pres
     assert.equal(settingsMirror.chatApiKey, 'chat-key');
     assert.equal(settingsMirror.defaultModel, 'gpt-4o');
     assert.equal(settingsMirror.followUpDefaultModel, 'gpt-4.1-mini');
+    assert.equal(settingsMirror.studyToolDefaultModel, 'gpt-4.1-study');
     assert.equal(settingsMirror.topicTitleDefaultModel, 'gpt-4.1-nano');
     assert.equal(settingsMirror.kbBaseUrl, 'https://kb.example.com/openai');
     assert.equal(settingsMirror.kbApiKey, 'kb-key');
@@ -87,6 +89,7 @@ test('ensureBuiltInTestProvider keeps the built-in provider models in the intend
             chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
             chatFallback: null,
             followUp: null,
+            studyTool: null,
             topicTitle: null,
             embedding: null,
             rerank: null,
@@ -103,8 +106,84 @@ test('ensureBuiltInTestProvider keeps the built-in provider models in the intend
             'Pro/moonshotai/Kimi-K2.6',
             'Qwen/Qwen3-VL-Embedding-8B',
             'Qwen/Qwen3-VL-Reranker-8B',
+            'Qwen/Qwen3.5-4B',
+            'Qwen/Qwen3.5-35B-A3B',
+            'Qwen/Qwen3.5-397B-A17B',
+            'deepseek-ai/DeepSeek-V4-Flash',
+            'Qwen/Qwen3.5-122B-A10B',
         ]
     );
+    assert.deepEqual(service.defaults.chat, {
+        providerId: 'chat-provider',
+        modelId: 'gpt-4o',
+    });
+});
+
+test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P preset itself', () => {
+    const service = modelService.ensureBuiltInTestProvider({
+        version: 1,
+        providers: [
+            {
+                id: 'aip-test-provider',
+                presetId: modelService.AIP_TEST_PROVIDER_PRESET_ID,
+                name: modelService.AIP_TEST_PROVIDER_NAME,
+                protocol: 'openai-compatible',
+                enabled: true,
+                apiBaseUrl: modelService.AIP_TEST_API_BASE_URL,
+                apiKeys: [modelService.AIP_TEST_API_KEY],
+                extraHeaders: {},
+                models: [],
+            },
+        ],
+        defaults: {
+            chat: null,
+            chatFallback: null,
+            followUp: null,
+            studyTool: null,
+            topicTitle: null,
+            embedding: null,
+            rerank: null,
+        },
+    });
+
+    assert.deepEqual(service.defaults.chat, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
+    });
+    assert.deepEqual(service.defaults.chatFallback, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+    });
+    assert.deepEqual(service.defaults.followUp, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+    });
+    assert.deepEqual(service.defaults.studyTool, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+    });
+    assert.deepEqual(service.defaults.topicTitle, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+    });
+});
+
+test('resolveExecutionConfig can target the dedicated study tool default', () => {
+    const settings = {
+        modelService: modelService.buildModelServiceFromSettings({
+            chatEndpoint: 'https://chat.example.com/base',
+            chatApiKey: 'chat-key',
+            defaultModel: 'chat-model',
+            studyToolDefaultModel: 'study-tool-model',
+        }),
+    };
+
+    const execution = modelService.resolveExecutionConfig(settings, { purpose: 'studyTool' });
+
+    assert.equal(execution.purpose, 'studyTool');
+    assert.equal(execution.model.id, 'study-tool-model');
+    assert.equal(execution.endpoint, 'https://chat.example.com/base/v1/chat/completions');
+    assert.equal(execution.apiKey, 'chat-key');
 });
 
 test('resolveChatFallbackExecution resolves only the configured fallback chat target', () => {
@@ -157,6 +236,7 @@ test('resolveChatFallbackExecution resolves only the configured fallback chat ta
                 chat: { providerId: 'primary-provider', modelId: 'primary-chat' },
                 chatFallback: { providerId: 'fallback-provider', modelId: 'fallback-chat' },
                 followUp: null,
+                studyTool: null,
                 topicTitle: null,
                 embedding: null,
                 rerank: null,
