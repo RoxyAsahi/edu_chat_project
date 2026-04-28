@@ -1,6 +1,6 @@
 import { positionFloatingElement } from '../dom/positionFloatingElement.js';
 
-const DEFAULT_AGENT_AVATAR = '../assets/default_avatar.png';
+const DEFAULT_AGENT_AVATAR = '../assets/brand-logo.png';
 
 function escapeHtml(text) {
     return String(text || '')
@@ -159,7 +159,6 @@ function createWorkspaceController(deps = {}) {
     let activeSubjectActionMenu = null;
     const overviewSubjectBrowserState = {
         search: '',
-        viewMode: 'grid',
         sortMode: 'recent',
         filterMode: 'all',
     };
@@ -884,7 +883,6 @@ function createWorkspaceController(deps = {}) {
             agents,
             statsByAgent: agentOverviewStats,
             selectedAgentId: state.currentSelectedItem.id,
-            viewMode: overviewSubjectBrowserState.viewMode,
         });
 
         const collection = host.querySelector('[data-subject-collection]');
@@ -926,12 +924,6 @@ function createWorkspaceController(deps = {}) {
             return;
         }
 
-        root.querySelectorAll('[data-subject-view]').forEach((button) => {
-            const isActive = button.dataset.subjectView === overviewSubjectBrowserState.viewMode;
-            button.classList.toggle('is-active', isActive);
-            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-        });
-
         root.querySelectorAll('[data-subject-filter]').forEach((button) => {
             const isActive = button.dataset.subjectFilter === overviewSubjectBrowserState.filterMode;
             button.classList.toggle('is-active', isActive);
@@ -958,18 +950,6 @@ function createWorkspaceController(deps = {}) {
         if (!root) {
             return;
         }
-
-        root.querySelectorAll('[data-subject-view]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const nextView = button.dataset.subjectView;
-                if (!nextView || nextView === overviewSubjectBrowserState.viewMode) {
-                    return;
-                }
-                overviewSubjectBrowserState.viewMode = nextView;
-                syncOverviewSubjectBrowserUi();
-                renderOverviewSubjectCollection();
-            });
-        });
 
         root.querySelectorAll('[data-subject-filter]').forEach((button) => {
             button.addEventListener('click', () => {

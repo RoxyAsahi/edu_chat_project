@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta
     http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: file: http: https:; connect-src 'self' http://127.0.0.1:*; frame-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self';"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: file: http: https:; connect-src 'self' data: blob: http://127.0.0.1:*; frame-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self';"
   />
   <title>UniStudy</title>
   <link rel="stylesheet" href="../../vendor/katex.min.css" />
@@ -108,6 +108,12 @@
               <button id="manualNotesLibraryDiaryTabBtn" class="notes-studio-panel-switch__btn" type="button" role="tab" aria-selected="false" aria-controls="diaryWallModal">日记墙</button>
             </div>
             <div id="manualNotesLibraryFilters" class="manual-notes-library-page__filters" aria-label="笔记筛选">
+              <label class="manual-notes-library-page__subject-filter" aria-label="按学科筛选收藏笔记">
+                <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+                <select id="manualNotesLibrarySubjectFilterSelect" class="manual-notes-library-page__subject-select">
+                  <option value="all">全部学科</option>
+                </select>
+              </label>
               <button
                 id="manualNewNoteBtn"
                 class="accent-button manual-notes-library-page__new-note"
@@ -115,24 +121,6 @@
               >
                 <span class="material-symbols-outlined" aria-hidden="true">note_add</span>
                 <span>新建笔记</span>
-              </button>
-              <button
-                id="manualNotesLibraryFilterAllBtn"
-                class="ghost-button manual-notes-library-page__filter manual-notes-library-page__filter--active"
-                type="button"
-                aria-pressed="true"
-              >
-                <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>
-                <span>全部</span>
-              </button>
-              <button
-                id="manualNotesLibraryFilterSelectedBtn"
-                class="ghost-button manual-notes-library-page__filter"
-                type="button"
-                aria-pressed="false"
-              >
-                <span class="material-symbols-outlined" aria-hidden="true">star</span>
-                <span>已加入 Studio</span>
               </button>
             </div>
           </header>
@@ -347,8 +335,8 @@
               <p id="currentTopicKnowledgeBaseStatus" class="chat-stage__status hidden">每个话题会自动准备独立 Source</p>
             </div>
             <div class="chat-stage__header-actions">
-              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn" type="button" title="请选择学科后管理" disabled>
-                <span class="material-symbols-outlined">tune</span> 学科管理
+              <button id="currentAgentSettingsBtn" class="ghost-button icon-text-btn" type="button" title="请选择学科后管理" aria-label="学科管理" disabled>
+                <span class="material-symbols-outlined" aria-hidden="true">tune</span>
               </button>
             </div>
           </header>
@@ -866,6 +854,7 @@
                 <div class="hidden" aria-hidden="true">
                   <input id="defaultModelInput" type="text" placeholder="gemini-3.1-flash-lite-preview" />
                   <input id="followUpDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
+                  <input id="studyToolDefaultModelInput" type="text" placeholder="留空则跟随默认聊天模型" />
                   <input id="topicTitleDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
                 </div>
               </section>
@@ -1068,7 +1057,7 @@
               <div class="settings-row settings-row--avatar">
                 <div class="settings-row__main"><strong>头像</strong><span>点击图片更换当前学科头像。</span></div>
                 <div class="avatar-editor settings-row__avatar" title="点击上传头像">
-                  <img id="agentAvatarPreview" src="../assets/default_avatar.png" alt="avatar" />
+                  <img id="agentAvatarPreview" src="../assets/brand-logo.png" alt="avatar" />
                   <input id="agentAvatarInput" type="file" accept="image/*" />
                 </div>
               </div>

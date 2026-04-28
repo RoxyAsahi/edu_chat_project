@@ -41,6 +41,7 @@ function createBaseState(overrides = {}) {
             settings: {
                 chatEndpoint: '',
                 chatApiKey: '',
+                studyToolDefaultModel: '',
             },
             settingsModalSection: 'global',
             promptModule: null,
@@ -75,6 +76,7 @@ function createBaseState(overrides = {}) {
             activeNoteMenu: null,
             activeFlashcardNoteId: null,
             pendingFlashcardGeneration: null,
+            pendingQuizGenerations: [],
             quizGenerationConfig: {
                 countPreset: 'standard',
                 questionCount: 8,
@@ -805,7 +807,7 @@ test('manual notes library can add a note into Studio selection from the right-c
     el.noteActionMenu.querySelector('[data-note-action="toggle-select"]').click();
 
     assert.deepEqual(store.getState().notes.selectedNoteIds, ['note-1']);
-    assert.match(el.manualNotesLibrarySubtitle.textContent, /已选 1 条可直接用于 Studio/);
+    assert.match(el.manualNotesLibrarySubtitle.textContent, /已选 1 条/);
 });
 
 test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {
@@ -822,6 +824,7 @@ test('notes tool actions read endpoint settings from the settings slice before c
                 settings: {
                     chatEndpoint: 'https://study.example.test/v1/chat',
                     chatApiKey: 'fixture-api-key',
+                    studyToolDefaultModel: 'settings-study-tool-model',
                 },
             },
             notes: {
@@ -865,6 +868,8 @@ test('notes tool actions read endpoint settings from the settings slice before c
 
     assert.equal(upstreamPayload.endpoint, 'https://study.example.test/v1/chat');
     assert.equal(upstreamPayload.apiKey, 'fixture-api-key');
+    assert.equal(upstreamPayload.modelConfig.purpose, 'studyTool');
+    assert.equal(upstreamPayload.modelConfig.model, 'settings-study-tool-model');
 });
 
 test('notes tool actions can consume selected manual notes from the agent library even when topic scope is active', async () => {
@@ -1130,6 +1135,220 @@ test('quiz source fallback passes selected knowledge base document ids into retr
 
     assert.deepEqual(retrievalPayload.documentIds, ['doc-a', 'doc-b']);
     assert.match(upstreamPayload.messages[1].content, /Source 检索内容/);
+});
+
+test('quiz generation saves to the origin topic when the user switches topics before completion', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let resolveUpstreamCall;
+    let releaseResponse;
+    let resolveSaveCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+    const responseReady = new Promise((resolve) => {
+        releaseResponse = resolve;
+    });
+    const saveCalled = new Promise((resolve) => {
+        resolveSaveCall = resolve;
+    });
+    let saveArgs = null;
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '函数连续性',
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                resolveUpstreamCall();
+                await responseReady;
+                return {
+                    response: {
+                        choices: [{ message: { content: buildQuizResponse() } }],
+                    },
+                };
+            },
+            saveTopicNote: async (agentId, topicId, payload) => {
+                saveArgs = { agentId, topicId, payload };
+                resolveSaveCall();
+                return {
+                    success: true,
+                    item: {
+                        id: 'saved-quiz',
+                        agentId,
+                        topicId,
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        quizSet: payload.quizSet,
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+    el.quizConfigGenerateBtn.click();
+    await upstreamCalled;
+
+    store.patchState('session', { currentTopicId: 'topic-2' });
+    controller.renderNotesPanel();
+    releaseResponse();
+    await saveCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(saveArgs.agentId, 'agent-1');
+    assert.equal(saveArgs.topicId, 'topic-1');
+    assert.equal(store.getState().notes.noteDetailKind, null);
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), true);
+    assert.deepEqual(store.getState().notes.pendingQuizGenerations, []);
+});
+
+test('quiz pending card is scoped to its origin topic and opens practice when still active', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let releaseResponse;
+    let resolveSaveCall;
+    const responseReady = new Promise((resolve) => {
+        releaseResponse = resolve;
+    });
+    const saveCalled = new Promise((resolve) => {
+        resolveSaveCall = resolve;
+    });
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '导数应用',
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                await responseReady;
+                return {
+                    response: {
+                        choices: [{ message: { content: buildQuizResponse() } }],
+                    },
+                };
+            },
+            saveTopicNote: async (agentId, topicId, payload) => {
+                resolveSaveCall();
+                return {
+                    success: true,
+                    item: {
+                        id: 'saved-quiz',
+                        agentId,
+                        topicId,
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        quizSet: payload.quizSet,
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+    el.quizConfigGenerateBtn.click();
+
+    assert.equal(store.getState().notes.pendingQuizGenerations.length, 1);
+    assert.match(el.notesList.textContent, /正在生成选择题/);
+    assert.equal(el.generateQuizBtn.hasAttribute('disabled'), true);
+
+    store.patchState('session', { currentTopicId: 'topic-2' });
+    controller.renderNotesPanel();
+    assert.doesNotMatch(el.notesList.textContent, /正在生成选择题/);
+    assert.equal(el.generateQuizBtn.hasAttribute('disabled'), false);
+
+    store.patchState('session', { currentTopicId: 'topic-1' });
+    controller.renderNotesPanel();
+    assert.match(el.notesList.textContent, /正在生成选择题/);
+
+    releaseResponse();
+    await saveCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(store.getState().notes.pendingQuizGenerations, []);
+    assert.equal(store.getState().notes.noteDetailKind, 'quiz');
+    assert.equal(store.getState().notes.noteDetailMode, 'practice');
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), false);
+});
+
+[
+    {
+        name: 'upstream error',
+        sendResult: { error: 'boom' },
+        expectSave: false,
+    },
+    {
+        name: 'empty response',
+        sendResult: { response: { choices: [{ message: { content: '   ' } }] } },
+        expectSave: false,
+    },
+    {
+        name: 'invalid quiz JSON',
+        sendResult: { response: { choices: [{ message: { content: '{"title":"坏格式","items":[]}' } }] } },
+        expectSave: false,
+    },
+    {
+        name: 'save failure',
+        sendResult: { response: { choices: [{ message: { content: buildQuizResponse() } }] } },
+        saveResult: { success: false, error: 'disk full' },
+        expectSave: true,
+    },
+].forEach((scenario) => {
+    test(`quiz pending clears after ${scenario.name}`, async () => {
+        const { createNotesController } = await loadNotesControllerModule();
+        let saveCallCount = 0;
+        const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+            stateOverrides: {
+                notes: {
+                    topicNotes: [{
+                        id: 'selected-note-1',
+                        title: '已选笔记',
+                        contentMarkdown: '概率基础',
+                    }],
+                    selectedNoteIds: ['selected-note-1'],
+                },
+            },
+            chatApiOverrides: {
+                sendChatRequest: async () => scenario.sendResult,
+                saveTopicNote: async () => {
+                    saveCallCount += 1;
+                    return scenario.saveResult || { success: true, item: { id: 'saved-quiz' } };
+                },
+            },
+        });
+
+        controller.bindEvents();
+        el.generateQuizBtn.click();
+        el.quizConfigGenerateBtn.click();
+        assert.equal(store.getState().notes.pendingQuizGenerations.length, 1);
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        assert.deepEqual(store.getState().notes.pendingQuizGenerations, []);
+        assert.equal(saveCallCount > 0, scenario.expectSave);
+        assert.equal(store.getState().notes.noteDetailKind, null);
+        assert.equal(el.noteDetailModal.classList.contains('hidden'), true);
+    });
 });
 
 test('note normalization preserves valid render snapshots and clears them when body changes', async () => {

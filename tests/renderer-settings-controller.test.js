@@ -1,13 +1,12 @@
 const test = require('node:test');
 const assert = require('assert/strict');
-const fs = require('fs/promises');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const { JSDOM } = require('jsdom');
 
 async function loadSettingsControllerModule() {
     const modulePath = path.resolve(__dirname, '../src/modules/renderer/app/settings/settingsController.js');
-    const source = await fs.readFile(modulePath, 'utf8');
-    return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+    return import(`${pathToFileURL(modulePath).href}?test=${Date.now()}${Math.random()}`);
 }
 
 function createStore(initialSettings = {}) {
@@ -37,6 +36,7 @@ function createDom() {
           <input id="userNameInput" />
           <input id="defaultModelInput" />
           <input id="followUpDefaultModelInput" />
+          <input id="studyToolDefaultModelInput" />
           <input id="topicTitleDefaultModelInput" />
           <input id="studentNameInput" />
           <input id="studyCityInput" />
@@ -155,6 +155,7 @@ function createElementMap(documentObj) {
         userNameInput: documentObj.getElementById('userNameInput'),
         defaultModelInput: documentObj.getElementById('defaultModelInput'),
         followUpDefaultModelInput: documentObj.getElementById('followUpDefaultModelInput'),
+        studyToolDefaultModelInput: documentObj.getElementById('studyToolDefaultModelInput'),
         topicTitleDefaultModelInput: documentObj.getElementById('topicTitleDefaultModelInput'),
         studentNameInput: documentObj.getElementById('studentNameInput'),
         studyCityInput: documentObj.getElementById('studyCityInput'),
@@ -409,10 +410,11 @@ test('subject card emoji picker syncs selection, clearing, and save payload', as
     el.agentModel.value = 'qwen-plus';
     controller.bindEvents();
 
-    assert.equal(el.agentCardEmojiPreview.textContent, '🎓');
+    assert.equal(el.agentCardEmojiPreview.textContent, '📐');
     assert.equal(el.agentCardEmojiClearBtn.classList.contains('hidden'), true);
 
     el.agentCardEmojiPickerBtn.click();
+    await flushAsyncWork();
 
     assert.equal(el.agentCardEmojiPickerPopover.classList.contains('hidden'), false);
     assert.equal(el.agentCardEmojiPickerPopover.getAttribute('aria-hidden'), 'false');
@@ -445,12 +447,78 @@ test('subject card emoji picker syncs selection, clearing, and save payload', as
 
     el.agentCardEmojiClearBtn.click();
     assert.equal(el.agentCardEmojiInput.value, '');
-    assert.equal(el.agentCardEmojiPreview.textContent, '🎓');
+    assert.equal(el.agentCardEmojiPreview.textContent, '📐');
     assert.equal(el.agentCardEmojiClearBtn.classList.contains('hidden'), true);
 
     await controller.saveAgentSettings();
 
     assert.equal(savedPatches.at(-1).patch.cardEmoji, '');
+});
+
+test('subject card emoji picker waits for the bundled custom element before configuring', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+    let resolveWhenDefined;
+    const whenDefinedPromise = new Promise((resolve) => {
+        resolveWhenDefined = resolve;
+    });
+    dom.window.customElements.whenDefined = () => whenDefinedPromise;
+
+    const configureCalls = [];
+    const controller = createSettingsController({
+        store: createStore(),
+        el,
+        chatAPI: {
+            saveAgentConfig() {
+                return Promise.resolve({ success: true });
+            },
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+        getCurrentSelectedItem: () => ({ id: 'agent-1', name: '英语' }),
+        resolvePromptText: async () => '',
+        reloadSelectedAgent: async () => {},
+    });
+
+    el.agentNameInput.value = '英语';
+    controller.bindEvents();
+    el.agentCardEmojiPickerBtn.click();
+    await flushAsyncWork();
+
+    assert.equal(configureCalls.length, 0);
+    assert.equal(el.agentCardEmojiPickerPopover.classList.contains('hidden'), true);
+
+    dom.window.UniStudyEmojiPicker = {
+        configure(picker, options) {
+            configureCalls.push({ picker, options });
+        },
+    };
+    resolveWhenDefined();
+    await flushAsyncWork();
+    await flushAsyncWork();
+
+    assert.equal(configureCalls.length, 1);
+    assert.equal(el.agentCardEmojiPickerPopover.classList.contains('hidden'), false);
+    assert.equal(el.agentCardEmojiPreview.textContent, '🔤');
 });
 
 async function addModelThroughWorkbench(el, dom, modelId, modelName = modelId) {
@@ -522,6 +590,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     userName: 'Alice',
                     defaultModel: 'chat-default-model',
                     followUpDefaultModel: 'follow-up-default-model',
+                    studyToolDefaultModel: 'study-tool-default-model',
                     topicTitleDefaultModel: 'topic-title-default-model',
                     kbUseRerank: true,
                     kbTopK: 6,
@@ -710,6 +779,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.agentBubbleThemePreviewMeta.textContent, '当前关闭，不会注入到 system 提示词。');
     assert.equal(el.defaultModelInput.value, 'chat-default-model');
     assert.equal(el.followUpDefaultModelInput.value, 'follow-up-default-model');
+    assert.equal(el.studyToolDefaultModelInput.value, 'study-tool-default-model');
     assert.equal(el.topicTitleDefaultModelInput.value, 'topic-title-default-model');
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chat"]')?.value || '',
@@ -722,6 +792,10 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="followUp"]')?.value || '',
         /::follow-up-default-model$/
+    );
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="studyTool"]')?.value || '',
+        /::study-tool-default-model$/
     );
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="topicTitle"]')?.value || '',
@@ -780,6 +854,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     await addModelThroughWorkbench(el, dom, 'updated-chat-default-model', 'Updated Chat Default Model');
     await addModelThroughWorkbench(el, dom, 'updated-fallback-model', 'Updated Fallback Model');
     await addModelThroughWorkbench(el, dom, 'updated-follow-up-model', 'Updated Follow-up Model');
+    await addModelThroughWorkbench(el, dom, 'updated-study-tool-model', 'Updated Study Tool Model');
     await addModelThroughWorkbench(el, dom, 'updated-topic-title-model', 'Updated Topic Title Model');
     await selectDefaultModel(el, dom, 'chat', 'updated-chat-default-model');
     await selectDefaultModel(el, dom, 'chatFallback', 'updated-chat-default-model');
@@ -792,9 +867,11 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     );
     await selectDefaultModel(el, dom, 'chatFallback', 'updated-fallback-model');
     await selectDefaultModel(el, dom, 'followUp', 'updated-follow-up-model');
+    await selectDefaultModel(el, dom, 'studyTool', 'updated-study-tool-model');
     await selectDefaultModel(el, dom, 'topicTitle', 'updated-topic-title-model');
     assert.equal(el.defaultModelInput.value, 'updated-chat-default-model');
     assert.equal(el.followUpDefaultModelInput.value, 'updated-follow-up-model');
+    assert.equal(el.studyToolDefaultModelInput.value, 'updated-study-tool-model');
     assert.equal(el.topicTitleDefaultModelInput.value, 'updated-topic-title-model');
     el.renderingPromptInput.value = 'native rendering text';
     el.emoticonPromptInput.value = 'native emoticon prompt: {{GeneralEmoticonPath}}';
@@ -818,14 +895,17 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.ok(savedPatch);
     assert.equal(savedPatch.defaultModel, 'updated-chat-default-model');
     assert.equal(savedPatch.followUpDefaultModel, 'updated-follow-up-model');
+    assert.equal(savedPatch.studyToolDefaultModel, 'updated-study-tool-model');
     assert.equal(savedPatch.topicTitleDefaultModel, 'updated-topic-title-model');
     assert.equal(savedPatch.modelService.defaults.chat.modelId, 'updated-chat-default-model');
     assert.equal(savedPatch.modelService.defaults.chatFallback.modelId, 'updated-fallback-model');
     assert.equal(savedPatch.modelService.defaults.followUp.modelId, 'updated-follow-up-model');
+    assert.equal(savedPatch.modelService.defaults.studyTool.modelId, 'updated-study-tool-model');
     assert.equal(savedPatch.modelService.defaults.topicTitle.modelId, 'updated-topic-title-model');
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-chat-default-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-fallback-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-follow-up-model'));
+    assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-study-tool-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-topic-title-model'));
     assert.equal(savedPatch.enableEmoticonPrompt, true);
     assert.equal(savedPatch.enableAgentBubbleTheme, true);
@@ -1000,7 +1080,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
                 return {
                     chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
                     chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
-                    defaultModel: 'Qwen/Qwen3.6-35B-A3B',
+                    defaultModel: 'Qwen/Qwen3.5-397B-A17B',
                     kbUseRerank: true,
                     kbTopK: 6,
                     kbCandidateTopK: 20,
@@ -1065,7 +1145,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     await controller.loadSettings();
     await flushAsyncWork();
 
-    assert.equal(el.defaultModelInput.value, 'Qwen/Qwen3.6-35B-A3B');
+    assert.equal(el.defaultModelInput.value, 'Qwen/Qwen3.5-397B-A17B');
     assert.match(el.modelServiceProviderList.textContent, /AI&P创新实践项目测试专用预设/);
     assert.match(el.modelServiceProviderList.textContent, /竞赛测试专用/);
     assert.match(el.modelServiceProviderDetail.textContent, /AI&P创新实践项目测试专用预设/);
@@ -1074,9 +1154,20 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     assert.match(el.modelServiceModelsPanel.textContent, /Pro\/moonshotai\/Kimi-K2\.6/);
     assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3-VL-Embedding-8B/);
     assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3-VL-Reranker-8B/);
+    assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3\.5-397B-A17B/);
+    assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3\.5-122B-A10B/);
+    assert.match(el.modelServiceModelsPanel.textContent, /deepseek-ai\/DeepSeek-V4-Flash/);
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chat"]')?.value || '',
-        /::Qwen\/Qwen3\.6-35B-A3B$/
+        /::Qwen\/Qwen3\.5-397B-A17B$/
+    );
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chatFallback"]')?.value || '',
+        /::Qwen\/Qwen3\.5-122B-A10B$/
+    );
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="followUp"]')?.value || '',
+        /::Qwen\/Qwen3\.5-122B-A10B$/
     );
 });
 

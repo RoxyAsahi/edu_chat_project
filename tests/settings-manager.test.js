@@ -38,6 +38,7 @@ test('validateSettings preserves direct settings fields when modelService is abs
         chatApiKey: 'chat-key',
         defaultModel: 'gpt-4o',
         followUpDefaultModel: 'gpt-4.1-mini',
+        studyToolDefaultModel: 'gpt-4.1-study',
         topicTitleDefaultModel: 'gpt-4.1-nano',
         kbBaseUrl: 'https://kb.example.com/openai/v1/embeddings',
         kbApiKey: 'kb-key',
@@ -49,6 +50,7 @@ test('validateSettings preserves direct settings fields when modelService is abs
     assert.equal(validated.modelService.defaults.chat, null);
     assert.equal(validated.modelService.defaults.chatFallback, null);
     assert.equal(validated.modelService.defaults.followUp, null);
+    assert.equal(validated.modelService.defaults.studyTool, null);
     assert.equal(validated.modelService.defaults.topicTitle, null);
     assert.equal(validated.modelService.defaults.embedding, null);
     assert.equal(validated.modelService.defaults.rerank, null);
@@ -131,6 +133,7 @@ test('validateSettings mirrors explicit modelService back into native settings f
                 chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
                 chatFallback: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 followUp: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
+                studyTool: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 topicTitle: { providerId: 'chat-provider', modelId: 'gpt-4.1-nano' },
                 embedding: { providerId: 'kb-provider', modelId: 'bge-m3' },
                 rerank: { providerId: 'kb-provider', modelId: 'bge-reranker-v2' },
@@ -148,6 +151,7 @@ test('validateSettings mirrors explicit modelService back into native settings f
     assert.equal(validated.chatApiKey, 'chat-key-1');
     assert.equal(validated.defaultModel, 'gpt-4o');
     assert.equal(validated.followUpDefaultModel, 'gpt-4.1-mini');
+    assert.equal(validated.studyToolDefaultModel, 'gpt-4.1-mini');
     assert.equal(validated.topicTitleDefaultModel, 'gpt-4.1-nano');
     assert.equal(validated.kbBaseUrl, 'https://kb.example.com/openai');
     assert.equal(validated.kbApiKey, 'kb-key-1');
@@ -191,6 +195,7 @@ test('validateSettings appends the built-in AI&P test preset for existing modelS
                 chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
                 chatFallback: null,
                 followUp: null,
+                studyTool: null,
                 topicTitle: null,
                 embedding: null,
                 rerank: null,
@@ -224,6 +229,7 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
     assert.equal(settings.emoticonPrompt, DEFAULT_SETTINGS.emoticonPrompt);
     assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);
     assert.equal(settings.followUpDefaultModel, DEFAULT_SETTINGS.followUpDefaultModel);
+    assert.equal(settings.studyToolDefaultModel, DEFAULT_SETTINGS.studyToolDefaultModel);
     assert.equal(settings.topicTitleDefaultModel, DEFAULT_SETTINGS.topicTitleDefaultModel);
     assert.equal(settings.enableThoughtChainInjection, false);
 });
@@ -246,6 +252,7 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.enableEmoticonPrompt, DEFAULT_SETTINGS.enableEmoticonPrompt);
     assert.equal(settings.emoticonPrompt, DEFAULT_SETTINGS.emoticonPrompt);
     assert.equal(settings.followUpDefaultModel, DEFAULT_SETTINGS.followUpDefaultModel);
+    assert.equal(settings.studyToolDefaultModel, DEFAULT_SETTINGS.studyToolDefaultModel);
     assert.equal(settings.followUpPromptTemplate, DEFAULT_SETTINGS.followUpPromptTemplate);
     assert.equal(settings.enableTopicTitleGeneration, DEFAULT_SETTINGS.enableTopicTitleGeneration);
     assert.equal(settings.topicTitleDefaultModel, DEFAULT_SETTINGS.topicTitleDefaultModel);
@@ -310,6 +317,7 @@ test('writeSettings persists normalized content and refreshes the cache', async 
         sidebarWidth: 50,
         followUpDefaultModel: 'follow-model',
         followUpPromptTemplate: 'Custom follow-up template',
+        studyToolDefaultModel: 'study-tool-model',
         topicTitleDefaultModel: 'title-model',
         topicTitlePromptTemplate: 'Custom title template',
         rogueField: 'remove-me',
@@ -320,6 +328,7 @@ test('writeSettings persists normalized content and refreshes the cache', async 
     assert.equal(written.sidebarWidth, DEFAULT_SETTINGS.sidebarWidth);
     assert.equal(written.followUpDefaultModel, 'follow-model');
     assert.equal(written.followUpPromptTemplate, 'Custom follow-up template');
+    assert.equal(written.studyToolDefaultModel, 'study-tool-model');
     assert.equal(written.topicTitleDefaultModel, 'title-model');
     assert.equal(written.topicTitlePromptTemplate, 'Custom title template');
     assert.equal('rogueField' in written, false);

@@ -131,6 +131,10 @@ function createNotesController(deps = {}) {
             get: () => getNotesSlice().agentNotes,
             set: (value) => patchNotes({ agentNotes: value }),
         },
+        allAgentManualNotes: {
+            get: () => getNotesSlice().allAgentManualNotes || [],
+            set: (value) => patchNotes({ allAgentManualNotes: Array.isArray(value) ? value : [] }),
+        },
         notesScope: {
             get: () => getNotesSlice().notesScope,
             set: (value) => patchNotes({ notesScope: value }),
@@ -153,7 +157,7 @@ function createNotesController(deps = {}) {
         },
         manualNotesLibraryFilter: {
             get: () => getNotesSlice().manualNotesLibraryFilter || 'all',
-            set: (value) => patchNotes({ manualNotesLibraryFilter: value === 'selected' ? 'selected' : 'all' }),
+            set: (value) => patchNotes({ manualNotesLibraryFilter: String(value || 'all') }),
         },
         noteDetailKind: {
             get: () => getNotesSlice().noteDetailKind,
@@ -174,6 +178,13 @@ function createNotesController(deps = {}) {
         pendingFlashcardGeneration: {
             get: () => getNotesSlice().pendingFlashcardGeneration,
             set: (value) => patchNotes({ pendingFlashcardGeneration: value }),
+        },
+        pendingQuizGenerations: {
+            get: () => {
+                const pending = getNotesSlice().pendingQuizGenerations;
+                return Array.isArray(pending) ? pending : [];
+            },
+            set: (value) => patchNotes({ pendingQuizGenerations: Array.isArray(value) ? value : [] }),
         },
         studioPomodoroVisible: {
             get: () => getNotesSlice().studioPomodoroVisible === true,
@@ -198,6 +209,9 @@ function createNotesController(deps = {}) {
         },
         currentSelectedItem: {
             get: () => getCurrentSelectedItem() || { id: null, name: null, config: null },
+        },
+        agents: {
+            get: () => getSessionSlice().agents || [],
         },
         topics: {
             get: () => getSessionSlice().topics || [],
@@ -235,7 +249,13 @@ function createNotesController(deps = {}) {
     }
 
     function getManualLibraryNotes() {
-        return filterManualNotes(state.agentNotes);
+        const filter = String(state.manualNotesLibraryFilter || 'all');
+        const sourceNotes = Array.isArray(state.allAgentManualNotes) ? state.allAgentManualNotes : [];
+        const fallbackNotes = Array.isArray(state.agentNotes) ? state.agentNotes : [];
+        const notes = sourceNotes.length ? sourceNotes : fallbackNotes;
+        return filterManualNotes(filter === 'all'
+            ? notes
+            : notes.filter((note) => String(note.agentId || '') === filter));
     }
 
     function getActiveNote() {
@@ -817,9 +837,10 @@ function createNotesController(deps = {}) {
         el.manualNotesLibraryModal?.classList.remove('hidden');
         el.manualNotesLibraryModal?.setAttribute('aria-hidden', 'false');
         documentObj.body?.classList.add('manual-notes-library-open');
-        el.manualNotesLibraryFilterAllBtn?.focus();
+        el.manualNotesLibrarySubjectFilterSelect?.focus();
 
         // Re-read persisted notes so externally added notes appear without a full app reload.
+        void notesOperationsApi.loadAllAgentManualNotes();
         void notesOperationsApi.loadAgentNotes();
         void notesOperationsApi.loadTopicNotes();
     }
@@ -871,6 +892,7 @@ function createNotesController(deps = {}) {
         }
         if (clearAgentNotes) {
             state.agentNotes = [];
+            state.allAgentManualNotes = [];
         }
         if (clearActiveNote) {
             notesDomApi.clearNoteEditor();
@@ -956,7 +978,27 @@ function createNotesController(deps = {}) {
         });
     }
 
+    function hasPendingQuizGenerationForCurrentTopic() {
+        const agentId = String(state.currentSelectedItem?.id || '').trim();
+        const topicId = String(state.currentTopicId || '').trim();
+        if (!agentId || !topicId || !Array.isArray(state.pendingQuizGenerations)) {
+            return false;
+        }
+
+        return state.pendingQuizGenerations.some((pending) => (
+            pending
+            && String(pending.agentId || '') === agentId
+            && String(pending.topicId || '') === topicId
+        ));
+    }
+
     function openQuizConfigModal(options = {}) {
+        if (hasPendingQuizGenerationForCurrentTopic()) {
+            ui.showToastNotification('当前话题已有选择题正在生成，请稍候。', 'info');
+            notesDomApi.renderNotesPanel();
+            return;
+        }
+
         if (options.trigger instanceof HTMLElementCtor) {
             quizConfigTrigger = options.trigger;
         }
@@ -1017,10 +1059,9 @@ function createNotesController(deps = {}) {
         syncQuizConfigControls();
         setQuizConfigGenerating(true);
         try {
-            const success = await notesOperationsApi.runNotesTool('quiz', config);
-            if (success) {
-                closeQuizConfigModal({ restoreFocus: false });
-            }
+            const generationPromise = notesOperationsApi.runNotesTool('quiz', config);
+            closeQuizConfigModal({ restoreFocus: false });
+            await generationPromise;
         } catch (error) {
             ui.showToastNotification(`生成失败：${error?.message || String(error)}`, 'error');
         } finally {
@@ -1067,11 +1108,8 @@ function createNotesController(deps = {}) {
         el.manualNotesLibraryBtn?.addEventListener('click', (event) => {
             void openManualNotesLibrary({ trigger: event.currentTarget });
         });
-        el.manualNotesLibraryFilterAllBtn?.addEventListener('click', () => {
-            setManualNotesLibraryFilter('all');
-        });
-        el.manualNotesLibraryFilterSelectedBtn?.addEventListener('click', () => {
-            setManualNotesLibraryFilter('selected');
+        el.manualNotesLibrarySubjectFilterSelect?.addEventListener('change', (event) => {
+            setManualNotesLibraryFilter(event.currentTarget?.value || 'all');
         });
         el.manualNotesLibraryCloseBtn?.addEventListener('click', () => {
             closeManualNotesLibrary();
@@ -1262,6 +1300,7 @@ function createNotesController(deps = {}) {
         findNoteById,
         getActiveNote,
         getCurrentDetailNote,
+        loadAllAgentManualNotes: (...args) => notesOperationsApi.loadAllAgentManualNotes(...args),
         loadAgentNotes: (...args) => notesOperationsApi.loadAgentNotes(...args),
         loadTopicNotes: (...args) => notesOperationsApi.loadTopicNotes(...args),
         normalizeNote,

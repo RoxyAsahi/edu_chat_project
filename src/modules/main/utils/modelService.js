@@ -4,6 +4,7 @@ const MODEL_SERVICE_DEFAULT_KEYS = Object.freeze([
     'chat',
     'chatFallback',
     'followUp',
+    'studyTool',
     'topicTitle',
     'embedding',
     'rerank',
@@ -22,7 +23,8 @@ const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
 const AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
 const AIP_TEST_CHAT_ENDPOINT = `${AIP_TEST_API_BASE_URL}/v1/chat/completions`;
 const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
-const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B';
+const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
+const AIP_TEST_AUXILIARY_DEFAULT_MODEL = 'Qwen/Qwen3.5-122B-A10B';
 const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
     {
         id: 'Qwen/Qwen3.6-35B-A3B',
@@ -53,6 +55,36 @@ const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
         name: 'Qwen/Qwen3-VL-Reranker-8B',
         group: 'rerank',
         capabilities: { chat: false, embedding: false, rerank: true, vision: true, reasoning: false },
+    },
+    {
+        id: 'Qwen/Qwen3.5-4B',
+        name: 'Qwen/Qwen3.5-4B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: false },
+    },
+    {
+        id: 'Qwen/Qwen3.5-35B-A3B',
+        name: 'Qwen/Qwen3.5-35B-A3B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: false },
+    },
+    {
+        id: 'Qwen/Qwen3.5-397B-A17B',
+        name: 'Qwen/Qwen3.5-397B-A17B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
+    },
+    {
+        id: 'deepseek-ai/DeepSeek-V4-Flash',
+        name: 'new-model',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
+    },
+    {
+        id: 'Qwen/Qwen3.5-122B-A10B',
+        name: 'Qwen/Qwen3.5-122B-A10B',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: false },
     },
 ]);
 
@@ -116,6 +148,7 @@ const DEFAULT_MODEL_SERVICE = Object.freeze({
         chat: null,
         chatFallback: null,
         followUp: null,
+        studyTool: null,
         topicTitle: null,
         embedding: null,
         rerank: null,
@@ -125,6 +158,7 @@ const DEFAULT_MODEL_SERVICE = Object.freeze({
 const TASK_KEY_BY_LEGACY_SETTINGS_KEY = Object.freeze({
     defaultModel: 'chat',
     followUpDefaultModel: 'followUp',
+    studyToolDefaultModel: 'studyTool',
     topicTitleDefaultModel: 'topicTitle',
     kbEmbeddingModel: 'embedding',
     kbRerankModel: 'rerank',
@@ -138,6 +172,7 @@ function createDefaultModelService() {
             chat: null,
             chatFallback: null,
             followUp: null,
+            studyTool: null,
             topicTitle: null,
             embedding: null,
             rerank: null,
@@ -532,6 +567,26 @@ function createBuiltInTestProvider() {
     });
 }
 
+function createBuiltInTestProviderDefaults(provider = {}) {
+    const refFor = (modelId) => resolveDefaultRefForProvider(provider, modelId);
+    return {
+        chat: refFor(AIP_TEST_DEFAULT_MODEL),
+        chatFallback: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        followUp: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        studyTool: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        topicTitle: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        embedding: refFor('Qwen/Qwen3-VL-Embedding-8B'),
+        rerank: refFor('Qwen/Qwen3-VL-Reranker-8B'),
+    };
+}
+
+function mergeDefaultsPreservingConfigured(fallbackDefaults = {}, configuredDefaults = {}) {
+    return MODEL_SERVICE_DEFAULT_KEYS.reduce((acc, key) => {
+        acc[key] = configuredDefaults?.[key] || fallbackDefaults?.[key] || null;
+        return acc;
+    }, {});
+}
+
 function ensureBuiltInTestProvider(service = DEFAULT_MODEL_SERVICE) {
     const normalizedService = normalizeModelService(service);
     if (!Array.isArray(normalizedService.providers) || normalizedService.providers.length === 0) {
@@ -573,9 +628,18 @@ function ensureBuiltInTestProvider(service = DEFAULT_MODEL_SERVICE) {
         ]),
     });
 
-    return normalizeModelService({
+    const serviceWithProvider = normalizeModelService({
         ...normalizedService,
         providers,
+    });
+    const currentBuiltInProvider = serviceWithProvider.providers[existingIndex];
+
+    return normalizeModelService({
+        ...serviceWithProvider,
+        defaults: mergeDefaultsPreservingConfigured(
+            createBuiltInTestProviderDefaults(currentBuiltInProvider),
+            serviceWithProvider.defaults
+        ),
     });
 }
 
@@ -647,6 +711,7 @@ function buildModelServiceFromSettings(settings = {}) {
     const chatModels = collectLegacyModels(settings, [
         [settings?.defaultModel, 'chat', { chat: true }],
         [settings?.followUpDefaultModel, 'chat', { chat: true }],
+        [settings?.studyToolDefaultModel, 'chat', { chat: true }],
         [settings?.topicTitleDefaultModel, 'chat', { chat: true }],
         [settings?.lastModel, 'chat', { chat: true }],
         [settings?.guideModel, 'chat', { chat: true }],
@@ -720,6 +785,12 @@ function buildModelServiceFromSettings(settings = {}) {
             ? resolveDefaultRefForProvider(
                 primaryProvider,
                 normalizeText(settings?.followUpDefaultModel) || normalizeText(settings?.defaultModel)
+            )
+            : null,
+        studyTool: primaryProvider
+            ? resolveDefaultRefForProvider(
+                primaryProvider,
+                normalizeText(settings?.studyToolDefaultModel) || normalizeText(settings?.defaultModel)
             )
             : null,
         topicTitle: primaryProvider
@@ -1003,6 +1074,7 @@ function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVIC
 
     const chatModel = getLegacyFallbackModel(normalizedModelService, 'chat');
     const followUpModel = getLegacyFallbackModel(normalizedModelService, 'followUp') || chatModel;
+    const studyToolModel = getLegacyFallbackModel(normalizedModelService, 'studyTool') || chatModel;
     const topicTitleModel = getLegacyFallbackModel(normalizedModelService, 'topicTitle') || chatModel;
     const embeddingModel = getLegacyFallbackModel(normalizedModelService, 'embedding');
     const rerankModel = getLegacyFallbackModel(normalizedModelService, 'rerank');
@@ -1015,6 +1087,7 @@ function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVIC
         chatApiKey: chatExecution?.apiKey || '',
         defaultModel: chatModel,
         followUpDefaultModel: followUpModel,
+        studyToolDefaultModel: studyToolModel,
         topicTitleDefaultModel: topicTitleModel,
         kbBaseUrl: kbExecution?.provider?.apiBaseUrl || normalizeApiBaseUrl(previousSettings?.kbBaseUrl || ''),
         kbApiKey: kbExecution?.apiKey || '',
@@ -1098,6 +1171,7 @@ function createFetchedModelEntry(modelId = '') {
 module.exports = {
     AIP_TEST_API_BASE_URL,
     AIP_TEST_API_KEY,
+    AIP_TEST_AUXILIARY_DEFAULT_MODEL,
     AIP_TEST_CHAT_ENDPOINT,
     AIP_TEST_DEFAULT_MODEL,
     AIP_TEST_PROVIDER_NAME,

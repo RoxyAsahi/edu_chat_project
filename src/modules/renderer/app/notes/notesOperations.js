@@ -164,6 +164,61 @@ function buildQuizInstruction(options = {}) {
     ].join('\n');
 }
 
+function cloneArray(value) {
+    return Array.isArray(value) ? [...value] : [];
+}
+
+function snapshotTopic(topic) {
+    if (!topic || typeof topic !== 'object') {
+        return null;
+    }
+
+    return {
+        ...topic,
+        selectedKnowledgeBaseDocumentIds: cloneArray(topic.selectedKnowledgeBaseDocumentIds),
+    };
+}
+
+function snapshotChatHistory(history = []) {
+    return Array.isArray(history)
+        ? history.map((message) => ({
+            ...message,
+            attachments: cloneArray(message?.attachments),
+            kbContextRefs: cloneArray(message?.kbContextRefs),
+            studyMemoryRefs: cloneArray(message?.studyMemoryRefs),
+            followUps: cloneArray(message?.followUps),
+            citations: cloneArray(message?.citations),
+        }))
+        : [];
+}
+
+function snapshotNotes(notes = []) {
+    return Array.isArray(notes)
+        ? notes.map((note) => ({
+            ...note,
+            sourceMessageIds: cloneArray(note?.sourceMessageIds),
+            sourceDocumentRefs: cloneArray(note?.sourceDocumentRefs),
+        }))
+        : [];
+}
+
+function countStudyInputSources(studyInput = {}, selectedNoteCount = 0) {
+    if (Number(selectedNoteCount) > 0) {
+        return Number(selectedNoteCount);
+    }
+
+    const documentCount = Array.isArray(studyInput.sourceDocumentRefs)
+        ? studyInput.sourceDocumentRefs.length
+        : 0;
+    if (documentCount > 0) {
+        return documentCount;
+    }
+
+    return Array.isArray(studyInput.sourceMessageIds)
+        ? studyInput.sourceMessageIds.length
+        : 0;
+}
+
 function createNotesOperations(deps = {}) {
     const state = deps.state || {};
     const el = deps.el;
@@ -198,6 +253,107 @@ function createNotesOperations(deps = {}) {
     const revealNote = deps.revealNote || (() => {});
     const setRightPanelMode = deps.setRightPanelMode || (() => {});
     const setSidePanelTab = deps.setSidePanelTab || (() => {});
+
+    function getPendingQuizGenerations() {
+        return Array.isArray(state.pendingQuizGenerations)
+            ? state.pendingQuizGenerations
+            : [];
+    }
+
+    function hasPendingQuizGeneration(agentId, topicId) {
+        return getPendingQuizGenerations().some((pending) => (
+            pending
+            && String(pending.agentId || '') === String(agentId || '')
+            && String(pending.topicId || '') === String(topicId || '')
+        ));
+    }
+
+    function beginPendingQuizGeneration(payload = {}) {
+        const requestId = String(payload.requestId || '').trim();
+        if (!requestId) {
+            return;
+        }
+
+        state.pendingQuizGenerations = [
+            ...getPendingQuizGenerations().filter((pending) => pending?.requestId !== requestId),
+            {
+                requestId,
+                agentId: String(payload.agentId || ''),
+                topicId: String(payload.topicId || ''),
+                title: String(payload.title || '选择题练习'),
+                questionCount: Number(payload.questionCount || 0),
+                difficulty: String(payload.difficulty || 'medium'),
+                sourceCount: Number(payload.sourceCount || 0),
+                focus: String(payload.focus || ''),
+                startedAt: Number(payload.startedAt || Date.now()),
+            },
+        ];
+        setRightPanelMode('notes');
+        renderNotesPanel();
+    }
+
+    function updatePendingQuizGeneration(requestId, patch = {}) {
+        const normalizedRequestId = String(requestId || '').trim();
+        if (!normalizedRequestId) {
+            return;
+        }
+
+        let changed = false;
+        state.pendingQuizGenerations = getPendingQuizGenerations().map((pending) => {
+            if (pending?.requestId !== normalizedRequestId) {
+                return pending;
+            }
+            changed = true;
+            return {
+                ...pending,
+                ...patch,
+            };
+        });
+        if (changed) {
+            renderNotesPanel();
+        }
+    }
+
+    function clearPendingQuizGeneration(requestId) {
+        const normalizedRequestId = String(requestId || '').trim();
+        if (!normalizedRequestId) {
+            return;
+        }
+
+        const nextPending = getPendingQuizGenerations().filter((pending) => pending?.requestId !== normalizedRequestId);
+        if (nextPending.length === getPendingQuizGenerations().length) {
+            return;
+        }
+        state.pendingQuizGenerations = nextPending;
+        renderNotesPanel();
+    }
+
+    function createGenerationContext(kind) {
+        const selectedItem = state.currentSelectedItem || {};
+        return {
+            kind,
+            requestId: createId(`study_${kind}`),
+            agentId: String(selectedItem.id || ''),
+            topicId: String(state.currentTopicId || ''),
+            selectedItem: {
+                ...selectedItem,
+                config: { ...(selectedItem.config || {}) },
+            },
+            settings: { ...(state.settings || {}) },
+            currentTopic: snapshotTopic(getCurrentTopic()),
+            currentChatHistory: snapshotChatHistory(state.currentChatHistory),
+            selectedNotes: snapshotNotes(getSelectedNotes()),
+            topicContext: buildTopicContext(),
+            startedAt: Date.now(),
+        };
+    }
+
+    function isActiveGenerationContext(context = {}) {
+        return (
+            String(state.currentSelectedItem?.id || '') === String(context.agentId || '')
+            && String(state.currentTopicId || '') === String(context.topicId || '')
+        );
+    }
 
     async function loadTopicNotes() {
         if (!state.currentSelectedItem.id || !state.currentTopicId) {
@@ -271,9 +427,39 @@ function createNotesOperations(deps = {}) {
         }
     }
 
+    async function loadAllAgentManualNotes() {
+        const agents = Array.isArray(state.agents) ? state.agents : [];
+        if (!agents.length || typeof chatAPI.listAgentNotes !== 'function') {
+            state.allAgentManualNotes = [];
+            if (state.manualNotesLibraryOpen) {
+                renderManualNotesLibrary();
+            }
+            return;
+        }
+
+        const results = await Promise.all(agents.map(async (agent) => {
+            const agentId = String(agent?.id || '').trim();
+            if (!agentId) {
+                return [];
+            }
+            const result = await chatAPI.listAgentNotes(agentId).catch(() => ({ success: false, items: [] }));
+            return result?.success && Array.isArray(result.items)
+                ? result.items.map((note) => normalizeNote({ ...note, agentId: note?.agentId || agentId }))
+                : [];
+        }));
+
+        state.allAgentManualNotes = results.flat().filter((note) => getNormalizedNoteKind(note) === 'note');
+        if (state.manualNotesLibraryOpen) {
+            renderManualNotesLibrary();
+        }
+    }
+
     async function refreshNotesData() {
         await loadTopicNotes();
         await loadAgentNotes();
+        if (state.manualNotesLibraryOpen) {
+            await loadAllAgentManualNotes();
+        }
     }
 
     async function saveActiveNote() {
@@ -507,13 +693,17 @@ function createNotesOperations(deps = {}) {
         return favoriteNote;
     }
 
-    async function resolveStudyInputText(options = {}) {
+    async function resolveStudyInputText(options = {}, generationContext = {}) {
         const appendChatContext = (studyInput) => {
             if (!options.includeChatContext || !studyInput?.text) {
                 return studyInput;
             }
 
-            const chatContext = buildRecentChatContext(state.currentChatHistory);
+            const chatContext = buildRecentChatContext(
+                Array.isArray(generationContext.currentChatHistory)
+                    ? generationContext.currentChatHistory
+                    : state.currentChatHistory,
+            );
             if (!chatContext.text) {
                 return studyInput;
             }
@@ -530,7 +720,9 @@ function createNotesOperations(deps = {}) {
             };
         };
 
-        const selectedNotes = getSelectedNotes();
+        const selectedNotes = Array.isArray(generationContext.selectedNotes)
+            ? generationContext.selectedNotes
+            : getSelectedNotes();
         if (selectedNotes.length > 0) {
             return appendChatContext({
                 sourceLabel: 'selected-notes',
@@ -542,7 +734,7 @@ function createNotesOperations(deps = {}) {
             });
         }
 
-        const currentTopic = getCurrentTopic();
+        const currentTopic = generationContext.currentTopic || getCurrentTopic();
         if (!currentTopic?.knowledgeBaseId) {
             return null;
         }
@@ -576,12 +768,6 @@ function createNotesOperations(deps = {}) {
         const quizOptions = kind === 'quiz'
             ? normalizeQuizGenerationOptions(options)
             : DEFAULT_QUIZ_GENERATION_CONFIG;
-        const studyInput = await resolveStudyInputText(quizOptions);
-        if (!studyInput?.text) {
-            ui.showToastNotification('请先选择笔记，或为当前话题绑定并导入来源资料。', 'warning');
-            return false;
-        }
-
         const prompts = {
             analysis: {
                 title: `深度分析报告 ${new Date().toLocaleString()}`,
@@ -620,139 +806,201 @@ function createNotesOperations(deps = {}) {
             return false;
         }
 
-        if (prompt.kind === 'flashcards') {
-            flashcardsApi.beginPendingGeneration({
-                title: prompt.title,
-                sourceCount: Array.isArray(studyInput.sourceDocumentRefs) ? studyInput.sourceDocumentRefs.length : 0,
-            });
-        }
-
-        ui.showToastNotification('正在生成内容，请稍候…', 'info', 2500);
-
-        const response = await chatAPI.sendChatRequest({
-            requestId: createId(`study_${kind}`),
-            endpoint: state.settings.chatEndpoint,
-            apiKey: state.settings.chatApiKey,
-            messages: [
-                {
-                    role: 'system',
-                    content: prompt.kind === 'quiz' || prompt.kind === 'flashcards'
-                        ? '你是 UniStudy 的学习助手。请严格遵守输出格式要求，不要输出任何额外说明。'
-                        : '你是 UniStudy 的学习助手，请输出结构清晰、适合学习沉淀的 Markdown。',
-                },
-                { role: 'user', content: `${prompt.instruction}\n\n学习材料如下：\n\n${studyInput.text}` },
-            ],
-            modelConfig: {
-                model: state.currentSelectedItem.config?.model || 'gemini-3.1-flash-lite-preview',
-                temperature: 0.4,
-                max_tokens: Number(state.currentSelectedItem.config?.maxOutputTokens ?? 2400),
-                top_p: 0.95,
-                stream: false,
-            },
-            context: buildTopicContext(),
-        });
-
-        if (response?.error) {
-            if (prompt.kind === 'flashcards') {
-                flashcardsApi.clearPendingGeneration();
-                setRightPanelMode('notes');
-                renderNotesPanel();
-            }
-            ui.showToastNotification(`生成失败：${response.error}`, 'error');
+        const generationContext = createGenerationContext(kind);
+        if (prompt.kind === 'quiz' && hasPendingQuizGeneration(generationContext.agentId, generationContext.topicId)) {
+            ui.showToastNotification('当前话题已有选择题正在生成，请稍候。', 'info');
             return false;
         }
 
-        const responseContent = response?.response?.choices?.[0]?.message?.content || '';
-        if (!responseContent.trim()) {
-            if (prompt.kind === 'flashcards') {
-                flashcardsApi.clearPendingGeneration();
-                setRightPanelMode('notes');
-                renderNotesPanel();
-            }
-            ui.showToastNotification('模型没有返回可保存的内容。', 'warning');
-            return false;
-        }
-
-        let contentMarkdown = responseContent;
-        let quizSet = null;
-        let flashcardDeck = null;
-        let flashcardProgress = null;
-
+        let pendingQuizRequestId = null;
         if (prompt.kind === 'quiz') {
-            quizSet = parseQuizSetFromResponse(responseContent, prompt.title);
-            if (!quizSet) {
-                ui.showToastNotification('选择题生成结果格式无效，请重试。', 'error');
-                return false;
-            }
-
-            contentMarkdown = buildQuizSummaryMarkdown(quizSet);
-        } else if (prompt.kind === 'flashcards') {
-            const generated = flashcardsApi.buildGeneratedFlashcardContent(
-                responseContent,
-                prompt.title,
-                studyInput.sourceDocumentRefs,
-            );
-
-            if (!generated) {
-                flashcardsApi.clearPendingGeneration();
-                setRightPanelMode('notes');
-                renderNotesPanel();
-                ui.showToastNotification('闪卡生成结果格式无效，请重试。', 'error');
-                return false;
-            }
-
-            flashcardDeck = generated.flashcardDeck;
-            flashcardProgress = generated.flashcardProgress;
-            contentMarkdown = generated.contentMarkdown;
-        }
-
-        const saveResult = await chatAPI.saveTopicNote(state.currentSelectedItem.id, state.currentTopicId, {
-            title: prompt.kind === 'quiz'
-                ? (quizSet?.title || prompt.title)
-                : prompt.title,
-            contentMarkdown,
-            sourceMessageIds: studyInput.sourceMessageIds,
-            sourceDocumentRefs: studyInput.sourceDocumentRefs,
-            kind: prompt.kind,
-            quizSet,
-            flashcardDeck,
-            flashcardProgress,
-        });
-
-        if (!saveResult?.success) {
-            if (prompt.kind === 'flashcards') {
-                flashcardsApi.clearPendingGeneration();
-                setRightPanelMode('notes');
-                renderNotesPanel();
-            }
-            ui.showToastNotification(`保存生成结果失败：${saveResult?.error || '未知错误'}`, 'error');
-            return false;
-        }
-
-        await refreshNotesData();
-        const savedNote = normalizeNote(saveResult.item);
-        if (prompt.kind === 'flashcards' && flashcardsApi.hasStructuredFlashcards(savedNote)) {
-            flashcardsApi.clearPendingGeneration();
-            flashcardsApi.openPractice(savedNote, { trigger: el.generateFlashcardsBtn || null });
-        } else {
-            flashcardsApi.clearPendingGeneration();
-            openNoteDetail(savedNote, {
-                kind: getNormalizedNoteKind(savedNote),
-                trigger: prompt.kind === 'analysis'
-                    ? el.analyzeNotesBtn
-                    : (prompt.kind === 'quiz' ? el.generateQuizBtn : null),
+            pendingQuizRequestId = generationContext.requestId;
+            beginPendingQuizGeneration({
+                requestId: generationContext.requestId,
+                agentId: generationContext.agentId,
+                topicId: generationContext.topicId,
+                title: prompt.title,
+                questionCount: quizOptions.questionCount,
+                difficulty: quizOptions.difficulty,
+                sourceCount: 0,
+                focus: quizOptions.focus,
+                startedAt: generationContext.startedAt,
             });
         }
 
-        setSidePanelTab('notes');
-        ui.showToastNotification('已生成并保存到当前话题笔记。', 'success');
-        return true;
+        try {
+            const studyInput = await resolveStudyInputText(quizOptions, generationContext);
+            if (!studyInput?.text) {
+                ui.showToastNotification('请先选择笔记，或为当前话题绑定并导入来源资料。', 'warning');
+                return false;
+            }
+
+            if (prompt.kind === 'quiz') {
+                updatePendingQuizGeneration(generationContext.requestId, {
+                    sourceCount: countStudyInputSources(studyInput, generationContext.selectedNotes.length),
+                });
+            }
+
+            if (prompt.kind === 'flashcards') {
+                flashcardsApi.beginPendingGeneration({
+                    title: prompt.title,
+                    sourceCount: Array.isArray(studyInput.sourceDocumentRefs) ? studyInput.sourceDocumentRefs.length : 0,
+                });
+            }
+
+            ui.showToastNotification('正在生成内容，请稍候…', 'info', 2500);
+
+            const response = await chatAPI.sendChatRequest({
+                requestId: generationContext.requestId,
+                endpoint: generationContext.settings.chatEndpoint,
+                apiKey: generationContext.settings.chatApiKey,
+                messages: [
+                    {
+                        role: 'system',
+                        content: prompt.kind === 'quiz' || prompt.kind === 'flashcards'
+                            ? '你是 UniStudy 的学习助手。请严格遵守输出格式要求，不要输出任何额外说明。'
+                            : '你是 UniStudy 的学习助手，请输出结构清晰、适合学习沉淀的 Markdown。',
+                    },
+                    { role: 'user', content: `${prompt.instruction}\n\n学习材料如下：\n\n${studyInput.text}` },
+                ],
+                modelConfig: {
+                    purpose: 'studyTool',
+                    modelRef: generationContext.settings.modelService?.defaults?.studyTool || null,
+                    model: String(generationContext.settings.studyToolDefaultModel || '').trim()
+                        || generationContext.selectedItem.config?.model
+                        || 'gemini-3.1-flash-lite-preview',
+                    temperature: 0.4,
+                    max_tokens: Number(generationContext.selectedItem.config?.maxOutputTokens ?? 2400),
+                    top_p: 0.95,
+                    stream: false,
+                },
+                context: generationContext.topicContext,
+            });
+
+            if (response?.error) {
+                if (prompt.kind === 'flashcards') {
+                    flashcardsApi.clearPendingGeneration();
+                    setRightPanelMode('notes');
+                    renderNotesPanel();
+                }
+                ui.showToastNotification(`生成失败：${response.error}`, 'error');
+                return false;
+            }
+
+            const responseContent = response?.response?.choices?.[0]?.message?.content || '';
+            if (!responseContent.trim()) {
+                if (prompt.kind === 'flashcards') {
+                    flashcardsApi.clearPendingGeneration();
+                    setRightPanelMode('notes');
+                    renderNotesPanel();
+                }
+                ui.showToastNotification('模型没有返回可保存的内容。', 'warning');
+                return false;
+            }
+
+            let contentMarkdown = responseContent;
+            let quizSet = null;
+            let flashcardDeck = null;
+            let flashcardProgress = null;
+
+            if (prompt.kind === 'quiz') {
+                quizSet = parseQuizSetFromResponse(responseContent, prompt.title);
+                if (!quizSet) {
+                    ui.showToastNotification('选择题生成结果格式无效，请重试。', 'error');
+                    return false;
+                }
+
+                contentMarkdown = buildQuizSummaryMarkdown(quizSet);
+            } else if (prompt.kind === 'flashcards') {
+                const generated = flashcardsApi.buildGeneratedFlashcardContent(
+                    responseContent,
+                    prompt.title,
+                    studyInput.sourceDocumentRefs,
+                );
+
+                if (!generated) {
+                    flashcardsApi.clearPendingGeneration();
+                    setRightPanelMode('notes');
+                    renderNotesPanel();
+                    ui.showToastNotification('闪卡生成结果格式无效，请重试。', 'error');
+                    return false;
+                }
+
+                flashcardDeck = generated.flashcardDeck;
+                flashcardProgress = generated.flashcardProgress;
+                contentMarkdown = generated.contentMarkdown;
+            }
+
+            const saveResult = await chatAPI.saveTopicNote(generationContext.agentId, generationContext.topicId, {
+                title: prompt.kind === 'quiz'
+                    ? (quizSet?.title || prompt.title)
+                    : prompt.title,
+                contentMarkdown,
+                sourceMessageIds: studyInput.sourceMessageIds,
+                sourceDocumentRefs: studyInput.sourceDocumentRefs,
+                kind: prompt.kind,
+                quizSet,
+                flashcardDeck,
+                flashcardProgress,
+            });
+
+            if (!saveResult?.success) {
+                if (prompt.kind === 'flashcards') {
+                    flashcardsApi.clearPendingGeneration();
+                    setRightPanelMode('notes');
+                    renderNotesPanel();
+                }
+                ui.showToastNotification(`保存生成结果失败：${saveResult?.error || '未知错误'}`, 'error');
+                return false;
+            }
+
+            const savedNote = normalizeNote({
+                ...(saveResult.item || {}),
+                agentId: saveResult.item?.agentId || generationContext.agentId,
+                topicId: saveResult.item?.topicId || generationContext.topicId,
+            });
+
+            if (!isActiveGenerationContext(generationContext)) {
+                flashcardsApi.clearPendingGeneration();
+                ui.showToastNotification('已生成并保存到发起的话题笔记。', 'success');
+                return true;
+            }
+
+            await refreshNotesData();
+            if (!isActiveGenerationContext(generationContext)) {
+                flashcardsApi.clearPendingGeneration();
+                ui.showToastNotification('已生成并保存到发起的话题笔记。', 'success');
+                return true;
+            }
+
+            if (prompt.kind === 'flashcards' && flashcardsApi.hasStructuredFlashcards(savedNote)) {
+                flashcardsApi.clearPendingGeneration();
+                flashcardsApi.openPractice(savedNote, { trigger: el.generateFlashcardsBtn || null });
+            } else {
+                flashcardsApi.clearPendingGeneration();
+                openNoteDetail(savedNote, {
+                    kind: getNormalizedNoteKind(savedNote),
+                    trigger: prompt.kind === 'analysis'
+                        ? el.analyzeNotesBtn
+                        : (prompt.kind === 'quiz' ? el.generateQuizBtn : null),
+                });
+            }
+
+            setSidePanelTab('notes');
+            ui.showToastNotification('已生成并保存到当前话题笔记。', 'success');
+            return true;
+        } finally {
+            if (pendingQuizRequestId) {
+                clearPendingQuizGeneration(pendingQuizRequestId);
+            }
+        }
     }
 
     return {
         createNoteFromMessage,
         deleteActiveNote,
         deleteNoteRecord,
+        loadAllAgentManualNotes,
         loadAgentNotes,
         loadTopicNotes,
         refreshNotesData,

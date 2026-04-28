@@ -181,6 +181,12 @@ function createOverviewDom() {
     };
 }
 
+test('workspace subject fallback avatar uses the app logo', async () => {
+    const { DEFAULT_AGENT_AVATAR } = await loadWorkspaceModule();
+
+    assert.equal(DEFAULT_AGENT_AVATAR, '../assets/brand-logo.png');
+});
+
 test('selectTopic stops the previous watcher before starting the next one', async () => {
     const { createWorkspaceController } = await loadWorkspaceModule();
     const harness = createControllerHarness();

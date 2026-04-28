@@ -46,6 +46,21 @@ test('renderer shell leaves Mermaid on the lazy-load path', async () => {
     assert.equal(srcs.includes('../../vendor/mermaid.min.js'), false);
 });
 
+test('renderer shell allows bundled emoji data sources through connect-src', async () => {
+    const { document } = await loadRendererShell();
+    const policy = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') || '';
+
+    assert.match(policy, /connect-src[^;]*\bdata:/);
+    assert.match(policy, /connect-src[^;]*\bblob:/);
+});
+
+test('renderer shell uses the app logo as the subject avatar fallback', async () => {
+    const { document } = await loadRendererShell();
+    const preview = document.getElementById('agentAvatarPreview');
+
+    assert.equal(preview?.getAttribute('src'), '../assets/brand-logo.png');
+});
+
 test('renderer shell keeps the critical DOM anchors for controller wiring', async () => {
     const { document } = await loadRendererShell();
 
@@ -90,10 +105,22 @@ test('manual notes page controls stay compact and left aligned', async () => {
 
     assert.match(workspaceCss, /\.manual-notes-library-page__header\s*\{[\s\S]*justify-content:\s*flex-start;/);
     assert.match(workspaceCss, /\.manual-notes-library-page__filters\s*\{[\s\S]*order:\s*2;/);
-    assert.match(workspaceCss, /\.manual-notes-library-page__filter\s*\{[\s\S]*min-height:\s*32px;/);
+    assert.match(workspaceCss, /\.manual-notes-library-page__subject-filter\s*\{[\s\S]*min-height:\s*32px;/);
     assert.match(workspaceCss, /\.manual-notes-library-page__new-note\s*\{[\s\S]*min-height:\s*32px;/);
     assert.match(sidepanelCss, /\.notes-studio-panel-switch\s*\{[\s\S]*justify-self:\s*flex-start;/);
     assert.match(sidepanelCss, /\.notes-studio-panel-switch__btn\s*\{[\s\S]*min-height:\s*32px;/);
+});
+
+test('renderer chat header keeps the subject settings action from increasing titlebar height', async () => {
+    const chatCssPath = path.resolve(__dirname, '../src/renderer/styles/chat.css');
+    const responsiveCssPath = path.resolve(__dirname, '../src/renderer/styles/responsive.css');
+    const chatCss = await fs.readFile(chatCssPath, 'utf8');
+    const responsiveCss = await fs.readFile(responsiveCssPath, 'utf8');
+
+    assert.match(chatCss, /\.chat-stage__header\s*\{[\s\S]*min-height:\s*34px;[\s\S]*position:\s*relative;/);
+    assert.match(chatCss, /\.chat-stage__header \.chat-stage__header-actions\s*\{[\s\S]*position:\s*absolute;[\s\S]*transform:\s*translateY\(-50%\);/);
+    assert.match(chatCss, /\.chat-stage__header-actions \.icon-text-btn\s*\{[\s\S]*min-height:\s*0;[\s\S]*height:\s*24px;/);
+    assert.match(responsiveCss, /\.chat-stage__header > div:first-child\s*\{[\s\S]*padding-right:\s*50px;/);
 });
 
 test('renderer chat stylesheet keeps assistant hover timestamps and bubble-only user messages', async () => {
