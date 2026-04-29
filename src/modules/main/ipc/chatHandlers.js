@@ -11,6 +11,7 @@ const {
     DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
     DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE,
     DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE,
+    THINKING_CHAT_REASONING_EFFORTS,
 } = require('../utils/settingsSchema');
 const {
     TASK_KEY_BY_LEGACY_SETTINGS_KEY,
@@ -61,6 +62,23 @@ const FOLLOW_UP_HTML_BLOCK_REGEX = /<(style|script|svg|canvas|iframe)\b[^>]*>[\s
 const FOLLOW_UP_BUTTON_REGEX = /<button\b[^>]*>([\s\S]*?)<\/button>/gi;
 const FOLLOW_UP_BLOCK_TAG_REGEX = /<\/?(address|article|aside|blockquote|br|caption|dd|details|div|dl|dt|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|li|main|nav|ol|p|pre|section|summary|table|tbody|td|tfoot|th|thead|tr|ul)\b[^>]*>/gi;
 const UTILITY_TASK_DISABLE_THINKING_MODEL_REGEX = /qwen/i;
+const OPENAI_COMPATIBLE_THINKING_BUDGET_MODEL_REGEX = /(qwen|qwq|glm|zhipu|kimi|moonshot|deepseek|hunyuan|doubao|mimo)/i;
+const OPENAI_COMPATIBLE_QWEN_THINKING_MODEL_REGEX = /(qwen|qwq|hunyuan)/i;
+const OPENAI_COMPATIBLE_ZHIPU_THINKING_MODEL_REGEX = /(glm|zhipu)/i;
+const OPENAI_COMPATIBLE_THINKING_OBJECT_MODEL_REGEX = /(kimi|moonshot|deepseek|doubao|mimo)/i;
+const DEFAULT_THINKING_CHAT_REASONING_EFFORT = 'low';
+const THINKING_CHAT_REASONING_EFFORT_SET = new Set(THINKING_CHAT_REASONING_EFFORTS || [
+    'default',
+    'none',
+    'low',
+    'medium',
+    'high',
+]);
+const QWEN_THINKING_BUDGET_BY_EFFORT = Object.freeze({
+    low: 2048,
+    medium: 8192,
+    high: 16384,
+});
 const TOOL_PROTOCOL_SIGNAL_PATTERNS = [
     /{{\s*DailyNoteGuide\s*}}/i,
     /——\s*日记\s*\(DailyNote\)\s*——/i,
@@ -178,14 +196,147 @@ function buildFollowUpRetryPrompt(prompt = '') {
     return `${String(prompt || '').trim()}\n\n${reminder}`.trim();
 }
 
-function shouldDisableThinkingForUtilityTask(model = '') {
+function supportsEnableThinkingToggle(model = '') {
     return UTILITY_TASK_DISABLE_THINKING_MODEL_REGEX.test(String(model || ''));
+}
+
+function isOpenAICompatibleExecution(executionConfig = null) {
+    const protocol = typeof executionConfig?.provider?.protocol === 'string'
+        ? executionConfig.provider.protocol.trim()
+        : '';
+    return !protocol || protocol === 'openai-compatible';
+}
+
+function supportsOpenAICompatibleThinkingBudgetControls(modelConfig = {}, executionConfig = null) {
+    if (!isOpenAICompatibleExecution(executionConfig)) {
+        return false;
+    }
+
+    const modelId = String(executionConfig?.model?.id || modelConfig?.model || '');
+    if (OPENAI_COMPATIBLE_THINKING_BUDGET_MODEL_REGEX.test(modelId)) {
+        return true;
+    }
+
+    return executionConfig?.source === 'modelService'
+        && executionConfig?.provider?.presetId !== 'openai'
+        && executionConfig?.model?.capabilities?.reasoning === true;
+}
+
+function getOpenAICompatibleThinkingModelId(modelConfig = {}, executionConfig = null) {
+    return String(executionConfig?.model?.id || modelConfig?.model || '');
+}
+
+function withFieldIfUnset(config = {}, key, value) {
+    return config[key] === undefined
+        ? { ...config, [key]: value }
+        : config;
+}
+
+function buildFastChatDisableThinkingConfig(modelConfig = {}, executionConfig = null) {
+    const modelId = getOpenAICompatibleThinkingModelId(modelConfig, executionConfig);
+    let nextConfig = withFieldIfUnset(modelConfig, 'enable_thinking', false);
+
+    if (OPENAI_COMPATIBLE_ZHIPU_THINKING_MODEL_REGEX.test(modelId)) {
+        nextConfig = withFieldIfUnset(nextConfig, 'reasoning', { enabled: false, exclude: true });
+        nextConfig = withFieldIfUnset(nextConfig, 'reasoning_effort', 'none');
+        return withFieldIfUnset(nextConfig, 'thinking', { type: 'disabled' });
+    }
+
+    if (OPENAI_COMPATIBLE_THINKING_OBJECT_MODEL_REGEX.test(modelId)) {
+        return withFieldIfUnset(nextConfig, 'thinking', { type: 'disabled' });
+    }
+
+    if (OPENAI_COMPATIBLE_QWEN_THINKING_MODEL_REGEX.test(modelId)) {
+        return nextConfig;
+    }
+
+    return nextConfig;
+}
+
+function buildThinkingChatEffortConfig(modelConfig = {}, effort = DEFAULT_THINKING_CHAT_REASONING_EFFORT, executionConfig = null) {
+    const modelId = getOpenAICompatibleThinkingModelId(modelConfig, executionConfig);
+
+    if (OPENAI_COMPATIBLE_ZHIPU_THINKING_MODEL_REGEX.test(modelId)) {
+        let nextConfig = withFieldIfUnset(modelConfig, 'thinking', { type: 'enabled' });
+        nextConfig = withFieldIfUnset(nextConfig, 'reasoning', { effort });
+        return withFieldIfUnset(nextConfig, 'reasoning_effort', effort);
+    }
+
+    if (OPENAI_COMPATIBLE_THINKING_OBJECT_MODEL_REGEX.test(modelId)) {
+        return withFieldIfUnset(modelConfig, 'thinking', { type: 'enabled' });
+    }
+
+    let nextConfig = modelConfig.enable_thinking === undefined
+        ? { ...modelConfig, enable_thinking: true }
+        : modelConfig;
+    const budget = QWEN_THINKING_BUDGET_BY_EFFORT[effort];
+    if (budget && nextConfig.enable_thinking !== false && nextConfig.thinking_budget === undefined) {
+        nextConfig = nextConfig === modelConfig ? { ...modelConfig } : nextConfig;
+        nextConfig.thinking_budget = budget;
+    }
+
+    return nextConfig;
+}
+
+function resolveModelConfigPurpose(modelConfig = {}) {
+    return typeof modelConfig?.purpose === 'string' && modelConfig.purpose.trim()
+        ? modelConfig.purpose.trim()
+        : 'chat';
+}
+
+function shouldDisableThinkingForFastChat(modelConfig = {}, executionConfig = null) {
+    const purpose = resolveModelConfigPurpose(modelConfig);
+    return purpose === 'chat'
+        && modelConfig.enable_thinking === undefined
+        && supportsOpenAICompatibleThinkingBudgetControls(modelConfig, executionConfig);
+}
+
+function normalizeThinkingChatReasoningEffort(value = '') {
+    const normalized = typeof value === 'string'
+        ? value.trim().toLowerCase()
+        : '';
+    return THINKING_CHAT_REASONING_EFFORT_SET.has(normalized)
+        ? normalized
+        : DEFAULT_THINKING_CHAT_REASONING_EFFORT;
+}
+
+function applyThinkingChatReasoningEffort(modelConfig = {}, settings = {}, executionConfig = null) {
+    if (
+        resolveModelConfigPurpose(modelConfig) !== 'thinkingChat'
+        || !supportsOpenAICompatibleThinkingBudgetControls(modelConfig, executionConfig)
+    ) {
+        return modelConfig;
+    }
+
+    const effort = normalizeThinkingChatReasoningEffort(settings?.thinkingChatReasoningEffort);
+    if (effort === 'default') {
+        return modelConfig;
+    }
+
+    if (effort === 'none') {
+        return buildFastChatDisableThinkingConfig(modelConfig, executionConfig);
+    }
+
+    return buildThinkingChatEffortConfig(modelConfig, effort, executionConfig);
+}
+
+function buildFinalChatModelConfig(modelConfig = {}, executionConfig = null, settings = {}) {
+    const resolvedConfig = {
+        ...modelConfig,
+        ...(executionConfig?.model?.id ? { model: executionConfig.model.id } : {}),
+    };
+
+    if (shouldDisableThinkingForFastChat(resolvedConfig, executionConfig)) {
+        return buildFastChatDisableThinkingConfig(resolvedConfig, executionConfig);
+    }
+
+    return applyThinkingChatReasoningEffort(resolvedConfig, settings, executionConfig);
 }
 
 function buildUtilityTaskModelConfig(model, config = {}) {
     return {
         ...config,
-        ...(shouldDisableThinkingForUtilityTask(model) ? { enable_thinking: false } : {}),
+        ...(supportsEnableThinkingToggle(model) ? { enable_thinking: false } : {}),
     };
 }
 
@@ -1767,10 +1918,7 @@ function initialize(mainWindow, context) {
             fallbackApiKey: apiKey,
             fallbackModel: modelConfig?.fallbackModel || modelConfig?.model,
         });
-        const finalModelConfig = {
-            ...modelConfig,
-            ...(executionConfig?.model?.id ? { model: executionConfig.model.id } : {}),
-        };
+        const finalModelConfig = buildFinalChatModelConfig(modelConfig, executionConfig, settings);
         const fallbackExecution = resolveChatFallbackExecution(settings);
 
         let promptVariableResolution = {

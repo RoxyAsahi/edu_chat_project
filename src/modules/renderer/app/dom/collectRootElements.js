@@ -178,6 +178,7 @@ function collectRootElements(rootDocument = document) {
         userNameInput: rootDocument.getElementById('userNameInput'),
         defaultModelInput: rootDocument.getElementById('defaultModelInput'),
         thinkingChatDefaultModelInput: rootDocument.getElementById('thinkingChatDefaultModelInput'),
+        thinkingChatReasoningEffortInput: rootDocument.getElementById('thinkingChatReasoningEffortInput'),
         followUpDefaultModelInput: rootDocument.getElementById('followUpDefaultModelInput'),
         studyToolDefaultModelInput: rootDocument.getElementById('studyToolDefaultModelInput'),
         topicTitleDefaultModelInput: rootDocument.getElementById('topicTitleDefaultModelInput'),

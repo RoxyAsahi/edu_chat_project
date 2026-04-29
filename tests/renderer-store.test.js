@@ -33,7 +33,10 @@ test('createInitialAppState groups renderer state into the expected slices', asy
     assert.match(state.settings.settings.agentBubbleThemePrompt, /response-root/);
     assert.equal(state.settings.settings.modelService.defaults.chatFallback, null);
     assert.equal(state.settings.settings.modelService.defaults.thinkingChat, null);
+    assert.equal(state.settings.settings.modelService.defaults.sourceGuide, null);
+    assert.equal(state.settings.settings.modelService.defaults.imageTranscription, null);
     assert.equal(state.settings.settings.thinkingChatDefaultModel, DEFAULT_SETTINGS.thinkingChatDefaultModel);
+    assert.equal(state.settings.settings.thinkingChatReasoningEffort, 'low');
     assert.equal(state.settings.settings.enableEmoticonPrompt, true);
     assert.equal(state.settings.settings.studyProfile.timezone, 'Asia/Hong_Kong');
     assert.equal(state.layout.sidePanelTab, 'notes');

@@ -180,13 +180,13 @@ function createGuideService(deps = {}) {
 
     async function requestGuideFromModel(document, parsed, prompt, requestSuffix) {
         const settings = await runtime.readSettings();
-        const execution = resolveExecutionConfig(settings, { purpose: 'chat' });
+        const execution = resolveExecutionConfig(settings, { purpose: 'sourceGuide' });
         const fallbackExecution = resolveChatFallbackExecution(settings);
         const endpoint = String(execution?.endpoint || settings?.chatEndpoint || '').trim();
         const apiKey = String(execution?.apiKey || settings?.chatApiKey || '').trim();
-        const model = await runtime.resolveGuideModel(settings);
+        const model = String(execution?.model?.id || await runtime.resolveGuideModel(settings) || '').trim();
 
-        if (!endpoint) {
+        if (!endpoint || !model) {
             throw new Error('模型服务配置不完整，无法生成来源指南。');
         }
 

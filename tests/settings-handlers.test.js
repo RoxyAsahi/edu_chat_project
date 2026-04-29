@@ -151,6 +151,7 @@ test('save-settings verifies dedicated task model fields persist correctly', asy
     const saveSettings = handleHandlers.get('save-settings');
     const result = await saveSettings({}, {
         thinkingChatDefaultModel: 'thinking-chat-model',
+        thinkingChatReasoningEffort: 'high',
         followUpDefaultModel: 'follow-up-model',
         studyToolDefaultModel: 'study-tool-model',
         topicTitleDefaultModel: 'topic-title-model',
@@ -159,10 +160,12 @@ test('save-settings verifies dedicated task model fields persist correctly', asy
     const rawSettings = await fs.readJson(settingsPath);
     assert.equal(result.success, true);
     assert.equal(rawSettings.thinkingChatDefaultModel, 'thinking-chat-model');
+    assert.equal(rawSettings.thinkingChatReasoningEffort, 'high');
     assert.equal(rawSettings.followUpDefaultModel, 'follow-up-model');
     assert.equal(rawSettings.studyToolDefaultModel, 'study-tool-model');
     assert.equal(rawSettings.topicTitleDefaultModel, 'topic-title-model');
     assert.equal(result.persistenceCheck.fieldChecks.thinkingChatDefaultModel.matched, true);
+    assert.equal(result.persistenceCheck.fieldChecks.thinkingChatReasoningEffort.matched, true);
     assert.equal(result.persistenceCheck.fieldChecks.followUpDefaultModel.matched, true);
     assert.equal(result.persistenceCheck.fieldChecks.studyToolDefaultModel.matched, true);
     assert.equal(result.persistenceCheck.fieldChecks.topicTitleDefaultModel.matched, true);

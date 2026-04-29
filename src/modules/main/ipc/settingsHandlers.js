@@ -117,6 +117,11 @@ const SETTINGS_PERSISTENCE_FIELD_SPECS = [
         type: 'string',
     },
     {
+        id: 'thinkingChatReasoningEffort',
+        path: ['thinkingChatReasoningEffort'],
+        type: 'string',
+    },
+    {
         id: 'studyToolDefaultModel',
         path: ['studyToolDefaultModel'],
         type: 'string',

@@ -18,6 +18,7 @@ test('validateSettings normalizes unknown keys, types, and bounds', () => {
         combinedItemOrder: {},
         agentOrder: 'broken',
         userName: 'Alice',
+        thinkingChatReasoningEffort: 'too-fast',
         rogueField: true,
     });
 
@@ -28,6 +29,7 @@ test('validateSettings normalizes unknown keys, types, and bounds', () => {
     assert.deepEqual(validated.networkNotesPaths, []);
     assert.deepEqual(validated.combinedItemOrder, []);
     assert.deepEqual(validated.agentOrder, []);
+    assert.equal(validated.thinkingChatReasoningEffort, DEFAULT_SETTINGS.thinkingChatReasoningEffort);
     assert.equal('rogueField' in validated, false);
   });
 
@@ -38,6 +40,7 @@ test('validateSettings preserves direct settings fields when modelService is abs
         chatApiKey: 'chat-key',
         defaultModel: 'gpt-4o',
         thinkingChatDefaultModel: 'gpt-4o-reasoning',
+        thinkingChatReasoningEffort: 'medium',
         followUpDefaultModel: 'gpt-4.1-mini',
         studyToolDefaultModel: 'gpt-4.1-study',
         topicTitleDefaultModel: 'gpt-4.1-nano',
@@ -54,9 +57,12 @@ test('validateSettings preserves direct settings fields when modelService is abs
     assert.equal(validated.modelService.defaults.followUp, null);
     assert.equal(validated.modelService.defaults.studyTool, null);
     assert.equal(validated.modelService.defaults.topicTitle, null);
+    assert.equal(validated.modelService.defaults.sourceGuide, null);
+    assert.equal(validated.modelService.defaults.imageTranscription, null);
     assert.equal(validated.modelService.defaults.embedding, null);
     assert.equal(validated.modelService.defaults.rerank, null);
     assert.equal(validated.chatEndpoint, 'https://chat.example.com/proxy/v1/chat/completions');
+    assert.equal(validated.thinkingChatReasoningEffort, 'medium');
     assert.equal(validated.kbBaseUrl, 'https://kb.example.com/openai/v1/embeddings');
 });
 
@@ -146,6 +152,8 @@ test('validateSettings mirrors explicit modelService back into native settings f
                 followUp: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 studyTool: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 topicTitle: { providerId: 'chat-provider', modelId: 'gpt-4.1-nano' },
+                sourceGuide: { providerId: 'chat-provider', modelId: 'gpt-4o' },
+                imageTranscription: { providerId: 'chat-provider', modelId: 'gpt-4o' },
                 embedding: { providerId: 'kb-provider', modelId: 'bge-m3' },
                 rerank: { providerId: 'kb-provider', modelId: 'bge-reranker-v2' },
             },
@@ -165,6 +173,8 @@ test('validateSettings mirrors explicit modelService back into native settings f
     assert.equal(validated.followUpDefaultModel, 'gpt-4.1-mini');
     assert.equal(validated.studyToolDefaultModel, 'gpt-4.1-mini');
     assert.equal(validated.topicTitleDefaultModel, 'gpt-4.1-nano');
+    assert.equal(validated.guideModel, 'gpt-4o');
+    assert.equal(validated.imageTranscriptionModel, 'gpt-4o');
     assert.equal(validated.kbBaseUrl, 'https://kb.example.com/openai');
     assert.equal(validated.kbApiKey, 'kb-key-1');
     assert.equal(validated.kbEmbeddingModel, 'bge-m3');
@@ -331,6 +341,7 @@ test('writeSettings persists normalized content and refreshes the cache', async 
         userName: 'Writer',
         sidebarWidth: 50,
         thinkingChatDefaultModel: 'thinking-model',
+        thinkingChatReasoningEffort: 'high',
         followUpDefaultModel: 'follow-model',
         followUpPromptTemplate: 'Custom follow-up template',
         studyToolDefaultModel: 'study-tool-model',
@@ -343,6 +354,7 @@ test('writeSettings persists normalized content and refreshes the cache', async 
     assert.equal(written.userName, 'Writer');
     assert.equal(written.sidebarWidth, DEFAULT_SETTINGS.sidebarWidth);
     assert.equal(written.thinkingChatDefaultModel, 'thinking-model');
+    assert.equal(written.thinkingChatReasoningEffort, 'high');
     assert.equal(written.followUpDefaultModel, 'follow-model');
     assert.equal(written.followUpPromptTemplate, 'Custom follow-up template');
     assert.equal(written.studyToolDefaultModel, 'study-tool-model');

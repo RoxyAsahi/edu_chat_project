@@ -668,6 +668,287 @@ test('send-chat-request uses direct-stream mode for main chat requests without t
     assert.deepEqual(result.toolEvents, []);
 });
 
+test('send-chat-request disables Qwen thinking for fast chat and caps thinking chat budget', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-fast-chat-thinking-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const capturedRequests = [];
+    const chatClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequests.push(request);
+            return {
+                streamingStarted: true,
+                requestId: request.requestId,
+                context: request.context,
+                fallbackMeta: null,
+            };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    ...DEFAULT_SETTINGS,
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendChatRequest = handlers.get('send-chat-request');
+    const basePayload = {
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        executionMode: 'direct-stream',
+        messages: [{ role: 'user', content: '解释一下这道题。' }],
+        context: {
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+            source: 'main-chat',
+        },
+    };
+
+    await sendChatRequest({ sender: {} }, {
+        ...basePayload,
+        requestId: 'req_fast_qwen',
+        modelConfig: {
+            purpose: 'chat',
+            stream: true,
+            model: 'Qwen/Qwen3.5-397B-A17B',
+        },
+    });
+    await sendChatRequest({ sender: {} }, {
+        ...basePayload,
+        requestId: 'req_thinking_qwen',
+        modelConfig: {
+            purpose: 'thinkingChat',
+            stream: true,
+            model: 'Qwen/Qwen3.5-397B-A17B',
+        },
+    });
+    await sendChatRequest({ sender: {} }, {
+        ...basePayload,
+        requestId: 'req_thinking_non_qwen',
+        modelConfig: {
+            purpose: 'thinkingChat',
+            stream: true,
+            model: 'gpt-4o-reasoning',
+        },
+    });
+
+    assert.equal(capturedRequests.length, 3);
+    assert.equal(capturedRequests[0].modelConfig.purpose, 'chat');
+    assert.equal(capturedRequests[0].modelConfig.enable_thinking, false);
+    assert.equal(capturedRequests[1].modelConfig.purpose, 'thinkingChat');
+    assert.equal(capturedRequests[1].modelConfig.enable_thinking, true);
+    assert.equal(capturedRequests[1].modelConfig.thinking_budget, 2048);
+    assert.equal(capturedRequests[2].modelConfig.purpose, 'thinkingChat');
+    assert.equal(capturedRequests[2].modelConfig.enable_thinking, undefined);
+    assert.equal(capturedRequests[2].modelConfig.thinking_budget, undefined);
+});
+
+test('send-chat-request applies tested reasoning controls to GLM-style OpenAI-compatible models', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-glm-thinking-budget-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const capturedRequests = [];
+    const chatClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequests.push(request);
+            return {
+                streamingStarted: true,
+                requestId: request.requestId,
+                context: request.context,
+                fallbackMeta: null,
+            };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    ...DEFAULT_SETTINGS,
+                    enableThoughtChainInjection: false,
+                    thinkingChatReasoningEffort: 'medium',
+                    modelService: {
+                        version: 1,
+                        providers: [
+                            {
+                                id: 'compat-provider',
+                                presetId: 'custom-openai-compatible',
+                                name: 'Compat Provider',
+                                protocol: 'openai-compatible',
+                                enabled: true,
+                                apiBaseUrl: 'http://example.com',
+                                apiKeys: ['demo-key'],
+                                extraHeaders: {},
+                                models: [
+                                    {
+                                        id: 'glm-5.1',
+                                        name: 'glm-5.1',
+                                        group: 'chat',
+                                        capabilities: {
+                                            chat: true,
+                                            embedding: false,
+                                            rerank: false,
+                                            vision: true,
+                                            reasoning: true,
+                                        },
+                                        enabled: true,
+                                        source: 'manual',
+                                    },
+                                ],
+                            },
+                        ],
+                        defaults: {
+                            chat: { providerId: 'compat-provider', modelId: 'glm-5.1' },
+                            thinkingChat: { providerId: 'compat-provider', modelId: 'glm-5.1' },
+                        },
+                    },
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendChatRequest = handlers.get('send-chat-request');
+    const basePayload = {
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        executionMode: 'direct-stream',
+        messages: [{ role: 'user', content: '解释一下这道题。' }],
+        context: {
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+            source: 'main-chat',
+        },
+    };
+
+    await sendChatRequest({ sender: {} }, {
+        ...basePayload,
+        requestId: 'req_fast_glm',
+        modelConfig: {
+            purpose: 'chat',
+            stream: true,
+            model: 'glm-5.1',
+        },
+    });
+    await sendChatRequest({ sender: {} }, {
+        ...basePayload,
+        requestId: 'req_thinking_glm',
+        modelConfig: {
+            purpose: 'thinkingChat',
+            stream: true,
+            model: 'glm-5.1',
+        },
+    });
+
+    assert.equal(capturedRequests.length, 2);
+    assert.equal(capturedRequests[0].modelConfig.purpose, 'chat');
+    assert.equal(capturedRequests[0].modelConfig.enable_thinking, false);
+    assert.deepEqual(capturedRequests[0].modelConfig.reasoning, { enabled: false, exclude: true });
+    assert.equal(capturedRequests[0].modelConfig.reasoning_effort, 'none');
+    assert.deepEqual(capturedRequests[0].modelConfig.thinking, { type: 'disabled' });
+    assert.equal(capturedRequests[0].modelConfig.thinking_budget, undefined);
+    assert.equal(capturedRequests[1].modelConfig.purpose, 'thinkingChat');
+    assert.equal(capturedRequests[1].modelConfig.enable_thinking, undefined);
+    assert.deepEqual(capturedRequests[1].modelConfig.thinking, { type: 'enabled' });
+    assert.deepEqual(capturedRequests[1].modelConfig.reasoning, { effort: 'medium' });
+    assert.equal(capturedRequests[1].modelConfig.reasoning_effort, 'medium');
+    assert.equal(capturedRequests[1].modelConfig.thinking_budget, undefined);
+});
+
+test('send-chat-request uses model-family disable parameters for fast OpenAI-compatible thinking models', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-fast-chat-family-thinking-'));
+    t.after(() => fs.remove(tempRoot));
+
+    const capturedRequests = [];
+    const chatClientStub = {
+        initialize() {},
+        async send(request) {
+            capturedRequests.push(request);
+            return {
+                streamingStarted: true,
+                requestId: request.requestId,
+                context: request.context,
+                fallbackMeta: null,
+            };
+        },
+    };
+
+    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
+    chatHandlers.initialize(null, {
+        AGENT_DIR: path.join(tempRoot, 'agents'),
+        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
+        DATA_ROOT: path.join(tempRoot, 'app-data'),
+        fileWatcher: null,
+        settingsManager: {
+            async readSettings() {
+                return {
+                    ...DEFAULT_SETTINGS,
+                    enableThoughtChainInjection: false,
+                };
+            },
+        },
+        agentConfigManager: null,
+    });
+
+    const sendChatRequest = handlers.get('send-chat-request');
+    const basePayload = {
+        endpoint: 'http://example.com/v1/chat/completions',
+        apiKey: 'demo-key',
+        executionMode: 'direct-stream',
+        messages: [{ role: 'user', content: '只回答 2。' }],
+        context: {
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+            source: 'main-chat',
+        },
+    };
+
+    await sendChatRequest({ sender: {} }, {
+        ...basePayload,
+        requestId: 'req_fast_kimi',
+        modelConfig: {
+            purpose: 'chat',
+            stream: true,
+            model: 'Pro/moonshotai/Kimi-K2.6',
+        },
+    });
+    await sendChatRequest({ sender: {} }, {
+        ...basePayload,
+        requestId: 'req_fast_qwen',
+        modelConfig: {
+            purpose: 'chat',
+            stream: true,
+            model: 'Qwen/Qwen3.6-35B-A3B',
+        },
+    });
+
+    assert.equal(capturedRequests.length, 2);
+    assert.equal(capturedRequests[0].modelConfig.enable_thinking, false);
+    assert.deepEqual(capturedRequests[0].modelConfig.thinking, { type: 'disabled' });
+    assert.equal(capturedRequests[0].modelConfig.reasoning, undefined);
+    assert.equal(capturedRequests[1].modelConfig.enable_thinking, false);
+    assert.equal(capturedRequests[1].modelConfig.thinking, undefined);
+    assert.equal(capturedRequests[1].modelConfig.reasoning, undefined);
+});
+
 test('send-chat-request keeps temporary context merged into the leading system message so fallback providers see a valid message order', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-system-order-'));
     t.after(() => fs.remove(tempRoot));
