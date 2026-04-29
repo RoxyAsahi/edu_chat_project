@@ -86,6 +86,14 @@ test('guideService forwards the global chat fallback execution into guide genera
                                         enabled: true,
                                         source: 'manual',
                                     },
+                                    {
+                                        id: 'guide-chat',
+                                        name: 'guide-chat',
+                                        group: 'chat',
+                                        capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: false },
+                                        enabled: true,
+                                        source: 'manual',
+                                    },
                                 ],
                             },
                             {
@@ -112,6 +120,7 @@ test('guideService forwards the global chat fallback execution into guide genera
                         defaults: {
                             chat: { providerId: 'primary-provider', modelId: 'primary-chat' },
                             chatFallback: { providerId: 'fallback-provider', modelId: 'fallback-chat' },
+                            sourceGuide: { providerId: 'primary-provider', modelId: 'guide-chat' },
                             followUp: null,
                             topicTitle: null,
                             embedding: null,
@@ -121,7 +130,7 @@ test('guideService forwards the global chat fallback execution into guide genera
                 };
             },
             async resolveGuideModel() {
-                return 'guide-model';
+                return 'guide-chat';
             },
         },
         repository: {},
@@ -153,7 +162,7 @@ test('guideService forwards the global chat fallback execution into guide genera
 
     assert.equal(markdown, '# 文档主题\n向量空间指南');
     assert.equal(capturedRequest.endpoint, 'https://primary.example.com/base/v1/chat/completions');
-    assert.equal(capturedRequest.modelConfig.model, 'guide-model');
+    assert.equal(capturedRequest.modelConfig.model, 'guide-chat');
     assert.deepEqual(capturedRequest.fallbackExecution.ref, {
         providerId: 'fallback-provider',
         modelId: 'fallback-chat',
@@ -229,6 +238,7 @@ test('imageDocumentTranscriber routes image transcription through a vision-capab
                         defaults: {
                             chat: { providerId: 'primary-provider', modelId: 'primary-chat' },
                             chatFallback: { providerId: 'fallback-provider', modelId: 'fallback-vision' },
+                            imageTranscription: { providerId: 'primary-provider', modelId: 'vision-primary' },
                             followUp: null,
                             topicTitle: null,
                             embedding: null,

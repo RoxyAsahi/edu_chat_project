@@ -69,6 +69,8 @@ function createNotesDom(deps = {}) {
     const getVisibleNotes = deps.getVisibleNotes || (() => []);
     const getGeneratedVisibleNotes = deps.getGeneratedVisibleNotes || (() => []);
     const getManualLibraryNotes = deps.getManualLibraryNotes || (() => []);
+    const getManualLibrarySubjectFilters = deps.getManualLibrarySubjectFilters || (() => []);
+    const resolveManualNotesLibraryFilter = deps.resolveManualNotesLibraryFilter || ((filter) => String(filter || 'all'));
     const getActiveNote = deps.getActiveNote || (() => null);
     const getCurrentTopicDisplayName = deps.getCurrentTopicDisplayName || (() => '请选择一个话题');
     const getTopicDisplayLabel = deps.getTopicDisplayLabel || ((topicId) => topicId || '未归类话题');
@@ -867,16 +869,22 @@ function createNotesDom(deps = {}) {
         }
 
         const agents = Array.isArray(state.agents) ? state.agents : [];
-        const currentFilter = String(state.manualNotesLibraryFilter || 'all');
+        let currentFilter = resolveManualNotesLibraryFilter(state.manualNotesLibraryFilter || 'all') || 'all';
+        const requestedFilter = String(state.manualNotesLibraryFilter || 'all');
+        if (currentFilter !== requestedFilter) {
+            state.manualNotesLibraryFilter = currentFilter;
+        }
         const isAnalysisFilter = currentFilter === 'analysis';
-        const libraryNotes = getManualLibraryNotes();
+        const libraryNotes = getManualLibraryNotes(currentFilter);
         const pendingAnalysisGenerations = isAnalysisFilter && Array.isArray(state.pendingAnalysisGenerations)
             ? state.pendingAnalysisGenerations
             : [];
+        const subjectFilters = getManualLibrarySubjectFilters();
         const currentAgent = currentFilter === 'all' || isAnalysisFilter
             ? null
             : agents.find((agent) => String(agent?.id || '') === currentFilter);
-        const currentAgentName = currentAgent?.name || state.currentSelectedItem?.name || '当前学科';
+        const currentSubjectFilter = subjectFilters.find((tab) => String(tab?.id || '') === currentFilter);
+        const currentAgentName = currentAgent?.name || currentSubjectFilter?.label || state.currentSelectedItem?.name || '当前学科';
         const setGridEmptyState = (empty) => {
             el.manualNotesLibraryGrid.classList.toggle('manual-notes-library-grid--empty', empty);
         };
@@ -892,13 +900,7 @@ function createNotesDom(deps = {}) {
             const tabs = [
                 { id: 'all', label: '筛选' },
                 { id: 'analysis', label: '深度分析' },
-                ...agents.map((agent) => {
-                    const agentId = String(agent?.id || '').trim();
-                    if (!agentId) {
-                        return null;
-                    }
-                    return { id: agentId, label: agent?.name || agentId };
-                }),
+                ...subjectFilters,
             ].filter(Boolean);
             el.manualNotesLibrarySubjectTabs.innerHTML = tabs.map((tab) => {
                 const isActive = String(tab.id) === currentFilter;
@@ -930,10 +932,13 @@ function createNotesDom(deps = {}) {
             cleanupRichPreviews(el.manualNotesLibraryGrid);
             el.manualNotesLibraryGrid.innerHTML = '';
             const empty = documentObj.createElement('div');
-            empty.className = 'empty-list-state manual-notes-library-grid__empty';
+            empty.className = 'empty-list-state manual-notes-library-empty manual-notes-library-grid__empty';
             empty.innerHTML = `
-                <strong>${escapeHtml(title)}</strong>
-                <span>${escapeHtml(description)}</span>
+                <img class="manual-notes-library-empty__image" src="../assets/写作业.webp" alt="" />
+                <div class="manual-notes-library-empty__copy">
+                    <strong>${escapeHtml(title)}</strong>
+                    <span>${escapeHtml(description)}</span>
+                </div>
             `;
             el.manualNotesLibraryGrid.appendChild(empty);
         };
@@ -950,8 +955,8 @@ function createNotesDom(deps = {}) {
                 ? '还没有深度分析报告'
                 : (currentFilter === 'all' ? '还没有收藏的手写笔记' : '当前学科还没有手写笔记');
             const emptyDescription = isAnalysisFilter
-                ? '点击右上角“深度分析”，选择多条笔记后生成的报告会直接出现在这里。'
-                : '你可以使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。';
+                ? '点击“深度分析”，选择多条笔记后生成的报告会直接出现在这里。'
+                : '在对话页面对想沉淀的消息右键，选择“记入笔记”，内容会自动收纳到这里。';
             replaceGridWithEmptyState(emptyTitle, emptyDescription);
             return;
         }

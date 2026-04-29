@@ -101,6 +101,14 @@ const DEFAULT_STUDY_LOG_POLICY = Object.freeze({
     memoryTopK: 4,
     memoryFallbackTopK: 2,
 });
+const THINKING_CHAT_REASONING_EFFORTS = Object.freeze([
+    'default',
+    'none',
+    'low',
+    'medium',
+    'high',
+]);
+const THINKING_CHAT_REASONING_EFFORT_SET = new Set(THINKING_CHAT_REASONING_EFFORTS);
 
 const DEFAULT_SETTINGS = Object.freeze({
     sidebarWidth: 260,
@@ -113,8 +121,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     chatEndpoint: AIP_TEST_CHAT_ENDPOINT,
     chatApiKey: AIP_TEST_API_KEY,
     guideModel: '',
+    imageTranscriptionModel: '',
     defaultModel: AIP_TEST_DEFAULT_MODEL,
     thinkingChatDefaultModel: AIP_TEST_DEFAULT_MODEL,
+    thinkingChatReasoningEffort: 'low',
     followUpDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
     studyToolDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
     topicTitleDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
@@ -297,6 +307,17 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
+    const normalizedThinkingChatReasoningEffort = typeof validated.thinkingChatReasoningEffort === 'string'
+        ? validated.thinkingChatReasoningEffort.trim().toLowerCase()
+        : '';
+    if (!THINKING_CHAT_REASONING_EFFORT_SET.has(normalizedThinkingChatReasoningEffort)) {
+        validated.thinkingChatReasoningEffort = defaultSettings.thinkingChatReasoningEffort;
+        hasIssues = true;
+    } else if (validated.thinkingChatReasoningEffort !== normalizedThinkingChatReasoningEffort) {
+        validated.thinkingChatReasoningEffort = normalizedThinkingChatReasoningEffort;
+        hasIssues = true;
+    }
+
     if (typeof validated.enableRenderingPrompt !== 'boolean') {
         validated.enableRenderingPrompt = defaultSettings.enableRenderingPrompt;
         hasIssues = true;
@@ -471,6 +492,7 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
             'kbEmbeddingModel',
             'kbRerankModel',
             'guideModel',
+            'imageTranscriptionModel',
             'lastModel',
         ].forEach((key) => {
             if (validated[key] !== settingsMirror[key]) {
@@ -497,6 +519,7 @@ module.exports = {
     DEFAULT_STUDY_PROFILE,
     DEFAULT_SETTINGS,
     LEGACY_SETTINGS_REPLACEMENTS,
+    THINKING_CHAT_REASONING_EFFORTS,
     cloneDefaultSettings,
     validateSettings,
 };

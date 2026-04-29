@@ -4,6 +4,7 @@ const {
     listEnabledModels,
     normalizeModelService,
     resolveChatFallbackExecution,
+    resolveDefaultModelRef,
     resolveExecutionConfig,
     resolveProviderApiKey,
 } = require('../utils/modelService');
@@ -83,19 +84,52 @@ function buildImageTranscriptionPrompt(document) {
 
 function resolveVisionExecution(settings = {}) {
     const normalizedService = normalizeModelService(settings?.modelService);
+    const configuredVisionRef = resolveDefaultModelRef(
+        normalizedService,
+        'imageTranscription',
+        { capabilities: ['chat', 'vision'] }
+    );
+    if (configuredVisionRef?.model?.id) {
+        return {
+            source: 'model-service',
+            purpose: 'imageTranscription',
+            provider: configuredVisionRef.provider,
+            model: configuredVisionRef.model,
+            ref: configuredVisionRef.ref,
+            endpoint: buildChatEndpoint(configuredVisionRef.provider?.apiBaseUrl),
+            apiKey: resolveProviderApiKey(configuredVisionRef.provider),
+            extraHeaders: configuredVisionRef.provider?.extraHeaders || {},
+        };
+    }
+
     const defaultExecution = resolveExecutionConfig(settings, { purpose: 'chat' });
     if (defaultExecution?.model?.capabilities?.vision === true) {
         return defaultExecution;
     }
 
-    const firstVisionModel = listEnabledModels(normalizedService, { capability: 'vision' })[0] || null;
+    const directVisionModel = String(settings?.imageTranscriptionModel || '').trim();
+    if (directVisionModel) {
+        const directVisionExecution = resolveExecutionConfig(settings, {
+            purpose: 'chat',
+            requestedModel: directVisionModel,
+            capabilities: ['chat', 'vision'],
+        });
+        if (directVisionExecution?.model?.id) {
+            return {
+                ...directVisionExecution,
+                purpose: 'imageTranscription',
+            };
+        }
+    }
+
+    const firstVisionModel = listEnabledModels(normalizedService, { capabilities: ['chat', 'vision'] })[0] || null;
     if (!firstVisionModel) {
         return defaultExecution;
     }
 
     return {
         source: 'model-service',
-        purpose: 'chat',
+        purpose: 'imageTranscription',
         provider: firstVisionModel.provider,
         model: firstVisionModel.model,
         ref: firstVisionModel.ref,
@@ -118,6 +152,7 @@ function createImageDocumentTranscriber(deps = {}) {
         const apiKey = String(execution?.apiKey || settings?.chatApiKey || '').trim();
         const model = String(
             execution?.model?.id
+            || settings?.imageTranscriptionModel
             || settings?.defaultModel
             || settings?.lastModel
             || ''

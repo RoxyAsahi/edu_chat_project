@@ -31,6 +31,17 @@ const SETTINGS_MODAL_META = Object.freeze({
     },
 });
 
+const THINKING_CHAT_REASONING_EFFORT_OPTIONS = Object.freeze([
+    { value: 'default', label: '默认' },
+    { value: 'none', label: '关闭' },
+    { value: 'low', label: '低强度（更快）' },
+    { value: 'medium', label: '中强度' },
+    { value: 'high', label: '高强度' },
+]);
+const THINKING_CHAT_REASONING_EFFORT_VALUES = new Set(
+    THINKING_CHAT_REASONING_EFFORT_OPTIONS.map((option) => option.value)
+);
+
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = 'Output formatting requirement: {{RenderingGuide}}';
 const DEFAULT_RENDERING_PROMPT = [
     'When structured rendering helps, emit a raw HTML fragment directly in the answer so the chat bubble can render it while streaming.',
@@ -95,6 +106,7 @@ const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
 ].join('\n');
 const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
     thinkingChatDefaultModel: '思考聊天默认模型',
+    thinkingChatReasoningEffort: '思考模式强度',
     followUpDefaultModel: '追问默认模型',
     studyToolDefaultModel: '学习工具默认模型',
     followUpPromptTemplate: '追问提示词模板',
@@ -116,6 +128,8 @@ const MODEL_SERVICE_TASK_META = Object.freeze({
     followUp: { label: '追问模型', capability: 'chat', description: '自动生成追问时优先使用。' },
     studyTool: { label: '学习工具模型', capability: 'chat', description: '右侧功能区生成选择题、闪卡和深度分析时优先使用。' },
     topicTitle: { label: '话题命名模型', capability: 'chat', description: '首轮回复后的自动命名任务使用。' },
+    sourceGuide: { label: '来源指南模型', capability: 'chat', description: '为 Source 文档生成学习指南时优先使用。' },
+    imageTranscription: { label: '图片转写视觉模型', capability: 'vision', requiredCapabilities: ['chat', 'vision'], description: '图片来源入库时先转写为 Markdown，必须支持 Chat 和 Vision。' },
     embedding: { label: 'Embedding 模型', capability: 'embedding', description: '知识库向量化时使用，可独立于聊天 Provider。' },
     rerank: { label: 'Rerank 模型', capability: 'rerank', description: '知识库重排时使用，可独立于聊天 Provider。' },
 });
@@ -223,6 +237,8 @@ function createDefaultModelService() {
             followUp: null,
             studyTool: null,
             topicTitle: null,
+            sourceGuide: null,
+            imageTranscription: null,
             embedding: null,
             rerank: null,
         },
@@ -232,6 +248,34 @@ function createDefaultModelService() {
 function normalizeModelServiceText(value, fallback = '') {
     const text = String(value ?? '').trim();
     return text || fallback;
+}
+
+function normalizeThinkingChatReasoningEffort(value = '') {
+    const normalized = typeof value === 'string'
+        ? value.trim().toLowerCase()
+        : '';
+    return THINKING_CHAT_REASONING_EFFORT_VALUES.has(normalized)
+        ? normalized
+        : 'low';
+}
+
+function normalizeModelServiceCapabilityFilter(value = '') {
+    const values = Array.isArray(value) ? value : [value];
+    return [...new Set(values.map((item) => normalizeModelServiceText(item)).filter(Boolean))];
+}
+
+function getModelServiceTaskRequiredCapabilities(taskKey = '') {
+    const meta = MODEL_SERVICE_TASK_META[taskKey] || {};
+    return normalizeModelServiceCapabilityFilter(meta.requiredCapabilities || meta.capability);
+}
+
+function modelServiceModelHasCapabilities(model = {}, capabilities = []) {
+    const requiredCapabilities = normalizeModelServiceCapabilityFilter(capabilities);
+    if (requiredCapabilities.length === 0) {
+        return true;
+    }
+
+    return requiredCapabilities.every((capability) => model?.capabilities?.[capability] === true);
 }
 
 function normalizeModelServiceBaseUrl(value) {
@@ -412,7 +456,7 @@ function detectModelServiceCapabilities(modelName = '') {
         capabilities.vision = true;
     }
 
-    if (/(reason|reasoning|thinking|deepthink|o1|o3|r1)/i.test(normalizedName)) {
+    if (/(reason|reasoning|thinking|deepthink|qwen|qwq|glm|zhipu|kimi|moonshot|deepseek|hunyuan|doubao|mimo|o1|o3|r1)/i.test(normalizedName)) {
         capabilities.reasoning = true;
     }
 
@@ -478,6 +522,23 @@ function mergeModelServiceModels(models = []) {
     return merged;
 }
 
+function preserveKnownTrueCapabilities(model = {}, knownModel = null) {
+    if (!knownModel?.capabilities) {
+        return model;
+    }
+
+    return {
+        ...model,
+        capabilities: {
+            ...(model.capabilities || {}),
+            ...Object.fromEntries(
+                Object.entries(knownModel.capabilities)
+                    .filter(([, value]) => value === true)
+            ),
+        },
+    };
+}
+
 function normalizeModelServiceProvider(provider = {}, index = 0) {
     const preset = MODEL_SERVICE_PRESETS.find((item) => item.presetId === provider.presetId) || null;
     const normalized = {
@@ -528,7 +589,7 @@ function normalizeModelServiceDefaults(defaults = {}, providers = []) {
 
         const provider = (providers || []).find((item) => item.id === normalized.providerId);
         const model = provider?.models?.find((item) => item.id === normalized.modelId) || null;
-        acc[key] = provider && model
+        acc[key] = provider && model && modelServiceModelHasCapabilities(model, getModelServiceTaskRequiredCapabilities(key))
             ? normalized
             : null;
         return acc;
@@ -594,6 +655,8 @@ function createBuiltInTestProviderDefaults(provider = {}) {
         followUp: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         studyTool: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         topicTitle: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        sourceGuide: refFor(AIP_TEST_DEFAULT_MODEL),
+        imageTranscription: refFor(AIP_TEST_DEFAULT_MODEL),
         embedding: refFor('Qwen/Qwen3-VL-Embedding-8B'),
         rerank: refFor('Qwen/Qwen3-VL-Reranker-8B'),
     };
@@ -632,6 +695,12 @@ function ensureBuiltInTestProvider(service = {}) {
     }
 
     const providers = [...normalizedService.providers];
+    const existingModelsWithBuiltInCapabilities = (providers[existingIndex].models || [])
+        .map((model) => preserveKnownTrueCapabilities(
+            model,
+            findModelServiceModel(builtInProvider, model.id)
+        ));
+
     providers[existingIndex] = normalizeModelServiceProvider({
         ...providers[existingIndex],
         id: providers[existingIndex].id || builtInProvider.id,
@@ -643,7 +712,7 @@ function ensureBuiltInTestProvider(service = {}) {
             : builtInProvider.apiKeys,
         models: mergeModelServiceModels([
             ...builtInProvider.models,
-            ...(providers[existingIndex].models || []),
+            ...existingModelsWithBuiltInCapabilities,
         ]),
     });
 
@@ -686,7 +755,7 @@ function resolveModelServiceRef(service = {}, ref = null, options = {}) {
         return null;
     }
 
-    if (options.capability && model.capabilities?.[options.capability] !== true) {
+    if (!modelServiceModelHasCapabilities(model, options.requiredCapabilities || options.capabilities || options.capability)) {
         return null;
     }
 
@@ -708,7 +777,7 @@ function listModelServiceModels(service = {}, options = {}) {
             if (options.onlyEnabled === true && model.enabled === false) {
                 return;
             }
-            if (options.capability && model.capabilities?.[options.capability] !== true) {
+            if (!modelServiceModelHasCapabilities(model, options.requiredCapabilities || options.capabilities || options.capability)) {
                 return;
             }
             items.push({
@@ -731,6 +800,12 @@ function buildModelServiceMirror(service = {}, currentSettings = {}) {
     const followUpDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.followUp) || chatDefault;
     const studyToolDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.studyTool) || chatDefault;
     const topicTitleDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.topicTitle) || chatDefault;
+    const sourceGuideDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.sourceGuide);
+    const imageTranscriptionDefault = resolveModelServiceRef(
+        normalizedService,
+        normalizedService.defaults.imageTranscription,
+        { requiredCapabilities: ['chat', 'vision'] }
+    );
     const embeddingDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.embedding);
     const rerankDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.rerank);
     const kbDefault = embeddingDefault || rerankDefault;
@@ -743,6 +818,8 @@ function buildModelServiceMirror(service = {}, currentSettings = {}) {
         followUpDefaultModel: followUpDefault?.model?.id || '',
         studyToolDefaultModel: studyToolDefault?.model?.id || '',
         topicTitleDefaultModel: topicTitleDefault?.model?.id || '',
+        guideModel: sourceGuideDefault?.model?.id || normalizeModelServiceText(currentSettings.guideModel),
+        imageTranscriptionModel: imageTranscriptionDefault?.model?.id || normalizeModelServiceText(currentSettings.imageTranscriptionModel),
         kbBaseUrl: kbDefault?.provider?.apiBaseUrl || normalizeModelServiceBaseUrl(currentSettings.kbBaseUrl || ''),
         kbApiKey: kbDefault ? String(kbDefault.provider.apiKeys?.[0] || '') : '',
         kbEmbeddingModel: embeddingDefault?.model?.id || normalizeModelServiceText(currentSettings.kbEmbeddingModel),
@@ -848,7 +925,9 @@ function buildBootstrapModelService(settings = {}) {
         settings.topicTitleDefaultModel,
         settings.lastModel,
         settings.guideModel,
+        settings.imageTranscriptionModel,
     ].filter((value) => normalizeModelServiceText(value));
+    const imageTranscriptionModelId = normalizeModelServiceText(settings.imageTranscriptionModel);
     const kbModels = [
         settings.kbEmbeddingModel,
         settings.kbRerankModel,
@@ -864,20 +943,23 @@ function buildBootstrapModelService(settings = {}) {
         name: builtInChatPreset?.name || 'Custom Provider',
         apiBaseUrl: settings.chatEndpoint,
         apiKeys: parseModelServiceApiKeysInput(settings.chatApiKey),
-        models: chatModels.map((modelId) => ({
-            id: modelId,
-            name: modelId,
-            group: 'chat',
-            capabilities: {
-                chat: true,
-                embedding: false,
-                rerank: false,
-                vision: false,
-                reasoning: false,
-            },
-            enabled: true,
-            source: 'manual',
-        })),
+        models: chatModels.map((modelId) => {
+            const detectedCapabilities = detectModelServiceCapabilities(modelId);
+            return {
+                id: modelId,
+                name: modelId,
+                group: 'chat',
+                capabilities: {
+                    chat: true,
+                    embedding: false,
+                    rerank: false,
+                    vision: modelId === imageTranscriptionModelId || detectedCapabilities.vision === true,
+                    reasoning: detectedCapabilities.reasoning === true,
+                },
+                enabled: true,
+                source: 'manual',
+            };
+        }),
     }, 0);
 
     const needsSeparateKbProvider = Boolean(
@@ -964,6 +1046,12 @@ function buildBootstrapModelService(settings = {}) {
         : null;
     service.defaults.topicTitle = primaryProvider && normalizeModelServiceText(settings.topicTitleDefaultModel)
         ? { providerId: primaryProvider.id, modelId: settings.topicTitleDefaultModel }
+        : null;
+    service.defaults.sourceGuide = primaryProvider && normalizeModelServiceText(settings.guideModel)
+        ? { providerId: primaryProvider.id, modelId: settings.guideModel }
+        : null;
+    service.defaults.imageTranscription = primaryProvider && normalizeModelServiceText(settings.imageTranscriptionModel)
+        ? { providerId: primaryProvider.id, modelId: settings.imageTranscriptionModel }
         : null;
     service.defaults.embedding = kbProvider && normalizeModelServiceText(settings.kbEmbeddingModel)
         ? { providerId: kbProvider.id, modelId: settings.kbEmbeddingModel }
@@ -2273,8 +2361,9 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         const optionsByTask = Object.entries(MODEL_SERVICE_TASK_META).map(([taskKey, meta]) => {
             const currentRef = service.defaults?.[taskKey];
             const chatDefaultRef = service.defaults?.chat || null;
+            const requiredCapabilities = getModelServiceTaskRequiredCapabilities(taskKey);
             const availableModels = listModelServiceModels(service, {
-                capability: meta.capability,
+                requiredCapabilities,
                 onlyEnabled: true,
             });
             return {
@@ -2282,21 +2371,25 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                 meta,
                 currentRef,
                 chatDefaultRef,
+                requiredCapabilities,
                 availableModels,
             };
         });
 
         el.modelServiceDefaultSelectors.innerHTML = `
             <div class="settings-list model-service-default-list">
-              ${optionsByTask.map(({ taskKey, meta, currentRef, chatDefaultRef, availableModels }) => {
+              ${optionsByTask.map(({ taskKey, meta, currentRef, chatDefaultRef, requiredCapabilities, availableModels }) => {
                     const sameAsPrimary = taskKey === 'chatFallback'
                         && currentRef
                         && chatDefaultRef
                         && currentRef.providerId === chatDefaultRef.providerId
                         && currentRef.modelId === chatDefaultRef.modelId;
+                    const capabilityLabel = requiredCapabilities.length > 0
+                        ? requiredCapabilities.join('+')
+                        : meta.capability;
                     const helperText = availableModels.length > 0
-                        ? `${availableModels.length} 个可选模型 · ${meta.capability}${sameAsPrimary ? ' · 当前与默认聊天模型相同，运行时会视为未配置回退' : ''}`
-                        : `暂无可用 ${meta.capability} 模型`;
+                        ? `${availableModels.length} 个可选模型 · ${capabilityLabel}${sameAsPrimary ? ' · 当前与默认聊天模型相同，运行时会视为未配置回退' : ''}`
+                        : `暂无可用 ${capabilityLabel} 模型`;
                     const description = `${meta.description} ${helperText}`;
                     return `
                   <article class="settings-row model-service-default-row">
@@ -3144,6 +3237,9 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         el.userNameInput.value = settings.userName || '';
         if (el.defaultModelInput) el.defaultModelInput.value = settings.defaultModel || '';
         if (el.thinkingChatDefaultModelInput) el.thinkingChatDefaultModelInput.value = settings.thinkingChatDefaultModel || '';
+        if (el.thinkingChatReasoningEffortInput) {
+            el.thinkingChatReasoningEffortInput.value = normalizeThinkingChatReasoningEffort(settings.thinkingChatReasoningEffort);
+        }
         if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = settings.followUpDefaultModel || '';
         if (el.studyToolDefaultModelInput) el.studyToolDefaultModelInput.value = settings.studyToolDefaultModel || '';
         if (el.topicTitleDefaultModelInput) el.topicTitleDefaultModelInput.value = settings.topicTitleDefaultModel || '';
@@ -3305,9 +3401,12 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             modelService,
             defaultModel: modelServiceMirror.defaultModel || '',
             thinkingChatDefaultModel: modelServiceMirror.thinkingChatDefaultModel || '',
+            thinkingChatReasoningEffort: normalizeThinkingChatReasoningEffort(el.thinkingChatReasoningEffortInput?.value),
             followUpDefaultModel: modelServiceMirror.followUpDefaultModel || '',
             studyToolDefaultModel: modelServiceMirror.studyToolDefaultModel || '',
             topicTitleDefaultModel: modelServiceMirror.topicTitleDefaultModel || '',
+            guideModel: modelServiceMirror.guideModel || '',
+            imageTranscriptionModel: modelServiceMirror.imageTranscriptionModel || '',
             studyProfile: {
                 studentName: el.studentNameInput?.value.trim() || '',
                 city: el.studyCityInput?.value.trim() || '',
@@ -4195,14 +4294,22 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             }
 
             const draftField = field.slice(6);
-            patchModelServicePopup((popup) => ({
-                ...popup,
-                error: '',
-                draft: {
+            patchModelServicePopup((popup) => {
+                const nextDraft = {
                     ...(popup.draft || {}),
                     [draftField]: event.target.value,
-                },
-            }), false);
+                };
+                if (popup.mode === 'create' && (draftField === 'id' || draftField === 'name')) {
+                    nextDraft.capabilities = detectModelServiceCapabilities(
+                        `${nextDraft.name || ''} ${nextDraft.id || ''}`
+                    );
+                }
+                return {
+                    ...popup,
+                    error: '',
+                    draft: nextDraft,
+                };
+            }, false);
         });
 
         ensureModelServiceDialogHost().addEventListener('change', (event) => {
@@ -4463,6 +4570,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             el.userNameInput,
             el.defaultModelInput,
             el.thinkingChatDefaultModelInput,
+            el.thinkingChatReasoningEffortInput,
             el.followUpDefaultModelInput,
             el.studyToolDefaultModelInput,
             el.topicTitleDefaultModelInput,

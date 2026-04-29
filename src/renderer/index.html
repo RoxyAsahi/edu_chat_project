@@ -987,6 +987,18 @@
                 <h3>模型用途</h3>
                 <div class="settings-list-card__body">
                   <div id="modelServiceDefaultSelectors" class="model-service-default-grid" aria-live="polite"></div>
+                  <div class="settings-list">
+                    <div class="settings-row">
+                      <div class="settings-row__main"><strong>思考模式强度</strong><span>控制“思考”聊天的推理预算。低强度会更快开始输出，默认则交给模型服务。</span></div>
+                      <select id="thinkingChatReasoningEffortInput" class="settings-row__control" aria-label="思考模式强度">
+                        <option value="default">默认</option>
+                        <option value="none">关闭</option>
+                        <option value="low">低强度（更快）</option>
+                        <option value="medium">中强度</option>
+                        <option value="high">高强度</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
                 <div class="hidden" aria-hidden="true">
                   <input id="defaultModelInput" type="text" placeholder="gemini-3.1-flash-lite-preview" />

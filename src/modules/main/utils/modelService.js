@@ -7,6 +7,8 @@ const MODEL_SERVICE_DEFAULT_KEYS = Object.freeze([
     'followUp',
     'studyTool',
     'topicTitle',
+    'sourceGuide',
+    'imageTranscription',
     'embedding',
     'rerank',
 ]);
@@ -18,6 +20,19 @@ const MODEL_CAPABILITY_KEYS = Object.freeze([
     'vision',
     'reasoning',
 ]);
+
+const MODEL_SERVICE_DEFAULT_REQUIRED_CAPABILITIES = Object.freeze({
+    chat: ['chat'],
+    thinkingChat: ['chat'],
+    chatFallback: ['chat'],
+    followUp: ['chat'],
+    studyTool: ['chat'],
+    topicTitle: ['chat'],
+    sourceGuide: ['chat'],
+    imageTranscription: ['chat', 'vision'],
+    embedding: ['embedding'],
+    rerank: ['rerank'],
+});
 
 const AIP_TEST_PROVIDER_PRESET_ID = 'aip-innovation-practice-test';
 const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
@@ -152,6 +167,8 @@ const DEFAULT_MODEL_SERVICE = Object.freeze({
         followUp: null,
         studyTool: null,
         topicTitle: null,
+        sourceGuide: null,
+        imageTranscription: null,
         embedding: null,
         rerank: null,
     },
@@ -163,6 +180,8 @@ const TASK_KEY_BY_LEGACY_SETTINGS_KEY = Object.freeze({
     followUpDefaultModel: 'followUp',
     studyToolDefaultModel: 'studyTool',
     topicTitleDefaultModel: 'topicTitle',
+    guideModel: 'sourceGuide',
+    imageTranscriptionModel: 'imageTranscription',
     kbEmbeddingModel: 'embedding',
     kbRerankModel: 'rerank',
 });
@@ -178,6 +197,8 @@ function createDefaultModelService() {
             followUp: null,
             studyTool: null,
             topicTitle: null,
+            sourceGuide: null,
+            imageTranscription: null,
             embedding: null,
             rerank: null,
         },
@@ -198,6 +219,28 @@ function normalizeBoolean(value, fallback = false) {
         return value;
     }
     return fallback;
+}
+
+function normalizeCapabilityFilter(value = '') {
+    const values = Array.isArray(value) ? value : [value];
+    return [...new Set(
+        values
+            .map((item) => normalizeText(item))
+            .filter(Boolean)
+    )];
+}
+
+function getRequiredCapabilitiesForTask(taskKey = '') {
+    return normalizeCapabilityFilter(MODEL_SERVICE_DEFAULT_REQUIRED_CAPABILITIES[taskKey]);
+}
+
+function modelHasCapabilities(model = {}, capabilities = []) {
+    const requiredCapabilities = normalizeCapabilityFilter(capabilities);
+    if (requiredCapabilities.length === 0) {
+        return true;
+    }
+
+    return requiredCapabilities.every((capability) => model?.capabilities?.[capability] === true);
 }
 
 function sanitizeIdSegment(value) {
@@ -371,7 +414,7 @@ function detectRemoteModelCapabilities(modelName = '') {
         capabilities.vision = true;
     }
 
-    if (/(reason|reasoning|thinking|deepthink|o1|o3|r1)/i.test(normalizedName)) {
+    if (/(reason|reasoning|thinking|deepthink|qwen|qwq|glm|zhipu|kimi|moonshot|deepseek|hunyuan|doubao|mimo|o1|o3|r1)/i.test(normalizedName)) {
         capabilities.reasoning = true;
     }
 
@@ -476,6 +519,23 @@ function mergeProviderModels(models = []) {
     return merged;
 }
 
+function preserveKnownTrueCapabilities(model = {}, knownModel = null) {
+    if (!knownModel?.capabilities) {
+        return model;
+    }
+
+    return {
+        ...model,
+        capabilities: {
+            ...(model.capabilities || {}),
+            ...Object.fromEntries(
+                Object.entries(knownModel.capabilities)
+                    .filter(([, value]) => value === true)
+            ),
+        },
+    };
+}
+
 function resolveProviderPreset(presetId = '') {
     return PROVIDER_PRESETS.find((preset) => preset.presetId === presetId) || null;
 }
@@ -520,8 +580,12 @@ function normalizeDefaults(defaults = {}, providers = []) {
         const normalized = normalizeModelRef(defaults?.[key]);
         if (normalized && validProviderIds.has(normalized.providerId)) {
             const provider = providers.find((item) => item.id === normalized.providerId);
+            const requiredCapabilities = getRequiredCapabilitiesForTask(key);
             const hasModel = Array.isArray(provider?.models)
-                && provider.models.some((model) => model.id === normalized.modelId);
+                && provider.models.some((model) => (
+                    model.id === normalized.modelId
+                    && modelHasCapabilities(model, requiredCapabilities)
+                ));
             acc[key] = hasModel ? normalized : null;
         } else {
             acc[key] = null;
@@ -580,6 +644,8 @@ function createBuiltInTestProviderDefaults(provider = {}) {
         followUp: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         studyTool: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         topicTitle: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        sourceGuide: refFor(AIP_TEST_DEFAULT_MODEL),
+        imageTranscription: refFor(AIP_TEST_DEFAULT_MODEL),
         embedding: refFor('Qwen/Qwen3-VL-Embedding-8B'),
         rerank: refFor('Qwen/Qwen3-VL-Reranker-8B'),
     };
@@ -618,6 +684,12 @@ function ensureBuiltInTestProvider(service = DEFAULT_MODEL_SERVICE) {
     }
 
     const providers = [...normalizedService.providers];
+    const existingModelsWithBuiltInCapabilities = (providers[existingIndex].models || [])
+        .map((model) => preserveKnownTrueCapabilities(
+            model,
+            findModelById(builtInProvider, model.id)
+        ));
+
     providers[existingIndex] = normalizeProviderConfig({
         ...providers[existingIndex],
         id: providers[existingIndex].id || builtInProvider.id,
@@ -629,7 +701,7 @@ function ensureBuiltInTestProvider(service = DEFAULT_MODEL_SERVICE) {
             : builtInProvider.apiKeys,
         models: mergeProviderModels([
             ...builtInProvider.models,
-            ...(providers[existingIndex].models || []),
+            ...existingModelsWithBuiltInCapabilities,
         ]),
     });
 
@@ -721,6 +793,7 @@ function buildModelServiceFromSettings(settings = {}) {
         [settings?.topicTitleDefaultModel, 'chat', { chat: true }],
         [settings?.lastModel, 'chat', { chat: true }],
         [settings?.guideModel, 'chat', { chat: true }],
+        [settings?.imageTranscriptionModel, 'chat', { chat: true, vision: true }],
     ]);
     const kbModels = collectLegacyModels(settings, [
         [settings?.kbEmbeddingModel, 'embedding', { chat: false, embedding: true, rerank: false, vision: false, reasoning: false }],
@@ -811,6 +884,18 @@ function buildModelServiceFromSettings(settings = {}) {
                 normalizeText(settings?.topicTitleDefaultModel) || normalizeText(settings?.defaultModel)
             )
             : null,
+        sourceGuide: primaryProvider
+            ? resolveDefaultRefForProvider(
+                primaryProvider,
+                normalizeText(settings?.guideModel)
+            )
+            : null,
+        imageTranscription: primaryProvider
+            ? resolveDefaultRefForProvider(
+                primaryProvider,
+                normalizeText(settings?.imageTranscriptionModel)
+            )
+            : null,
         embedding: kbProvider
             ? resolveDefaultRefForProvider(kbProvider, normalizeText(settings?.kbEmbeddingModel))
             : null,
@@ -861,6 +946,10 @@ function resolveModelRef(service = DEFAULT_MODEL_SERVICE, ref = null, options = 
         return null;
     }
 
+    if (!modelHasCapabilities(model, options.capabilities || options.capability)) {
+        return null;
+    }
+
     return {
         ref: normalizedRef,
         provider,
@@ -880,7 +969,7 @@ function resolveModelById(service = DEFAULT_MODEL_SERVICE, modelId = '', options
     }
 
     const includeDisabled = options.includeDisabled === true;
-    const capability = normalizeText(options.capability);
+    const requiredCapabilities = normalizeCapabilityFilter(options.capabilities || options.capability);
     for (const provider of service.providers || []) {
         if (!includeDisabled && provider.enabled === false) {
             continue;
@@ -893,7 +982,7 @@ function resolveModelById(service = DEFAULT_MODEL_SERVICE, modelId = '', options
             if (!includeDisabled && model.enabled === false) {
                 continue;
             }
-            if (capability && model.capabilities?.[capability] !== true) {
+            if (!modelHasCapabilities(model, requiredCapabilities)) {
                 continue;
             }
 
@@ -912,7 +1001,7 @@ function resolveModelById(service = DEFAULT_MODEL_SERVICE, modelId = '', options
 }
 
 function listEnabledModels(service = DEFAULT_MODEL_SERVICE, options = {}) {
-    const capability = normalizeText(options.capability);
+    const requiredCapabilities = normalizeCapabilityFilter(options.capabilities || options.capability);
     const includeDisabled = options.includeDisabled === true;
     const items = [];
 
@@ -924,7 +1013,7 @@ function listEnabledModels(service = DEFAULT_MODEL_SERVICE, options = {}) {
             if (!includeDisabled && model.enabled === false) {
                 continue;
             }
-            if (capability && model.capabilities?.[capability] !== true) {
+            if (!modelHasCapabilities(model, requiredCapabilities)) {
                 continue;
             }
             items.push({
@@ -994,25 +1083,50 @@ function resolveExecutionConfig(settings = {}, options = {}) {
     const requestedModel = normalizeText(options.requestedModel);
     const requestedRef = normalizeModelRef(options.requestedRef);
     const preferredTaskKey = MODEL_SERVICE_DEFAULT_KEYS.includes(purpose) ? purpose : 'chat';
+    const requiredCapabilities = normalizeCapabilityFilter(
+        options.capabilities || options.capability || getRequiredCapabilitiesForTask(preferredTaskKey)
+    );
 
     let resolved = null;
     if (requestedRef) {
-        resolved = resolveModelRef(normalizedSettings, requestedRef, options);
+        resolved = resolveModelRef(normalizedSettings, requestedRef, {
+            ...options,
+            capabilities: requiredCapabilities,
+        });
     }
     if (!resolved && requestedModel) {
         resolved = resolveModelById(
             normalizedSettings,
             requestedModel,
-            purpose === 'embedding' || purpose === 'rerank'
-                ? { ...options, capability: purpose }
-                : options
+            {
+                ...options,
+                capabilities: requiredCapabilities,
+            }
         );
     }
     if (!resolved) {
-        resolved = resolveDefaultModelRef(normalizedSettings, preferredTaskKey, options);
+        resolved = resolveDefaultModelRef(normalizedSettings, preferredTaskKey, {
+            ...options,
+            capabilities: requiredCapabilities,
+        });
+    }
+    if (!resolved && purpose === 'sourceGuide' && normalizeText(settings?.guideModel)) {
+        resolved = resolveModelById(normalizedSettings, settings.guideModel, {
+            ...options,
+            capabilities: requiredCapabilities,
+        });
+    }
+    if (!resolved && purpose === 'imageTranscription' && normalizeText(settings?.imageTranscriptionModel)) {
+        resolved = resolveModelById(normalizedSettings, settings.imageTranscriptionModel, {
+            ...options,
+            capabilities: requiredCapabilities,
+        });
     }
     if (!resolved && purpose !== 'chat') {
-        resolved = resolveDefaultModelRef(normalizedSettings, 'chat', options);
+        resolved = resolveDefaultModelRef(normalizedSettings, 'chat', {
+            ...options,
+            capabilities: requiredCapabilities,
+        });
     }
 
     const resolvedExecution = buildResolvedExecution(resolved, purpose);
@@ -1052,6 +1166,8 @@ function resolveExecutionConfig(settings = {}, options = {}) {
 
     const legacyModel = requestedModel
         || (purpose === 'thinkingChat' ? normalizeText(settings?.thinkingChatDefaultModel) : '')
+        || (purpose === 'sourceGuide' ? normalizeText(settings?.guideModel) : '')
+        || (purpose === 'imageTranscription' ? normalizeText(settings?.imageTranscriptionModel) : '')
         || normalizeText(settings?.defaultModel)
         || normalizeText(options.fallbackModel);
     return {
@@ -1090,6 +1206,8 @@ function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVIC
     const followUpModel = getLegacyFallbackModel(normalizedModelService, 'followUp') || chatModel;
     const studyToolModel = getLegacyFallbackModel(normalizedModelService, 'studyTool') || chatModel;
     const topicTitleModel = getLegacyFallbackModel(normalizedModelService, 'topicTitle') || chatModel;
+    const sourceGuideModel = getLegacyFallbackModel(normalizedModelService, 'sourceGuide');
+    const imageTranscriptionModel = getLegacyFallbackModel(normalizedModelService, 'imageTranscription');
     const embeddingModel = getLegacyFallbackModel(normalizedModelService, 'embedding');
     const rerankModel = getLegacyFallbackModel(normalizedModelService, 'rerank');
     const kbExecution = embeddingExecution?.endpoint
@@ -1108,7 +1226,8 @@ function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVIC
         kbApiKey: kbExecution?.apiKey || '',
         kbEmbeddingModel: embeddingModel || normalizeText(previousSettings?.kbEmbeddingModel),
         kbRerankModel: rerankModel || normalizeText(previousSettings?.kbRerankModel),
-        guideModel: normalizeText(previousSettings?.guideModel, chatModel),
+        guideModel: sourceGuideModel || normalizeText(previousSettings?.guideModel),
+        imageTranscriptionModel: imageTranscriptionModel || normalizeText(previousSettings?.imageTranscriptionModel),
         lastModel: normalizeText(previousSettings?.lastModel, chatModel),
     };
 }
@@ -1194,6 +1313,7 @@ module.exports = {
     DEFAULT_MODEL_SERVICE,
     MODEL_CAPABILITY_KEYS,
     MODEL_SERVICE_DEFAULT_KEYS,
+    MODEL_SERVICE_DEFAULT_REQUIRED_CAPABILITIES,
     MODEL_SERVICE_VERSION,
     PROVIDER_PRESETS,
     TASK_KEY_BY_LEGACY_SETTINGS_KEY,

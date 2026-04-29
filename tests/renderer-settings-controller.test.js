@@ -36,6 +36,13 @@ function createDom() {
           <input id="userNameInput" />
           <input id="defaultModelInput" />
           <input id="thinkingChatDefaultModelInput" />
+          <select id="thinkingChatReasoningEffortInput">
+            <option value="default">default</option>
+            <option value="none">none</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
           <input id="followUpDefaultModelInput" />
           <input id="studyToolDefaultModelInput" />
           <input id="topicTitleDefaultModelInput" />
@@ -156,6 +163,7 @@ function createElementMap(documentObj) {
         userNameInput: documentObj.getElementById('userNameInput'),
         defaultModelInput: documentObj.getElementById('defaultModelInput'),
         thinkingChatDefaultModelInput: documentObj.getElementById('thinkingChatDefaultModelInput'),
+        thinkingChatReasoningEffortInput: documentObj.getElementById('thinkingChatReasoningEffortInput'),
         followUpDefaultModelInput: documentObj.getElementById('followUpDefaultModelInput'),
         studyToolDefaultModelInput: documentObj.getElementById('studyToolDefaultModelInput'),
         topicTitleDefaultModelInput: documentObj.getElementById('topicTitleDefaultModelInput'),
@@ -694,6 +702,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     userName: 'Alice',
                     defaultModel: 'chat-default-model',
                     thinkingChatDefaultModel: 'thinking-chat-default-model',
+                    thinkingChatReasoningEffort: 'medium',
                     followUpDefaultModel: 'follow-up-default-model',
                     studyToolDefaultModel: 'study-tool-default-model',
                     topicTitleDefaultModel: 'topic-title-default-model',
@@ -884,6 +893,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.agentBubbleThemePreviewMeta.textContent, '当前关闭，不会注入到 system 提示词。');
     assert.equal(el.defaultModelInput.value, 'chat-default-model');
     assert.equal(el.thinkingChatDefaultModelInput.value, 'thinking-chat-default-model');
+    assert.equal(el.thinkingChatReasoningEffortInput.value, 'medium');
     assert.equal(el.followUpDefaultModelInput.value, 'follow-up-default-model');
     assert.equal(el.studyToolDefaultModelInput.value, 'study-tool-default-model');
     assert.equal(el.topicTitleDefaultModelInput.value, 'topic-title-default-model');
@@ -910,6 +920,14 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="topicTitle"]')?.value || '',
         /::topic-title-default-model$/
+    );
+    assert.equal(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="sourceGuide"]')?.value || '',
+        ''
+    );
+    assert.equal(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="imageTranscription"]')?.value || '',
+        ''
     );
     assert.equal(el.modelServiceProviderDetail.querySelector('[data-model-service-provider-field="name"]'), null);
     assert.equal(el.modelServiceProviderDetail.querySelector('[data-model-service-check-model]'), null);
@@ -967,6 +985,8 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     await addModelThroughWorkbench(el, dom, 'updated-follow-up-model', 'Updated Follow-up Model');
     await addModelThroughWorkbench(el, dom, 'updated-study-tool-model', 'Updated Study Tool Model');
     await addModelThroughWorkbench(el, dom, 'updated-topic-title-model', 'Updated Topic Title Model');
+    await addModelThroughWorkbench(el, dom, 'updated-source-guide-model', 'Updated Source Guide Model');
+    await addModelThroughWorkbench(el, dom, 'updated-vision-model', 'Updated Vision Model');
     await selectDefaultModel(el, dom, 'chat', 'updated-chat-default-model');
     await selectDefaultModel(el, dom, 'thinkingChat', 'updated-thinking-chat-model');
     await selectDefaultModel(el, dom, 'chatFallback', 'updated-chat-default-model');
@@ -981,8 +1001,12 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     await selectDefaultModel(el, dom, 'followUp', 'updated-follow-up-model');
     await selectDefaultModel(el, dom, 'studyTool', 'updated-study-tool-model');
     await selectDefaultModel(el, dom, 'topicTitle', 'updated-topic-title-model');
+    await selectDefaultModel(el, dom, 'sourceGuide', 'updated-source-guide-model');
+    await selectDefaultModel(el, dom, 'imageTranscription', 'updated-vision-model');
     assert.equal(el.defaultModelInput.value, 'updated-chat-default-model');
     assert.equal(el.thinkingChatDefaultModelInput.value, 'updated-thinking-chat-model');
+    el.thinkingChatReasoningEffortInput.value = 'high';
+    el.thinkingChatReasoningEffortInput.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
     assert.equal(el.followUpDefaultModelInput.value, 'updated-follow-up-model');
     assert.equal(el.studyToolDefaultModelInput.value, 'updated-study-tool-model');
     assert.equal(el.topicTitleDefaultModelInput.value, 'updated-topic-title-model');
@@ -1008,21 +1032,28 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.ok(savedPatch);
     assert.equal(savedPatch.defaultModel, 'updated-chat-default-model');
     assert.equal(savedPatch.thinkingChatDefaultModel, 'updated-thinking-chat-model');
+    assert.equal(savedPatch.thinkingChatReasoningEffort, 'high');
     assert.equal(savedPatch.followUpDefaultModel, 'updated-follow-up-model');
     assert.equal(savedPatch.studyToolDefaultModel, 'updated-study-tool-model');
     assert.equal(savedPatch.topicTitleDefaultModel, 'updated-topic-title-model');
+    assert.equal(savedPatch.guideModel, 'updated-source-guide-model');
+    assert.equal(savedPatch.imageTranscriptionModel, 'updated-vision-model');
     assert.equal(savedPatch.modelService.defaults.chat.modelId, 'updated-chat-default-model');
     assert.equal(savedPatch.modelService.defaults.thinkingChat.modelId, 'updated-thinking-chat-model');
     assert.equal(savedPatch.modelService.defaults.chatFallback.modelId, 'updated-fallback-model');
     assert.equal(savedPatch.modelService.defaults.followUp.modelId, 'updated-follow-up-model');
     assert.equal(savedPatch.modelService.defaults.studyTool.modelId, 'updated-study-tool-model');
     assert.equal(savedPatch.modelService.defaults.topicTitle.modelId, 'updated-topic-title-model');
+    assert.equal(savedPatch.modelService.defaults.sourceGuide.modelId, 'updated-source-guide-model');
+    assert.equal(savedPatch.modelService.defaults.imageTranscription.modelId, 'updated-vision-model');
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-chat-default-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-thinking-chat-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-fallback-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-follow-up-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-study-tool-model'));
     assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-topic-title-model'));
+    assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-source-guide-model'));
+    assert.ok(savedPatch.modelService.providers[0].models.some((model) => model.id === 'updated-vision-model' && model.capabilities.vision === true));
     assert.equal(savedPatch.enableEmoticonPrompt, true);
     assert.equal(savedPatch.enableAgentBubbleTheme, true);
     assert.equal(savedPatch.agentBubbleThemePrompt, 'Editable prompt: {{RenderingGuide}}');
@@ -1289,6 +1320,14 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="followUp"]')?.value || '',
         /::Qwen\/Qwen3\.5-122B-A10B$/
+    );
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="sourceGuide"]')?.value || '',
+        /::Qwen\/Qwen3\.5-397B-A17B$/
+    );
+    assert.match(
+        el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="imageTranscription"]')?.value || '',
+        /::Qwen\/Qwen3\.5-397B-A17B$/
     );
 });
 

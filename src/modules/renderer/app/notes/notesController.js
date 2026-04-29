@@ -217,6 +217,8 @@ function createNotesController(deps = {}) {
     let noteDetailReturnTarget = 'studio';
     let quizConfigTrigger = null;
     let flashcardConfigTrigger = null;
+    let quizIncludeChatContextAutoDefaulted = false;
+    let flashcardIncludeChatContextAutoDefaulted = false;
     let manualNotesLibraryTrigger = null;
     let noteAnalysisTrigger = null;
     let studioPomodoroTickTimerId = null;
@@ -543,8 +545,44 @@ function createNotesController(deps = {}) {
             });
     }
 
-    function getManualLibraryNotes() {
-        const filter = String(state.manualNotesLibraryFilter || 'all');
+    function getManualLibraryAgentIdsWithNotes() {
+        return new Set(
+            filterManualNotes(getManualLibrarySourceNotes())
+                .map((note) => String(note.agentId || '').trim())
+                .filter(Boolean),
+        );
+    }
+
+    function getManualLibrarySubjectFilters() {
+        const agentIdsWithNotes = getManualLibraryAgentIdsWithNotes();
+        const filters = (Array.isArray(state.agents) ? state.agents : [])
+            .map((agent) => {
+                const agentId = String(agent?.id || '').trim();
+                if (!agentId || !agentIdsWithNotes.has(agentId)) {
+                    return null;
+                }
+                return { id: agentId, label: agent?.name || agentId };
+            })
+            .filter(Boolean);
+        const representedAgentIds = new Set(filters.map((filterItem) => filterItem.id));
+        agentIdsWithNotes.forEach((agentId) => {
+            if (!representedAgentIds.has(agentId)) {
+                filters.push({ id: agentId, label: getAgentDisplayLabel(agentId) });
+            }
+        });
+        return filters;
+    }
+
+    function resolveManualNotesLibraryFilter(filter = 'all') {
+        const normalizedFilter = String(filter || 'all').trim() || 'all';
+        if (normalizedFilter === 'all' || normalizedFilter === 'analysis') {
+            return normalizedFilter;
+        }
+        return getManualLibraryAgentIdsWithNotes().has(normalizedFilter) ? normalizedFilter : 'all';
+    }
+
+    function getManualLibraryNotes(filterOverride = state.manualNotesLibraryFilter) {
+        const filter = resolveManualNotesLibraryFilter(filterOverride);
         const notes = getManualLibrarySourceNotes();
         if (filter === 'analysis') {
             return notes.filter((note) => getNormalizedNoteKind(note) === 'analysis');
@@ -1223,9 +1261,10 @@ function createNotesController(deps = {}) {
     }
 
     function setManualNotesLibraryFilter(filter = 'all') {
-        state.manualNotesLibraryFilter = filter;
+        const nextFilter = resolveManualNotesLibraryFilter(filter);
+        state.manualNotesLibraryFilter = nextFilter;
         notesDomApi.renderManualNotesLibrary();
-        onManualNotesLibraryFilterChange(filter);
+        onManualNotesLibraryFilterChange(nextFilter);
     }
 
     function getPendingAnalysisGenerations() {
@@ -1455,7 +1494,7 @@ function createNotesController(deps = {}) {
                     : `
                         <div class="empty-list-state note-analysis-empty">
                             <strong>还没有可分析的笔记</strong>
-                            <span>先用右侧“新建笔记”记录内容，再回到这里进行综合分析。</span>
+                            <span>先在对话页面对想沉淀的消息右键，选择“记入笔记”，再回到这里进行综合分析。</span>
                         </div>
                     `}
             </section>
@@ -1950,6 +1989,59 @@ function createNotesController(deps = {}) {
         }
     }
 
+    function hasCurrentTopicSourceDocuments() {
+        const currentTopic = getCurrentTopic();
+        if (!currentTopic?.knowledgeBaseId) {
+            return false;
+        }
+
+        const sourceSlice = store.getState().source || {};
+        const topicDocuments = Array.isArray(sourceSlice.topicKnowledgeBaseDocuments)
+            ? sourceSlice.topicKnowledgeBaseDocuments
+            : [];
+        const documentIds = topicDocuments
+            .map((documentItem) => String(documentItem?.id || '').trim())
+            .filter(Boolean);
+        if (documentIds.length === 0) {
+            return false;
+        }
+
+        const selectedIds = Array.isArray(currentTopic.selectedKnowledgeBaseDocumentIds)
+            ? currentTopic.selectedKnowledgeBaseDocumentIds
+                .map((id) => String(id || '').trim())
+                .filter(Boolean)
+            : null;
+        return selectedIds === null
+            ? true
+            : selectedIds.some((id) => documentIds.includes(id));
+    }
+
+    function shouldDefaultIncludeChatContext() {
+        return !hasCurrentTopicSourceDocuments();
+    }
+
+    function resolveIncludeChatContextForModalOpen(config, wasAutoDefaulted) {
+        const shouldAutoDefault = shouldDefaultIncludeChatContext();
+        if (shouldAutoDefault) {
+            return {
+                includeChatContext: true,
+                autoDefaulted: config.includeChatContext !== true || wasAutoDefaulted,
+            };
+        }
+
+        if (wasAutoDefaulted) {
+            return {
+                includeChatContext: false,
+                autoDefaulted: false,
+            };
+        }
+
+        return {
+            includeChatContext: config.includeChatContext === true,
+            autoDefaulted: false,
+        };
+    }
+
     function syncQuizConfigControls() {
         const config = state.quizGenerationConfig;
         Array.from(el.quizCountPresetBtns || []).forEach((button) => {
@@ -2025,7 +2117,16 @@ function createNotesController(deps = {}) {
         if (options.trigger instanceof HTMLElementCtor) {
             quizConfigTrigger = options.trigger;
         }
-        state.quizGenerationConfig = normalizeQuizGenerationConfig(state.quizGenerationConfig);
+        const normalizedConfig = normalizeQuizGenerationConfig(state.quizGenerationConfig);
+        const includeChatContext = resolveIncludeChatContextForModalOpen(
+            normalizedConfig,
+            quizIncludeChatContextAutoDefaulted
+        );
+        quizIncludeChatContextAutoDefaulted = includeChatContext.autoDefaulted;
+        state.quizGenerationConfig = normalizeQuizGenerationConfig({
+            ...normalizedConfig,
+            includeChatContext: includeChatContext.includeChatContext,
+        });
         syncQuizConfigControls();
         closeTopicActionMenu();
         closeSourceFileActionMenu();
@@ -2147,7 +2248,16 @@ function createNotesController(deps = {}) {
         if (options.trigger instanceof HTMLElementCtor) {
             flashcardConfigTrigger = options.trigger;
         }
-        state.flashcardGenerationConfig = normalizeFlashcardGenerationConfig(state.flashcardGenerationConfig);
+        const normalizedConfig = normalizeFlashcardGenerationConfig(state.flashcardGenerationConfig);
+        const includeChatContext = resolveIncludeChatContextForModalOpen(
+            normalizedConfig,
+            flashcardIncludeChatContextAutoDefaulted
+        );
+        flashcardIncludeChatContextAutoDefaulted = includeChatContext.autoDefaulted;
+        state.flashcardGenerationConfig = normalizeFlashcardGenerationConfig({
+            ...normalizedConfig,
+            includeChatContext: includeChatContext.includeChatContext,
+        });
         syncFlashcardConfigControls();
         closeTopicActionMenu();
         closeSourceFileActionMenu();
@@ -2331,6 +2441,7 @@ function createNotesController(deps = {}) {
             state.quizGenerationConfig = readQuizConfigFromControls();
         });
         el.quizIncludeChatContextInput?.addEventListener('change', () => {
+            quizIncludeChatContextAutoDefaulted = false;
             state.quizGenerationConfig = readQuizConfigFromControls();
         });
         Array.from(el.quizCountPresetBtns || []).forEach((button) => {
@@ -2356,6 +2467,7 @@ function createNotesController(deps = {}) {
             state.flashcardGenerationConfig = readFlashcardConfigFromControls();
         });
         el.flashcardIncludeChatContextInput?.addEventListener('change', () => {
+            flashcardIncludeChatContextAutoDefaulted = false;
             state.flashcardGenerationConfig = readFlashcardConfigFromControls();
         });
         Array.from(el.flashcardCountPresetBtns || []).forEach((button) => {
@@ -2463,6 +2575,8 @@ function createNotesController(deps = {}) {
         getVisibleNotes,
         getGeneratedVisibleNotes,
         getManualLibraryNotes,
+        getManualLibrarySubjectFilters,
+        resolveManualNotesLibraryFilter,
         getActiveNote,
         getCurrentTopicDisplayName,
         getTopicDisplayLabel,

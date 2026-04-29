@@ -1061,7 +1061,10 @@ test('manual notes library exposes a deep analysis tab that only renders analysi
     controller.bindEvents();
     controller.renderManualNotesLibrary();
 
-    assert.match(el.manualNotesLibrarySubjectTabs.textContent, /深度分析/);
+    const subjectTabsText = el.manualNotesLibrarySubjectTabs.textContent;
+    assert.match(subjectTabsText, /深度分析/);
+    assert.match(subjectTabsText, /数学/);
+    assert.doesNotMatch(subjectTabsText, /物理/);
     assert.match(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析内容/);
 
@@ -1071,6 +1074,36 @@ test('manual notes library exposes a deep analysis tab that only renders analysi
     assert.match(el.manualNotesLibraryGrid.textContent, /分析内容/);
     assert.match(el.manualNotesLibraryGrid.textContent, /物理/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
+});
+
+test('manual notes library resets subject filters that no longer have manual notes', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                agents: [
+                    { id: 'agent-1', name: '数学' },
+                    { id: 'agent-2', name: '物理' },
+                ],
+            },
+            notes: {
+                manualNotesLibraryFilter: 'agent-2',
+                allAgentManualNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', agentId: 'agent-1', topicId: 'topic-1' },
+                    { id: 'analysis-1', title: '分析报告', contentMarkdown: '分析内容', kind: 'analysis', agentId: 'agent-2', topicId: 'topic-2' },
+                ],
+            },
+        },
+    });
+
+    controller.renderManualNotesLibrary();
+
+    assert.equal(store.getState().notes.manualNotesLibraryFilter, 'all');
+    assert.match(el.manualNotesLibrarySubjectTabs.textContent, /数学/);
+    assert.doesNotMatch(el.manualNotesLibrarySubjectTabs.textContent, /物理/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析内容/);
 });
 
 test('manual notes library close button hides the modal and clears the open state', async () => {
@@ -1616,7 +1649,7 @@ test('quiz config modal opens with defaults and injects custom count difficulty 
     assert.equal(el.quizConfigModal.getAttribute('aria-hidden'), 'false');
     assert.equal(el.quizCountPresetBtns[1].getAttribute('aria-pressed'), 'true');
     assert.equal(el.quizDifficultyBtns[1].getAttribute('aria-pressed'), 'true');
-    assert.equal(el.quizIncludeChatContextInput.checked, false);
+    assert.equal(el.quizIncludeChatContextInput.checked, true);
 
     el.quizCountPresetBtns[2].click();
     el.quizDifficultyBtns[2].click();
@@ -1896,7 +1929,7 @@ test('quiz chat-only generation sends sanitized text instead of rendered HTML', 
     assert.doesNotMatch(prompt, /response-root/);
 });
 
-test('quiz generation without notes source or chat opt-in shows the study input hint', async () => {
+test('quiz generation still shows the study input hint after manually disabling chat-only input', async () => {
     const { createNotesController } = await loadNotesControllerModule();
     let sendCallCount = 0;
 
@@ -1921,12 +1954,80 @@ test('quiz generation without notes source or chat opt-in shows the study input 
 
     controller.bindEvents();
     el.generateQuizBtn.click();
+    assert.equal(el.quizIncludeChatContextInput.checked, true);
+    el.quizIncludeChatContextInput.checked = false;
+    el.quizIncludeChatContextInput.dispatchEvent(new el.quizIncludeChatContextInput.ownerDocument.defaultView.Event('change', { bubbles: true }));
     el.quizConfigGenerateBtn.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     assert.equal(sendCallCount, 0);
     assert.deepEqual(store.getState().notes.pendingQuizGenerations, []);
     assert.equal(toasts.some(([message]) => message === '请先选择笔记、导入来源资料，或勾选“包含当前对话”。'), true);
+});
+
+test('study tool config modals keep chat context off by default when the current topic has source documents', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            source: {
+                topicKnowledgeBaseDocuments: [
+                    { id: 'source-doc-1', name: '课件.md', status: 'done' },
+                ],
+            },
+        },
+        depsOverrides: {
+            getCurrentTopic: () => ({
+                knowledgeBaseId: 'kb-1',
+                selectedKnowledgeBaseDocumentIds: ['source-doc-1'],
+            }),
+        },
+    });
+
+    controller.bindEvents();
+
+    el.generateQuizBtn.click();
+    assert.equal(el.quizIncludeChatContextInput.checked, false);
+    controller.closeQuizConfigModal({ restoreFocus: false });
+
+    el.generateFlashcardsBtn.click();
+    assert.equal(el.flashcardIncludeChatContextInput.checked, false);
+});
+
+test('study tool chat-only auto default does not stick after source documents appear', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let currentTopic = { knowledgeBaseId: 'kb-1' };
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        depsOverrides: {
+            getCurrentTopic: () => currentTopic,
+        },
+    });
+
+    controller.bindEvents();
+
+    el.generateQuizBtn.click();
+    assert.equal(el.quizIncludeChatContextInput.checked, true);
+    controller.closeQuizConfigModal({ restoreFocus: false });
+
+    el.generateFlashcardsBtn.click();
+    assert.equal(el.flashcardIncludeChatContextInput.checked, true);
+    controller.closeFlashcardConfigModal({ restoreFocus: false });
+
+    currentTopic = {
+        knowledgeBaseId: 'kb-1',
+        selectedKnowledgeBaseDocumentIds: ['source-doc-1'],
+    };
+    store.patchState('source', {
+        topicKnowledgeBaseDocuments: [
+            { id: 'source-doc-1', name: '课件.md', status: 'done' },
+        ],
+    });
+
+    el.generateQuizBtn.click();
+    assert.equal(el.quizIncludeChatContextInput.checked, false);
+    controller.closeQuizConfigModal({ restoreFocus: false });
+
+    el.generateFlashcardsBtn.click();
+    assert.equal(el.flashcardIncludeChatContextInput.checked, false);
 });
 
 test('quiz source fallback passes selected knowledge base document ids into retrieval', async () => {
@@ -2262,7 +2363,7 @@ test('flashcard config modal opens with defaults and injects custom options into
     assert.equal(el.flashcardCountPresetBtns[1].getAttribute('aria-pressed'), 'true');
     assert.equal(el.flashcardDifficultyBtns[1].getAttribute('aria-pressed'), 'true');
     assert.equal(el.flashcardFocusInput.value, '');
-    assert.equal(el.flashcardIncludeChatContextInput.checked, false);
+    assert.equal(el.flashcardIncludeChatContextInput.checked, true);
 
     el.flashcardCountPresetBtns[2].click();
     el.flashcardDifficultyBtns[2].click();

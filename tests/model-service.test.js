@@ -20,6 +20,7 @@ test('buildModelServiceFromSettings and buildSettingsMirrorFromModelService pres
         studyToolDefaultModel: 'gpt-4.1-study',
         topicTitleDefaultModel: 'gpt-4.1-nano',
         guideModel: 'guide-model',
+        imageTranscriptionModel: 'vision-model',
         lastModel: 'last-model',
         kbBaseUrl: 'https://kb.example.com/openai/v1/embeddings',
         kbApiKey: 'kb-key',
@@ -29,6 +30,7 @@ test('buildModelServiceFromSettings and buildSettingsMirrorFromModelService pres
 
     const settingsMirror = modelService.buildSettingsMirrorFromModelService(service, {
         guideModel: 'guide-model',
+        imageTranscriptionModel: 'vision-model',
         lastModel: 'last-model',
     });
 
@@ -44,8 +46,15 @@ test('buildModelServiceFromSettings and buildSettingsMirrorFromModelService pres
     assert.equal(settingsMirror.kbEmbeddingModel, 'bge-m3');
     assert.equal(settingsMirror.kbRerankModel, 'bge-reranker-v2');
     assert.equal(settingsMirror.guideModel, 'guide-model');
+    assert.equal(settingsMirror.imageTranscriptionModel, 'vision-model');
     assert.equal(settingsMirror.lastModel, 'last-model');
     assert.equal('chatFallback' in settingsMirror, false);
+});
+
+test('detectRemoteModelCapabilities recognizes OpenAI-compatible thinking model families', () => {
+    assert.equal(modelService.detectRemoteModelCapabilities('glm-5.1').reasoning, true);
+    assert.equal(modelService.detectRemoteModelCapabilities('Pro/moonshotai/Kimi-K2.6').reasoning, true);
+    assert.equal(modelService.detectRemoteModelCapabilities('deepseek-ai/DeepSeek-V4-Flash').reasoning, true);
 });
 
 test('buildModelServiceFromSettings recognizes the built-in AI&P test preset from the hardcoded channel', () => {
@@ -174,6 +183,34 @@ test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P pre
         providerId: 'aip-test-provider',
         modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
     });
+    assert.deepEqual(service.defaults.sourceGuide, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
+    });
+    assert.deepEqual(service.defaults.imageTranscription, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
+    });
+});
+
+test('resolveExecutionConfig can target dedicated source guide and image transcription defaults', () => {
+    const settings = {
+        modelService: modelService.buildModelServiceFromSettings({
+            chatEndpoint: 'https://chat.example.com/base',
+            chatApiKey: 'chat-key',
+            defaultModel: 'chat-model',
+            guideModel: 'guide-model',
+            imageTranscriptionModel: 'vision-model',
+        }),
+    };
+
+    const guideExecution = modelService.resolveExecutionConfig(settings, { purpose: 'sourceGuide' });
+    const visionExecution = modelService.resolveExecutionConfig(settings, { purpose: 'imageTranscription' });
+
+    assert.equal(guideExecution.model.id, 'guide-model');
+    assert.equal(guideExecution.endpoint, 'https://chat.example.com/base/v1/chat/completions');
+    assert.equal(visionExecution.model.id, 'vision-model');
+    assert.equal(visionExecution.endpoint, 'https://chat.example.com/base/v1/chat/completions');
 });
 
 test('resolveExecutionConfig can target the dedicated thinking chat default', () => {

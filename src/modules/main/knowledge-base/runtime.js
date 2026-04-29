@@ -133,7 +133,7 @@ function createKnowledgeBaseRuntime(deps = {}) {
     }
 
     async function resolveGuideModel(settings = {}) {
-        const modelServiceExecution = resolveExecutionConfig(settings, { purpose: 'chat' });
+        const modelServiceExecution = resolveExecutionConfig(settings, { purpose: 'sourceGuide' });
         if (modelServiceExecution?.model?.id) {
             return modelServiceExecution.model.id;
         }
