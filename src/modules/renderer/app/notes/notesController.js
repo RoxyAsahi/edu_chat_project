@@ -1017,7 +1017,7 @@ function createNotesController(deps = {}) {
             );
         noteDetailReturnTarget = openedFromManualNotes ? 'manual-notes' : 'studio';
 
-        if (state.manualNotesLibraryOpen) {
+        if (state.manualNotesLibraryOpen && !openedFromManualNotes) {
             closeManualNotesLibrary({ restoreFocus: false });
         }
 
@@ -1233,8 +1233,9 @@ function createNotesController(deps = {}) {
             closeNoteDetail({ restoreFocus: false });
         }
 
+        const wasManualNotesLibraryOpen = state.manualNotesLibraryOpen;
         state.manualNotesLibraryOpen = true;
-        notesDomApi.renderManualNotesLibrary();
+        notesDomApi.renderManualNotesLibrary({ forcePreviewRemount: !wasManualNotesLibraryOpen });
         patchLayout({ workspaceViewMode: 'manual-notes' });
         showManualNotesLibraryPage();
         el.manualNotesLibraryModal?.classList.remove('hidden');
@@ -2119,12 +2120,13 @@ function createNotesController(deps = {}) {
                 closeNoteAnalysisWizard();
                 return;
             }
+            if (el.noteDetailModal && !el.noteDetailModal.classList.contains('hidden')) {
+                closeNoteDetail();
+                return;
+            }
             if (state.manualNotesLibraryOpen) {
                 closeManualNotesLibrary();
                 return;
-            }
-            if (el.noteDetailModal && !el.noteDetailModal.classList.contains('hidden')) {
-                closeNoteDetail();
             }
         });
         el.notesList?.addEventListener('scroll', notesDomApi.closeNoteActionMenu);

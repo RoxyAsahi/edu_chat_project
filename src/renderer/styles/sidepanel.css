@@ -5024,6 +5024,16 @@ body.dark-theme .prompt-dialog-input {
   color: #d93025;
 }
 
+.prompt-dialog .subject-emoji-picker__popover {
+  width: min(380px, calc(100vw - 64px));
+  min-width: 0;
+  height: min(360px, calc(100dvh - 220px));
+}
+
+.prompt-dialog .subject-emoji-picker__popover emoji-picker {
+  --num-columns: 7;
+}
+
 /* Note Suggestions */
 #note-suggestion-popup {
   position: fixed;

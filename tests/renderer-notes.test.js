@@ -921,6 +921,54 @@ test('manual notes library opens from the top button and only renders manual not
     assert.equal(el.manualNotesLibraryGrid.querySelector('[data-note-menu]'), null);
 });
 
+test('manual notes library keeps rich previews mounted during lightweight controls', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const mountCalls = [];
+    const richRenderer = {
+        cleanupNotePreviewMount() {},
+        mountRichNotePreview(target, note, options) {
+            mountCalls.push({
+                noteId: note.id,
+                forceRemount: options.forceRemount === true,
+            });
+            target.innerHTML = `<div class="rich-bubble" data-rich-note="${note.id}">${note.contentMarkdown}</div>`;
+            target.classList.add('unistudy-note-rich-preview');
+        },
+    };
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                agentNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', topicId: 'topic-1' },
+                    { id: 'note-2', title: '手写笔记 B', contentMarkdown: '普通内容 B', kind: 'note', topicId: 'topic-2' },
+                ],
+            },
+        },
+        depsOverrides: {
+            messageRendererApi: richRenderer,
+        },
+    });
+
+    controller.bindEvents();
+    controller.renderManualNotesLibrary({ forcePreviewRemount: true });
+    const firstCard = el.manualNotesLibraryGrid.querySelector('.manual-note-card');
+    const firstPreviewBubble = firstCard.querySelector('.rich-bubble');
+
+    assert.equal(mountCalls.length, 2);
+    assert.equal(mountCalls.every((call) => call.forceRemount), true);
+
+    el.manualNotesLibrarySubjectToggle.click();
+
+    assert.equal(mountCalls.length, 2);
+    assert.strictEqual(el.manualNotesLibraryGrid.querySelector('.manual-note-card'), firstCard);
+    assert.strictEqual(firstCard.querySelector('.rich-bubble'), firstPreviewBubble);
+
+    controller.renderManualNotesLibrary({ forcePreviewRemount: true });
+
+    assert.equal(mountCalls.length, 4);
+});
+
 test('manual notes library exposes a deep analysis tab that only renders analysis notes', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 
@@ -985,7 +1033,7 @@ test('manual notes library close button hides the modal and clears the open stat
 test('note detail opened from manual notes returns to the manual notes library', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 
-    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+    const { controller, el, store, window } = createNotesControllerHarness(createNotesController, {
         stateOverrides: {
             notes: {
                 agentNotes: [
@@ -1000,12 +1048,12 @@ test('note detail opened from manual notes returns to the manual notes library',
     const card = el.manualNotesLibraryGrid.querySelector('.manual-note-card');
     card.click();
 
-    assert.equal(store.getState().notes.manualNotesLibraryOpen, false);
-    assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), true);
+    assert.equal(store.getState().notes.manualNotesLibraryOpen, true);
+    assert.equal(el.manualNotesLibraryModal.classList.contains('hidden'), false);
     assert.equal(el.noteDetailModal.classList.contains('hidden'), false);
     assert.match(el.noteDetailBackBtn.textContent, /返回我的笔记/);
 
-    controller.closeNoteDetail();
+    window.document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
     assert.equal(el.noteDetailModal.classList.contains('hidden'), true);
     assert.equal(store.getState().notes.manualNotesLibraryOpen, true);

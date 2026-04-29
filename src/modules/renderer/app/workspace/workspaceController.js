@@ -1,4 +1,5 @@
 import { positionFloatingElement } from '../dom/positionFloatingElement.js';
+import { normalizeSubjectCardEmoji, resolveSubjectCardEmoji } from './subjectEmoji.js';
 
 const DEFAULT_AGENT_AVATAR = '../assets/brand-logo.png';
 
@@ -1845,25 +1846,235 @@ function createWorkspaceController(deps = {}) {
     }
 
     async function createAgent() {
-        const name = await ui.showPromptDialog({
-            title: '新建学科入口',
-            message: '创建一个新的学科入口，并为它配置专属的提示词风格。',
-            placeholder: '例如：语文 / 数学 / 英语',
-            confirmText: '创建',
-            cancelText: '取消',
+        const result = await new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'confirm-dialog-overlay prompt-dialog-overlay';
+
+            const dialog = document.createElement('div');
+            dialog.className = 'confirm-dialog prompt-dialog';
+
+            const titleEl = document.createElement('div');
+            titleEl.className = 'confirm-dialog-title';
+            titleEl.textContent = '新建学科入口';
+            dialog.appendChild(titleEl);
+
+            const messageEl = document.createElement('div');
+            messageEl.className = 'confirm-dialog-message prompt-dialog-message';
+            messageEl.textContent = '创建一个新的学科入口，并为它配置专属的提示词风格。';
+            dialog.appendChild(messageEl);
+
+            const nameInput = document.createElement('input');
+            nameInput.className = 'prompt-dialog-input';
+            nameInput.type = 'text';
+            nameInput.placeholder = '例如：语文 / 数学 / 英语';
+            dialog.appendChild(nameInput);
+
+            const errorEl = document.createElement('div');
+            errorEl.className = 'prompt-dialog-error';
+            dialog.appendChild(errorEl);
+
+            const emojiSection = document.createElement('div');
+            emojiSection.style.cssText = 'display:flex;align-items:center;gap:12px;margin-top:4px;';
+
+            const emojiLabel = document.createElement('span');
+            emojiLabel.textContent = '学科图标';
+            emojiLabel.style.cssText = 'font-size:14px;color:var(--muted);font-weight:500;';
+            emojiSection.appendChild(emojiLabel);
+
+            const emojiPickerRoot = document.createElement('div');
+            emojiPickerRoot.className = 'subject-emoji-picker';
+            emojiPickerRoot.style.cssText = 'position:relative;display:inline-flex;align-items:center;gap:8px;';
+
+            const agentIndex = state.agents.length;
+            let hasUserSelectedEmoji = false;
+            let currentEmoji = resolveSubjectCardEmoji({ agent: { name: '' }, index: agentIndex });
+
+            const emojiTrigger = document.createElement('button');
+            emojiTrigger.className = 'subject-emoji-picker__trigger';
+            emojiTrigger.type = 'button';
+            emojiTrigger.setAttribute('aria-haspopup', 'dialog');
+            emojiTrigger.setAttribute('aria-expanded', 'false');
+            emojiTrigger.innerHTML = `<span class="subject-emoji-picker__preview" aria-hidden="true">${escapeHtml(currentEmoji)}</span><span class="subject-emoji-picker__label">选择</span>`;
+
+            const emojiPopover = document.createElement('div');
+            emojiPopover.className = 'subject-emoji-picker__popover hidden';
+            emojiPopover.setAttribute('role', 'dialog');
+            emojiPopover.setAttribute('aria-label', '选择卡片 Emoji');
+            emojiPopover.setAttribute('aria-hidden', 'true');
+            const isDark = documentObj.body.classList.contains('dark-theme');
+            emojiPopover.innerHTML = `<span class="subject-emoji-picker__arrow" aria-hidden="true"></span><emoji-picker class="${isDark ? 'dark' : 'light'}"></emoji-picker>`;
+
+            const emojiInput = document.createElement('input');
+            emojiInput.type = 'hidden';
+
+            emojiPickerRoot.appendChild(emojiTrigger);
+            emojiPickerRoot.appendChild(emojiPopover);
+            emojiPickerRoot.appendChild(emojiInput);
+            emojiSection.appendChild(emojiPickerRoot);
+            dialog.appendChild(emojiSection);
+
+            const buttonsEl = document.createElement('div');
+            buttonsEl.className = 'confirm-dialog-buttons';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'confirm-dialog-btn confirm-dialog-cancel';
+            cancelBtn.textContent = '取消';
+            buttonsEl.appendChild(cancelBtn);
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'confirm-dialog-btn confirm-dialog-confirm';
+            confirmBtn.textContent = '创建';
+            buttonsEl.appendChild(confirmBtn);
+
+            dialog.appendChild(buttonsEl);
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+
+            const picker = emojiPopover.querySelector('emoji-picker');
+
+            const cleanup = (value) => {
+                document.removeEventListener('keydown', handleKeydown);
+                document.removeEventListener('click', handleDocumentClick);
+                overlay.classList.remove('visible');
+                setTimeout(() => {
+                    if (overlay.parentNode) {
+                        overlay.parentNode.removeChild(overlay);
+                    }
+                    resolve(value);
+                }, 200);
+            };
+
+            const submit = () => {
+                const name = nameInput.value.trim();
+                if (!name) {
+                    errorEl.textContent = '请输入学科名称。';
+                    nameInput.focus();
+                    return;
+                }
+                errorEl.textContent = '';
+                cleanup({ name, cardEmoji: emojiInput.value || currentEmoji });
+            };
+
+            const closeEmojiPicker = () => {
+                emojiPopover.classList.add('hidden');
+                emojiPopover.setAttribute('aria-hidden', 'true');
+                emojiTrigger.setAttribute('aria-expanded', 'false');
+            };
+
+            const openEmojiPicker = async () => {
+                const configure = windowObj.UniStudyEmojiPicker?.configure;
+                if (typeof configure === 'function') {
+                    configure(picker, {
+                        locale: windowObj.navigator?.language || 'zh-CN',
+                    });
+                }
+                emojiPopover.classList.remove('hidden');
+                emojiPopover.setAttribute('aria-hidden', 'false');
+                emojiTrigger.setAttribute('aria-expanded', 'true');
+                picker?.focus?.();
+            };
+
+            const toggleEmojiPicker = () => {
+                if (emojiPopover.classList.contains('hidden')) {
+                    void openEmojiPicker();
+                } else {
+                    closeEmojiPicker();
+                }
+            };
+
+            const handleDocumentClick = (event) => {
+                if (emojiPopover.classList.contains('hidden')) return;
+                const target = event.target;
+                if (target instanceof windowObj.Node && emojiPickerRoot.contains(target)) {
+                    return;
+                }
+                closeEmojiPicker();
+            };
+
+            const handleKeydown = (event) => {
+                if (event.key === 'Escape') {
+                    if (!emojiPopover.classList.contains('hidden')) {
+                        event.preventDefault();
+                        closeEmojiPicker();
+                        return;
+                    }
+                    event.preventDefault();
+                    cleanup(null);
+                } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submit();
+                }
+            };
+
+            nameInput.addEventListener('input', () => {
+                if (hasUserSelectedEmoji) return;
+                const name = nameInput.value.trim();
+                currentEmoji = resolveSubjectCardEmoji({ agent: { name }, index: agentIndex });
+                emojiTrigger.querySelector('.subject-emoji-picker__preview').textContent = currentEmoji;
+            });
+
+            nameInput.addEventListener('input', () => {
+                if (errorEl.textContent) {
+                    errorEl.textContent = '';
+                }
+            });
+
+            emojiTrigger.addEventListener('click', (event) => {
+                event.stopPropagation();
+                toggleEmojiPicker();
+            });
+
+            picker.addEventListener('emoji-click', (event) => {
+                event.stopPropagation();
+                const detail = event?.detail || {};
+                let emoji = '';
+                if (typeof detail.unicode === 'string' && detail.unicode) {
+                    emoji = detail.unicode;
+                } else if (typeof detail.emoji === 'string' && detail.emoji) {
+                    emoji = detail.emoji;
+                } else if (typeof detail.emoji?.unicode === 'string' && detail.emoji.unicode) {
+                    emoji = detail.emoji.unicode;
+                }
+                if (!emoji) return;
+                hasUserSelectedEmoji = true;
+                currentEmoji = normalizeSubjectCardEmoji(emoji);
+                emojiTrigger.querySelector('.subject-emoji-picker__preview').textContent = currentEmoji;
+                emojiInput.value = currentEmoji;
+                closeEmojiPicker();
+                nameInput.focus();
+            });
+
+            cancelBtn.onclick = () => cleanup(null);
+            confirmBtn.onclick = submit;
+            overlay.onclick = (event) => {
+                if (event.target === overlay) {
+                    cleanup(null);
+                }
+            };
+
+            document.addEventListener('keydown', handleKeydown);
+            document.addEventListener('click', handleDocumentClick);
+
+            requestAnimationFrame(() => {
+                overlay.classList.add('visible');
+                nameInput.focus();
+                nameInput.select();
+            });
         });
-        if (!name) {
+
+        if (!result) {
             return;
         }
 
-        const result = await chatAPI.createAgent(name.trim(), null);
-        if (result?.error) {
-            ui.showToastNotification(result.error, 'error');
+        const initialConfig = result.cardEmoji ? { cardEmoji: result.cardEmoji } : null;
+        const apiResult = await chatAPI.createAgent(result.name.trim(), initialConfig);
+        if (apiResult?.error) {
+            ui.showToastNotification(apiResult.error, 'error');
             return;
         }
 
         await loadAgents();
-        await selectAgent(result.agentId);
+        await selectAgent(apiResult.agentId);
     }
 
     async function createTopic() {
