@@ -265,6 +265,7 @@ function createDiaryWallController(deps = {}) {
         noteModalOpen: false,
         lastLoadedAt: 0,
         loadingPromise: null,
+        tabsCollapsed: false,
     };
 
     function isEmbeddedPanel() {
@@ -340,32 +341,22 @@ function createDiaryWallController(deps = {}) {
         setCardSelected(key, !state.selectedCardKeys.has(key));
     }
 
+    function setAgentFilter(nextFilter) {
+        if (state.activeAgentFilter === nextFilter) {
+            return;
+        }
+        state.activeAgentFilter = nextFilter;
+        syncSelectedDiary();
+        renderSummary();
+        renderCards();
+        void loadDetail();
+    }
+
     function renderAgentNav() {
         if (!el.diaryWallAgentNav) {
             return;
         }
-
-        const tabs = getAgentTabs();
-        const options = tabs.map((tab) => `
-            <option value="${escapeHtml(tab.id)}">
-              ${escapeHtml(tab.id === 'all' ? '全部' : tab.label)}
-            </option>
-        `).join('');
-        el.diaryWallAgentNav.innerHTML = `
-            <label class="diary-wall-agent-filter" aria-label="按学科筛选日记墙">
-              <span class="material-symbols-outlined" aria-hidden="true">tune</span>
-              <select class="diary-wall-agent-select" data-diary-wall-agent-filter>
-                ${options}
-              </select>
-            </label>
-        `;
-        const select = el.diaryWallAgentNav.querySelector('[data-diary-wall-agent-filter]');
-        if (select) {
-            select.value = state.activeAgentFilter;
-            if (select.value !== state.activeAgentFilter) {
-                select.value = 'all';
-            }
-        }
+        el.diaryWallAgentNav.innerHTML = '';
     }
 
     function getFilters() {
@@ -1084,22 +1075,7 @@ function createDiaryWallController(deps = {}) {
             renderCards();
             renderDetail();
         });
-        el.diaryWallAgentNav?.addEventListener('change', (event) => {
-            const target = event.target instanceof Element ? event.target.closest('[data-diary-wall-agent-filter]') : null;
-            if (!target) {
-                return;
-            }
-            const nextFilter = target.value || 'all';
-            if (state.activeAgentFilter === nextFilter) {
-                return;
-            }
-            state.activeAgentFilter = nextFilter;
-            syncSelectedDiary();
-            renderAgentNav();
-            renderSummary();
-            renderCards();
-            void loadDetail();
-        });
+
         [el.diaryWallSearchInput, el.diaryWallNotebookInput, el.diaryWallTagInput, el.diaryWallDateInput].forEach((node) => {
             node?.addEventListener(node === el.diaryWallDateInput ? 'change' : 'input', () => {
                 void refresh();
@@ -1208,6 +1184,7 @@ function createDiaryWallController(deps = {}) {
         close,
         open,
         refresh,
+        setAgentFilter,
     };
 }
 

@@ -207,6 +207,7 @@ function createNotesController(deps = {}) {
     const closeTopicActionMenu = deps.closeTopicActionMenu || (() => {});
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
+    const onManualNotesLibraryFilterChange = deps.onManualNotesLibraryFilterChange || (() => {});
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
     const getCurrentChatHistory = deps.getCurrentChatHistory || (() => store.getState().session.currentChatHistory);
@@ -731,6 +732,58 @@ function createNotesController(deps = {}) {
         }
     }
 
+    function cleanupRichNotePreviews(root) {
+        if (!root || typeof messageRendererApi.cleanupNotePreviewMount !== 'function') {
+            return;
+        }
+        root.querySelectorAll?.('.unistudy-note-rich-preview, [data-note-analysis-preview]').forEach((node) => {
+            messageRendererApi.cleanupNotePreviewMount(node);
+        });
+    }
+
+    function renderCompactRichNotePreview(target, note) {
+        if (!target) {
+            return;
+        }
+
+        const normalized = normalizeNote(note);
+        const contentMarkdown = String(normalized.contentMarkdown || '');
+        const useSavedSnapshot = Boolean(
+            normalized.renderSnapshot
+            && contentMarkdown === String(normalized.contentMarkdown || '')
+        );
+        const previewNote = {
+            ...normalized,
+            renderSnapshot: useSavedSnapshot ? normalized.renderSnapshot : null,
+        };
+
+        if (contentMarkdown.trim() && typeof messageRendererApi.mountRichNotePreview === 'function') {
+            messageRendererApi.mountRichNotePreview(target, previewNote, {
+                compact: true,
+                emptyText: '暂无内容。',
+            });
+            return;
+        }
+
+        if (typeof messageRendererApi.cleanupNotePreviewMount === 'function') {
+            messageRendererApi.cleanupNotePreviewMount(target);
+        }
+        target.innerHTML = contentMarkdown.trim()
+            ? renderMarkdownFragment(contentMarkdown)
+            : '<p>暂无内容。</p>';
+        if (contentMarkdown.trim() && typeof windowObj.renderMathInElement === 'function') {
+            windowObj.renderMathInElement(target, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '\\[', right: '\\]', display: true },
+                    { left: '$', right: '$', display: false },
+                    { left: '\\(', right: '\\)', display: false },
+                ],
+                throwOnError: false,
+            });
+        }
+    }
+
     function buildAnalysisPreviewMeta(note = null) {
         if (!note?.id) {
             return '未保存的草稿预览。';
@@ -1172,6 +1225,7 @@ function createNotesController(deps = {}) {
     function setManualNotesLibraryFilter(filter = 'all') {
         state.manualNotesLibraryFilter = filter;
         notesDomApi.renderManualNotesLibrary();
+        onManualNotesLibraryFilterChange(filter);
     }
 
     function getPendingAnalysisGenerations() {
@@ -1296,23 +1350,21 @@ function createNotesController(deps = {}) {
             const complete = step.id < wizard.step || (step.id === 4 && Boolean(wizard.savedNote));
             return `
                 <div class="note-analysis-step${active ? ' note-analysis-step--active' : ''}${complete ? ' note-analysis-step--complete' : ''}" aria-current="${active ? 'step' : 'false'}">
-                    <span class="note-analysis-step__icon material-symbols-outlined">${escapeHtml(complete ? 'check' : step.icon)}</span>
-                    <span>${escapeHtml(step.label)}</span>
+                    <span class="note-analysis-step__number" aria-hidden="true">${escapeHtml(step.id)}</span>
+                    <span class="note-analysis-step__label">${escapeHtml(step.label)}</span>
                 </div>
             `;
         }).join('');
     }
 
     function renderNoteAnalysisBasicStep(wizard) {
-        const targetAgent = getAgentDisplayLabel(state.currentSelectedItem?.id);
-        const targetTopic = getCurrentTopicDisplayName();
         return `
             <section class="note-analysis-panel">
                 <div class="note-analysis-panel__heading">
                     <span class="material-symbols-outlined">settings</span>
                     <div>
                         <h3>基本设置</h3>
-                        <p class="settings-caption">分析报告会保存到当前学科和话题中。</p>
+                        <p class="settings-caption">分析报告会保存到“我的笔记”的深度分析分类中。</p>
                     </div>
                 </div>
                 <label class="note-analysis-field" for="noteAnalysisTitleInput">
@@ -1323,7 +1375,8 @@ function createNotesController(deps = {}) {
                     <span class="material-symbols-outlined">drive_file_move</span>
                     <div>
                         <strong>保存位置</strong>
-                        <p>${escapeHtml(targetAgent)} / ${escapeHtml(targetTopic)}</p>
+                        <p>我的笔记 / 深度分析</p>
+                        <small>生成开始后会自动切换到这里，并在列表中显示生成进度。</small>
                     </div>
                 </div>
             </section>
@@ -1363,24 +1416,27 @@ function createNotesController(deps = {}) {
             const selected = selectedIds.has(note.id);
             const disabled = !selected && selectedCount >= NOTE_ANALYSIS_MAX_SELECTION;
             const topicLabel = getTopicDisplayLabel(note.topicId);
-            const preview = stripMarkdown(note.contentMarkdown).slice(0, 150) || '暂无内容。';
             return `
-                <button
-                    type="button"
+                <article
                     class="note-analysis-note-card${selected ? ' note-analysis-note-card--selected' : ''}${disabled ? ' note-analysis-note-card--disabled' : ''}"
                     data-note-analysis-note-id="${escapeHtml(note.id)}"
+                    role="button"
+                    tabindex="0"
                     aria-pressed="${selected ? 'true' : 'false'}"
+                    aria-label="${escapeHtml(`${selected ? '取消选择' : '选择'} ${note.title}`)}"
                 >
-                    <span class="note-analysis-note-card__check material-symbols-outlined">${selected ? 'check_box' : 'check_box_outline_blank'}</span>
-                    <span class="note-analysis-note-card__body">
-                        <strong>${escapeHtml(note.title)}</strong>
-                        <span class="note-analysis-note-card__preview">${escapeHtml(preview)}</span>
-                        <span class="note-analysis-note-card__meta">
-                            <span>${escapeHtml(getAgentDisplayLabel(note.agentId))}</span>
-                            <span>${escapeHtml(topicLabel)}</span>
+                    <div class="note-analysis-note-card__header">
+                        <span class="note-analysis-note-card__check material-symbols-outlined" aria-hidden="true">${selected ? 'check_box' : 'check_box_outline_blank'}</span>
+                        <span class="note-analysis-note-card__body">
+                            <strong>${escapeHtml(note.title)}</strong>
                         </span>
-                    </span>
-                </button>
+                    </div>
+                    <div class="manual-note-card__preview note-analysis-note-card__preview" data-note-analysis-preview="${escapeHtml(note.id)}"></div>
+                    <div class="note-analysis-note-card__meta">
+                        <span>${escapeHtml(getAgentDisplayLabel(note.agentId))}</span>
+                        <span>${escapeHtml(topicLabel)}</span>
+                    </div>
+                </article>
             `;
         }).join('');
 
@@ -1389,7 +1445,7 @@ function createNotesController(deps = {}) {
                 <div class="note-analysis-panel__heading">
                     <span class="material-symbols-outlined">library_books</span>
                     <div>
-                        <h3>选择笔记 (${selectedCount} / ${NOTE_ANALYSIS_MAX_SELECTION})</h3>
+                        <h3>选择笔记 (<span data-note-analysis-selected-count>${selectedCount}</span> / ${NOTE_ANALYSIS_MAX_SELECTION})</h3>
                         <p class="settings-caption">勾选需要一起分析的笔记，可以跨话题、跨学科选择。</p>
                     </div>
                 </div>
@@ -1404,6 +1460,52 @@ function createNotesController(deps = {}) {
                     `}
             </section>
         `;
+    }
+
+    function renderNoteAnalysisSelectPreviews() {
+        if (!el.noteAnalysisBody) {
+            return;
+        }
+
+        const noteMap = new Map(getAnalysisWizardVisibleNotes().map((note) => [note.id, note]));
+        el.noteAnalysisBody.querySelectorAll('[data-note-analysis-preview]').forEach((target) => {
+            const noteId = target.getAttribute('data-note-analysis-preview');
+            const note = noteMap.get(noteId);
+            if (note) {
+                renderCompactRichNotePreview(target, note);
+            }
+        });
+    }
+
+    function syncNoteAnalysisSelectState(wizard = state.noteAnalysisWizard) {
+        if (!el.noteAnalysisBody || wizard.step !== 2) {
+            return;
+        }
+
+        const selectedIds = new Set(wizard.selectedNoteIds);
+        const selectedCount = wizard.selectedNoteIds.length;
+        const countNode = el.noteAnalysisBody.querySelector('[data-note-analysis-selected-count]');
+        if (countNode) {
+            countNode.textContent = String(selectedCount);
+        }
+
+        el.noteAnalysisBody.querySelectorAll('[data-note-analysis-note-id]').forEach((card) => {
+            const noteId = String(card.getAttribute('data-note-analysis-note-id') || '').trim();
+            const selected = selectedIds.has(noteId);
+            const disabled = !selected && selectedCount >= NOTE_ANALYSIS_MAX_SELECTION;
+            const title = card.querySelector('.note-analysis-note-card__body strong')?.textContent || '笔记';
+
+            card.classList.toggle('note-analysis-note-card--selected', selected);
+            card.classList.toggle('note-analysis-note-card--disabled', disabled);
+            card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            card.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+            card.setAttribute('aria-label', `${selected ? '取消选择' : '选择'} ${title}`);
+
+            const check = card.querySelector('.note-analysis-note-card__check');
+            if (check) {
+                check.textContent = selected ? 'check_box' : 'check_box_outline_blank';
+            }
+        });
     }
 
     function renderNoteAnalysisGuidanceStep(wizard) {
@@ -1515,10 +1617,12 @@ function createNotesController(deps = {}) {
         renderNoteAnalysisStepIndicator(wizard);
 
         if (el.noteAnalysisBody) {
+            cleanupRichNotePreviews(el.noteAnalysisBody);
             if (wizard.step === 1) {
                 el.noteAnalysisBody.innerHTML = renderNoteAnalysisBasicStep(wizard);
             } else if (wizard.step === 2) {
                 el.noteAnalysisBody.innerHTML = renderNoteAnalysisSelectStep(wizard);
+                renderNoteAnalysisSelectPreviews();
             } else if (wizard.step === 3) {
                 el.noteAnalysisBody.innerHTML = renderNoteAnalysisGuidanceStep(wizard);
             } else {
@@ -1644,6 +1748,11 @@ function createNotesController(deps = {}) {
                 ? selectedIds.filter((id) => id !== normalizedId)
                 : [...selectedIds, normalizedId],
         };
+        if (state.noteAnalysisWizard.step === 2) {
+            syncNoteAnalysisSelectState(state.noteAnalysisWizard);
+            syncNoteAnalysisWizardActions(state.noteAnalysisWizard);
+            return;
+        }
         renderNoteAnalysisWizard();
     }
 
@@ -1680,6 +1789,22 @@ function createNotesController(deps = {}) {
         if (noteCard) {
             toggleNoteAnalysisWizardNote(noteCard.getAttribute('data-note-analysis-note-id'));
         }
+    }
+
+    function handleNoteAnalysisWizardBodyKeydown(event) {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+        const target = event.target;
+        if (!(target instanceof ElementCtor)) {
+            return;
+        }
+        const noteCard = target.closest('[data-note-analysis-note-id]');
+        if (!noteCard) {
+            return;
+        }
+        event.preventDefault();
+        toggleNoteAnalysisWizardNote(noteCard.getAttribute('data-note-analysis-note-id'));
     }
 
     function handleNoteAnalysisWizardBodyInput(event) {
@@ -2191,6 +2316,7 @@ function createNotesController(deps = {}) {
         });
         el.noteAnalysisOpenReportBtn?.addEventListener('click', openGeneratedAnalysisReport);
         el.noteAnalysisBody?.addEventListener('click', handleNoteAnalysisWizardBodyClick);
+        el.noteAnalysisBody?.addEventListener('keydown', handleNoteAnalysisWizardBodyKeydown);
         el.noteAnalysisBody?.addEventListener('input', handleNoteAnalysisWizardBodyInput);
         el.generateQuizBtn?.addEventListener('click', (event) => {
             openQuizConfigModal({ trigger: event.currentTarget });

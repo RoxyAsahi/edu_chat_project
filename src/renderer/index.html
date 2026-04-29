@@ -107,15 +107,15 @@
               <button id="manualNotesLibraryNotesTabBtn" class="notes-studio-panel-switch__btn notes-studio-panel-switch__btn--active" type="button" role="tab" aria-selected="true" aria-controls="manualNotesLibraryNotesPanel">笔记</button>
               <button id="manualNotesLibraryDiaryTabBtn" class="notes-studio-panel-switch__btn" type="button" role="tab" aria-selected="false" aria-controls="diaryWallModal">日记墙</button>
             </div>
-            <div id="manualNotesLibraryFilters" class="manual-notes-library-page__filters" aria-label="笔记筛选">
-              <div id="manualNotesLibrarySubjectTabsWrapper" class="manual-notes-library-page__subject-tabs-wrapper">
-                <button id="manualNotesLibrarySubjectToggle" type="button" class="manual-notes-library-page__subject-toggle" aria-label="展开/收起学科筛选" aria-expanded="true">
-                  <span class="material-symbols-outlined" aria-hidden="true">tune</span>
-                </button>
-                <div id="manualNotesLibrarySubjectTabs" class="manual-notes-library-page__subject-tabs" aria-label="按学科筛选收藏笔记" role="tablist">
-                  <button type="button" class="manual-notes-library-page__subject-tab manual-notes-library-page__subject-tab--active" data-subject-filter="all">筛选</button>
-                </div>
+            <div id="manualNotesLibrarySubjectTabsWrapper" class="manual-notes-library-page__subject-tabs-wrapper">
+              <button id="manualNotesLibrarySubjectToggle" type="button" class="manual-notes-library-page__subject-toggle" aria-label="展开/收起学科筛选" aria-expanded="true">
+                <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+              </button>
+              <div id="manualNotesLibrarySubjectTabs" class="manual-notes-library-page__subject-tabs" aria-label="按学科筛选收藏笔记" role="tablist">
+                <button type="button" class="manual-notes-library-page__subject-tab manual-notes-library-page__subject-tab--active" data-subject-filter="all">筛选</button>
               </div>
+            </div>
+            <div id="manualNotesLibraryFilters" class="manual-notes-library-page__filters" aria-label="笔记筛选">
               <button
                 id="manualNewNoteBtn"
                 class="accent-button manual-notes-library-page__new-note"
@@ -140,7 +140,12 @@
                   <section class="diary-wall-canvas">
                     <div class="diary-wall-canvas__toolbar">
                       <div id="diaryWallAgentNav" class="diary-wall-agent-nav" aria-label="日记墙 Agent 导航">
-                        <button type="button" class="diary-wall-agent-tab diary-wall-agent-tab--active" data-diary-wall-agent-filter="all">全部</button>
+                        <button id="diaryWallAgentToggle" type="button" class="diary-wall-agent-toggle" aria-label="展开/收起学科筛选" aria-expanded="true">
+                          <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+                        </button>
+                        <div class="diary-wall-agent-tabs" role="tablist">
+                          <button type="button" class="diary-wall-agent-tab diary-wall-agent-tab--active" data-diary-wall-agent-filter="all">全部</button>
+                        </div>
                       </div>
                       <div class="diary-wall-canvas__toolbar-meta">
                         <div id="diaryWallSummary" class="diary-wall-summary">

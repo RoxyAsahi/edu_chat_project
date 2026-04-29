@@ -254,9 +254,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
 
     assert.equal(documentObj.getElementById('diaryWallModal').classList.contains('hidden'), false);
     assert.match(documentObj.getElementById('diaryWallSummary').textContent, /3 张日记/);
-    assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /全部/);
-    assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /Nova/);
-    assert.match(documentObj.getElementById('diaryWallAgentNav').textContent, /Hornet/);
+    assert.equal(documentObj.getElementById('diaryWallAgentNav').innerHTML, '');
     assert.match(documentObj.getElementById('diaryWallCards').textContent, /初中数学_二次函数/);
     assert.match(documentObj.getElementById('diaryWallCards').textContent, /高中英语_定语从句/);
     assert.ok(documentObj.querySelector('.diary-wall-card__header-main'));
@@ -268,9 +266,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     assert.equal(listPayloads[0].scope, 'global');
     assert.equal(detailPayloads.length, 0);
 
-    const hornetTab = documentObj.querySelector('[data-diary-wall-agent-filter="Hornet"]');
-    assert.ok(hornetTab);
-    hornetTab.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    controller.setAgentFilter('Hornet');
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /初中数学_二次函数/);
@@ -278,9 +274,7 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     assert.match(documentObj.getElementById('diaryWallSummary').textContent, /1 张日记/);
     assert.match(documentObj.getElementById('diaryWallDetail').textContent, /选择一张日记卡/);
 
-    const novaTab = documentObj.querySelector('[data-diary-wall-agent-filter="Nova"]');
-    assert.ok(novaTab);
-    novaTab.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+    controller.setAgentFilter('Nova');
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     const novaCard = documentObj.querySelector('[data-diary-wall-card*="study_diary_nova_2026-04-14"]');

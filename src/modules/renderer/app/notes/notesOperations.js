@@ -52,6 +52,15 @@ const DEFAULT_FLASHCARD_GENERATION_CONFIG = {
 };
 
 const RECENT_CHAT_CONTEXT_LIMIT = 12;
+const RECENT_CHAT_MESSAGE_CHAR_LIMIT = 3000;
+const HTML_ENTITY_MAP = {
+    amp: '&',
+    lt: '<',
+    gt: '>',
+    quot: '"',
+    apos: "'",
+    nbsp: ' ',
+};
 
 function normalizeAnalysisGenerationOptions(options = {}) {
     return {
@@ -144,7 +153,56 @@ function normalizeFlashcardGenerationOptions(options = {}) {
     };
 }
 
-function getMessageTextContent(message = {}) {
+function decodeHtmlEntities(value = '') {
+    return String(value || '').replace(/&(#x?[0-9a-f]+|[a-z][a-z0-9]+);/gi, (match, entity) => {
+        const normalized = String(entity || '').toLowerCase();
+        if (normalized.startsWith('#x')) {
+            const codePoint = parseInt(normalized.slice(2), 16);
+            return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+        }
+        if (normalized.startsWith('#')) {
+            const codePoint = parseInt(normalized.slice(1), 10);
+            return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+        }
+        return Object.prototype.hasOwnProperty.call(HTML_ENTITY_MAP, normalized)
+            ? HTML_ENTITY_MAP[normalized]
+            : match;
+    });
+}
+
+function normalizeStudyTextWhitespace(value = '') {
+    return String(value || '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[ \t\f\v]+/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+function stripHtmlForStudyContext(value = '') {
+    return decodeHtmlEntities(String(value || '')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<\s*(script|style|noscript|template|svg|canvas)\b[\s\S]*?<\/\s*\1\s*>/gi, '')
+        .replace(/<\s*img\b[^>]*\balt\s*=\s*(["'])(.*?)\1[^>]*>/gi, '\n$2\n')
+        .replace(/<\s*img\b[^>]*>/gi, '\n')
+        .replace(/<\s*(?:br|hr)\b[^>]*\/?>/gi, '\n')
+        .replace(/<\s*\/?\s*(?:p|div|section|article|header|footer|main|aside|nav|h[1-6]|li|ul|ol|tr|td|th|table|thead|tbody|blockquote|pre)\b[^>]*>/gi, '\n')
+        .replace(/<\s*\/?\s*[a-z][a-z0-9:-]*\b[^>]*>/gi, ' '));
+}
+
+function sanitizeStudyMessageText(value = '') {
+    const sanitized = normalizeStudyTextWhitespace(stripHtmlForStudyContext(value)
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+        .replace(/\[([^\]]+)]\((?:https?:\/\/|file:|\/)[^)]+\)/g, '$1'));
+    if (sanitized.length <= RECENT_CHAT_MESSAGE_CHAR_LIMIT) {
+        return sanitized;
+    }
+
+    return `${sanitized.slice(0, RECENT_CHAT_MESSAGE_CHAR_LIMIT).trimEnd()}\n...（内容过长，已截断）`;
+}
+
+function getRawMessageTextContent(message = {}) {
     const content = message.content;
     if (typeof content === 'string') {
         return content.trim();
@@ -172,6 +230,10 @@ function getMessageTextContent(message = {}) {
         }
     }
     return '';
+}
+
+function getMessageTextContent(message = {}) {
+    return sanitizeStudyMessageText(getRawMessageTextContent(message));
 }
 
 function buildRecentChatContext(history = []) {
@@ -333,6 +395,53 @@ function countStudyInputSources(studyInput = {}, selectedNoteCount = 0) {
     return Array.isArray(studyInput.sourceMessageIds)
         ? studyInput.sourceMessageIds.length
         : 0;
+}
+
+function extractResponseText(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (Array.isArray(value)) {
+        return value
+            .map((part) => {
+                if (typeof part === 'string') {
+                    return part;
+                }
+                if (typeof part?.text === 'string') {
+                    return part.text;
+                }
+                if (typeof part?.content === 'string') {
+                    return part.content;
+                }
+                return '';
+            })
+            .filter(Boolean)
+            .join('\n');
+    }
+    if (value && typeof value === 'object' && typeof value.text === 'string') {
+        return value.text;
+    }
+    return '';
+}
+
+function extractStudyToolResponseContent(response = {}) {
+    const payload = response?.response || response || {};
+    const candidates = [
+        payload?.choices?.[0]?.message?.content,
+        payload?.choices?.[0]?.text,
+        payload?.message?.content,
+        payload?.output_text,
+        payload?.content,
+    ];
+
+    for (const candidate of candidates) {
+        const text = extractResponseText(candidate);
+        if (text.trim()) {
+            return text;
+        }
+    }
+
+    return '';
 }
 
 function createNotesOperations(deps = {}) {
@@ -832,16 +941,34 @@ function createNotesOperations(deps = {}) {
     }
 
     async function resolveStudyInputText(options = {}, generationContext = {}) {
+        const getChatContext = () => buildRecentChatContext(
+            Array.isArray(generationContext.currentChatHistory)
+                ? generationContext.currentChatHistory
+                : state.currentChatHistory,
+        );
+        const buildChatOnlyInput = () => {
+            if (!options.includeChatContext) {
+                return null;
+            }
+
+            const chatContext = getChatContext();
+            if (!chatContext.text) {
+                return null;
+            }
+
+            return {
+                sourceLabel: 'chat-context',
+                text: chatContext.text,
+                sourceMessageIds: chatContext.sourceMessageIds,
+                sourceDocumentRefs: [],
+            };
+        };
         const appendChatContext = (studyInput) => {
             if (!options.includeChatContext || !studyInput?.text) {
                 return studyInput;
             }
 
-            const chatContext = buildRecentChatContext(
-                Array.isArray(generationContext.currentChatHistory)
-                    ? generationContext.currentChatHistory
-                    : state.currentChatHistory,
-            );
+            const chatContext = getChatContext();
             if (!chatContext.text) {
                 return studyInput;
             }
@@ -889,7 +1016,7 @@ function createNotesOperations(deps = {}) {
 
         const currentTopic = generationContext.currentTopic || getCurrentTopic();
         if (!currentTopic?.knowledgeBaseId) {
-            return null;
+            return buildChatOnlyInput();
         }
 
         const sourceResult = await chatAPI.retrieveKnowledgeBaseContext({
@@ -901,7 +1028,7 @@ function createNotesOperations(deps = {}) {
         }).catch(() => null);
 
         if (!sourceResult?.success || !sourceResult.contextText) {
-            return null;
+            return buildChatOnlyInput();
         }
 
         return appendChatContext({
@@ -1001,9 +1128,14 @@ function createNotesOperations(deps = {}) {
                 );
             const studyInput = await resolveStudyInputText(generationOptions, generationContext);
             if (!studyInput?.text) {
-                ui.showToastNotification(analysisOptions.requireSelectedNotes
-                    ? '请先选择需要深度分析的笔记。'
-                    : '请先选择笔记，或为当前话题绑定并导入来源资料。', 'warning');
+                const missingInputMessage = prompt.kind === 'quiz' || prompt.kind === 'flashcards'
+                    ? '请先选择笔记、导入来源资料，或勾选“包含当前对话”。'
+                    : (
+                        analysisOptions.requireSelectedNotes
+                            ? '请先选择需要深度分析的笔记。'
+                            : '请先选择笔记，或为当前话题绑定并导入来源资料。'
+                    );
+                ui.showToastNotification(missingInputMessage, 'warning');
                 return false;
             }
 
@@ -1053,9 +1185,9 @@ function createNotesOperations(deps = {}) {
                 return false;
             }
 
-            const responseContent = response?.response?.choices?.[0]?.message?.content || '';
+            const responseContent = extractStudyToolResponseContent(response);
             if (!responseContent.trim()) {
-                ui.showToastNotification('模型没有返回可保存的内容。', 'warning');
+                ui.showToastNotification('模型这次没有返回内容，已取消本次生成。可以稍后重试或换一个学习工具模型。', 'warning');
                 return false;
             }
 
