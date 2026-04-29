@@ -319,18 +319,53 @@ function createNotesDom(deps = {}) {
         });
     }
 
-    function renderCompactNotePreview(target, note) {
+    function buildCompactPreviewSignature(note = {}) {
+        const snapshot = note?.renderSnapshot && typeof note.renderSnapshot === 'object'
+            ? {
+                schemaVersion: note.renderSnapshot.schemaVersion,
+                renderer: note.renderSnapshot.renderer,
+                role: note.renderSnapshot.role,
+                sourceMessageId: note.renderSnapshot.sourceMessageId,
+                contentHtml: note.renderSnapshot.contentHtml,
+                styleText: note.renderSnapshot.styleText,
+                scopeId: note.renderSnapshot.scopeId,
+            }
+            : null;
+
+        return JSON.stringify({
+            id: String(note?.id || ''),
+            contentMarkdown: String(note?.contentMarkdown || ''),
+            snapshot,
+        });
+    }
+
+    function renderCompactNotePreview(target, note, options = {}) {
         if (!target) {
             return;
         }
+        const previewSignature = buildCompactPreviewSignature(note);
+        if (
+            options.forceRemount !== true
+            && target.dataset?.unistudyCompactPreviewSignature === previewSignature
+        ) {
+            return;
+        }
+
         if (typeof messageRendererApi.mountRichNotePreview === 'function') {
             messageRendererApi.mountRichNotePreview(target, note, {
                 compact: true,
                 emptyText: '暂无内容。',
+                forceRemount: options.forceRemount === true,
             });
+            if (target.dataset) {
+                target.dataset.unistudyCompactPreviewSignature = previewSignature;
+            }
             return;
         }
         target.textContent = stripMarkdown(note?.contentMarkdown || '').trim() || '暂无内容。';
+        if (target.dataset) {
+            target.dataset.unistudyCompactPreviewSignature = previewSignature;
+        }
     }
 
     function getPendingQuizGenerationsForCurrentTopic() {
@@ -471,6 +506,171 @@ function createNotesDom(deps = {}) {
             </div>
         `;
         return pendingCard;
+    }
+
+    function buildPendingAnalysisKey(pending) {
+        const fallback = [
+            pending?.title,
+            pending?.agentId,
+            pending?.topicId,
+            pending?.selectedNoteCount,
+        ].map((value) => String(value || '')).join(':');
+        return `pending-analysis:${String(pending?.requestId || fallback || 'pending')}`;
+    }
+
+    function buildPendingAnalysisSignature(pending) {
+        return JSON.stringify({
+            requestId: String(pending?.requestId || ''),
+            title: String(pending?.title || ''),
+            selectedNoteCount: Number(pending?.selectedNoteCount || 0),
+            agentId: String(pending?.agentId || ''),
+            topicId: String(pending?.topicId || ''),
+        });
+    }
+
+    function updatePendingAnalysisCard(card, pending) {
+        const signature = buildPendingAnalysisSignature(pending);
+        if (card.dataset?.manualGridItemSignature === signature) {
+            return;
+        }
+        const freshCard = renderPendingAnalysisCard(pending);
+        card.className = freshCard.className;
+        card.setAttribute('aria-busy', 'true');
+        card.innerHTML = freshCard.innerHTML;
+        card.dataset.manualGridItemSignature = signature;
+    }
+
+    function createManualNoteCard() {
+        const card = documentObj.createElement('article');
+        card.addEventListener('click', (event) => {
+            const target = event.target;
+            if (target instanceof ElementCtor && target.closest('[data-note-menu]')) {
+                return;
+            }
+            if (card.__unistudyManualNote) {
+                openNoteDetail(card.__unistudyManualNote, { trigger: card });
+            }
+        });
+        card.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!card.__unistudyManualNote) {
+                return;
+            }
+            openNoteItemMenu(card.__unistudyManualNote, card, {
+                anchorRect: {
+                    left: event.clientX,
+                    right: event.clientX,
+                    top: event.clientY,
+                    bottom: event.clientY,
+                    width: 0,
+                    height: 0,
+                },
+                placement: 'right',
+            });
+        });
+        return card;
+    }
+
+    function ensureManualNoteCardSkeleton(card, noteId) {
+        if (
+            card.querySelector('.manual-note-card__preview')
+            && card.querySelector('.manual-note-card__meta')
+        ) {
+            return;
+        }
+
+        card.innerHTML = `
+            <div class="manual-note-card__preview" data-note-preview="${escapeHtml(noteId)}"></div>
+            <div class="manual-note-card__meta"></div>
+        `;
+    }
+
+    function buildManualNoteMetaHtml(normalized, options = {}) {
+        const topicLabel = escapeHtml(getTopicDisplayLabel(normalized.topicId));
+        const agentLabel = escapeHtml(getManualLibraryAgentLabel(normalized.agentId));
+        const updatedLabel = escapeHtml(formatRelativeTime(normalized.updatedAt) || '');
+        const isSelected = options.isSelected === true;
+        const isAnalysisFilter = options.isAnalysisFilter === true;
+
+        return [
+            isAnalysisFilter ? `<span>${agentLabel}</span>` : '',
+            `<span>${topicLabel}</span>`,
+            `<span>${updatedLabel}</span>`,
+            isSelected ? '<span class="manual-note-card__selection">已选用于生成</span>' : '',
+        ].filter(Boolean).join('');
+    }
+
+    function updateManualNoteCard(card, normalized, options = {}) {
+        const noteId = String(normalized.id || '');
+        const isSelected = options.isSelected === true;
+        card.__unistudyManualNote = normalized;
+        card.className = 'manual-note-card';
+        card.classList.toggle('manual-note-card--selected', isSelected);
+        card.setAttribute('aria-label', `${normalized.title || '未命名笔记'}，右键打开菜单`);
+        ensureManualNoteCardSkeleton(card, noteId);
+
+        const preview = card.querySelector('.manual-note-card__preview');
+        if (preview) {
+            preview.setAttribute('data-note-preview', noteId);
+            renderCompactNotePreview(preview, normalized, {
+                forceRemount: options.forcePreviewRemount === true,
+            });
+        }
+
+        const meta = card.querySelector('.manual-note-card__meta');
+        const metaHtml = buildManualNoteMetaHtml(normalized, {
+            isSelected,
+            isAnalysisFilter: options.isAnalysisFilter === true,
+        });
+        if (meta && card.dataset.manualNoteMetaHtml !== metaHtml) {
+            meta.innerHTML = metaHtml;
+            card.dataset.manualNoteMetaHtml = metaHtml;
+        }
+    }
+
+    function removeManualGridItem(node) {
+        cleanupRichPreviews(node);
+        node.remove();
+    }
+
+    function reconcileManualNotesGrid(items = []) {
+        if (!el.manualNotesLibraryGrid) {
+            return;
+        }
+
+        const desiredKeys = new Set(items.map((item) => item.key));
+        Array.from(el.manualNotesLibraryGrid.children).forEach((child) => {
+            const key = child.dataset?.manualGridItemKey || '';
+            if (!desiredKeys.has(key)) {
+                removeManualGridItem(child);
+            }
+        });
+
+        const existingByKey = new Map();
+        Array.from(el.manualNotesLibraryGrid.children).forEach((child) => {
+            const key = child.dataset?.manualGridItemKey || '';
+            if (key) {
+                existingByKey.set(key, child);
+            }
+        });
+
+        let cursor = el.manualNotesLibraryGrid.firstElementChild;
+        items.forEach((item) => {
+            let node = existingByKey.get(item.key);
+            if (!node) {
+                node = item.create();
+                node.dataset.manualGridItemKey = item.key;
+            }
+            item.update(node);
+
+            if (node.parentElement !== el.manualNotesLibraryGrid) {
+                el.manualNotesLibraryGrid.insertBefore(node, cursor || null);
+            } else if (node !== cursor) {
+                el.manualNotesLibraryGrid.insertBefore(node, cursor || null);
+            }
+            cursor = node.nextElementSibling;
+        });
     }
 
     function renderNotesPanel() {
@@ -648,7 +848,7 @@ function createNotesDom(deps = {}) {
         });
     }
 
-    function renderManualNotesLibrary() {
+    function renderManualNotesLibrary(options = {}) {
         if (!el.manualNotesLibraryGrid) {
             return;
         }
@@ -713,92 +913,61 @@ function createNotesDom(deps = {}) {
             }
         }
 
-        cleanupRichPreviews(el.manualNotesLibraryGrid);
-        el.manualNotesLibraryGrid.innerHTML = '';
-        if (!state.currentSelectedItem?.id && currentFilter !== 'all' && !isAnalysisFilter) {
-            setGridEmptyState(true);
+        const replaceGridWithEmptyState = (title, description) => {
+            cleanupRichPreviews(el.manualNotesLibraryGrid);
+            el.manualNotesLibraryGrid.innerHTML = '';
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
             empty.innerHTML = `
-                <strong>还没有选中学科</strong>
-                <span>请选择一个学科后，再查看当前学科下的手写笔记总览。</span>
+                <strong>${escapeHtml(title)}</strong>
+                <span>${escapeHtml(description)}</span>
             `;
             el.manualNotesLibraryGrid.appendChild(empty);
+        };
+
+        if (!state.currentSelectedItem?.id && currentFilter !== 'all' && !isAnalysisFilter) {
+            setGridEmptyState(true);
+            replaceGridWithEmptyState('还没有选中学科', '请选择一个学科后，再查看当前学科下的手写笔记总览。');
             return;
         }
 
         if (libraryNotes.length === 0 && pendingAnalysisGenerations.length === 0) {
             setGridEmptyState(true);
-            const empty = documentObj.createElement('div');
-            empty.className = 'empty-list-state manual-notes-library-grid__empty';
             const emptyTitle = isAnalysisFilter
                 ? '还没有深度分析报告'
                 : (currentFilter === 'all' ? '还没有收藏的手写笔记' : '当前学科还没有手写笔记');
             const emptyDescription = isAnalysisFilter
                 ? '点击右上角“深度分析”，选择多条笔记后生成的报告会直接出现在这里。'
                 : '你可以使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。';
-            empty.innerHTML = `
-                <strong>${escapeHtml(emptyTitle)}</strong>
-                <span>${escapeHtml(emptyDescription)}</span>
-            `;
-            el.manualNotesLibraryGrid.appendChild(empty);
+            replaceGridWithEmptyState(emptyTitle, emptyDescription);
             return;
         }
 
         setGridEmptyState(false);
 
+        const gridItems = [];
         pendingAnalysisGenerations.forEach((pending) => {
-            el.manualNotesLibraryGrid.appendChild(renderPendingAnalysisCard(pending));
+            gridItems.push({
+                key: buildPendingAnalysisKey(pending),
+                create: () => documentObj.createElement('article'),
+                update: (node) => updatePendingAnalysisCard(node, pending),
+            });
         });
 
         libraryNotes.forEach((note) => {
             const normalized = normalizeNote(note);
-            const topicLabel = escapeHtml(getTopicDisplayLabel(normalized.topicId));
-            const agentLabel = escapeHtml(getManualLibraryAgentLabel(normalized.agentId));
-            const updatedLabel = escapeHtml(formatRelativeTime(normalized.updatedAt) || '');
-            const isSelected = state.selectedNoteIds.includes(normalized.id);
-            const card = documentObj.createElement('article');
-
-            card.className = 'manual-note-card';
-            card.classList.toggle('manual-note-card--selected', isSelected);
-            card.setAttribute('aria-label', `${normalized.title || '未命名笔记'}，右键打开菜单`);
-            card.innerHTML = `
-                <div class="manual-note-card__preview" data-note-preview="${escapeHtml(normalized.id)}"></div>
-                <div class="manual-note-card__meta">
-                    ${isAnalysisFilter ? `<span>${agentLabel}</span>` : ''}
-                    <span>${topicLabel}</span>
-                    <span>${updatedLabel}</span>
-                    ${isSelected ? '<span class="manual-note-card__selection">已选用于生成</span>' : ''}
-                </div>
-            `;
-            renderCompactNotePreview(card.querySelector('.manual-note-card__preview'), normalized);
-
-            card.addEventListener('click', (event) => {
-                const target = event.target;
-                if (target instanceof ElementCtor && target.closest('[data-note-menu]')) {
-                    return;
-                }
-                openNoteDetail(normalized, { trigger: card });
+            gridItems.push({
+                key: `note:${normalized.id}`,
+                create: createManualNoteCard,
+                update: (node) => updateManualNoteCard(node, normalized, {
+                    isAnalysisFilter,
+                    isSelected: state.selectedNoteIds.includes(normalized.id),
+                    forcePreviewRemount: options.forcePreviewRemount === true,
+                }),
             });
-
-            card.addEventListener('contextmenu', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                openNoteItemMenu(normalized, card, {
-                    anchorRect: {
-                        left: event.clientX,
-                        right: event.clientX,
-                        top: event.clientY,
-                        bottom: event.clientY,
-                        width: 0,
-                        height: 0,
-                    },
-                    placement: 'right',
-                });
-            });
-
-            el.manualNotesLibraryGrid.appendChild(card);
         });
+
+        reconcileManualNotesGrid(gridItems);
     }
 
     function decorateChatMessages() {

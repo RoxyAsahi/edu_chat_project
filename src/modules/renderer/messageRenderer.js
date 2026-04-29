@@ -1575,7 +1575,33 @@ function cleanupNotePreviewMount(container) {
     }
     if (container.dataset) {
         delete container.dataset.unistudyNotePreviewScopeId;
+        delete container.dataset.unistudyNotePreviewSignature;
     }
+}
+
+function normalizePreviewSignatureText(value, scopeId = '') {
+    const text = String(value || '');
+    return scopeId ? text.split(scopeId).join('__NOTE_PREVIEW_SCOPE__') : text;
+}
+
+function buildNotePreviewMountSignature(snapshot, note = {}, options = {}, compact = false) {
+    if (!snapshot) {
+        return JSON.stringify({
+            mode: compact ? 'compact' : 'full',
+            emptyText: String(options.emptyText || ''),
+            contentMarkdown: String(options.contentMarkdown !== undefined ? options.contentMarkdown : (note.contentMarkdown || '')),
+        });
+    }
+
+    return JSON.stringify({
+        mode: compact ? 'compact' : 'full',
+        noteId: String(note.id || ''),
+        role: normalizeSnapshotRole(snapshot.role),
+        sourceMessageId: String(snapshot.sourceMessageId || ''),
+        contentMarkdown: String(options.contentMarkdown !== undefined ? options.contentMarkdown : (note.contentMarkdown || '')),
+        contentHtml: normalizePreviewSignatureText(snapshot.contentHtml, snapshot.scopeId),
+        styleText: normalizePreviewSignatureText(snapshot.styleText, snapshot.scopeId),
+    });
 }
 
 function rewriteSnapshotContentScopeId(html, previousScopeId, nextScopeId) {
@@ -1660,12 +1686,32 @@ function mountRichNotePreview(container, note = {}, options = {}) {
         return null;
     }
 
-    cleanupNotePreviewMount(container);
     const compact = options.compact === true;
     const snapshot = resolveNotePreviewSnapshot(note, options);
+    const previewSignature = buildNotePreviewMountSignature(snapshot, note, options, compact);
     container.classList.add('unistudy-note-rich-preview');
     container.classList.toggle('unistudy-note-rich-preview--compact', compact);
     container.classList.toggle('unistudy-note-rich-preview--full', !compact);
+
+    if (
+        options.forceRemount !== true
+        && container.dataset?.unistudyNotePreviewSignature === previewSignature
+    ) {
+        const existingContent = container.querySelector('.unistudy-note-preview-content, .unistudy-note-rich-preview__empty');
+        if (existingContent) {
+            return {
+                scopeId: container.dataset.unistudyNotePreviewScopeId || '',
+                snapshot,
+                reused: true,
+            };
+        }
+    }
+
+    cleanupNotePreviewMount(container);
+    container.classList.add('unistudy-note-rich-preview');
+    container.classList.toggle('unistudy-note-rich-preview--compact', compact);
+    container.classList.toggle('unistudy-note-rich-preview--full', !compact);
+    container.dataset.unistudyNotePreviewSignature = previewSignature;
 
     if (!snapshot) {
         const emptyText = options.emptyText || '暂无内容。';
