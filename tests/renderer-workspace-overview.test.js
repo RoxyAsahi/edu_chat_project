@@ -135,7 +135,7 @@ test('buildSubjectOverviewMarkup renders the onboarding empty state when there a
 
     assert.equal(result.headline, '学习工作台');
     assert.match(result.gridMarkup, /app-home--learning/);
-    assert.match(result.gridMarkup, /个人 AI 学习中心/);
+    assert.match(result.gridMarkup, /UniStudy/);
     assert.match(result.gridMarkup, /data-home-action="create-subject"/);
     assert.match(result.gridMarkup, /新建学科/);
     assert.match(result.gridMarkup, /创建第一个学科工作台/);

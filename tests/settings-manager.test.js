@@ -37,6 +37,7 @@ test('validateSettings preserves direct settings fields when modelService is abs
         chatEndpoint: 'https://chat.example.com/proxy/v1/chat/completions',
         chatApiKey: 'chat-key',
         defaultModel: 'gpt-4o',
+        thinkingChatDefaultModel: 'gpt-4o-reasoning',
         followUpDefaultModel: 'gpt-4.1-mini',
         studyToolDefaultModel: 'gpt-4.1-study',
         topicTitleDefaultModel: 'gpt-4.1-nano',
@@ -48,6 +49,7 @@ test('validateSettings preserves direct settings fields when modelService is abs
 
     assert.equal(validated.modelService.providers.length, 0);
     assert.equal(validated.modelService.defaults.chat, null);
+    assert.equal(validated.modelService.defaults.thinkingChat, null);
     assert.equal(validated.modelService.defaults.chatFallback, null);
     assert.equal(validated.modelService.defaults.followUp, null);
     assert.equal(validated.modelService.defaults.studyTool, null);
@@ -82,8 +84,16 @@ test('validateSettings mirrors explicit modelService back into native settings f
                             enabled: true,
                             source: 'manual',
                         },
-                        {
-                            id: 'gpt-4.1-mini',
+                {
+                    id: 'gpt-4o-reasoning',
+                    name: 'gpt-4o-reasoning',
+                    group: 'chat',
+                    capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
+                    enabled: true,
+                    source: 'manual',
+                },
+                {
+                    id: 'gpt-4.1-mini',
                             name: 'gpt-4.1-mini',
                             group: 'chat',
                             capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
@@ -131,6 +141,7 @@ test('validateSettings mirrors explicit modelService back into native settings f
             ],
             defaults: {
                 chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
+                thinkingChat: { providerId: 'chat-provider', modelId: 'gpt-4o-reasoning' },
                 chatFallback: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 followUp: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
                 studyTool: { providerId: 'chat-provider', modelId: 'gpt-4.1-mini' },
@@ -150,6 +161,7 @@ test('validateSettings mirrors explicit modelService back into native settings f
     assert.equal(validated.chatEndpoint, 'https://chat.example.com/proxy/v1/chat/completions');
     assert.equal(validated.chatApiKey, 'chat-key-1');
     assert.equal(validated.defaultModel, 'gpt-4o');
+    assert.equal(validated.thinkingChatDefaultModel, 'gpt-4o-reasoning');
     assert.equal(validated.followUpDefaultModel, 'gpt-4.1-mini');
     assert.equal(validated.studyToolDefaultModel, 'gpt-4.1-mini');
     assert.equal(validated.topicTitleDefaultModel, 'gpt-4.1-nano');
@@ -193,6 +205,7 @@ test('validateSettings appends the built-in AI&P test preset for existing modelS
             ],
             defaults: {
                 chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
+                thinkingChat: null,
                 chatFallback: null,
                 followUp: null,
                 studyTool: null,
@@ -223,6 +236,7 @@ test('readSettings falls back to defaults when the file is missing', async (t) =
     assert.equal(settings.chatEndpoint, DEFAULT_SETTINGS.chatEndpoint);
     assert.equal(settings.chatApiKey, DEFAULT_SETTINGS.chatApiKey);
     assert.equal(settings.defaultModel, DEFAULT_SETTINGS.defaultModel);
+    assert.equal(settings.thinkingChatDefaultModel, DEFAULT_SETTINGS.thinkingChatDefaultModel);
     assert.equal(settings.kbEmbeddingModel, DEFAULT_SETTINGS.kbEmbeddingModel);
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
     assert.equal(settings.enableEmoticonPrompt, DEFAULT_SETTINGS.enableEmoticonPrompt);
@@ -251,6 +265,7 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
     assert.equal(settings.enableEmoticonPrompt, DEFAULT_SETTINGS.enableEmoticonPrompt);
     assert.equal(settings.emoticonPrompt, DEFAULT_SETTINGS.emoticonPrompt);
+    assert.equal(settings.thinkingChatDefaultModel, DEFAULT_SETTINGS.thinkingChatDefaultModel);
     assert.equal(settings.followUpDefaultModel, DEFAULT_SETTINGS.followUpDefaultModel);
     assert.equal(settings.studyToolDefaultModel, DEFAULT_SETTINGS.studyToolDefaultModel);
     assert.equal(settings.followUpPromptTemplate, DEFAULT_SETTINGS.followUpPromptTemplate);
@@ -315,6 +330,7 @@ test('writeSettings persists normalized content and refreshes the cache', async 
         ...DEFAULT_SETTINGS,
         userName: 'Writer',
         sidebarWidth: 50,
+        thinkingChatDefaultModel: 'thinking-model',
         followUpDefaultModel: 'follow-model',
         followUpPromptTemplate: 'Custom follow-up template',
         studyToolDefaultModel: 'study-tool-model',
@@ -326,6 +342,7 @@ test('writeSettings persists normalized content and refreshes the cache', async 
     const written = await fs.readJson(settingsPath);
     assert.equal(written.userName, 'Writer');
     assert.equal(written.sidebarWidth, DEFAULT_SETTINGS.sidebarWidth);
+    assert.equal(written.thinkingChatDefaultModel, 'thinking-model');
     assert.equal(written.followUpDefaultModel, 'follow-model');
     assert.equal(written.followUpPromptTemplate, 'Custom follow-up template');
     assert.equal(written.studyToolDefaultModel, 'study-tool-model');

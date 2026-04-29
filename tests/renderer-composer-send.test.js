@@ -83,6 +83,16 @@ function createComposerHarness(overrides = {}) {
           <button id="sendMessageBtn" type="button">send</button>
           <button id="attachFileBtn" type="button">attach</button>
           <button id="emoticonTriggerBtn" type="button">emoji</button>
+          <div id="chatModelModeRoot">
+            <button id="chatModelModeBtn" type="button" aria-expanded="false">
+              <span class="material-symbols-outlined">bolt</span>
+              <span id="chatModelModeLabel">快速</span>
+            </button>
+            <div id="chatModelModeMenu" class="hidden">
+              <button type="button" data-chat-model-mode="fast" aria-checked="true">快速</button>
+              <button type="button" data-chat-model-mode="thinking" aria-checked="false">思考</button>
+            </div>
+          </div>
           <button id="composerQuickNewTopicBtn" type="button">topic</button>
           <div id="attachmentPreviewArea"></div>
           <div id="selectionContextPreview"></div>
@@ -113,6 +123,7 @@ function createComposerHarness(overrides = {}) {
             pendingAttachments: [],
             pendingSelectionContextRefs: [],
             activeRequestId: null,
+            chatModelMode: 'fast',
         },
     };
 
@@ -126,6 +137,10 @@ function createComposerHarness(overrides = {}) {
             sendMessageBtn: dom.window.document.getElementById('sendMessageBtn'),
             attachFileBtn: dom.window.document.getElementById('attachFileBtn'),
             emoticonTriggerBtn: dom.window.document.getElementById('emoticonTriggerBtn'),
+            chatModelModeRoot: dom.window.document.getElementById('chatModelModeRoot'),
+            chatModelModeBtn: dom.window.document.getElementById('chatModelModeBtn'),
+            chatModelModeLabel: dom.window.document.getElementById('chatModelModeLabel'),
+            chatModelModeMenu: dom.window.document.getElementById('chatModelModeMenu'),
             composerQuickNewTopicBtn: dom.window.document.getElementById('composerQuickNewTopicBtn'),
             attachmentPreviewArea: dom.window.document.getElementById('attachmentPreviewArea'),
             selectionContextPreview: dom.window.document.getElementById('selectionContextPreview'),
@@ -254,6 +269,11 @@ test('composerController shows user and thinking bubbles before persistence, ret
     assert.ok(events.indexOf('start:assistant_2') < events.indexOf('retrieve'));
     assert.ok(events.indexOf('retrieve') < events.indexOf('send'));
     assert.equal(requestPayload?.requestId, 'assistant_2');
+    assert.equal(requestPayload?.modelConfig?.purpose, 'chat');
+    assert.equal(requestPayload?.modelConfig?.fallbackModel, 'agent-model');
+    assert.equal(requestPayload?.modelConfig?.model, undefined);
+    assert.equal(requestPayload?.context?.chatModelMode, 'fast');
+    assert.equal(requestPayload?.context?.modelPurpose, 'chat');
     assert.match(requestPayload?.messages?.[0]?.content || '', /KB context/);
     assert.deepEqual(
         harness.state.session.currentChatHistory.find((message) => message.id === 'assistant_2')?.kbContextRefs,
@@ -359,4 +379,83 @@ test('composerController cancels a locally prepared request before model send st
     assert.equal(events.includes('remote-interrupt'), false);
     assert.ok(events.includes('finalize:assistant_2:cancelled_by_user:已取消'));
     assert.equal(harness.state.composer.activeRequestId, null);
+});
+
+test('composerController sends thinking mode as thinkingChat purpose', async (t) => {
+    const { createComposerController } = await loadComposerControllerModule();
+    const harness = createComposerHarness();
+    t.after(() => harness.dom.window.close());
+
+    let requestPayload = null;
+    const controller = createComposerController({
+        store: harness.store,
+        el: harness.el,
+        chatAPI: {
+            async getActiveSystemPrompt() {
+                return { success: false, systemPrompt: '' };
+            },
+            async retrieveKnowledgeBaseContext() {
+                return { success: true, refs: [], contextText: '' };
+            },
+            async sendChatRequest(payload) {
+                requestPayload = payload;
+                return {
+                    response: {
+                        choices: [{ message: { content: '更深入的回复' } }],
+                    },
+                };
+            },
+        },
+        ui: {
+            updateAttachmentPreview() {},
+            showToastNotification() {},
+            scrollToBottom() {},
+        },
+        windowObj: harness.dom.window,
+        documentObj: harness.dom.window.document,
+        interruptRequest: async () => ({ success: true }),
+        messageRendererApi: {
+            async renderMessage() {},
+            async startStreamingMessage() {},
+            async finalizeStreamedMessage() {},
+        },
+        createId: createIdFactory(),
+        getCurrentTopic: () => ({
+            id: 'topic-1',
+            name: 'Topic One',
+            knowledgeBaseId: '',
+        }),
+        loadTopics: async () => {},
+        loadAgents: async () => {},
+        buildTopicContext: () => ({
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+        }),
+        persistHistory: async () => {},
+        resolveLivePrompt: async () => '',
+        autoResizeTextarea: () => {},
+        decorateChatMessages: () => {},
+        generateFollowUpsForAssistantMessage: async () => [],
+        generateTopicTitleForAssistantMessage: async () => '',
+        updateCurrentChatHistory: (updater) => {
+            harness.state.session.currentChatHistory = updater(harness.state.session.currentChatHistory);
+            return harness.state.session.currentChatHistory;
+        },
+        getCurrentSelectedItem: () => harness.state.session.currentSelectedItem,
+        getCurrentTopicId: () => harness.state.session.currentTopicId,
+        getCurrentChatHistory: () => harness.state.session.currentChatHistory,
+        getGlobalSettings: () => harness.state.settings.settings,
+    });
+
+    controller.setChatModelMode('thinking');
+    harness.el.messageInput.value = '分析一下这个复杂问题';
+    await controller.handleSend();
+
+    assert.equal(harness.state.composer.chatModelMode, 'thinking');
+    assert.equal(harness.el.chatModelModeLabel.textContent, '思考');
+    assert.equal(requestPayload?.modelConfig?.purpose, 'thinkingChat');
+    assert.equal(requestPayload?.modelConfig?.fallbackModel, 'agent-model');
+    assert.equal(requestPayload?.modelConfig?.model, undefined);
+    assert.equal(requestPayload?.context?.chatModelMode, 'thinking');
+    assert.equal(requestPayload?.context?.modelPurpose, 'thinkingChat');
 });

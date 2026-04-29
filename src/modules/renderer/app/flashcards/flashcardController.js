@@ -50,6 +50,13 @@ function createFlashcardController(deps = {}) {
             get: () => getNotesSlice().pendingFlashcardGeneration,
             set: (value) => patchNotes({ pendingFlashcardGeneration: value }),
         },
+        pendingFlashcardGenerations: {
+            get: () => {
+                const pending = getNotesSlice().pendingFlashcardGenerations;
+                return Array.isArray(pending) ? pending : [];
+            },
+            set: (value) => patchNotes({ pendingFlashcardGenerations: Array.isArray(value) ? value : [] }),
+        },
     });
 
     function getActiveFlashcardNote() {
@@ -57,23 +64,89 @@ function createFlashcardController(deps = {}) {
         return note ? normalizeNote(note) : null;
     }
 
+    function normalizePendingGeneration(payload = {}) {
+        return {
+            requestId: String(payload.requestId || `flashcards_${Date.now()}`).trim(),
+            agentId: String(payload.agentId || ''),
+            topicId: String(payload.topicId || ''),
+            title: String(payload.title || '闪卡生成中').trim() || '闪卡生成中',
+            cardCount: Number(payload.cardCount || 0),
+            difficulty: String(payload.difficulty || 'medium'),
+            sourceCount: Number(payload.sourceCount || 0),
+            focus: String(payload.focus || ''),
+            startedAt: Number(payload.startedAt || Date.now()),
+        };
+    }
+
+    function getPendingGenerations() {
+        if (state.pendingFlashcardGenerations.length > 0) {
+            return state.pendingFlashcardGenerations;
+        }
+        return state.pendingFlashcardGeneration
+            ? [normalizePendingGeneration(state.pendingFlashcardGeneration)]
+            : [];
+    }
+
+    function syncLegacyPendingGeneration(nextPending = getPendingGenerations()) {
+        state.pendingFlashcardGeneration = nextPending[0] || null;
+    }
+
     function getPendingGeneration() {
-        return state.pendingFlashcardGeneration || null;
+        return getPendingGenerations()[0] || null;
     }
 
     function beginPendingGeneration(payload = {}) {
+        const pending = normalizePendingGeneration(payload);
+        if (!pending.requestId) {
+            return;
+        }
         state.activeFlashcardNoteId = null;
-        state.pendingFlashcardGeneration = {
-            title: String(payload.title || '闪卡生成中').trim() || '闪卡生成中',
-            sourceCount: Number(payload.sourceCount || 0),
-            startedAt: Date.now(),
-        };
+        const nextPending = [
+            ...getPendingGenerations().filter((item) => item?.requestId !== pending.requestId),
+            pending,
+        ];
+        state.pendingFlashcardGenerations = nextPending;
+        syncLegacyPendingGeneration(nextPending);
         setRightPanelMode('notes');
         renderNotesPanel();
     }
 
-    function clearPendingGeneration() {
-        state.pendingFlashcardGeneration = null;
+    function updatePendingGeneration(requestId, patch = {}) {
+        const normalizedRequestId = String(requestId || '').trim();
+        if (!normalizedRequestId) {
+            return;
+        }
+
+        let changed = false;
+        const nextPending = getPendingGenerations().map((pending) => {
+            if (pending?.requestId !== normalizedRequestId) {
+                return pending;
+            }
+            changed = true;
+            return {
+                ...pending,
+                ...patch,
+            };
+        });
+        if (!changed) {
+            return;
+        }
+        state.pendingFlashcardGenerations = nextPending;
+        syncLegacyPendingGeneration(nextPending);
+        renderNotesPanel();
+    }
+
+    function clearPendingGeneration(requestId = '') {
+        const normalizedRequestId = String(requestId || '').trim();
+        const nextPending = normalizedRequestId
+            ? getPendingGenerations().filter((pending) => pending?.requestId !== normalizedRequestId)
+            : [];
+        if (nextPending.length === getPendingGenerations().length) {
+            return;
+        }
+        state.pendingFlashcardGenerations = nextPending;
+        syncLegacyPendingGeneration(nextPending);
+        renderNotesPanel();
     }
 
     function resetState(options = {}) {
@@ -82,6 +155,7 @@ function createFlashcardController(deps = {}) {
         }
         if (options.clearPending !== false) {
             state.pendingFlashcardGeneration = null;
+            state.pendingFlashcardGenerations = [];
         }
         if (options.render === true) {
             renderNotesPanel();
@@ -311,11 +385,13 @@ function createFlashcardController(deps = {}) {
         clearPendingGeneration,
         getActiveFlashcardNote,
         getFlashcardSourceCount,
+        getPendingGenerations,
         getPendingGeneration,
         hasStructuredFlashcards,
         openPractice,
         renderPractice,
         resetState,
+        updatePendingGeneration,
     };
 }
 

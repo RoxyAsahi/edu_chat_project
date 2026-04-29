@@ -66,17 +66,39 @@ function createBaseState(overrides = {}) {
         notes: {
             topicNotes: [],
             agentNotes: [],
+            allAgentManualNotes: [],
             notesScope: 'topic',
             activeNoteId: null,
             selectedNoteIds: [],
             notesStudioView: 'overview',
             manualNotesLibraryOpen: false,
+            manualNotesLibraryFilter: 'all',
+            noteAnalysisWizard: {
+                open: false,
+                step: 1,
+                title: '',
+                subjectFilter: 'all',
+                selectedNoteIds: [],
+                guidance: '',
+                generating: false,
+                savedNote: null,
+                error: '',
+            },
             noteDetailKind: null,
             noteDetailMode: 'edit',
             activeNoteMenu: null,
             activeFlashcardNoteId: null,
             pendingFlashcardGeneration: null,
+            pendingFlashcardGenerations: [],
             pendingQuizGenerations: [],
+            pendingAnalysisGenerations: [],
+            flashcardGenerationConfig: {
+                countPreset: 'standard',
+                cardCount: 12,
+                difficulty: 'medium',
+                focus: '',
+                includeChatContext: false,
+            },
             quizGenerationConfig: {
                 countPreset: 'standard',
                 questionCount: 8,
@@ -163,6 +185,16 @@ function buildQuizResponse(title = '函数测验') {
     });
 }
 
+function buildFlashcardResponse(title = '函数闪卡') {
+    return JSON.stringify({
+        title,
+        cards: [
+            { id: 'card-1', front: '连续', back: '函数值等于极限' },
+            { id: 'card-2', front: '导数', back: '瞬时变化率' },
+        ],
+    });
+}
+
 function createNotesDom() {
     const dom = new JSDOM(`
         <body>
@@ -191,6 +223,19 @@ function createNotesDom() {
             <button data-quiz-difficulty="medium"></button>
             <button data-quiz-difficulty="hard"></button>
             <button id="generateFlashcardsBtn"></button>
+            <div id="flashcardConfigModal" class="hidden" aria-hidden="true"></div>
+            <div id="flashcardConfigModalBackdrop"></div>
+            <button id="flashcardConfigCloseBtn"></button>
+            <button id="flashcardConfigCancelBtn"></button>
+            <button id="flashcardConfigGenerateBtn"></button>
+            <textarea id="flashcardFocusInput"></textarea>
+            <input id="flashcardIncludeChatContextInput" type="checkbox" />
+            <button data-flashcard-count-preset="less" data-card-count="8"></button>
+            <button data-flashcard-count-preset="standard" data-card-count="12"></button>
+            <button data-flashcard-count-preset="more" data-card-count="18"></button>
+            <button data-flashcard-difficulty="easy"></button>
+            <button data-flashcard-difficulty="medium"></button>
+            <button data-flashcard-difficulty="hard"></button>
             <button id="analysisViewReportBtn"></button>
             <button id="analysisEditMarkdownBtn"></button>
             <button id="quizViewPracticeBtn"></button>
@@ -200,11 +245,27 @@ function createNotesDom() {
             <button id="noteDetailCloseBtn"></button>
             <div id="noteDetailModalBackdrop"></div>
             <div id="noteActionMenu"></div>
+            <div id="noteAnalysisModal" class="hidden" aria-hidden="true"></div>
+            <div id="noteAnalysisModalBackdrop"></div>
+            <button id="noteAnalysisCloseBtn"></button>
+            <div id="noteAnalysisModalTitle"></div>
+            <div id="noteAnalysisModalSubtitle"></div>
+            <div id="noteAnalysisStepIndicator"></div>
+            <div id="noteAnalysisBody"></div>
+            <button id="noteAnalysisCancelBtn"></button>
+            <button id="noteAnalysisPrevBtn"></button>
+            <button id="noteAnalysisNextBtn"></button>
+            <button id="noteAnalysisGenerateBtn"></button>
+            <button id="noteAnalysisOpenReportBtn"></button>
             <div id="manualNotesLibraryModal" class="hidden"></div>
             <div id="manualNotesLibraryBackdrop"></div>
             <button id="manualNotesLibraryCloseBtn"></button>
             <div id="manualNotesLibraryTitle"></div>
             <div id="manualNotesLibrarySubtitle"></div>
+            <button id="manualNotesLibrarySubjectToggle"></button>
+            <div id="manualNotesLibrarySubjectTabsWrapper">
+                <div id="manualNotesLibrarySubjectTabs"></div>
+            </div>
             <div id="manualNotesLibraryGrid"></div>
             <input id="noteTitleInput" />
             <textarea id="noteContentInput"></textarea>
@@ -268,6 +329,15 @@ function createNotesDom() {
             quizCountPresetBtns: window.document.querySelectorAll('[data-quiz-count-preset]'),
             quizDifficultyBtns: window.document.querySelectorAll('[data-quiz-difficulty]'),
             generateFlashcardsBtn: window.document.getElementById('generateFlashcardsBtn'),
+            flashcardConfigModal: window.document.getElementById('flashcardConfigModal'),
+            flashcardConfigModalBackdrop: window.document.getElementById('flashcardConfigModalBackdrop'),
+            flashcardConfigCloseBtn: window.document.getElementById('flashcardConfigCloseBtn'),
+            flashcardConfigCancelBtn: window.document.getElementById('flashcardConfigCancelBtn'),
+            flashcardConfigGenerateBtn: window.document.getElementById('flashcardConfigGenerateBtn'),
+            flashcardFocusInput: window.document.getElementById('flashcardFocusInput'),
+            flashcardIncludeChatContextInput: window.document.getElementById('flashcardIncludeChatContextInput'),
+            flashcardCountPresetBtns: window.document.querySelectorAll('[data-flashcard-count-preset]'),
+            flashcardDifficultyBtns: window.document.querySelectorAll('[data-flashcard-difficulty]'),
             analysisViewReportBtn: window.document.getElementById('analysisViewReportBtn'),
             analysisEditMarkdownBtn: window.document.getElementById('analysisEditMarkdownBtn'),
             quizViewPracticeBtn: window.document.getElementById('quizViewPracticeBtn'),
@@ -278,11 +348,26 @@ function createNotesDom() {
             noteDetailCloseBtn: window.document.getElementById('noteDetailCloseBtn'),
             noteDetailModalBackdrop: window.document.getElementById('noteDetailModalBackdrop'),
             noteActionMenu: window.document.getElementById('noteActionMenu'),
+            noteAnalysisModal: window.document.getElementById('noteAnalysisModal'),
+            noteAnalysisModalBackdrop: window.document.getElementById('noteAnalysisModalBackdrop'),
+            noteAnalysisCloseBtn: window.document.getElementById('noteAnalysisCloseBtn'),
+            noteAnalysisModalTitle: window.document.getElementById('noteAnalysisModalTitle'),
+            noteAnalysisModalSubtitle: window.document.getElementById('noteAnalysisModalSubtitle'),
+            noteAnalysisStepIndicator: window.document.getElementById('noteAnalysisStepIndicator'),
+            noteAnalysisBody: window.document.getElementById('noteAnalysisBody'),
+            noteAnalysisCancelBtn: window.document.getElementById('noteAnalysisCancelBtn'),
+            noteAnalysisPrevBtn: window.document.getElementById('noteAnalysisPrevBtn'),
+            noteAnalysisNextBtn: window.document.getElementById('noteAnalysisNextBtn'),
+            noteAnalysisGenerateBtn: window.document.getElementById('noteAnalysisGenerateBtn'),
+            noteAnalysisOpenReportBtn: window.document.getElementById('noteAnalysisOpenReportBtn'),
             manualNotesLibraryModal: window.document.getElementById('manualNotesLibraryModal'),
             manualNotesLibraryBackdrop: window.document.getElementById('manualNotesLibraryBackdrop'),
             manualNotesLibraryCloseBtn: window.document.getElementById('manualNotesLibraryCloseBtn'),
             manualNotesLibraryTitle: window.document.getElementById('manualNotesLibraryTitle'),
             manualNotesLibrarySubtitle: window.document.getElementById('manualNotesLibrarySubtitle'),
+            manualNotesLibrarySubjectToggle: window.document.getElementById('manualNotesLibrarySubjectToggle'),
+            manualNotesLibrarySubjectTabsWrapper: window.document.getElementById('manualNotesLibrarySubjectTabsWrapper'),
+            manualNotesLibrarySubjectTabs: window.document.getElementById('manualNotesLibrarySubjectTabs'),
             manualNotesLibraryGrid: window.document.getElementById('manualNotesLibraryGrid'),
             noteTitleInput: window.document.getElementById('noteTitleInput'),
             noteContentInput: window.document.getElementById('noteContentInput'),
@@ -322,23 +407,130 @@ function createNotesControllerHarness(createNotesController, options = {}) {
     const { window, document, el } = createNotesDom();
     const store = createStore(createBaseState(options.stateOverrides));
     const toasts = [];
+    let idCounter = 0;
     const ui = {
         showToastNotification: (...args) => {
             toasts.push(args);
         },
         showConfirmDialog: async () => true,
     };
+    let controller = null;
+    const getPendingFlashcardGenerations = () => {
+        const pending = store.getState().notes.pendingFlashcardGenerations;
+        if (Array.isArray(pending) && pending.length > 0) {
+            return pending;
+        }
+        const legacyPending = store.getState().notes.pendingFlashcardGeneration;
+        return legacyPending ? [legacyPending] : [];
+    };
+    const setPendingFlashcardGenerations = (pending) => {
+        store.patchState('notes', (current) => ({
+            ...current,
+            pendingFlashcardGenerations: pending,
+            pendingFlashcardGeneration: pending[0] || null,
+        }));
+    };
     const flashcardsApi = {
-        activateNote: () => null,
-        beginPendingGeneration: () => {},
-        buildGeneratedFlashcardContent: () => null,
-        clearPendingGeneration: () => {},
+        activateNote: (note) => {
+            store.patchState('notes', {
+                activeFlashcardNoteId: note?.id || null,
+                activeNoteId: null,
+            });
+            store.patchState('layout', { rightPanelMode: 'flashcards' });
+            return note || null;
+        },
+        beginPendingGeneration: (payload = {}) => {
+            const requestId = String(payload.requestId || `flashcards_${Date.now()}`);
+            const pending = {
+                requestId,
+                agentId: String(payload.agentId || ''),
+                topicId: String(payload.topicId || ''),
+                title: String(payload.title || '闪卡生成中'),
+                cardCount: Number(payload.cardCount || 0),
+                difficulty: String(payload.difficulty || 'medium'),
+                sourceCount: Number(payload.sourceCount || 0),
+                focus: String(payload.focus || ''),
+                startedAt: Number(payload.startedAt || Date.now()),
+            };
+            setPendingFlashcardGenerations([
+                ...getPendingFlashcardGenerations().filter((item) => item?.requestId !== requestId),
+                pending,
+            ]);
+            store.patchState('layout', { rightPanelMode: 'notes' });
+            controller?.renderNotesPanel();
+        },
+        buildGeneratedFlashcardContent: (responseText, fallbackTitle, fallbackRefs = []) => {
+            let payload = null;
+            try {
+                payload = JSON.parse(String(responseText || ''));
+            } catch {
+                return null;
+            }
+            const cards = Array.isArray(payload?.cards)
+                ? payload.cards
+                    .map((card, index) => ({
+                        id: String(card?.id || `card-${index + 1}`),
+                        front: String(card?.front || '').trim(),
+                        back: String(card?.back || '').trim(),
+                        sourceDocumentRefs: Array.isArray(card?.sourceDocumentRefs)
+                            ? card.sourceDocumentRefs
+                            : fallbackRefs,
+                    }))
+                    .filter((card) => card.front && card.back)
+                : [];
+            if (cards.length === 0) {
+                return null;
+            }
+            const flashcardDeck = {
+                title: String(payload.title || fallbackTitle || '闪卡集合'),
+                cards,
+            };
+            return {
+                flashcardDeck,
+                flashcardProgress: {
+                    currentIndex: 0,
+                    flipped: false,
+                    cardStates: cards.map((card) => ({ cardId: card.id, result: null, updatedAt: 0 })),
+                    knownCount: 0,
+                    unknownCount: 0,
+                },
+                contentMarkdown: `# ${flashcardDeck.title}`,
+            };
+        },
+        clearPendingGeneration: (requestId = '') => {
+            const normalizedRequestId = String(requestId || '');
+            const nextPending = normalizedRequestId
+                ? getPendingFlashcardGenerations().filter((item) => item?.requestId !== normalizedRequestId)
+                : [];
+            setPendingFlashcardGenerations(nextPending);
+            controller?.renderNotesPanel();
+        },
         getFlashcardSourceCount: () => 0,
-        getPendingGeneration: () => null,
-        hasStructuredFlashcards: () => false,
-        openPractice: () => false,
+        getPendingGenerations: () => getPendingFlashcardGenerations(),
+        getPendingGeneration: () => getPendingFlashcardGenerations()[0] || null,
+        hasStructuredFlashcards: (note) => Array.isArray(note?.flashcardDeck?.cards) && note.flashcardDeck.cards.length > 0,
+        openPractice: (note, practiceOptions = {}) => {
+            controller?.openNoteDetail(note, { ...practiceOptions, kind: 'flashcards' });
+            return true;
+        },
         renderPractice: () => {},
-        resetState: () => {},
+        resetState: (resetOptions = {}) => {
+            if (resetOptions.clearPending !== false) {
+                setPendingFlashcardGenerations([]);
+            }
+            if (resetOptions.clearActive !== false) {
+                store.patchState('notes', { activeFlashcardNoteId: null });
+            }
+        },
+        updatePendingGeneration: (requestId, patch = {}) => {
+            const normalizedRequestId = String(requestId || '');
+            setPendingFlashcardGenerations(getPendingFlashcardGenerations().map((item) => (
+                item?.requestId === normalizedRequestId
+                    ? { ...item, ...patch }
+                    : item
+            )));
+            controller?.renderNotesPanel();
+        },
         ...(options.flashcardsOverrides || {}),
     };
     const chatAPI = {
@@ -365,7 +557,7 @@ function createNotesControllerHarness(createNotesController, options = {}) {
         ...(options.chatApiOverrides || {}),
     };
 
-    const controller = createNotesController({
+    controller = createNotesController({
         store,
         el,
         chatAPI,
@@ -380,6 +572,7 @@ function createNotesControllerHarness(createNotesController, options = {}) {
         getCurrentTopicDisplayName: () => '函数',
         persistHistory: async () => {},
         buildTopicContext: () => ({ topicId: store.getState().session.currentTopicId }),
+        createId: (prefix) => `${prefix}_${++idCounter}`,
         flashcardsApi,
         ...(options.depsOverrides || {}),
     });
@@ -728,6 +921,45 @@ test('manual notes library opens from the top button and only renders manual not
     assert.equal(el.manualNotesLibraryGrid.querySelector('[data-note-menu]'), null);
 });
 
+test('manual notes library exposes a deep analysis tab that only renders analysis notes', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                agents: [
+                    { id: 'agent-1', name: '数学' },
+                    { id: 'agent-2', name: '物理' },
+                ],
+                topics: [
+                    { id: 'topic-1', name: '函数' },
+                    { id: 'topic-2', name: '力学' },
+                ],
+            },
+            notes: {
+                allAgentManualNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', agentId: 'agent-1', topicId: 'topic-1' },
+                    { id: 'analysis-1', title: '分析报告', contentMarkdown: '分析内容', kind: 'analysis', agentId: 'agent-2', topicId: 'topic-2' },
+                ],
+            },
+        },
+    });
+
+    controller.bindEvents();
+    controller.renderManualNotesLibrary();
+
+    assert.match(el.manualNotesLibrarySubjectTabs.textContent, /深度分析/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析内容/);
+
+    el.manualNotesLibrarySubjectTabs.querySelector('[data-subject-filter="analysis"]').click();
+
+    assert.equal(store.getState().notes.manualNotesLibraryFilter, 'analysis');
+    assert.match(el.manualNotesLibraryGrid.textContent, /分析内容/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /物理/);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
+});
+
 test('manual notes library close button hides the modal and clears the open state', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 
@@ -810,6 +1042,27 @@ test('manual notes library can add a note into Studio selection from the right-c
     assert.match(el.manualNotesLibrarySubtitle.textContent, /已选 1 条/);
 });
 
+test('right-side analysis tile now creates a blank note instead of calling the model', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let sendCallCount = 0;
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                sendCallCount += 1;
+                return { response: { choices: [{ message: { content: 'should-not-run' } }] } };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.analyzeNotesBtn.click();
+
+    assert.equal(sendCallCount, 0);
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), false);
+    assert.match(el.noteTitleInput.value, /函数/);
+});
+
 test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {
     const { createNotesController } = await loadNotesControllerModule();
     let upstreamPayload = null;
@@ -828,10 +1081,12 @@ test('notes tool actions read endpoint settings from the settings slice before c
                 },
             },
             notes: {
-                topicNotes: [{
+                agentNotes: [{
                     id: 'selected-note-1',
                     title: '已选笔记',
                     contentMarkdown: '极限与连续',
+                    kind: 'note',
+                    topicId: 'topic-1',
                     sourceMessageIds: ['msg-1'],
                     sourceDocumentRefs: ['doc-1'],
                 }],
@@ -862,7 +1117,14 @@ test('notes tool actions read endpoint settings from the settings slice before c
     });
 
     controller.bindEvents();
-    el.analyzeNotesBtn.click();
+    el.manualNewNoteBtn.click();
+    assert.equal(el.noteAnalysisModal.classList.contains('hidden'), false);
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisNextBtn.click();
+    const guidanceInput = el.noteAnalysisBody.querySelector('#noteAnalysisGuidanceInput');
+    guidanceInput.value = '重点分析可迁移的方法。';
+    guidanceInput.dispatchEvent(new el.noteAnalysisBody.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    el.noteAnalysisGenerateBtn.click();
     await upstreamCalled;
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -870,9 +1132,134 @@ test('notes tool actions read endpoint settings from the settings slice before c
     assert.equal(upstreamPayload.apiKey, 'fixture-api-key');
     assert.equal(upstreamPayload.modelConfig.purpose, 'studyTool');
     assert.equal(upstreamPayload.modelConfig.model, 'settings-study-tool-model');
+    assert.match(upstreamPayload.messages[1].content, /重点分析可迁移的方法/);
+    assert.match(upstreamPayload.messages[1].content, /## 4\. 跨话题\/跨学科迁移/);
 });
 
-test('notes tool actions can consume selected manual notes from the agent library even when topic scope is active', async () => {
+test('notes analysis wizard switches to the analysis tab with a pending placeholder until saved', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const manualNote = {
+        id: 'selected-note-1',
+        title: '已选笔记',
+        contentMarkdown: '极限与连续',
+        kind: 'note',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    };
+    let upstreamPayload = null;
+    let resolveUpstreamCall;
+    let resolveResponse;
+    let savedAnalysis = null;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+    const responseReady = new Promise((resolve) => {
+        resolveResponse = resolve;
+    });
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                agentNotes: [manualNote],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return responseReady;
+            },
+            saveTopicNote: async (_agentId, _topicId, payload) => {
+                savedAnalysis = {
+                    id: 'saved-analysis',
+                    agentId: 'agent-1',
+                    topicId: 'topic-1',
+                    title: payload.title,
+                    contentMarkdown: payload.contentMarkdown,
+                    kind: payload.kind,
+                };
+                return { success: true, item: savedAnalysis };
+            },
+            listAgentNotes: async () => ({ success: true, items: savedAnalysis ? [manualNote, savedAnalysis] : [manualNote] }),
+            listTopicNotes: async () => ({ success: true, items: savedAnalysis ? [manualNote, savedAnalysis] : [manualNote] }),
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNewNoteBtn.click();
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisGenerateBtn.click();
+
+    assert.equal(store.getState().notes.manualNotesLibraryOpen, true);
+    assert.equal(store.getState().notes.manualNotesLibraryFilter, 'analysis');
+    assert.equal(el.noteAnalysisModal.classList.contains('hidden'), true);
+    assert.match(el.manualNotesLibraryGrid.textContent, /正在生成深度分析/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /1 条笔记/);
+
+    await upstreamCalled;
+    assert.equal(upstreamPayload.modelConfig.purpose, 'studyTool');
+    resolveResponse({ response: { choices: [{ message: { content: '最终深度分析内容' } }] } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(store.getState().notes.pendingAnalysisGenerations.length, 0);
+    assert.equal(store.getState().notes.manualNotesLibraryFilter, 'analysis');
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /正在生成深度分析/);
+    assert.match(el.manualNotesLibraryGrid.textContent, /最终深度分析内容/);
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), true);
+});
+
+test('notes analysis wizard clears the analysis placeholder when generation fails', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+
+    const { controller, el, store, toasts } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                agentNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '极限与连续',
+                    kind: 'note',
+                    agentId: 'agent-1',
+                    topicId: 'topic-1',
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                resolveUpstreamCall();
+                throw new Error('网络失败');
+            },
+            listAgentNotes: async () => ({ success: true, items: [] }),
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNewNoteBtn.click();
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisGenerateBtn.click();
+
+    assert.equal(store.getState().notes.manualNotesLibraryFilter, 'analysis');
+    assert.match(el.manualNotesLibraryGrid.textContent, /正在生成深度分析/);
+
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(store.getState().notes.pendingAnalysisGenerations.length, 0);
+    assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /正在生成深度分析/);
+    assert.equal(toasts.some(([message, level]) => level === 'error' && /网络失败/.test(message)), true);
+});
+
+test('notes analysis wizard consumes selected all-agent manual notes even when topic scope is active', async () => {
     const { createNotesController } = await loadNotesControllerModule();
     let upstreamPayload = null;
     let resolveUpstreamCall;
@@ -888,14 +1275,21 @@ test('notes tool actions can consume selected manual notes from the agent librar
                     chatApiKey: 'fixture-api-key',
                 },
             },
+            session: {
+                agents: [
+                    { id: 'agent-1', name: '数学' },
+                    { id: 'agent-2', name: '物理' },
+                ],
+            },
             notes: {
                 notesScope: 'topic',
                 topicNotes: [],
-                agentNotes: [{
+                allAgentManualNotes: [{
                     id: 'manual-note-1',
                     title: '跨话题手写笔记',
                     contentMarkdown: '这里是跨话题整理的重点内容。',
                     kind: 'note',
+                    agentId: 'agent-2',
                     topicId: 'topic-2',
                 }],
                 selectedNoteIds: ['manual-note-1'],
@@ -912,26 +1306,67 @@ test('notes tool actions can consume selected manual notes from the agent librar
                 };
             },
             listTopicNotes: async () => ({ success: true, items: [] }),
-            listAgentNotes: async () => ({
+            listAgentNotes: async (agentId) => ({
                 success: true,
-                items: [{
-                    id: 'manual-note-1',
-                    title: '跨话题手写笔记',
-                    contentMarkdown: '这里是跨话题整理的重点内容。',
-                    kind: 'note',
-                    topicId: 'topic-2',
-                }],
+                items: agentId === 'agent-2'
+                    ? [{
+                        id: 'manual-note-1',
+                        title: '跨话题手写笔记',
+                        contentMarkdown: '这里是跨话题整理的重点内容。',
+                        kind: 'note',
+                        agentId: 'agent-2',
+                        topicId: 'topic-2',
+                    }]
+                    : [],
             }),
         },
     });
 
     controller.bindEvents();
-    el.analyzeNotesBtn.click();
+    el.manualNewNoteBtn.click();
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisGenerateBtn.click();
     await upstreamCalled;
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     assert.match(upstreamPayload.messages[1].content, /跨话题手写笔记/);
     assert.match(upstreamPayload.messages[1].content, /这里是跨话题整理的重点内容/);
+    assert.match(upstreamPayload.messages[1].content, /学科：物理/);
+});
+
+test('notes analysis wizard blocks generation until at least one note is selected', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let sendCallCount = 0;
+
+    const { controller, el, store, toasts } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                agentNotes: [{
+                    id: 'manual-note-1',
+                    title: '待选笔记',
+                    contentMarkdown: '函数连续性。',
+                    kind: 'note',
+                    topicId: 'topic-1',
+                }],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                sendCallCount += 1;
+                return { response: { choices: [{ message: { content: 'should-not-run' } }] } };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNewNoteBtn.click();
+    el.noteAnalysisNextBtn.click();
+    el.noteAnalysisNextBtn.click();
+
+    assert.equal(sendCallCount, 0);
+    assert.equal(store.getState().notes.noteAnalysisWizard.step, 2);
+    assert.equal(toasts.some(([message]) => /请先选择至少一条/.test(message)), true);
 });
 
 test('quiz config modal opens with defaults and injects custom count difficulty and focus into the prompt', async () => {
@@ -1345,6 +1780,349 @@ test('quiz pending card is scoped to its origin topic and opens practice when st
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         assert.deepEqual(store.getState().notes.pendingQuizGenerations, []);
+        assert.equal(saveCallCount > 0, scenario.expectSave);
+        assert.equal(store.getState().notes.noteDetailKind, null);
+        assert.equal(el.noteDetailModal.classList.contains('hidden'), true);
+    });
+});
+
+test('flashcard config modal opens with defaults and injects custom options into the prompt', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let savedPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+    const chatMessages = Array.from({ length: 13 }, (_, index) => ({
+        id: `chat-${index + 1}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `对话内容 ${index + 1}`,
+    }));
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [
+                    ...chatMessages.slice(0, 6),
+                    { id: 'thinking-msg', role: 'assistant', content: 'Thinking', isThinking: true },
+                    ...chatMessages.slice(6),
+                ],
+            },
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '连续与导数课堂笔记',
+                    sourceMessageIds: ['note-msg'],
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: buildFlashcardResponse('自定义函数闪卡') } }],
+                    },
+                };
+            },
+            saveTopicNote: async (_agentId, _topicId, payload) => {
+                savedPayload = payload;
+                return {
+                    success: true,
+                    item: {
+                        id: 'saved-flashcards',
+                        agentId: 'agent-1',
+                        topicId: 'topic-1',
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        flashcardDeck: payload.flashcardDeck,
+                        flashcardProgress: payload.flashcardProgress,
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateFlashcardsBtn.click();
+
+    assert.equal(el.flashcardConfigModal.classList.contains('hidden'), false);
+    assert.equal(el.flashcardConfigModal.getAttribute('aria-hidden'), 'false');
+    assert.equal(el.flashcardCountPresetBtns[1].getAttribute('aria-pressed'), 'true');
+    assert.equal(el.flashcardDifficultyBtns[1].getAttribute('aria-pressed'), 'true');
+    assert.equal(el.flashcardFocusInput.value, '');
+    assert.equal(el.flashcardIncludeChatContextInput.checked, false);
+
+    el.flashcardCountPresetBtns[2].click();
+    el.flashcardDifficultyBtns[2].click();
+    el.flashcardFocusInput.value = '只整理极限和连续的易混概念';
+    el.flashcardFocusInput.dispatchEvent(new el.flashcardFocusInput.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    el.flashcardIncludeChatContextInput.checked = true;
+    el.flashcardIncludeChatContextInput.dispatchEvent(new el.flashcardIncludeChatContextInput.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    el.flashcardConfigGenerateBtn.click();
+
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const prompt = upstreamPayload.messages[1].content;
+    assert.match(prompt, /生成 18 张卡/);
+    assert.match(prompt, /难度等级：困难/);
+    assert.match(prompt, /主题范围：只整理极限和连续的易混概念/);
+    assert.match(prompt, /你必须只返回严格 JSON/);
+    assert.match(prompt, /连续与导数课堂笔记/);
+    assert.match(prompt, /当前对话摘录（最近 12 条）/);
+    assert.doesNotMatch(prompt, /^对话内容 1$/m);
+    assert.match(prompt, /对话内容 13/);
+    assert.equal(savedPayload.title, '自定义函数闪卡');
+    assert.deepEqual(savedPayload.sourceMessageIds, [
+        'note-msg',
+        'chat-2',
+        'chat-3',
+        'chat-4',
+        'chat-5',
+        'chat-6',
+        'chat-7',
+        'chat-8',
+        'chat-9',
+        'chat-10',
+        'chat-11',
+        'chat-12',
+        'chat-13',
+    ]);
+    assert.equal(el.flashcardConfigModal.classList.contains('hidden'), true);
+});
+
+test('flashcard pending cards allow repeated submissions and are scoped per topic', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const releases = [];
+    let sendCallCount = 0;
+    let resolveTwoCalls;
+    const twoCalls = new Promise((resolve) => {
+        resolveTwoCalls = resolve;
+    });
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '函数图像与导数',
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                sendCallCount += 1;
+                const callIndex = sendCallCount;
+                if (sendCallCount === 2) {
+                    resolveTwoCalls();
+                }
+                await new Promise((resolve) => {
+                    releases[callIndex - 1] = resolve;
+                });
+                return {
+                    response: {
+                        choices: [{ message: { content: buildFlashcardResponse(`函数闪卡 ${callIndex}`) } }],
+                    },
+                };
+            },
+            saveTopicNote: async (agentId, topicId, payload) => ({
+                success: true,
+                item: {
+                    id: `saved-flashcards-${payload.title}`,
+                    agentId,
+                    topicId,
+                    title: payload.title,
+                    contentMarkdown: payload.contentMarkdown,
+                    sourceMessageIds: payload.sourceMessageIds,
+                    sourceDocumentRefs: payload.sourceDocumentRefs,
+                    kind: payload.kind,
+                    flashcardDeck: payload.flashcardDeck,
+                    flashcardProgress: payload.flashcardProgress,
+                },
+            }),
+        },
+    });
+
+    controller.bindEvents();
+    el.generateFlashcardsBtn.click();
+    el.flashcardConfigGenerateBtn.click();
+    assert.equal(store.getState().notes.pendingFlashcardGenerations.length, 1);
+
+    el.generateFlashcardsBtn.click();
+    el.flashcardConfigGenerateBtn.click();
+    await twoCalls;
+
+    assert.equal(store.getState().notes.pendingFlashcardGenerations.length, 2);
+    assert.equal((el.notesList.textContent.match(/正在生成闪卡/g) || []).length, 2);
+    assert.equal(el.generateFlashcardsBtn.hasAttribute('disabled'), false);
+    assert.equal(el.generateFlashcardsBtn.getAttribute('aria-busy'), 'true');
+
+    store.patchState('session', { currentTopicId: 'topic-2' });
+    controller.renderNotesPanel();
+    assert.doesNotMatch(el.notesList.textContent, /正在生成闪卡/);
+    assert.equal(el.generateFlashcardsBtn.getAttribute('aria-busy'), 'false');
+
+    store.patchState('session', { currentTopicId: 'topic-1' });
+    controller.renderNotesPanel();
+    assert.equal((el.notesList.textContent.match(/正在生成闪卡/g) || []).length, 2);
+
+    releases[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const remainingPending = store.getState().notes.pendingFlashcardGenerations;
+    assert.equal(remainingPending.length, 1);
+    assert.equal(remainingPending[0].requestId, 'study_flashcards_2');
+    assert.equal(store.getState().notes.noteDetailKind, 'flashcards');
+
+    releases[1]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(store.getState().notes.pendingFlashcardGenerations, []);
+});
+
+test('flashcard generation saves to the origin topic without opening detail after a topic switch', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let resolveUpstreamCall;
+    let releaseResponse;
+    let resolveSaveCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+    const responseReady = new Promise((resolve) => {
+        releaseResponse = resolve;
+    });
+    const saveCalled = new Promise((resolve) => {
+        resolveSaveCall = resolve;
+    });
+    let saveArgs = null;
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                topicNotes: [{
+                    id: 'selected-note-1',
+                    title: '已选笔记',
+                    contentMarkdown: '函数连续性',
+                }],
+                selectedNoteIds: ['selected-note-1'],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                resolveUpstreamCall();
+                await responseReady;
+                return {
+                    response: {
+                        choices: [{ message: { content: buildFlashcardResponse('跨话题闪卡') } }],
+                    },
+                };
+            },
+            saveTopicNote: async (agentId, topicId, payload) => {
+                saveArgs = { agentId, topicId, payload };
+                resolveSaveCall();
+                return {
+                    success: true,
+                    item: {
+                        id: 'saved-flashcards',
+                        agentId,
+                        topicId,
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        flashcardDeck: payload.flashcardDeck,
+                        flashcardProgress: payload.flashcardProgress,
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateFlashcardsBtn.click();
+    el.flashcardConfigGenerateBtn.click();
+    await upstreamCalled;
+    assert.match(el.notesList.textContent, /正在生成闪卡/);
+
+    store.patchState('session', { currentTopicId: 'topic-2' });
+    controller.renderNotesPanel();
+    releaseResponse();
+    await saveCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(saveArgs.agentId, 'agent-1');
+    assert.equal(saveArgs.topicId, 'topic-1');
+    assert.equal(store.getState().notes.noteDetailKind, null);
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), true);
+    assert.deepEqual(store.getState().notes.pendingFlashcardGenerations, []);
+});
+
+[
+    {
+        name: 'upstream error',
+        sendResult: { error: 'boom' },
+        expectSave: false,
+    },
+    {
+        name: 'empty response',
+        sendResult: { response: { choices: [{ message: { content: '   ' } }] } },
+        expectSave: false,
+    },
+    {
+        name: 'invalid flashcard JSON',
+        sendResult: { response: { choices: [{ message: { content: '{"title":"坏格式","cards":[]}' } }] } },
+        expectSave: false,
+    },
+    {
+        name: 'save failure',
+        sendResult: { response: { choices: [{ message: { content: buildFlashcardResponse() } }] } },
+        saveResult: { success: false, error: 'disk full' },
+        expectSave: true,
+    },
+].forEach((scenario) => {
+    test(`flashcard pending clears after ${scenario.name}`, async () => {
+        const { createNotesController } = await loadNotesControllerModule();
+        let saveCallCount = 0;
+        const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+            stateOverrides: {
+                notes: {
+                    topicNotes: [{
+                        id: 'selected-note-1',
+                        title: '已选笔记',
+                        contentMarkdown: '概率基础',
+                    }],
+                    selectedNoteIds: ['selected-note-1'],
+                },
+            },
+            chatApiOverrides: {
+                sendChatRequest: async () => scenario.sendResult,
+                saveTopicNote: async () => {
+                    saveCallCount += 1;
+                    return scenario.saveResult || { success: true, item: { id: 'saved-flashcards' } };
+                },
+            },
+        });
+
+        controller.bindEvents();
+        el.generateFlashcardsBtn.click();
+        el.flashcardConfigGenerateBtn.click();
+        assert.equal(store.getState().notes.pendingFlashcardGenerations.length, 1);
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        assert.deepEqual(store.getState().notes.pendingFlashcardGenerations, []);
         assert.equal(saveCallCount > 0, scenario.expectSave);
         assert.equal(store.getState().notes.noteDetailKind, null);
         assert.equal(el.noteDetailModal.classList.contains('hidden'), true);

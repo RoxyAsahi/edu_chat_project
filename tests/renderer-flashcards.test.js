@@ -3,10 +3,36 @@ const assert = require('assert/strict');
 const fs = require('fs/promises');
 const path = require('path');
 
+async function buildModuleDataUrl(filePath, moduleCache = new Map()) {
+    const normalizedPath = path.resolve(filePath);
+    if (moduleCache.has(normalizedPath)) {
+        return moduleCache.get(normalizedPath);
+    }
+
+    let source = await fs.readFile(normalizedPath, 'utf8');
+    const importMatches = [...source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)];
+    for (const match of importMatches) {
+        const specifier = match[1];
+        const dependencyPath = path.resolve(path.dirname(normalizedPath), specifier);
+        const dependencyUrl = await buildModuleDataUrl(dependencyPath, moduleCache);
+        source = source.replace(`from '${specifier}'`, `from '${dependencyUrl}'`);
+        source = source.replace(`from "${specifier}"`, `from "${dependencyUrl}"`);
+    }
+
+    const dataUrl = `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+    moduleCache.set(normalizedPath, dataUrl);
+    return dataUrl;
+}
+
 async function loadFlashcardUtilsModule() {
     const modulePath = path.resolve(__dirname, '../src/modules/renderer/app/flashcards/flashcardUtils.js');
     const source = await fs.readFile(modulePath, 'utf8');
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
+}
+
+async function loadFlashcardControllerModule() {
+    const modulePath = path.resolve(__dirname, '../src/modules/renderer/app/flashcards/flashcardController.js');
+    return import(await buildModuleDataUrl(modulePath));
 }
 
 test('normalizeFlashcardDeck filters invalid cards and applies fallback refs', async () => {
@@ -115,4 +141,77 @@ test('navigation clamps within deck bounds and resets flipped state', async () =
     assert.equal(next.currentIndex, 1);
     assert.equal(next.flipped, false);
     assert.equal(previous.currentIndex, 0);
+});
+
+test('pending generation array APIs clear only the requested flashcard job', async () => {
+    const { createFlashcardController } = await loadFlashcardControllerModule();
+    const state = {
+        notes: {
+            activeNoteId: 'note-1',
+            activeFlashcardNoteId: 'flashcard-note',
+            pendingFlashcardGeneration: null,
+            pendingFlashcardGenerations: [],
+        },
+    };
+    const store = {
+        getState: () => state,
+        patchState(slice, patch) {
+            const current = state[slice] || {};
+            state[slice] = typeof patch === 'function'
+                ? patch(current, state)
+                : { ...current, ...patch };
+            return state[slice];
+        },
+    };
+    let rightPanelMode = null;
+    let renderCount = 0;
+
+    const controller = createFlashcardController({
+        store,
+        el: {},
+        chatAPI: {},
+        ui: {},
+        setRightPanelMode: (mode) => {
+            rightPanelMode = mode;
+        },
+        renderNotesPanel: () => {
+            renderCount += 1;
+        },
+    });
+
+    controller.beginPendingGeneration({
+        requestId: 'request-1',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        title: '第一组闪卡',
+        cardCount: 8,
+    });
+    controller.beginPendingGeneration({
+        requestId: 'request-2',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        title: '第二组闪卡',
+        cardCount: 18,
+    });
+
+    assert.equal(rightPanelMode, 'notes');
+    assert.equal(state.notes.activeFlashcardNoteId, null);
+    assert.deepEqual(controller.getPendingGenerations().map((pending) => pending.requestId), ['request-1', 'request-2']);
+    assert.equal(controller.getPendingGeneration().requestId, 'request-1');
+    assert.equal(state.notes.pendingFlashcardGeneration.requestId, 'request-1');
+
+    controller.updatePendingGeneration('request-1', { sourceCount: 3 });
+    assert.equal(controller.getPendingGenerations()[0].sourceCount, 3);
+
+    controller.clearPendingGeneration('request-1');
+    assert.deepEqual(controller.getPendingGenerations().map((pending) => pending.requestId), ['request-2']);
+    assert.equal(state.notes.pendingFlashcardGeneration.requestId, 'request-2');
+
+    controller.clearPendingGeneration('missing-request');
+    assert.deepEqual(controller.getPendingGenerations().map((pending) => pending.requestId), ['request-2']);
+
+    controller.clearPendingGeneration();
+    assert.deepEqual(controller.getPendingGenerations(), []);
+    assert.equal(state.notes.pendingFlashcardGeneration, null);
+    assert.ok(renderCount >= 4);
 });

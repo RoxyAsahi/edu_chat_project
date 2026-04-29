@@ -124,7 +124,7 @@ test('manual notes page controls stay compact and left aligned', async () => {
 
     assert.match(workspaceCss, /\.manual-notes-library-page__header\s*\{[\s\S]*justify-content:\s*flex-start;/);
     assert.match(workspaceCss, /\.manual-notes-library-page__filters\s*\{[\s\S]*order:\s*2;/);
-    assert.match(workspaceCss, /\.manual-notes-library-page__subject-filter\s*\{[\s\S]*min-height:\s*32px;/);
+    assert.match(workspaceCss, /\.manual-notes-library-page__subject-tabs\s*\{[\s\S]*display:\s*inline-flex;/);
     assert.match(workspaceCss, /\.manual-notes-library-page__new-note\s*\{[\s\S]*min-height:\s*32px;/);
     assert.match(sidepanelCss, /\.notes-studio-panel-switch\s*\{[\s\S]*justify-self:\s*flex-start;/);
     assert.match(sidepanelCss, /\.notes-studio-panel-switch__btn\s*\{[\s\S]*min-height:\s*32px;/);

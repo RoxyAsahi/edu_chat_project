@@ -94,6 +94,7 @@ const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
     '</chat_history>',
 ].join('\n');
 const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
+    thinkingChatDefaultModel: '思考聊天默认模型',
     followUpDefaultModel: '追问默认模型',
     studyToolDefaultModel: '学习工具默认模型',
     followUpPromptTemplate: '追问提示词模板',
@@ -109,7 +110,8 @@ const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
 });
 const MODEL_SERVICE_VERSION = 1;
 const MODEL_SERVICE_TASK_META = Object.freeze({
-    chat: { label: '默认聊天模型', capability: 'chat', description: '普通对话与大部分聊天任务的兜底模型。' },
+    chat: { label: '默认快速聊天模型', capability: 'chat', description: '输入框选择“快速”时使用，适用于大部分聊天任务。' },
+    thinkingChat: { label: '默认思考聊天模型', capability: 'chat', description: '输入框选择“思考”时使用，适合复杂问题。' },
     chatFallback: { label: '聊天回退模型', capability: 'chat', description: '聊天上游失败时自动切换，覆盖普通聊天、追问、命名、来源指南与图片转写等聊天用途任务。' },
     followUp: { label: '追问模型', capability: 'chat', description: '自动生成追问时优先使用。' },
     studyTool: { label: '学习工具模型', capability: 'chat', description: '右侧功能区生成选择题、闪卡和深度分析时优先使用。' },
@@ -216,6 +218,7 @@ function createDefaultModelService() {
         providers: [],
         defaults: {
             chat: null,
+            thinkingChat: null,
             chatFallback: null,
             followUp: null,
             studyTool: null,
@@ -586,6 +589,7 @@ function createBuiltInTestProviderDefaults(provider = {}) {
     );
     return {
         chat: refFor(AIP_TEST_DEFAULT_MODEL),
+        thinkingChat: refFor(AIP_TEST_DEFAULT_MODEL),
         chatFallback: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         followUp: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         studyTool: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
@@ -723,6 +727,7 @@ function listModelServiceModels(service = {}, options = {}) {
 function buildModelServiceMirror(service = {}, currentSettings = {}) {
     const normalizedService = normalizeModelService(service);
     const chatDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.chat);
+    const thinkingChatDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.thinkingChat) || chatDefault;
     const followUpDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.followUp) || chatDefault;
     const studyToolDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.studyTool) || chatDefault;
     const topicTitleDefault = resolveModelServiceRef(normalizedService, normalizedService.defaults.topicTitle) || chatDefault;
@@ -734,6 +739,7 @@ function buildModelServiceMirror(service = {}, currentSettings = {}) {
         chatEndpoint: chatDefault ? buildModelServiceEndpoint(chatDefault.provider.apiBaseUrl, '/v1/chat/completions') : '',
         chatApiKey: chatDefault ? String(chatDefault.provider.apiKeys?.[0] || '') : '',
         defaultModel: chatDefault?.model?.id || '',
+        thinkingChatDefaultModel: thinkingChatDefault?.model?.id || '',
         followUpDefaultModel: followUpDefault?.model?.id || '',
         studyToolDefaultModel: studyToolDefault?.model?.id || '',
         topicTitleDefaultModel: topicTitleDefault?.model?.id || '',
@@ -836,6 +842,7 @@ function buildBootstrapModelService(settings = {}) {
     const service = createDefaultModelService();
     const chatModels = [
         settings.defaultModel,
+        settings.thinkingChatDefaultModel,
         settings.followUpDefaultModel,
         settings.studyToolDefaultModel,
         settings.topicTitleDefaultModel,
@@ -945,6 +952,9 @@ function buildBootstrapModelService(settings = {}) {
 
     service.defaults.chat = primaryProvider && normalizeModelServiceText(settings.defaultModel)
         ? { providerId: primaryProvider.id, modelId: settings.defaultModel }
+        : null;
+    service.defaults.thinkingChat = primaryProvider && normalizeModelServiceText(settings.thinkingChatDefaultModel)
+        ? { providerId: primaryProvider.id, modelId: settings.thinkingChatDefaultModel }
         : null;
     service.defaults.followUp = primaryProvider && normalizeModelServiceText(settings.followUpDefaultModel)
         ? { providerId: primaryProvider.id, modelId: settings.followUpDefaultModel }
@@ -1194,6 +1204,7 @@ function createSettingsController(deps = {}) {
         if (el.kbEmbeddingModel) el.kbEmbeddingModel.value = mirrors.kbEmbeddingModel || '';
         if (el.kbRerankModel) el.kbRerankModel.value = mirrors.kbRerankModel || '';
         if (el.defaultModelInput) el.defaultModelInput.value = mirrors.defaultModel || '';
+        if (el.thinkingChatDefaultModelInput) el.thinkingChatDefaultModelInput.value = mirrors.thinkingChatDefaultModel || '';
         if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = mirrors.followUpDefaultModel || '';
         if (el.studyToolDefaultModelInput) el.studyToolDefaultModelInput.value = mirrors.studyToolDefaultModel || '';
         if (el.topicTitleDefaultModelInput) el.topicTitleDefaultModelInput.value = mirrors.topicTitleDefaultModel || '';
@@ -3132,6 +3143,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         const settings = composeSettingsWithModelService(getGlobalSettings());
         el.userNameInput.value = settings.userName || '';
         if (el.defaultModelInput) el.defaultModelInput.value = settings.defaultModel || '';
+        if (el.thinkingChatDefaultModelInput) el.thinkingChatDefaultModelInput.value = settings.thinkingChatDefaultModel || '';
         if (el.followUpDefaultModelInput) el.followUpDefaultModelInput.value = settings.followUpDefaultModel || '';
         if (el.studyToolDefaultModelInput) el.studyToolDefaultModelInput.value = settings.studyToolDefaultModel || '';
         if (el.topicTitleDefaultModelInput) el.topicTitleDefaultModelInput.value = settings.topicTitleDefaultModel || '';
@@ -3292,6 +3304,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             userName: el.userNameInput.value.trim() || 'User',
             modelService,
             defaultModel: modelServiceMirror.defaultModel || '',
+            thinkingChatDefaultModel: modelServiceMirror.thinkingChatDefaultModel || '',
             followUpDefaultModel: modelServiceMirror.followUpDefaultModel || '',
             studyToolDefaultModel: modelServiceMirror.studyToolDefaultModel || '',
             topicTitleDefaultModel: modelServiceMirror.topicTitleDefaultModel || '',
@@ -4449,6 +4462,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         [
             el.userNameInput,
             el.defaultModelInput,
+            el.thinkingChatDefaultModelInput,
             el.followUpDefaultModelInput,
             el.studyToolDefaultModelInput,
             el.topicTitleDefaultModelInput,

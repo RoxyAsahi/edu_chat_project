@@ -32,6 +32,8 @@ test('createInitialAppState groups renderer state into the expected slices', asy
     assert.match(state.settings.settings.agentBubbleThemePrompt, /\{\{RenderingGuide\}\}/);
     assert.match(state.settings.settings.agentBubbleThemePrompt, /response-root/);
     assert.equal(state.settings.settings.modelService.defaults.chatFallback, null);
+    assert.equal(state.settings.settings.modelService.defaults.thinkingChat, null);
+    assert.equal(state.settings.settings.thinkingChatDefaultModel, DEFAULT_SETTINGS.thinkingChatDefaultModel);
     assert.equal(state.settings.settings.enableEmoticonPrompt, true);
     assert.equal(state.settings.settings.studyProfile.timezone, 'Asia/Hong_Kong');
     assert.equal(state.layout.sidePanelTab, 'notes');
@@ -40,6 +42,7 @@ test('createInitialAppState groups renderer state into the expected slices', asy
     assert.equal(state.notes.notesScope, 'topic');
     assert.equal(state.logs.scope, 'topic');
     assert.equal(state.composer.activeRequestId, null);
+    assert.equal(state.composer.chatModelMode, 'fast');
 });
 
 test('appStore patchState and subscribe operate on slices and reject unknown slices', async () => {

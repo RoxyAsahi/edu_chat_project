@@ -205,6 +205,21 @@
     padding: 12px;
   }
 
+  .note-analysis-modal {
+    padding: 12px;
+  }
+
+  .note-analysis-modal__dialog {
+    width: 100%;
+    min-height: 0;
+    max-height: calc(100vh - 24px);
+  }
+
+  .note-analysis-steps,
+  .note-analysis-template-row {
+    grid-template-columns: 1fr;
+  }
+
   .quiz-config-modal__dialog {
     width: 100%;
     max-height: calc(100vh - 24px);
@@ -260,6 +275,28 @@
 @media (max-width: 620px) {
   .quiz-config-modal {
     padding: 0;
+  }
+
+  .note-analysis-modal {
+    padding: 0;
+  }
+
+  .note-analysis-modal__dialog {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .note-analysis-modal__header,
+  .note-analysis-modal__actions,
+  .note-analysis-steps,
+  .note-analysis-modal__body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .note-analysis-note-grid {
+    grid-template-columns: 1fr;
   }
 
   .quiz-config-modal__dialog {
@@ -517,6 +554,13 @@
   .chat-input-area {
     padding-left: 16px;
     padding-right: 16px;
+  }
+  .chat-model-mode__button {
+    min-width: 68px;
+    padding: 0 8px;
+  }
+  .chat-model-mode__menu {
+    width: min(240px, calc(100vw - 40px));
   }
   .chat-messages-container {
     padding: 20px 16px;
@@ -1120,7 +1164,7 @@
     gap: 8px;
   }
 
-  .manual-notes-library-page__subject-filter,
+  .manual-notes-library-page__subject-tabs,
   .manual-notes-library-page__new-note {
     min-height: 32px;
   }

@@ -375,25 +375,39 @@ function createDynamicIslandController(deps = {}) {
         el.dynamicIslandStartBtn?.addEventListener('click', () => {
             startPomodoro();
         });
-        el.studioPomodoroStartBtn?.addEventListener('click', () => {
-            startPomodoro();
+        documentObj.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof ElementCtor)) {
+                return;
+            }
+            const actionButton = target.closest('#studioPomodoroStartBtn, #studioPomodoroPauseBtn, #studioPomodoroResumeBtn, #studioPomodoroResetBtn');
+            if (!(actionButton instanceof ElementCtor)) {
+                return;
+            }
+
+            if (actionButton.id === 'studioPomodoroStartBtn') {
+                startPomodoro();
+                return;
+            }
+            if (actionButton.id === 'studioPomodoroPauseBtn') {
+                pausePomodoro();
+                return;
+            }
+            if (actionButton.id === 'studioPomodoroResumeBtn') {
+                resumePomodoro();
+                return;
+            }
+            if (actionButton.id === 'studioPomodoroResetBtn') {
+                resetPomodoro();
+            }
         });
         el.dynamicIslandPauseBtn?.addEventListener('click', () => {
-            pausePomodoro();
-        });
-        el.studioPomodoroPauseBtn?.addEventListener('click', () => {
             pausePomodoro();
         });
         el.dynamicIslandResumeBtn?.addEventListener('click', () => {
             resumePomodoro();
         });
-        el.studioPomodoroResumeBtn?.addEventListener('click', () => {
-            resumePomodoro();
-        });
         el.dynamicIslandResetBtn?.addEventListener('click', () => {
-            resetPomodoro();
-        });
-        el.studioPomodoroResetBtn?.addEventListener('click', () => {
             resetPomodoro();
         });
         documentObj.addEventListener('click', (event) => {

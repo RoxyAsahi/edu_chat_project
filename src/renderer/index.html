@@ -31,7 +31,7 @@
           <div class="app-boot-loading__pulse"></div>
           <div class="app-boot-loading__pulse app-boot-loading__pulse--delayed"></div>
         </div>
-        <div class="app-boot-loading__title">UniStudy</div>
+        <img class="app-boot-loading__wordmark" src="../assets/UniStudy.png" alt="" />
         <div class="app-boot-loading__subtitle">正在准备学习工作台</div>
         <div class="app-boot-loading__hint">
           <span class="app-boot-loading__dot"></span>
@@ -108,19 +108,21 @@
               <button id="manualNotesLibraryDiaryTabBtn" class="notes-studio-panel-switch__btn" type="button" role="tab" aria-selected="false" aria-controls="diaryWallModal">日记墙</button>
             </div>
             <div id="manualNotesLibraryFilters" class="manual-notes-library-page__filters" aria-label="笔记筛选">
-              <label class="manual-notes-library-page__subject-filter" aria-label="按学科筛选收藏笔记">
-                <span class="material-symbols-outlined" aria-hidden="true">tune</span>
-                <select id="manualNotesLibrarySubjectFilterSelect" class="manual-notes-library-page__subject-select">
-                  <option value="all">全部学科</option>
-                </select>
-              </label>
+              <div id="manualNotesLibrarySubjectTabsWrapper" class="manual-notes-library-page__subject-tabs-wrapper">
+                <button id="manualNotesLibrarySubjectToggle" type="button" class="manual-notes-library-page__subject-toggle" aria-label="展开/收起学科筛选" aria-expanded="true">
+                  <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+                </button>
+                <div id="manualNotesLibrarySubjectTabs" class="manual-notes-library-page__subject-tabs" aria-label="按学科筛选收藏笔记" role="tablist">
+                  <button type="button" class="manual-notes-library-page__subject-tab manual-notes-library-page__subject-tab--active" data-subject-filter="all">筛选</button>
+                </div>
+              </div>
               <button
                 id="manualNewNoteBtn"
                 class="accent-button manual-notes-library-page__new-note"
                 type="button"
               >
-                <span class="material-symbols-outlined" aria-hidden="true">note_add</span>
-                <span>新建笔记</span>
+                <span class="material-symbols-outlined" aria-hidden="true">analytics</span>
+                <span>深度分析</span>
               </button>
             </div>
           </header>
@@ -379,6 +381,24 @@
               <div id="selectionContextPreview" class="selection-context-preview hidden"></div>
               <textarea id="messageInput" rows="1" placeholder="输入消息... (Shift+Enter 换行)" disabled></textarea>
               <div class="chat-input-actions">
+                <div class="chat-model-mode" id="chatModelModeRoot">
+                  <button id="chatModelModeBtn" class="chat-model-mode__button" type="button" title="切换聊天模型模式" aria-haspopup="menu" aria-expanded="false" disabled>
+                    <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+                    <span id="chatModelModeLabel">快速</span>
+                  </button>
+                  <div id="chatModelModeMenu" class="chat-model-mode__menu hidden" role="menu" aria-label="聊天模型模式">
+                    <button class="chat-model-mode__item chat-model-mode__item--active" type="button" role="menuitemradio" aria-checked="true" data-chat-model-mode="fast">
+                      <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+                      <span><strong>快速</strong><small>适用于大部分情况</small></span>
+                      <span class="material-symbols-outlined chat-model-mode__check" aria-hidden="true">check</span>
+                    </button>
+                    <button class="chat-model-mode__item" type="button" role="menuitemradio" aria-checked="false" data-chat-model-mode="thinking">
+                      <span class="material-symbols-outlined" aria-hidden="true">psychology</span>
+                      <span><strong>思考</strong><small>适合复杂问题</small></span>
+                      <span class="material-symbols-outlined chat-model-mode__check" aria-hidden="true">check</span>
+                    </button>
+                  </div>
+                </div>
                 <button id="composerQuickNewTopicBtn" title="新建聊天话题" disabled>
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -444,10 +464,10 @@
               <div id="notesStudioNotesPanel" class="notes-studio__pane notes-studio__pane--active" role="tabpanel" aria-labelledby="notesStudioNotesTabBtn">
                 <div class="notes-studio__section notes-studio__section--tools">
                   <div class="notes-tool-grid">
-                    <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--analysis" type="button">
-                      <span class="notes-tool-tile__icon material-symbols-outlined">analytics</span>
+                    <button id="analyzeNotesBtn" class="notes-tool-tile notes-tool-tile--primary" type="button">
+                      <span class="notes-tool-tile__icon material-symbols-outlined">note_add</span>
                       <span class="notes-tool-tile__body">
-                        <strong>深度分析</strong>
+                        <strong>新建笔记</strong>
                       </span>
                       <span class="notes-tool-tile__arrow material-symbols-outlined">chevron_right</span>
                     </button>
@@ -691,6 +711,44 @@
       </div>
     </div>
 
+    <div id="noteAnalysisModal" class="note-analysis-modal hidden" aria-hidden="true">
+      <div id="noteAnalysisModalBackdrop" class="note-analysis-modal__backdrop"></div>
+      <section class="note-analysis-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="noteAnalysisModalTitle">
+        <header class="note-analysis-modal__header">
+          <div class="note-analysis-modal__title-block">
+            <span class="material-symbols-outlined note-analysis-modal__icon" aria-hidden="true">analytics</span>
+            <div>
+              <p class="eyebrow">跨笔记综合分析</p>
+              <h2 id="noteAnalysisModalTitle">深度分析</h2>
+              <p id="noteAnalysisModalSubtitle" class="settings-caption">选择多条笔记，生成横向迁移和综合诊断报告。</p>
+            </div>
+          </div>
+          <button id="noteAnalysisCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭深度分析">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </header>
+
+        <div id="noteAnalysisStepIndicator" class="note-analysis-steps" aria-label="深度分析步骤"></div>
+        <div id="noteAnalysisBody" class="note-analysis-modal__body" aria-live="polite"></div>
+
+        <footer class="note-analysis-modal__actions">
+          <button id="noteAnalysisCancelBtn" class="ghost-button" type="button">取消</button>
+          <button id="noteAnalysisPrevBtn" class="ghost-button hidden" type="button">
+            <span class="material-symbols-outlined">arrow_back</span> 上一步
+          </button>
+          <button id="noteAnalysisNextBtn" class="accent-button icon-text-btn" type="button">
+            下一步 <span class="material-symbols-outlined">arrow_forward</span>
+          </button>
+          <button id="noteAnalysisGenerateBtn" class="accent-button icon-text-btn hidden" type="button">
+            <span class="material-symbols-outlined">auto_awesome</span> 创建分析
+          </button>
+          <button id="noteAnalysisOpenReportBtn" class="accent-button icon-text-btn hidden" type="button">
+            <span class="material-symbols-outlined">preview</span> 打开报告
+          </button>
+        </footer>
+      </section>
+    </div>
+
     <div id="quizConfigModal" class="quiz-config-modal hidden" aria-hidden="true">
       <div id="quizConfigModalBackdrop" class="quiz-config-modal__backdrop"></div>
       <section class="quiz-config-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="quizConfigModalTitle">
@@ -759,6 +817,80 @@
         <footer class="quiz-config-modal__actions">
           <button id="quizConfigCancelBtn" class="ghost-button" type="button">取消</button>
           <button id="quizConfigGenerateBtn" class="accent-button icon-text-btn" type="button">
+            <span class="material-symbols-outlined">auto_awesome</span> 生成
+          </button>
+        </footer>
+      </section>
+    </div>
+
+    <div id="flashcardConfigModal" class="quiz-config-modal hidden" aria-hidden="true">
+      <div id="flashcardConfigModalBackdrop" class="quiz-config-modal__backdrop"></div>
+      <section class="quiz-config-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="flashcardConfigModalTitle">
+        <header class="quiz-config-modal__header">
+          <div class="quiz-config-modal__title-block">
+            <span class="material-symbols-outlined quiz-config-modal__icon" aria-hidden="true">style</span>
+            <div>
+              <p class="eyebrow">自定义抽认卡</p>
+              <h2 id="flashcardConfigModalTitle">生成闪卡</h2>
+              <p class="settings-caption">设置本次卡组的数量、难度和主题范围。</p>
+            </div>
+          </div>
+          <button id="flashcardConfigCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭自定义闪卡">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </header>
+
+        <div class="quiz-config-modal__body">
+          <section class="quiz-config-fieldset" aria-labelledby="flashcardCountLabel">
+            <p id="flashcardCountLabel" class="quiz-config-label">卡片数量</p>
+            <div class="quiz-config-segment" role="group" aria-label="卡片数量">
+              <button class="quiz-config-segment__btn" type="button" data-flashcard-count-preset="less" data-card-count="8" aria-pressed="false">
+                <span>更少</span>
+                <small>8 张</small>
+              </button>
+              <button class="quiz-config-segment__btn quiz-config-segment__btn--active" type="button" data-flashcard-count-preset="standard" data-card-count="12" aria-pressed="true">
+                <span>标准</span>
+                <small>12 张</small>
+              </button>
+              <button class="quiz-config-segment__btn" type="button" data-flashcard-count-preset="more" data-card-count="18" aria-pressed="false">
+                <span>更多</span>
+                <small>18 张</small>
+              </button>
+            </div>
+          </section>
+
+          <section class="quiz-config-fieldset" aria-labelledby="flashcardDifficultyLabel">
+            <p id="flashcardDifficultyLabel" class="quiz-config-label">难度等级</p>
+            <div class="quiz-config-segment" role="group" aria-label="难度等级">
+              <button class="quiz-config-segment__btn" type="button" data-flashcard-difficulty="easy" aria-pressed="false">
+                <span>简单</span>
+              </button>
+              <button class="quiz-config-segment__btn quiz-config-segment__btn--active" type="button" data-flashcard-difficulty="medium" aria-pressed="true">
+                <span>中等</span>
+              </button>
+              <button class="quiz-config-segment__btn" type="button" data-flashcard-difficulty="hard" aria-pressed="false">
+                <span>困难</span>
+              </button>
+            </div>
+          </section>
+
+          <label class="quiz-config-field" for="flashcardFocusInput">
+            <span>主题应该是什么？</span>
+            <textarea id="flashcardFocusInput" rows="5" placeholder="例如：只围绕某一篇 Source、专注核心术语、整理这次聊天里的易混概念。"></textarea>
+          </label>
+
+          <label class="quiz-config-check">
+            <input id="flashcardIncludeChatContextInput" type="checkbox" />
+            <span>
+              <strong>包含当前对话</strong>
+              <small>追加最近 12 条有效提问和回答，适合把刚讨论过的重点整理成抽认卡。</small>
+            </span>
+          </label>
+        </div>
+
+        <footer class="quiz-config-modal__actions">
+          <button id="flashcardConfigCancelBtn" class="ghost-button" type="button">取消</button>
+          <button id="flashcardConfigGenerateBtn" class="accent-button icon-text-btn" type="button">
             <span class="material-symbols-outlined">auto_awesome</span> 生成
           </button>
         </footer>
@@ -853,6 +985,7 @@
                 </div>
                 <div class="hidden" aria-hidden="true">
                   <input id="defaultModelInput" type="text" placeholder="gemini-3.1-flash-lite-preview" />
+                  <input id="thinkingChatDefaultModelInput" type="text" placeholder="留空则跟随默认快速聊天模型" />
                   <input id="followUpDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
                   <input id="studyToolDefaultModelInput" type="text" placeholder="留空则跟随默认聊天模型" />
                   <input id="topicTitleDefaultModelInput" type="text" placeholder="留空则跟随当前学科模型" />
