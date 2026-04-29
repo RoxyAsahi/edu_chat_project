@@ -91,9 +91,10 @@
   align-items: center;
   gap: 8px;
   flex-wrap: nowrap;
-  order: 2;
+  order: 3;
   flex: 1 1 auto;
   min-width: 240px;
+  justify-content: flex-end;
 }
 
 .manual-notes-library-page__switch {
@@ -105,6 +106,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  order: 2;
 }
 
 .manual-notes-library-page__subject-tabs-wrapper--collapsed .manual-notes-library-page__subject-tabs {
@@ -185,7 +187,6 @@
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
-  margin-left: auto;
 }
 
 .manual-notes-library-page__new-note .material-symbols-outlined {

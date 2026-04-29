@@ -3,16 +3,34 @@ const assert = require('assert/strict');
 const fs = require('fs/promises');
 const path = require('path');
 
+async function buildModuleDataUrl(filePath, moduleCache = new Map()) {
+    const normalizedPath = path.resolve(filePath);
+    if (moduleCache.has(normalizedPath)) {
+        return moduleCache.get(normalizedPath);
+    }
+
+    let source = await fs.readFile(normalizedPath, 'utf8');
+    const importMatches = [...source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)];
+    for (const match of importMatches) {
+        const specifier = match[1];
+        const dependencyPath = path.resolve(path.dirname(normalizedPath), specifier);
+        const dependencyUrl = await buildModuleDataUrl(dependencyPath, moduleCache);
+        source = source.replace(`from '${specifier}'`, `from '${dependencyUrl}'`);
+        source = source.replace(`from "${specifier}"`, `from "${dependencyUrl}"`);
+    }
+
+    const dataUrl = `data:text/javascript;base64,${Buffer.from(source, 'utf8').toString('base64')}`;
+    moduleCache.set(normalizedPath, dataUrl);
+    return dataUrl;
+}
+
 async function loadModule(relativePath) {
     const modulePath = path.resolve(__dirname, '..', relativePath);
     let source = await fs.readFile(modulePath, 'utf8');
     if (relativePath.endsWith('app/bootstrap.js')) {
         source = source.replace(/^import\s.+?;\r?\n/gm, '');
     } else if (relativePath.endsWith('app/workspace/workspaceController.js')) {
-        source = source.replace(
-            /^import\s+\{\s*positionFloatingElement\s*\}\s+from\s+['"].+?['"];\r?\n/m,
-            'const positionFloatingElement = () => {};\n'
-        );
+        return import(await buildModuleDataUrl(modulePath));
     }
     return import(`data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`);
 }

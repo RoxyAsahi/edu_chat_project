@@ -883,6 +883,71 @@ test('right-side notes panel only renders generated content kinds', async () => 
     assert.doesNotMatch(notesText, /手写笔记/);
 });
 
+test('generated quiz cards use the same compact card shape as flashcards', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const quizTitle = 'DeepSeek最新模型基础测验';
+    const firstStem = 'DeepSeek最新发布的 V3 模型的总参数量是多少？';
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                topicNotes: [{
+                    id: 'quiz-card-1',
+                    title: quizTitle,
+                    contentMarkdown: [
+                        `# ${quizTitle}`,
+                        '',
+                        `## 1. ${firstStem}`,
+                        'A. 671B',
+                        'B. 7B',
+                        'C. 13B',
+                        'D. 70B',
+                        '正确答案：A',
+                        '解析：材料提到 DeepSeek-V3 为 671B 总参数。',
+                    ].join('\n'),
+                    kind: 'quiz',
+                    topicId: 'topic-1',
+                    quizSet: {
+                        title: quizTitle,
+                        items: [{
+                            id: 'quiz_1',
+                            stem: firstStem,
+                            options: [
+                                { id: 'option_a', label: 'A', text: '671B' },
+                                { id: 'option_b', label: 'B', text: '7B' },
+                                { id: 'option_c', label: 'C', text: '13B' },
+                                { id: 'option_d', label: 'D', text: '70B' },
+                            ],
+                            correctOptionId: 'option_a',
+                            explanation: '材料提到 DeepSeek-V3 为 671B 总参数。',
+                        }],
+                    },
+                }],
+            },
+        },
+    });
+
+    controller.renderNotesPanel();
+
+    const card = el.notesList.querySelector('.note-card--studio');
+    const preview = card?.querySelector('.note-card__studio-preview');
+    const title = card?.querySelector('.note-card__generated-title');
+    const meta = card?.querySelector('.note-card__generated-meta');
+    const menuButton = card?.querySelector('.note-card__menu-button');
+    assert.ok(card);
+    assert.equal(card.classList.contains('note-card--generated-entry'), true);
+    assert.equal(card.classList.contains('note-card--flashcard-entry'), false);
+    assert.equal(preview, null);
+    assert.ok(title);
+    assert.ok(meta);
+    assert.ok(menuButton);
+    assert.equal(title.textContent, quizTitle);
+    assert.match(meta.textContent, /1 道题/);
+    assert.doesNotMatch(card.textContent, new RegExp(firstStem.replace(/[？?]/g, '[？?]')));
+    assert.doesNotMatch(card.textContent, /解析/);
+    assert.equal(menuButton.parentElement, card.querySelector('.note-card__studio-main'));
+});
+
 test('manual notes library opens from the top button and only renders manual notes', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 
@@ -1109,6 +1174,100 @@ test('right-side analysis tile now creates a blank note instead of calling the m
     assert.equal(sendCallCount, 0);
     assert.equal(el.noteDetailModal.classList.contains('hidden'), false);
     assert.match(el.noteTitleInput.value, /函数/);
+});
+
+test('notes analysis wizard shows numbered steps and the notes analysis save location', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentSelectedItem: {
+                    id: 'agent-1',
+                    name: '展示案例',
+                },
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNewNoteBtn.click();
+
+    assert.match(el.noteAnalysisStepIndicator.textContent, /1\s*基本设置/);
+    assert.match(el.noteAnalysisStepIndicator.textContent, /2\s*选择笔记/);
+    assert.match(el.noteAnalysisStepIndicator.textContent, /3\s*设置指引/);
+    assert.match(el.noteAnalysisStepIndicator.textContent, /4\s*创建中/);
+    assert.match(el.noteAnalysisBody.textContent, /我的笔记\s*\/\s*深度分析/);
+    assert.doesNotMatch(el.noteAnalysisBody.textContent, /展示案例\s*\/\s*函数/);
+});
+
+test('notes analysis wizard uses rich square note previews in the selection step', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    const mountCalls = [];
+    const manualNote = {
+        id: 'manual-note-1',
+        title: '课堂笔记',
+        contentMarkdown: '# 完整预览\n\n这里是需要像笔记页一样展示的内容。',
+        kind: 'note',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    };
+    const secondManualNote = {
+        id: 'manual-note-2',
+        title: '另一条课堂笔记',
+        contentMarkdown: '# 不应重复入场\n\n勾选旁边卡片时，这里不能重新挂载。',
+        kind: 'note',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    };
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                agentNotes: [manualNote, secondManualNote],
+            },
+        },
+        depsOverrides: {
+            messageRendererApi: {
+                cleanupNotePreviewMount() {},
+                mountRichNotePreview(target, note, options) {
+                    mountCalls.push({
+                        noteId: note.id,
+                        compact: options.compact === true,
+                    });
+                    target.innerHTML = `<div class="rich-bubble">${note.contentMarkdown}</div>`;
+                    target.classList.add('unistudy-note-rich-preview');
+                },
+            },
+        },
+        chatApiOverrides: {
+            listAgentNotes: async () => ({ success: true, items: [manualNote, secondManualNote] }),
+        },
+    });
+
+    controller.bindEvents();
+    el.manualNewNoteBtn.click();
+    el.noteAnalysisNextBtn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const card = el.noteAnalysisBody.querySelector('.note-analysis-note-card');
+    const preview = el.noteAnalysisBody.querySelector('[data-note-analysis-preview="manual-note-1"]');
+    const secondPreview = el.noteAnalysisBody.querySelector('[data-note-analysis-preview="manual-note-2"]');
+    const mountCountAfterInitialRender = mountCalls.length;
+    assert.ok(card);
+    assert.ok(preview);
+    assert.ok(secondPreview);
+    assert.equal(preview.classList.contains('manual-note-card__preview'), true);
+    assert.equal(preview.classList.contains('unistudy-note-rich-preview'), true);
+    assert.equal(mountCalls.some((call) => call.noteId === 'manual-note-1' && call.compact), true);
+    assert.match(preview.textContent, /完整预览/);
+
+    card.click();
+
+    assert.equal(mountCalls.length, mountCountAfterInitialRender);
+    assert.strictEqual(el.noteAnalysisBody.querySelector('[data-note-analysis-preview="manual-note-1"]'), preview);
+    assert.strictEqual(el.noteAnalysisBody.querySelector('[data-note-analysis-preview="manual-note-2"]'), secondPreview);
+    assert.match(el.noteAnalysisBody.textContent, /选择笔记 \(1 \/ 10\)/);
 });
 
 test('notes tool actions read endpoint settings from the settings slice before calling the upstream client', async () => {
@@ -1573,6 +1732,203 @@ test('quiz generation can append the recent chat context and source message ids'
     ]);
 });
 
+test('quiz generation can use the recent chat as the only study input', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let savedPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+    const chatMessages = Array.from({ length: 14 }, (_, index) => ({
+        id: `chat-only-${index + 1}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `纯对话内容 ${index + 1}`,
+    }));
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [
+                    chatMessages[0],
+                    { id: 'thinking-msg', role: 'assistant', content: 'Thinking', isThinking: true },
+                    { id: 'empty-msg', role: 'user', content: '   ' },
+                    ...chatMessages.slice(1),
+                ],
+            },
+            notes: {
+                topicNotes: [],
+                agentNotes: [],
+                selectedNoteIds: [],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: buildQuizResponse('纯对话测验') } }],
+                    },
+                };
+            },
+            saveTopicNote: async (_agentId, _topicId, payload) => {
+                savedPayload = payload;
+                return {
+                    success: true,
+                    item: {
+                        id: 'saved-chat-only-quiz',
+                        agentId: 'agent-1',
+                        topicId: 'topic-1',
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        quizSet: payload.quizSet,
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+    el.quizIncludeChatContextInput.checked = true;
+    el.quizIncludeChatContextInput.dispatchEvent(new el.quizIncludeChatContextInput.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    el.quizConfigGenerateBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const prompt = upstreamPayload.messages[1].content;
+    assert.match(prompt, /当前对话摘录（最近 12 条）/);
+    assert.doesNotMatch(prompt, /^纯对话内容 1$/m);
+    assert.doesNotMatch(prompt, /^纯对话内容 2$/m);
+    assert.match(prompt, /纯对话内容 3/);
+    assert.match(prompt, /纯对话内容 14/);
+    assert.doesNotMatch(prompt, /Thinking/);
+    assert.doesNotMatch(prompt, /已选笔记/);
+    assert.doesNotMatch(prompt, /Source 检索内容/);
+    assert.deepEqual(savedPayload.sourceMessageIds, [
+        'chat-only-3',
+        'chat-only-4',
+        'chat-only-5',
+        'chat-only-6',
+        'chat-only-7',
+        'chat-only-8',
+        'chat-only-9',
+        'chat-only-10',
+        'chat-only-11',
+        'chat-only-12',
+        'chat-only-13',
+        'chat-only-14',
+    ]);
+});
+
+test('quiz chat-only generation sends sanitized text instead of rendered HTML', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+
+    const { controller, el } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [
+                    { id: 'deepseek-user', role: 'user', content: '介绍一下 deepseek 最新的模型' },
+                    {
+                        id: 'deepseek-assistant',
+                        role: 'assistant',
+                        content: `
+                            <div id="response-root" style="color: red">
+                                <style>
+                                    @keyframes glow { from { opacity: 0; } to { opacity: 1; } }
+                                    .card { animation: glow 3s infinite; }
+                                </style>
+                                <!-- 头部标题区 -->
+                                <h1 style="font-size: 28px;">DeepSeek 最新模型</h1>
+                                <section>
+                                    <h2>DeepSeek-V3</h2>
+                                    <div><span>671B 总参数</span><span>128K tokens</span></div>
+                                </section>
+                                <img src="/表情包/知识点来了.jpg" width="100" style="display:block;">
+                            </div>
+                        `,
+                    },
+                ],
+            },
+            notes: {
+                topicNotes: [],
+                agentNotes: [],
+                selectedNoteIds: [],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return { response: { output_text: buildQuizResponse('DeepSeek 测验') } };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+    el.quizIncludeChatContextInput.checked = true;
+    el.quizIncludeChatContextInput.dispatchEvent(new el.quizIncludeChatContextInput.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    el.quizConfigGenerateBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const prompt = upstreamPayload.messages[1].content;
+    assert.match(prompt, /当前对话摘录（最近 2 条）/);
+    assert.match(prompt, /DeepSeek 最新模型/);
+    assert.match(prompt, /DeepSeek-V3/);
+    assert.match(prompt, /671B 总参数/);
+    assert.doesNotMatch(prompt, /@keyframes/);
+    assert.doesNotMatch(prompt, /<style/i);
+    assert.doesNotMatch(prompt, /<div/i);
+    assert.doesNotMatch(prompt, /style=/i);
+    assert.doesNotMatch(prompt, /<img/i);
+    assert.doesNotMatch(prompt, /表情包/);
+    assert.doesNotMatch(prompt, /response-root/);
+});
+
+test('quiz generation without notes source or chat opt-in shows the study input hint', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let sendCallCount = 0;
+
+    const { controller, el, store, toasts } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [{ id: 'user-msg', role: 'user', content: '这条对话没有被勾选使用' }],
+            },
+            notes: {
+                topicNotes: [],
+                agentNotes: [],
+                selectedNoteIds: [],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                sendCallCount += 1;
+                return { response: { choices: [{ message: { content: buildQuizResponse() } }] } };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateQuizBtn.click();
+    el.quizConfigGenerateBtn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(sendCallCount, 0);
+    assert.deepEqual(store.getState().notes.pendingQuizGenerations, []);
+    assert.equal(toasts.some(([message]) => message === '请先选择笔记、导入来源资料，或勾选“包含当前对话”。'), true);
+});
+
 test('quiz source fallback passes selected knowledge base document ids into retrieval', async () => {
     const { createNotesController } = await loadNotesControllerModule();
     let retrievalPayload = null;
@@ -1945,6 +2301,127 @@ test('flashcard config modal opens with defaults and injects custom options into
         'chat-13',
     ]);
     assert.equal(el.flashcardConfigModal.classList.contains('hidden'), true);
+});
+
+test('flashcard generation can use the recent chat as the only study input', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let upstreamPayload = null;
+    let savedPayload = null;
+    let resolveUpstreamCall;
+    const upstreamCalled = new Promise((resolve) => {
+        resolveUpstreamCall = resolve;
+    });
+    const chatMessages = [
+        { id: 'flash-chat-1', role: 'user', content: '我们今天复习连续函数。' },
+        {
+            id: 'flash-chat-2',
+            role: 'assistant',
+            content: '<div class="answer" style="color:red"><style>.answer{color:red}</style><p>连续要求函数值和极限一致。</p><img src="/表情包/知识点来了.jpg"></div>',
+        },
+        { id: 'flash-chat-3', role: 'user', content: '再补一下导数。' },
+    ];
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [
+                    { id: 'thinking-msg', role: 'assistant', content: 'Thinking', isThinking: true },
+                    ...chatMessages,
+                ],
+            },
+            notes: {
+                topicNotes: [],
+                agentNotes: [],
+                selectedNoteIds: [],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async (payload) => {
+                upstreamPayload = payload;
+                resolveUpstreamCall();
+                return {
+                    response: {
+                        choices: [{ message: { content: buildFlashcardResponse('纯对话闪卡') } }],
+                    },
+                };
+            },
+            saveTopicNote: async (_agentId, _topicId, payload) => {
+                savedPayload = payload;
+                return {
+                    success: true,
+                    item: {
+                        id: 'saved-chat-only-flashcards',
+                        agentId: 'agent-1',
+                        topicId: 'topic-1',
+                        title: payload.title,
+                        contentMarkdown: payload.contentMarkdown,
+                        sourceMessageIds: payload.sourceMessageIds,
+                        sourceDocumentRefs: payload.sourceDocumentRefs,
+                        kind: payload.kind,
+                        flashcardDeck: payload.flashcardDeck,
+                        flashcardProgress: payload.flashcardProgress,
+                    },
+                };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateFlashcardsBtn.click();
+    el.flashcardIncludeChatContextInput.checked = true;
+    el.flashcardIncludeChatContextInput.dispatchEvent(new el.flashcardIncludeChatContextInput.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    el.flashcardConfigGenerateBtn.click();
+    await upstreamCalled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const prompt = upstreamPayload.messages[1].content;
+    assert.match(prompt, /当前对话摘录（最近 3 条）/);
+    assert.match(prompt, /我们今天复习连续函数/);
+    assert.match(prompt, /连续要求函数值和极限一致/);
+    assert.doesNotMatch(prompt, /<div|<style|style=|<img|表情包|\.answer/i);
+    assert.doesNotMatch(prompt, /Thinking/);
+    assert.doesNotMatch(prompt, /已选笔记/);
+    assert.deepEqual(savedPayload.sourceMessageIds, ['flash-chat-1', 'flash-chat-2', 'flash-chat-3']);
+    assert.equal(store.getState().notes.noteDetailKind, 'flashcards');
+    assert.equal(el.noteDetailModal.classList.contains('hidden'), false);
+});
+
+test('flashcard generation with chat opt-in still stops when the chat has no usable messages', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+    let sendCallCount = 0;
+
+    const { controller, el, store, toasts } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            session: {
+                currentChatHistory: [
+                    { id: 'thinking-msg', role: 'assistant', content: 'Thinking', isThinking: true },
+                    { id: 'empty-user', role: 'user', content: '   ' },
+                ],
+            },
+            notes: {
+                topicNotes: [],
+                agentNotes: [],
+                selectedNoteIds: [],
+            },
+        },
+        chatApiOverrides: {
+            sendChatRequest: async () => {
+                sendCallCount += 1;
+                return { response: { choices: [{ message: { content: buildFlashcardResponse() } }] } };
+            },
+        },
+    });
+
+    controller.bindEvents();
+    el.generateFlashcardsBtn.click();
+    el.flashcardIncludeChatContextInput.checked = true;
+    el.flashcardIncludeChatContextInput.dispatchEvent(new el.flashcardIncludeChatContextInput.ownerDocument.defaultView.Event('change', { bubbles: true }));
+    el.flashcardConfigGenerateBtn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(sendCallCount, 0);
+    assert.deepEqual(store.getState().notes.pendingFlashcardGenerations, []);
+    assert.equal(toasts.some(([message]) => message === '请先选择笔记、导入来源资料，或勾选“包含当前对话”。'), true);
 });
 
 test('flashcard pending cards allow repeated submissions and are scoped per topic', async () => {

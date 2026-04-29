@@ -756,8 +756,11 @@ function createNotesDom(deps = {}) {
             const card = documentObj.createElement('div');
             card.className = 'note-card note-card--studio';
             const isInteractiveFlashcard = flashcardsApi.hasStructuredFlashcards(normalized);
+            const isStructuredQuiz = hasStructuredQuiz(normalized);
+            const isGeneratedPracticeCard = isInteractiveFlashcard || isStructuredQuiz;
             const isSelected = state.selectedNoteIds.includes(normalized.id);
             card.classList.toggle('note-card--flashcard-entry', isInteractiveFlashcard);
+            card.classList.toggle('note-card--generated-entry', isGeneratedPracticeCard);
             card.classList.toggle('note-card--active', normalized.id === getNoteHighlightId());
             card.classList.toggle('note-card--selected', isSelected);
 
@@ -779,20 +782,30 @@ function createNotesDom(deps = {}) {
                 ? '<span class="note-card__selection-pill"><span class="material-symbols-outlined">check</span><span>已选</span></span>'
                 : '';
 
-            if (isInteractiveFlashcard) {
+            if (isGeneratedPracticeCard) {
+                const isQuizCard = isStructuredQuiz && !isInteractiveFlashcard;
                 const cardCount = Array.isArray(normalized.flashcardDeck?.cards) ? normalized.flashcardDeck.cards.length : 0;
-                const flashcardMeta = `${sourceCount > 0 ? `${sourceCount} 个来源` : `${cardCount} 张卡`} · ${formatRelativeTime(normalized.updatedAt)}`;
+                const questionCount = Array.isArray(normalized.quizSet?.items) ? normalized.quizSet.items.length : 0;
+                const generatedTitle = isQuizCard
+                    ? (normalized.quizSet?.title || normalized.title || '选择题练习')
+                    : (normalized.flashcardDeck?.title || normalized.title || '闪卡练习');
+                const generatedMetaFallback = isQuizCard
+                    ? (questionCount > 0 ? `${questionCount} 道题` : '选择题')
+                    : (cardCount > 0 ? `${cardCount} 张卡` : '闪卡');
+                const generatedMeta = `${sourceCount > 0 ? `${sourceCount} 个来源` : generatedMetaFallback} · ${formatRelativeTime(normalized.updatedAt)}`;
+                const generatedIconClass = isQuizCard ? 'note-card__quiz-icon' : 'note-card__flashcard-icon';
+                const generatedIcon = isQuizCard ? 'quiz' : 'cards_star';
                 card.innerHTML = `
                     <div class="note-card__studio-main">
-                        <div class="note-card__studio-icon note-card__flashcard-icon">
-                            <span class="material-symbols-outlined">cards_star</span>
+                        <div class="note-card__studio-icon ${generatedIconClass}">
+                            <span class="material-symbols-outlined">${escapeHtml(generatedIcon)}</span>
                         </div>
                         <div class="note-card__studio-body">
                             <div class="note-card__studio-heading">
-                                <strong class="note-card__flashcard-title">${escapeHtml(normalized.flashcardDeck?.title || normalized.title)}</strong>
+                                <strong class="note-card__generated-title">${escapeHtml(generatedTitle)}</strong>
                                 ${selectedBadge}
                             </div>
-                            <div class="note-card__flashcard-meta">${flashcardMeta}</div>
+                            <div class="note-card__generated-meta">${escapeHtml(generatedMeta)}</div>
                         </div>
                         <button class="note-card__menu-button" type="button" data-note-menu="${escapeHtml(normalized.id)}" aria-label="打开笔记菜单">
                             <span class="material-symbols-outlined">more_vert</span>

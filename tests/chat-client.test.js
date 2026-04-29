@@ -240,6 +240,125 @@ test('chatClient retries once with the configured fallback on retryable upstream
     });
 });
 
+test('chatClient retries study tool requests with fallback when the upstream reply is empty', async () => {
+    let fetchCount = 0;
+    global.fetch = async (url, options = {}) => {
+        fetchCount += 1;
+
+        if (fetchCount === 1) {
+            assert.equal(url, 'http://primary.example.com/v1/chat/completions');
+            assert.equal(JSON.parse(String(options.body || '{}')).model, 'primary-study-model');
+            return {
+                ok: true,
+                async json() {
+                    return {
+                        choices: [{
+                            finish_reason: 'length',
+                            message: {
+                                content: '',
+                                reasoning_content: '思考内容占用了输出预算',
+                            },
+                        }],
+                    };
+                },
+            };
+        }
+
+        assert.equal(url, 'http://fallback.example.com/v1/chat/completions');
+        assert.equal(JSON.parse(String(options.body || '{}')).model, 'fallback-model');
+        return {
+            ok: true,
+            async json() {
+                return {
+                    choices: [{
+                        message: {
+                            content: '{"title":"ok","cards":[{"id":"card-1","front":"正面","back":"背面"}]}',
+                        },
+                    }],
+                };
+            },
+        };
+    };
+
+    const result = await chatClient.send({
+        requestId: 'req_empty_study_fallback',
+        endpoint: 'http://primary.example.com/v1/chat/completions',
+        apiKey: 'primary-key',
+        messages: [{ role: 'user', content: 'generate json' }],
+        modelConfig: {
+            purpose: 'studyTool',
+            model: 'primary-study-model',
+            stream: false,
+        },
+        fallbackExecution: {
+            endpoint: 'http://fallback.example.com/v1/chat/completions',
+            apiKey: 'fallback-key',
+            model: {
+                id: 'fallback-model',
+                capabilities: {
+                    chat: true,
+                },
+            },
+        },
+    });
+
+    assert.equal(fetchCount, 2);
+    assert.equal(result.error, undefined);
+    assert.equal(result.response.choices[0].message.content.includes('"cards"'), true);
+    assert.equal(result.fallbackMeta.attempted, true);
+    assert.equal(result.fallbackMeta.used, true);
+    assert.deepEqual(result.fallbackMeta.trigger, {
+        type: 'empty_response',
+        finishReason: 'length',
+        reasoningLength: '思考内容占用了输出预算'.length,
+    });
+});
+
+test('chatClient keeps empty non-study replies on the primary model', async () => {
+    let fetchCount = 0;
+    global.fetch = async () => {
+        fetchCount += 1;
+        return {
+            ok: true,
+            async json() {
+                return {
+                    choices: [{
+                        message: {
+                            content: '',
+                        },
+                    }],
+                };
+            },
+        };
+    };
+
+    const result = await chatClient.send({
+        requestId: 'req_empty_plain_chat',
+        endpoint: 'http://primary.example.com/v1/chat/completions',
+        apiKey: 'primary-key',
+        messages: [{ role: 'user', content: 'hello' }],
+        modelConfig: {
+            model: 'primary-model',
+            stream: false,
+        },
+        fallbackExecution: {
+            endpoint: 'http://fallback.example.com/v1/chat/completions',
+            apiKey: 'fallback-key',
+            model: {
+                id: 'fallback-model',
+                capabilities: {
+                    chat: true,
+                },
+            },
+        },
+    });
+
+    assert.equal(fetchCount, 1);
+    assert.equal(result.error, undefined);
+    assert.equal(result.response.choices[0].message.content, '');
+    assert.equal(result.fallbackMeta.attempted, false);
+});
+
 test('chatClient does not fallback for non-retryable upstream HTTP errors', async () => {
     let fetchCount = 0;
     global.fetch = async () => {

@@ -298,6 +298,7 @@ notesController = createNotesController({
     closeTopicActionMenu: (...args) => workspaceController?.closeTopicActionMenu?.(...args),
     closeSourceFileActionMenu,
     updateCurrentChatHistory,
+    onManualNotesLibraryFilterChange: (filter) => diaryWallController?.setAgentFilter?.(filter),
 });
   logsController = createLogsController({
       store,

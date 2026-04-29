@@ -103,23 +103,83 @@ async function installReloadCounter(app) {
     });
 }
 
-async function getReloadCount(app) {
-    return app.evaluate(({ BrowserWindow }) => {
+async function triggerShortcutAndWaitForReload(app, keyCode, modifiers = [], timeoutMs = 15000) {
+    const result = await app.evaluate(({ BrowserWindow }, payload) => new Promise((resolve) => {
         const win = BrowserWindow.getAllWindows()[0];
-        return win?.webContents.__codexReloadCount || 0;
-    });
-}
-
-async function waitForReloadIncrement(app, previousCount, timeoutMs = 15000) {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeoutMs) {
-        const currentCount = await getReloadCount(app);
-        if (currentCount > previousCount) {
-            return currentCount;
+        if (!win || win.isDestroyed()) {
+            resolve({
+                success: false,
+                error: 'No Electron window is available for reload shortcut testing.',
+                count: 0,
+                previousCount: 0,
+            });
+            return;
         }
-        await delay(250);
+
+        const webContents = win.webContents;
+        const previousCount = Number(webContents.__codexReloadCount || 0);
+        let settled = false;
+        let timer = null;
+
+        const finish = (payloadResult) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            if (timer) {
+                clearTimeout(timer);
+            }
+            webContents.removeListener('did-start-loading', onDidStartLoading);
+            resolve(payloadResult);
+        };
+
+        const onDidStartLoading = () => {
+            const currentCount = Number(webContents.__codexReloadCount || 0);
+            const nextCount = Math.max(currentCount, previousCount + 1);
+            webContents.__codexReloadCount = nextCount;
+            finish({
+                success: true,
+                count: nextCount,
+                previousCount,
+            });
+        };
+
+        timer = setTimeout(() => {
+            finish({
+                success: false,
+                error: 'Timed out waiting for a reload shortcut to trigger navigation.',
+                count: Number(webContents.__codexReloadCount || 0),
+                previousCount,
+                url: webContents.getURL(),
+            });
+        }, payload.timeoutMs);
+
+        webContents.once('did-start-loading', onDidStartLoading);
+        win.focus();
+        webContents.focus();
+        webContents.sendInputEvent({
+            type: 'keyDown',
+            keyCode: payload.keyCode,
+            modifiers: payload.modifiers,
+        });
+        webContents.sendInputEvent({
+            type: 'keyUp',
+            keyCode: payload.keyCode,
+            modifiers: payload.modifiers,
+        });
+    }), { keyCode, modifiers, timeoutMs });
+
+    if (!result?.success) {
+        throw new Error(`${result?.error || 'Reload shortcut did not trigger navigation.'} ${JSON.stringify({
+            keyCode,
+            modifiers,
+            count: result?.count,
+            previousCount: result?.previousCount,
+            url: result?.url,
+        })}`);
     }
-    throw new Error('Timed out waiting for a reload shortcut to trigger navigation.');
+
+    return result.count;
 }
 
 async function waitForDevToolsOpen(app, timeoutMs = 15000) {
@@ -140,8 +200,15 @@ async function waitForDevToolsOpen(app, timeoutMs = 15000) {
 async function triggerShortcut(app, keyCode, modifiers = []) {
     await app.evaluate(({ BrowserWindow }, payload) => {
         const win = BrowserWindow.getAllWindows()[0];
+        win?.focus();
+        win?.webContents.focus();
         win?.webContents.sendInputEvent({
             type: 'keyDown',
+            keyCode: payload.keyCode,
+            modifiers: payload.modifiers,
+        });
+        win?.webContents.sendInputEvent({
+            type: 'keyUp',
             keyCode: payload.keyCode,
             modifiers: payload.modifiers,
         });
@@ -170,21 +237,18 @@ test('controlled Electron E2E covers shortcuts, viewer flow, topic KB binding, a
 
         await installReloadCounter(app);
 
-        let reloadCount = await getReloadCount(app);
-        await triggerShortcut(app, 'F5');
-        reloadCount = await waitForReloadIncrement(app, reloadCount);
+        let reloadCount = await triggerShortcutAndWaitForReload(app, 'F5');
         await page.waitForLoadState('domcontentloaded');
         await waitForRendererBridge(page, 30000);
         await delay(500);
 
-        await triggerShortcut(app, 'R', [commandOrControl]);
-        reloadCount = await waitForReloadIncrement(app, reloadCount);
+        reloadCount = await triggerShortcutAndWaitForReload(app, 'R', [commandOrControl]);
         await page.waitForLoadState('domcontentloaded');
         await waitForRendererBridge(page, 30000);
         await delay(500);
 
-        await triggerShortcut(app, 'R', [commandOrControl, 'shift']);
-        reloadCount = await waitForReloadIncrement(app, reloadCount);
+        reloadCount = await triggerShortcutAndWaitForReload(app, 'R', [commandOrControl, 'shift']);
+        assert.ok(reloadCount >= 3);
         await page.waitForLoadState('domcontentloaded');
         await waitForRendererBridge(page, 30000);
         await delay(500);

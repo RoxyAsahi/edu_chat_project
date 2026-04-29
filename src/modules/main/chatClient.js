@@ -187,6 +187,65 @@ function extractFinishReason(chunk) {
         || null;
 }
 
+function extractResponseContent(response = {}) {
+    const candidates = [
+        response?.choices?.[0]?.message?.content,
+        response?.choices?.[0]?.text,
+        response?.message?.content,
+        response?.output_text,
+        response?.content,
+    ];
+
+    for (const candidate of candidates) {
+        const text = extractTextFromCandidate(candidate);
+        if (text) {
+            return text;
+        }
+    }
+
+    return '';
+}
+
+function extractResponseReasoningContent(response = {}) {
+    const candidates = [
+        response?.choices?.[0]?.message?.reasoning_content,
+        response?.choices?.[0]?.message?.reasoning,
+        response?.message?.reasoning_content,
+        response?.message?.reasoning,
+        response?.reasoning_content,
+        response?.reasoning,
+    ];
+
+    for (const candidate of candidates) {
+        const text = extractTextFromCandidate(candidate);
+        if (text) {
+            return text;
+        }
+    }
+
+    return '';
+}
+
+function buildEmptyResponseFailure(response = {}, modelConfig = {}) {
+    if (modelConfig?.stream === true || modelConfig?.purpose !== 'studyTool') {
+        return null;
+    }
+
+    const content = extractResponseContent(response);
+    if (content.trim()) {
+        return null;
+    }
+
+    return {
+        retryable: true,
+        trigger: {
+            type: 'empty_response',
+            finishReason: extractFinishReason(response) || '',
+            reasoningLength: extractResponseReasoningContent(response).length,
+        },
+    };
+}
+
 async function parseErrorResponse(response) {
     const errorText = await response.text().catch(() => '');
     let errorData = { message: `Server returned status ${response.status}`, details: errorText };
@@ -762,15 +821,12 @@ async function executeRequestAttempt({
         }
 
         const parsedResponse = await response.json();
+        const rawContent = extractResponseContent(parsedResponse);
+        const rawReasoningContent = extractResponseReasoningContent(parsedResponse);
         logUpstreamRawReply({
             requestId,
             round,
-            content: extractTextFromCandidate(
-                parsedResponse?.choices?.[0]?.message?.content
-                ?? parsedResponse?.message?.content
-                ?? parsedResponse?.content
-                ?? ''
-            ),
+            content: rawContent,
         });
         cleanupRequest(requestState);
         return {
@@ -778,6 +834,12 @@ async function executeRequestAttempt({
             context,
             requestId,
             fallbackMeta: requestState.fallbackMeta || null,
+            emptyResponseFailure: buildEmptyResponseFailure(parsedResponse, modelConfig),
+            responseDiagnostics: {
+                contentLength: rawContent.length,
+                reasoningLength: rawReasoningContent.length,
+                finishReason: extractFinishReason(parsedResponse) || '',
+            },
         };
     } catch (error) {
         cleanupRequest(requestState);
@@ -879,14 +941,23 @@ async function send(request) {
         fallbackMeta,
     });
 
-    if (!primaryResult?.error) {
+    const emptyResponseFailure = primaryResult?.emptyResponseFailure || null;
+    if (!primaryResult?.error && !emptyResponseFailure) {
         return fallbackMeta
             ? { ...primaryResult, fallbackMeta }
             : primaryResult;
     }
 
+    const effectivePrimaryResult = primaryResult?.error
+        ? primaryResult
+        : {
+            ...primaryResult,
+            error: 'Chat request returned an empty assistant response.',
+            failure: emptyResponseFailure,
+        };
+
     if (!fallbackMeta) {
-        return primaryResult;
+        return effectivePrimaryResult;
     }
 
     const skipReason = resolveFallbackSkipReason({
@@ -897,21 +968,21 @@ async function send(request) {
     });
     if (skipReason) {
         return {
-            ...primaryResult,
+            ...effectivePrimaryResult,
             fallbackMeta,
         };
     }
 
-    if (primaryResult?.failure?.retryable !== true) {
+    if (effectivePrimaryResult?.failure?.retryable !== true) {
         fallbackMeta.skippedReason = 'not-triggered';
         return {
-            ...primaryResult,
+            ...effectivePrimaryResult,
             fallbackMeta,
         };
     }
 
     fallbackMeta.attempted = true;
-    fallbackMeta.trigger = primaryResult.failure.trigger || null;
+    fallbackMeta.trigger = effectivePrimaryResult.failure.trigger || null;
     fallbackMeta.skippedReason = '';
 
     const fallbackResult = await executeRequestAttempt({
@@ -937,8 +1008,17 @@ async function send(request) {
 
     if (fallbackResult?.error) {
         return {
-            error: `${primaryResult.error}；回退后仍失败：${fallbackResult.error}`,
+            error: `${effectivePrimaryResult.error}；回退后仍失败：${fallbackResult.error}`,
             failure: fallbackResult.failure,
+            fallbackMeta,
+        };
+    }
+
+    if (fallbackResult?.emptyResponseFailure) {
+        return {
+            ...fallbackResult,
+            error: `${effectivePrimaryResult.error}；回退后仍然没有返回内容。`,
+            failure: fallbackResult.emptyResponseFailure,
             fallbackMeta,
         };
     }
