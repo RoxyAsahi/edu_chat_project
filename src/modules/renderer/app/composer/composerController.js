@@ -113,6 +113,23 @@ const LEGACY_PLACEHOLDER_TOPIC_NAMES = new Set([
     'Main Conversation',
 ]);
 
+const CHAT_MODEL_MODE_META = Object.freeze({
+    fast: {
+        label: '快速',
+        icon: 'bolt',
+        purpose: 'chat',
+    },
+    thinking: {
+        label: '思考',
+        icon: 'psychology',
+        purpose: 'thinkingChat',
+    },
+});
+
+function normalizeChatModelMode(value) {
+    return value === 'thinking' ? 'thinking' : 'fast';
+}
+
 function normalizeTopicName(name = '') {
     return String(name || '')
         .replace(/\s+/g, ' ')
@@ -188,6 +205,10 @@ function createComposerController(deps = {}) {
             get: () => getComposerSlice().activeRequestId,
             set: (value) => patchComposer({ activeRequestId: value }),
         },
+        chatModelMode: {
+            get: () => normalizeChatModelMode(getComposerSlice().chatModelMode),
+            set: (value) => patchComposer({ chatModelMode: normalizeChatModelMode(value) }),
+        },
         currentSelectedItem: {
             get: () => getCurrentSelectedItem() || { id: null, name: null, avatarUrl: null, config: null },
         },
@@ -230,12 +251,59 @@ function createComposerController(deps = {}) {
         el.emoticonTriggerBtn.disabled = availability.disableEmoticons;
         el.composerQuickNewTopicBtn.disabled = availability.disableQuickNewTopic;
         el.sendMessageBtn.disabled = availability.disableSend;
+        if (el.chatModelModeBtn) {
+            el.chatModelModeBtn.disabled = availability.disableInput;
+        }
 
         if (availability.shouldClearDragOver) {
             el.chatInputCard?.classList.remove('drag-over');
         }
 
         return availability;
+    }
+
+    function isChatModelModeMenuOpen() {
+        return Boolean(el.chatModelModeMenu && !el.chatModelModeMenu.classList.contains('hidden'));
+    }
+
+    function closeChatModelModeMenu() {
+        el.chatModelModeMenu?.classList.add('hidden');
+        el.chatModelModeBtn?.setAttribute('aria-expanded', 'false');
+    }
+
+    function renderChatModelModeControl() {
+        const mode = state.chatModelMode;
+        const meta = CHAT_MODEL_MODE_META[mode] || CHAT_MODEL_MODE_META.fast;
+        if (el.chatModelModeLabel) {
+            el.chatModelModeLabel.textContent = meta.label;
+        }
+        const icon = el.chatModelModeBtn?.querySelector('.material-symbols-outlined');
+        if (icon) {
+            icon.textContent = meta.icon;
+        }
+        el.chatModelModeBtn?.setAttribute('title', `当前：${meta.label}`);
+        el.chatModelModeMenu?.querySelectorAll('[data-chat-model-mode]').forEach((item) => {
+            const itemMode = normalizeChatModelMode(item.dataset.chatModelMode);
+            const active = itemMode === mode;
+            item.classList.toggle('chat-model-mode__item--active', active);
+            item.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+    }
+
+    function setChatModelMode(mode) {
+        state.chatModelMode = mode;
+        renderChatModelModeControl();
+        closeChatModelModeMenu();
+        el.messageInput?.focus?.();
+    }
+
+    function toggleChatModelModeMenu() {
+        if (!el.chatModelModeMenu || !el.chatModelModeBtn || el.chatModelModeBtn.disabled) {
+            return;
+        }
+        const nextOpen = !isChatModelModeMenuOpen();
+        el.chatModelModeMenu.classList.toggle('hidden', !nextOpen);
+        el.chatModelModeBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
     }
 
     function clearPendingSelectionContext() {
@@ -829,8 +897,12 @@ function createComposerController(deps = {}) {
         forceScrollToLatestMessage();
         decorateChatMessages();
 
+        const chatMode = state.chatModelMode;
+        const modeMeta = CHAT_MODEL_MODE_META[chatMode] || CHAT_MODEL_MODE_META.fast;
+        const agentModel = String(requestContext.selectedItem.config?.model || '').trim();
         const modelConfig = {
-            model: requestContext.selectedItem.config?.model || 'gemini-3.1-flash-lite-preview',
+            purpose: modeMeta.purpose,
+            ...(agentModel ? { fallbackModel: agentModel } : {}),
             stream: requestContext.selectedItem.config?.streamOutput !== false,
         };
 
@@ -838,7 +910,9 @@ function createComposerController(deps = {}) {
             topicName: requestContext.topicName,
             lastUserMessageId: userMessage.id,
             assistantMessageId: assistantMessage.id,
-            model: modelConfig.model,
+            model: agentModel,
+            chatModelMode: chatMode,
+            modelPurpose: modelConfig.purpose,
         });
         let retrieval = { refs: [], temporarySystemMessages: [] };
         let response = null;
@@ -874,7 +948,8 @@ function createComposerController(deps = {}) {
                 return;
             }
 
-            const historyForRequest = state.currentChatHistory;
+            const historyForRequest = state.currentChatHistory
+                .filter((message) => message?.id !== assistantMessage.id);
             const apiMessages = await buildApiMessages({
                 agentIdOverride: requestContext.selectedItem.id,
                 historyOverride: historyForRequest,
@@ -1149,6 +1224,38 @@ function createComposerController(deps = {}) {
 
             windowObj.emoticonManager.togglePanel(el.emoticonTriggerBtn, el.messageInput);
         });
+
+        el.chatModelModeBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            toggleChatModelModeMenu();
+        });
+
+        el.chatModelModeMenu?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-chat-model-mode]');
+            if (!button) {
+                return;
+            }
+            event.stopPropagation();
+            setChatModelMode(button.dataset.chatModelMode);
+        });
+
+        documentObj.addEventListener('click', (event) => {
+            if (!isChatModelModeMenuOpen()) {
+                return;
+            }
+            if (el.chatModelModeRoot?.contains(event.target)) {
+                return;
+            }
+            closeChatModelModeMenu();
+        });
+
+        documentObj.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeChatModelModeMenu();
+            }
+        });
+
+        renderChatModelModeControl();
     }
 
     return {
@@ -1168,6 +1275,7 @@ function createComposerController(deps = {}) {
         resetState,
         sendMessage,
         sendFollowUp,
+        setChatModelMode,
         setActiveRequestId,
         syncComposerAvailability,
         updateSendButtonState,

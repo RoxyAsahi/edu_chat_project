@@ -44,6 +44,7 @@ function createDynamicIslandDom() {
     const dom = new JSDOM(`
         <body>
             <div id="outside"></div>
+            <div id="notesList"></div>
             <div id="dynamicIsland" class="dynamic-island dynamic-island--overview">
                 <div class="dynamic-island__bar">
                     <button id="dynamicIslandStatusBtn" type="button" aria-expanded="false" aria-controls="dynamicIslandPanel">
@@ -60,6 +61,18 @@ function createDynamicIslandDom() {
                     <button id="dynamicIslandResetBtn" type="button">重置</button>
                 </div>
             </div>
+            <section id="studioPomodoroPanel">
+                <button id="studioPomodoroToggleBtn" type="button">
+                    <span id="studioPomodoroSummaryText">25:00</span>
+                </button>
+                <div id="studioPomodoroBody">
+                    <input id="studioPomodoroDisplayInput" type="text" value="25:00" />
+                    <button id="studioPomodoroStartBtn" type="button">开始</button>
+                    <button id="studioPomodoroPauseBtn" class="hidden" type="button">暂停</button>
+                    <button id="studioPomodoroResumeBtn" class="hidden" type="button">继续</button>
+                    <button id="studioPomodoroResetBtn" type="button">重置</button>
+                </div>
+            </section>
         </body>
     `, { pretendToBeVisual: true });
 
@@ -71,6 +84,7 @@ function createDynamicIslandDom() {
             dynamicIslandStatusBtn: dom.window.document.getElementById('dynamicIslandStatusBtn'),
             dynamicIslandStatusEyebrow: dom.window.document.getElementById('dynamicIslandStatusEyebrow'),
             dynamicIslandStatusText: dom.window.document.getElementById('dynamicIslandStatusText'),
+            notesList: dom.window.document.getElementById('notesList'),
             dynamicIslandPanel: dom.window.document.getElementById('dynamicIslandPanel'),
             dynamicIslandTimerDisplay: dom.window.document.getElementById('dynamicIslandTimerDisplay'),
             dynamicIslandMinutesInput: dom.window.document.getElementById('dynamicIslandMinutesInput'),
@@ -78,6 +92,12 @@ function createDynamicIslandDom() {
             dynamicIslandPauseBtn: dom.window.document.getElementById('dynamicIslandPauseBtn'),
             dynamicIslandResumeBtn: dom.window.document.getElementById('dynamicIslandResumeBtn'),
             dynamicIslandResetBtn: dom.window.document.getElementById('dynamicIslandResetBtn'),
+            studioPomodoroSummaryText: dom.window.document.getElementById('studioPomodoroSummaryText'),
+            studioPomodoroDisplayInput: dom.window.document.getElementById('studioPomodoroDisplayInput'),
+            studioPomodoroStartBtn: dom.window.document.getElementById('studioPomodoroStartBtn'),
+            studioPomodoroPauseBtn: dom.window.document.getElementById('studioPomodoroPauseBtn'),
+            studioPomodoroResumeBtn: dom.window.document.getElementById('studioPomodoroResumeBtn'),
+            studioPomodoroResetBtn: dom.window.document.getElementById('studioPomodoroResetBtn'),
         },
     };
 }
@@ -187,6 +207,56 @@ test('dynamic island pomodoro start pause resume and reset update the status tex
     assert.equal(harness.store.getState().layout.pomodoroStatus, 'idle');
     assert.equal(harness.el.dynamicIslandTimerDisplay.textContent, '10:00');
     assert.equal(harness.el.dynamicIslandStatusText.textContent, '番茄钟');
+});
+
+test('studio pomodoro start button starts the timer and swaps visible actions', async () => {
+    const { createDynamicIslandController } = await loadDynamicIslandModule();
+    const harness = createHarness();
+    const controller = createDynamicIslandController(harness.createControllerDeps());
+
+    controller.bindEvents();
+    harness.el.studioPomodoroDisplayInput.value = '12:00';
+    harness.el.studioPomodoroDisplayInput.focus();
+    harness.el.studioPomodoroStartBtn.click();
+
+    assert.equal(harness.store.getState().layout.pomodoroStatus, 'running');
+    assert.equal(harness.store.getState().layout.pomodoroDurationMinutes, 12);
+    assert.equal(harness.el.studioPomodoroDisplayInput.value, '12:00');
+    assert.equal(harness.el.studioPomodoroStartBtn.classList.contains('hidden'), true);
+    assert.equal(harness.el.studioPomodoroPauseBtn.classList.contains('hidden'), false);
+    assert.equal(harness.el.studioPomodoroResetBtn.disabled, false);
+});
+
+test('studio pomodoro start button still works after the panel is reparented by notes render', async () => {
+    const { createDynamicIslandController } = await loadDynamicIslandModule();
+    const harness = createHarness();
+    const controller = createDynamicIslandController(harness.createControllerDeps());
+
+    controller.bindEvents();
+    harness.el.notesList.appendChild(harness.document.createElement('div'));
+    harness.el.notesList.innerHTML = '';
+    harness.el.notesList.appendChild(harness.document.getElementById('studioPomodoroPanel'));
+    harness.el.studioPomodoroStartBtn.click();
+
+    assert.equal(harness.store.getState().layout.pomodoroStatus, 'running');
+    assert.equal(harness.el.studioPomodoroStartBtn.classList.contains('hidden'), true);
+    assert.equal(harness.el.studioPomodoroPauseBtn.classList.contains('hidden'), false);
+});
+
+test('studio pomodoro actions use event delegation so replaced buttons still work', async () => {
+    const { createDynamicIslandController } = await loadDynamicIslandModule();
+    const harness = createHarness();
+    const controller = createDynamicIslandController(harness.createControllerDeps());
+
+    controller.bindEvents();
+    const replacement = harness.document.createElement('button');
+    replacement.id = 'studioPomodoroStartBtn';
+    replacement.type = 'button';
+    replacement.textContent = '开始';
+    harness.el.studioPomodoroStartBtn.replaceWith(replacement);
+    replacement.click();
+
+    assert.equal(harness.store.getState().layout.pomodoroStatus, 'running');
 });
 
 test('dynamic island expands from the status button and closes on outside click', async () => {

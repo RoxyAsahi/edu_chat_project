@@ -17,6 +17,12 @@ const QUIZ_COUNT_PRESETS = {
     more: 12,
 };
 
+const FLASHCARD_COUNT_PRESETS = {
+    less: 8,
+    standard: 12,
+    more: 18,
+};
+
 const QUIZ_DIFFICULTY_LABELS = {
     easy: '简单',
     medium: '中等',
@@ -37,7 +43,60 @@ const DEFAULT_QUIZ_GENERATION_CONFIG = {
     includeChatContext: false,
 };
 
+const DEFAULT_FLASHCARD_GENERATION_CONFIG = {
+    countPreset: 'standard',
+    cardCount: FLASHCARD_COUNT_PRESETS.standard,
+    difficulty: 'medium',
+    focus: '',
+    includeChatContext: false,
+};
+
 const RECENT_CHAT_CONTEXT_LIMIT = 12;
+
+function normalizeAnalysisGenerationOptions(options = {}) {
+    return {
+        selectedNoteIds: Array.isArray(options.selectedNoteIds)
+            ? [...new Set(options.selectedNoteIds.map((id) => String(id || '').trim()).filter(Boolean))]
+            : null,
+        requireSelectedNotes: options.requireSelectedNotes === true,
+        guidance: String(options.guidance || '').trim(),
+        title: String(options.title || '').trim(),
+        openAfterSave: options.openAfterSave !== false,
+        returnSavedNote: options.returnSavedNote === true,
+        trigger: options.trigger || null,
+    };
+}
+
+function buildAnalysisInstruction(options = {}) {
+    const config = normalizeAnalysisGenerationOptions(options);
+    const guidance = config.guidance || '请全面分析这些笔记，找出共性主题、关键知识点、迁移关系和后续改进方向。';
+    return [
+        '你是一位专业的学习教练和教育分析专家，擅长把多条学习笔记进行横向迁移、综合诊断和行动建议提炼。',
+        '',
+        `本次分析指引：${guidance}`,
+        '',
+        '请基于以下学习材料生成一份结构清晰的简体中文 Markdown 深度分析报告。请引用笔记标题来支撑你的判断，并尽量体现跨话题/跨学科之间的关联。',
+        '',
+        '报告结构必须包含：',
+        '# 深度分析报告',
+        '## 1. 整体概览',
+        '概括这些笔记覆盖的主题、材料范围和最重要的总体结论。',
+        '## 2. 共性主题与关联网络',
+        '提炼反复出现的概念、方法、模型或问题，并说明它们之间如何关联。',
+        '## 3. 知识点诊断',
+        '指出掌握较好的部分、容易混淆的部分、证据不足的部分。',
+        '## 4. 跨话题/跨学科迁移',
+        '说明哪些思想、方法或解题策略可以迁移到其他话题或学科场景。',
+        '## 5. 薄弱点与待补问题',
+        '列出需要补齐的理解漏洞、值得追问的问题和可能的误区。',
+        '## 6. 后续学习计划',
+        '给出可执行的复习顺序、练习方向和下一步产出建议。',
+        '## 7. 代表性笔记解析',
+        '挑选 2-3 条最有代表性的笔记，解释它们为什么关键。',
+        '',
+        '格式要求：使用 Markdown；数学公式使用 LaTeX；语言专业但易懂；不要输出 JSON；不要编造材料中不存在的事实。',
+    ].join('\n');
+}
 
 function normalizeQuizGenerationOptions(options = {}) {
     const requestedPreset = String(options.countPreset || '').trim();
@@ -56,6 +115,29 @@ function normalizeQuizGenerationOptions(options = {}) {
     return {
         countPreset,
         questionCount,
+        difficulty,
+        focus: String(options.focus || '').trim(),
+        includeChatContext: options.includeChatContext === true,
+    };
+}
+
+function normalizeFlashcardGenerationOptions(options = {}) {
+    const requestedPreset = String(options.countPreset || '').trim();
+    const countPreset = Object.prototype.hasOwnProperty.call(FLASHCARD_COUNT_PRESETS, requestedPreset)
+        ? requestedPreset
+        : DEFAULT_FLASHCARD_GENERATION_CONFIG.countPreset;
+    const requestedCount = Number(options.cardCount);
+    const cardCount = Number.isFinite(requestedCount) && requestedCount > 0
+        ? Math.max(1, Math.min(60, Math.round(requestedCount)))
+        : FLASHCARD_COUNT_PRESETS[countPreset];
+    const requestedDifficulty = String(options.difficulty || '').trim();
+    const difficulty = Object.prototype.hasOwnProperty.call(QUIZ_DIFFICULTY_LABELS, requestedDifficulty)
+        ? requestedDifficulty
+        : DEFAULT_FLASHCARD_GENERATION_CONFIG.difficulty;
+
+    return {
+        countPreset,
+        cardCount,
         difficulty,
         focus: String(options.focus || '').trim(),
         includeChatContext: options.includeChatContext === true,
@@ -164,6 +246,40 @@ function buildQuizInstruction(options = {}) {
     ].join('\n');
 }
 
+function buildFlashcardInstruction(options = {}) {
+    const config = normalizeFlashcardGenerationOptions(options);
+    const difficultyLabel = QUIZ_DIFFICULTY_LABELS[config.difficulty];
+    const difficultyDescription = QUIZ_DIFFICULTY_DESCRIPTIONS[config.difficulty];
+    const requirements = [
+        `1. 生成 ${config.cardCount} 张卡。`,
+        '2. front 与 back 都使用简体中文，可包含少量 Markdown 强调。',
+        '3. 每张卡必须信息准确、去重、适合抽认卡练习。',
+        '4. front 必须简短易记，优先控制在 1-5 个字或一个短问题。',
+        '5. back 必须直接回答 front，不要写成长篇报告。',
+        '6. title 要简洁、像一个可学习的卡组名称，不要带时间戳。',
+        `7. 难度等级：${difficultyLabel}。${difficultyDescription}`,
+    ];
+
+    if (config.focus) {
+        requirements.push(`8. 主题范围：${config.focus}。请优先围绕这个主题制卡，不要偏离学习材料。`);
+    }
+
+    return [
+        '请基于以下学习材料生成一组适合复习记忆的结构化闪卡。',
+        '你必须只返回严格 JSON，不要输出 JSON 之外的任何文字。',
+        '禁止输出寒暄、前言、分隔线、时间戳标题、Markdown 标题或额外说明。',
+        'JSON 结构如下：',
+        '{',
+        '  "title": "卡组标题",',
+        '  "cards": [',
+        '    { "id": "card-1", "front": "问题正面", "back": "答案背面" }',
+        '  ]',
+        '}',
+        '要求：',
+        ...requirements,
+    ].join('\n');
+}
+
 function cloneArray(value) {
     return Array.isArray(value) ? [...value] : [];
 }
@@ -232,6 +348,7 @@ function createNotesOperations(deps = {}) {
         hasStructuredFlashcards: () => false,
         openPractice: () => false,
         renderPractice: () => {},
+        updatePendingGeneration: () => {},
     };
     const persistHistory = deps.persistHistory || (async () => {});
     const buildTopicContext = deps.buildTopicContext || (() => ({}));
@@ -241,6 +358,24 @@ function createNotesOperations(deps = {}) {
     const getActiveNote = deps.getActiveNote || (() => null);
     const getCurrentDetailNote = deps.getCurrentDetailNote || (() => null);
     const findNoteById = deps.findNoteById || (() => null);
+    const getAgentDisplayLabel = deps.getAgentDisplayLabel || ((agentId) => {
+        const normalizedAgentId = String(agentId || '').trim();
+        if (!normalizedAgentId) {
+            return '未归类学科';
+        }
+        const agent = (Array.isArray(state.agents) ? state.agents : [])
+            .find((item) => String(item?.id || '') === normalizedAgentId);
+        return agent?.name || normalizedAgentId;
+    });
+    const getTopicDisplayLabel = deps.getTopicDisplayLabel || ((topicId) => {
+        const normalizedTopicId = String(topicId || '').trim();
+        if (!normalizedTopicId) {
+            return '未归类话题';
+        }
+        const topic = (Array.isArray(state.topics) ? state.topics : [])
+            .find((item) => String(item?.id || '') === normalizedTopicId);
+        return topic?.name || normalizedTopicId;
+    });
     const patchCurrentHistoryMessage = deps.patchCurrentHistoryMessage || (() => null);
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
     const getSelectedNotes = deps.getSelectedNotes || (() => []);
@@ -328,7 +463,7 @@ function createNotesOperations(deps = {}) {
         renderNotesPanel();
     }
 
-    function createGenerationContext(kind) {
+    function createGenerationContext(kind, options = {}) {
         const selectedItem = state.currentSelectedItem || {};
         return {
             kind,
@@ -342,7 +477,7 @@ function createNotesOperations(deps = {}) {
             settings: { ...(state.settings || {}) },
             currentTopic: snapshotTopic(getCurrentTopic()),
             currentChatHistory: snapshotChatHistory(state.currentChatHistory),
-            selectedNotes: snapshotNotes(getSelectedNotes()),
+            selectedNotes: snapshotNotes(getSelectedNotes(options.selectedNoteIds)),
             topicContext: buildTopicContext(),
             startedAt: Date.now(),
         };
@@ -448,7 +583,10 @@ function createNotesOperations(deps = {}) {
                 : [];
         }));
 
-        state.allAgentManualNotes = results.flat().filter((note) => getNormalizedNoteKind(note) === 'note');
+        state.allAgentManualNotes = results.flat().filter((note) => {
+            const kind = getNormalizedNoteKind(note);
+            return kind === 'note' || kind === 'analysis';
+        });
         if (state.manualNotesLibraryOpen) {
             renderManualNotesLibrary();
         }
@@ -727,7 +865,22 @@ function createNotesOperations(deps = {}) {
             return appendChatContext({
                 sourceLabel: 'selected-notes',
                 text: selectedNotes
-                    .map((note) => `# ${note.title}\n\n${note.contentMarkdown}`)
+                    .map((note, index) => {
+                        const agentLabel = getAgentDisplayLabel(note.agentId);
+                        const topicLabel = getTopicDisplayLabel(note.topicId);
+                        const updatedLabel = note.updatedAt
+                            ? new Date(note.updatedAt).toLocaleString('zh-CN', { hour12: false })
+                            : '未知';
+                        return [
+                            `# 笔记 ${index + 1}：${note.title}`,
+                            '',
+                            `- 学科：${agentLabel}`,
+                            `- 话题：${topicLabel}`,
+                            `- 更新时间：${updatedLabel}`,
+                            '',
+                            note.contentMarkdown,
+                        ].join('\n');
+                    })
                     .join('\n\n---\n\n'),
                 sourceMessageIds: [...new Set(selectedNotes.flatMap((note) => note.sourceMessageIds || []))],
                 sourceDocumentRefs: selectedNotes.flatMap((note) => note.sourceDocumentRefs || []),
@@ -768,10 +921,16 @@ function createNotesOperations(deps = {}) {
         const quizOptions = kind === 'quiz'
             ? normalizeQuizGenerationOptions(options)
             : DEFAULT_QUIZ_GENERATION_CONFIG;
+        const flashcardOptions = kind === 'flashcards'
+            ? normalizeFlashcardGenerationOptions(options)
+            : DEFAULT_FLASHCARD_GENERATION_CONFIG;
+        const analysisOptions = kind === 'analysis'
+            ? normalizeAnalysisGenerationOptions(options)
+            : normalizeAnalysisGenerationOptions();
         const prompts = {
             analysis: {
-                title: `深度分析报告 ${new Date().toLocaleString()}`,
-                instruction: '请基于以下学习材料生成一份结构化深度分析报告，包含：核心结论、关键知识点、关联关系、疑难点/待补问题、后续学习建议。使用简体中文 Markdown。',
+                title: analysisOptions.title || `深度分析报告 ${new Date().toLocaleString()}`,
+                instruction: buildAnalysisInstruction(analysisOptions),
                 kind: 'analysis',
             },
             quiz: {
@@ -781,22 +940,7 @@ function createNotesOperations(deps = {}) {
             },
             flashcards: {
                 title: `闪卡集合 ${new Date().toLocaleString()}`,
-                instruction: [
-                    '请基于以下学习材料生成一组适合复习记忆的结构化闪卡。',
-                    '你必须返回严格 JSON，不要输出 JSON 之外的说明。',
-                    'JSON 结构如下：',
-                    '{',
-                    '  "title": "卡组标题",',
-                    '  "cards": [',
-                    '    { "id": "card-1", "front": "问题正面", "back": "答案背面" }',
-                    '  ]',
-                    '}',
-                    '要求：',
-                    '1. 生成 12 张卡。',
-                    '2. front 与 back 都使用简体中文，可包含少量 Markdown 强调。',
-                    '3. 每张卡必须信息准确、去重、适合抽认卡练习。',
-                    '4. title 要简洁、像一个可学习的卡组名称。',
-                ].join('\n'),
+                instruction: buildFlashcardInstruction(flashcardOptions),
                 kind: 'flashcards',
             },
         };
@@ -806,13 +950,18 @@ function createNotesOperations(deps = {}) {
             return false;
         }
 
-        const generationContext = createGenerationContext(kind);
+        const generationContext = createGenerationContext(kind, kind === 'analysis' ? analysisOptions : {});
+        if (prompt.kind === 'analysis' && analysisOptions.requireSelectedNotes && generationContext.selectedNotes.length === 0) {
+            ui.showToastNotification('请先选择需要深度分析的笔记。', 'warning');
+            return false;
+        }
         if (prompt.kind === 'quiz' && hasPendingQuizGeneration(generationContext.agentId, generationContext.topicId)) {
             ui.showToastNotification('当前话题已有选择题正在生成，请稍候。', 'info');
             return false;
         }
 
         let pendingQuizRequestId = null;
+        let pendingFlashcardRequestId = null;
         if (prompt.kind === 'quiz') {
             pendingQuizRequestId = generationContext.requestId;
             beginPendingQuizGeneration({
@@ -827,11 +976,34 @@ function createNotesOperations(deps = {}) {
                 startedAt: generationContext.startedAt,
             });
         }
+        if (prompt.kind === 'flashcards') {
+            pendingFlashcardRequestId = generationContext.requestId;
+            flashcardsApi.beginPendingGeneration({
+                requestId: generationContext.requestId,
+                agentId: generationContext.agentId,
+                topicId: generationContext.topicId,
+                title: prompt.title,
+                cardCount: flashcardOptions.cardCount,
+                difficulty: flashcardOptions.difficulty,
+                sourceCount: 0,
+                focus: flashcardOptions.focus,
+                startedAt: generationContext.startedAt,
+            });
+        }
 
         try {
-            const studyInput = await resolveStudyInputText(quizOptions, generationContext);
+            const generationOptions = prompt.kind === 'quiz'
+                ? quizOptions
+                : (
+                    prompt.kind === 'flashcards'
+                        ? flashcardOptions
+                        : analysisOptions
+                );
+            const studyInput = await resolveStudyInputText(generationOptions, generationContext);
             if (!studyInput?.text) {
-                ui.showToastNotification('请先选择笔记，或为当前话题绑定并导入来源资料。', 'warning');
+                ui.showToastNotification(analysisOptions.requireSelectedNotes
+                    ? '请先选择需要深度分析的笔记。'
+                    : '请先选择笔记，或为当前话题绑定并导入来源资料。', 'warning');
                 return false;
             }
 
@@ -842,9 +1014,8 @@ function createNotesOperations(deps = {}) {
             }
 
             if (prompt.kind === 'flashcards') {
-                flashcardsApi.beginPendingGeneration({
-                    title: prompt.title,
-                    sourceCount: Array.isArray(studyInput.sourceDocumentRefs) ? studyInput.sourceDocumentRefs.length : 0,
+                flashcardsApi.updatePendingGeneration(generationContext.requestId, {
+                    sourceCount: countStudyInputSources(studyInput, generationContext.selectedNotes.length),
                 });
             }
 
@@ -878,22 +1049,12 @@ function createNotesOperations(deps = {}) {
             });
 
             if (response?.error) {
-                if (prompt.kind === 'flashcards') {
-                    flashcardsApi.clearPendingGeneration();
-                    setRightPanelMode('notes');
-                    renderNotesPanel();
-                }
                 ui.showToastNotification(`生成失败：${response.error}`, 'error');
                 return false;
             }
 
             const responseContent = response?.response?.choices?.[0]?.message?.content || '';
             if (!responseContent.trim()) {
-                if (prompt.kind === 'flashcards') {
-                    flashcardsApi.clearPendingGeneration();
-                    setRightPanelMode('notes');
-                    renderNotesPanel();
-                }
                 ui.showToastNotification('模型没有返回可保存的内容。', 'warning');
                 return false;
             }
@@ -919,9 +1080,6 @@ function createNotesOperations(deps = {}) {
                 );
 
                 if (!generated) {
-                    flashcardsApi.clearPendingGeneration();
-                    setRightPanelMode('notes');
-                    renderNotesPanel();
                     ui.showToastNotification('闪卡生成结果格式无效，请重试。', 'error');
                     return false;
                 }
@@ -934,7 +1092,11 @@ function createNotesOperations(deps = {}) {
             const saveResult = await chatAPI.saveTopicNote(generationContext.agentId, generationContext.topicId, {
                 title: prompt.kind === 'quiz'
                     ? (quizSet?.title || prompt.title)
-                    : prompt.title,
+                    : (
+                        prompt.kind === 'flashcards'
+                            ? (flashcardDeck?.title || prompt.title)
+                            : prompt.title
+                    ),
                 contentMarkdown,
                 sourceMessageIds: studyInput.sourceMessageIds,
                 sourceDocumentRefs: studyInput.sourceDocumentRefs,
@@ -945,11 +1107,6 @@ function createNotesOperations(deps = {}) {
             });
 
             if (!saveResult?.success) {
-                if (prompt.kind === 'flashcards') {
-                    flashcardsApi.clearPendingGeneration();
-                    setRightPanelMode('notes');
-                    renderNotesPanel();
-                }
                 ui.showToastNotification(`保存生成结果失败：${saveResult?.error || '未知错误'}`, 'error');
                 return false;
             }
@@ -961,37 +1118,43 @@ function createNotesOperations(deps = {}) {
             });
 
             if (!isActiveGenerationContext(generationContext)) {
-                flashcardsApi.clearPendingGeneration();
+                if (prompt.kind === 'flashcards') {
+                    flashcardsApi.clearPendingGeneration(generationContext.requestId);
+                }
                 ui.showToastNotification('已生成并保存到发起的话题笔记。', 'success');
-                return true;
+                return analysisOptions.returnSavedNote ? savedNote : true;
             }
 
             await refreshNotesData();
             if (!isActiveGenerationContext(generationContext)) {
-                flashcardsApi.clearPendingGeneration();
+                if (prompt.kind === 'flashcards') {
+                    flashcardsApi.clearPendingGeneration(generationContext.requestId);
+                }
                 ui.showToastNotification('已生成并保存到发起的话题笔记。', 'success');
-                return true;
+                return analysisOptions.returnSavedNote ? savedNote : true;
             }
 
             if (prompt.kind === 'flashcards' && flashcardsApi.hasStructuredFlashcards(savedNote)) {
-                flashcardsApi.clearPendingGeneration();
+                flashcardsApi.clearPendingGeneration(generationContext.requestId);
                 flashcardsApi.openPractice(savedNote, { trigger: el.generateFlashcardsBtn || null });
-            } else {
-                flashcardsApi.clearPendingGeneration();
+            } else if (prompt.kind !== 'analysis' || analysisOptions.openAfterSave) {
                 openNoteDetail(savedNote, {
                     kind: getNormalizedNoteKind(savedNote),
                     trigger: prompt.kind === 'analysis'
-                        ? el.analyzeNotesBtn
+                        ? (analysisOptions.trigger || el.manualNewNoteBtn || el.analyzeNotesBtn)
                         : (prompt.kind === 'quiz' ? el.generateQuizBtn : null),
                 });
             }
 
             setSidePanelTab('notes');
             ui.showToastNotification('已生成并保存到当前话题笔记。', 'success');
-            return true;
+            return analysisOptions.returnSavedNote ? savedNote : true;
         } finally {
             if (pendingQuizRequestId) {
                 clearPendingQuizGeneration(pendingQuizRequestId);
+            }
+            if (pendingFlashcardRequestId) {
+                flashcardsApi.clearPendingGeneration(pendingFlashcardRequestId);
             }
         }
     }

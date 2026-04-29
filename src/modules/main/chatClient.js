@@ -417,10 +417,14 @@ function createRequestState({
 }
 
 function buildRequestAttemptBody(normalizedMessages, modelConfig, requestId) {
+    const upstreamModelConfig = { ...(modelConfig || {}) };
+    delete upstreamModelConfig.purpose;
+    delete upstreamModelConfig.fallbackModel;
+    delete upstreamModelConfig.modelRef;
     return {
         messages: normalizedMessages,
-        ...modelConfig,
-        stream: modelConfig.stream === true,
+        ...upstreamModelConfig,
+        stream: modelConfig?.stream === true,
         requestId,
     };
 }

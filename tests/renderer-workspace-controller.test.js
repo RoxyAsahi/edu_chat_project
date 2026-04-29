@@ -181,10 +181,58 @@ function createOverviewDom() {
     };
 }
 
+function createTopicListDom() {
+    const dom = new JSDOM(`
+        <body>
+            <input id="topicSearchInput" />
+            <ul id="topicList"></ul>
+        </body>
+    `);
+
+    return {
+        window: dom.window,
+        document: dom.window.document,
+        el: {
+            topicSearchInput: dom.window.document.getElementById('topicSearchInput'),
+            topicList: dom.window.document.getElementById('topicList'),
+        },
+    };
+}
+
 test('workspace subject fallback avatar uses the app logo', async () => {
     const { DEFAULT_AGENT_AVATAR } = await loadWorkspaceModule();
 
     assert.equal(DEFAULT_AGENT_AVATAR, '../assets/brand-logo.png');
+});
+
+test('renderTopics prefixes placeholder topic titles with a conversation emoji', async () => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const harness = createControllerHarness();
+    const { window, document, el } = createTopicListDom();
+    harness.state.session.topics = [
+        { id: 'topic-1', name: '新对话 1', createdAt: Date.now() },
+        { id: 'topic-2', name: '📘 作业习题要求', createdAt: Date.now() },
+    ];
+    harness.state.session.currentTopicId = 'topic-1';
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        el: {
+            ...harness.deps.el,
+            ...el,
+        },
+        windowObj: window,
+        documentObj: document,
+    });
+
+    controller.renderTopics();
+
+    const placeholderTopic = document.querySelector('[data-topic-id="topic-1"]');
+    const emojiTopic = document.querySelector('[data-topic-id="topic-2"]');
+    assert.equal(placeholderTopic.querySelector('.topic-item__body strong')?.textContent, '💬 新对话 1');
+    assert.equal(placeholderTopic.querySelector('.topic-item__body strong')?.getAttribute('title'), '💬 新对话 1');
+    assert.equal(emojiTopic.querySelector('.topic-item__body strong')?.textContent, '📘 作业习题要求');
+    assert.equal(emojiTopic.querySelector('.topic-item__body strong')?.getAttribute('title'), '📘 作业习题要求');
 });
 
 test('selectTopic stops the previous watcher before starting the next one', async () => {

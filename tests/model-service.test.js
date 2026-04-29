@@ -15,6 +15,7 @@ test('buildModelServiceFromSettings and buildSettingsMirrorFromModelService pres
         chatEndpoint: 'https://chat.example.com/proxy/v1/chat/completions',
         chatApiKey: 'chat-key',
         defaultModel: 'gpt-4o',
+        thinkingChatDefaultModel: 'gpt-4o-reasoning',
         followUpDefaultModel: 'gpt-4.1-mini',
         studyToolDefaultModel: 'gpt-4.1-study',
         topicTitleDefaultModel: 'gpt-4.1-nano',
@@ -34,6 +35,7 @@ test('buildModelServiceFromSettings and buildSettingsMirrorFromModelService pres
     assert.equal(settingsMirror.chatEndpoint, 'https://chat.example.com/proxy/v1/chat/completions');
     assert.equal(settingsMirror.chatApiKey, 'chat-key');
     assert.equal(settingsMirror.defaultModel, 'gpt-4o');
+    assert.equal(settingsMirror.thinkingChatDefaultModel, 'gpt-4o-reasoning');
     assert.equal(settingsMirror.followUpDefaultModel, 'gpt-4.1-mini');
     assert.equal(settingsMirror.studyToolDefaultModel, 'gpt-4.1-study');
     assert.equal(settingsMirror.topicTitleDefaultModel, 'gpt-4.1-nano');
@@ -87,6 +89,7 @@ test('ensureBuiltInTestProvider keeps the built-in provider models in the intend
         ],
         defaults: {
             chat: { providerId: 'chat-provider', modelId: 'gpt-4o' },
+            thinkingChat: null,
             chatFallback: null,
             followUp: null,
             studyTool: null,
@@ -137,6 +140,7 @@ test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P pre
         ],
         defaults: {
             chat: null,
+            thinkingChat: null,
             chatFallback: null,
             followUp: null,
             studyTool: null,
@@ -147,6 +151,10 @@ test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P pre
     });
 
     assert.deepEqual(service.defaults.chat, {
+        providerId: 'aip-test-provider',
+        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
+    });
+    assert.deepEqual(service.defaults.thinkingChat, {
         providerId: 'aip-test-provider',
         modelId: modelService.AIP_TEST_DEFAULT_MODEL,
     });
@@ -166,6 +174,40 @@ test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P pre
         providerId: 'aip-test-provider',
         modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
     });
+});
+
+test('resolveExecutionConfig can target the dedicated thinking chat default', () => {
+    const settings = {
+        modelService: modelService.buildModelServiceFromSettings({
+            chatEndpoint: 'https://chat.example.com/base',
+            chatApiKey: 'chat-key',
+            defaultModel: 'fast-chat-model',
+            thinkingChatDefaultModel: 'thinking-chat-model',
+        }),
+    };
+
+    const execution = modelService.resolveExecutionConfig(settings, { purpose: 'thinkingChat' });
+
+    assert.equal(execution.purpose, 'thinkingChat');
+    assert.equal(execution.model.id, 'thinking-chat-model');
+    assert.equal(execution.endpoint, 'https://chat.example.com/base/v1/chat/completions');
+    assert.equal(execution.apiKey, 'chat-key');
+});
+
+test('resolveExecutionConfig falls thinking chat back to the fast chat default when unset', () => {
+    const settings = {
+        modelService: modelService.buildModelServiceFromSettings({
+            chatEndpoint: 'https://chat.example.com/base',
+            chatApiKey: 'chat-key',
+            defaultModel: 'fast-chat-model',
+        }),
+    };
+
+    settings.modelService.defaults.thinkingChat = null;
+    const execution = modelService.resolveExecutionConfig(settings, { purpose: 'thinkingChat' });
+
+    assert.equal(execution.purpose, 'thinkingChat');
+    assert.equal(execution.model.id, 'fast-chat-model');
 });
 
 test('resolveExecutionConfig can target the dedicated study tool default', () => {
@@ -234,6 +276,7 @@ test('resolveChatFallbackExecution resolves only the configured fallback chat ta
             ],
             defaults: {
                 chat: { providerId: 'primary-provider', modelId: 'primary-chat' },
+                thinkingChat: null,
                 chatFallback: { providerId: 'fallback-provider', modelId: 'fallback-chat' },
                 followUp: null,
                 studyTool: null,

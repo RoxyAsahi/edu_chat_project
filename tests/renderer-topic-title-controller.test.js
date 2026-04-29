@@ -459,7 +459,10 @@ test('composerController declares topic title background task only for the first
         interruptRequest: async () => ({ success: true }),
         messageRendererApi: {
             async renderMessage() {},
-            startStreamingMessage() {},
+            startStreamingMessage(message) {
+                message.content = '';
+                message.isThinking = false;
+            },
             async finalizeStreamedMessage() {},
         },
         createId: (() => {
@@ -500,6 +503,8 @@ test('composerController declares topic title background task only for the first
 
     assert.equal(followUpCalls.length, 1);
     assert.equal(sendPayloads.length, 1);
+    assert.deepEqual(sendPayloads[0].messages.map((message) => message.role), ['user']);
+    assert.equal(sendPayloads[0].messages[0].content, '第一问');
     assert.deepEqual(sendPayloads[0].backgroundTasks, {
         topicTitle: {
             enabled: true,

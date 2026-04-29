@@ -1765,7 +1765,7 @@ function initialize(mainWindow, context) {
             requestedRef: modelConfig?.modelRef,
             fallbackEndpoint: endpoint,
             fallbackApiKey: apiKey,
-            fallbackModel: modelConfig?.model,
+            fallbackModel: modelConfig?.fallbackModel || modelConfig?.model,
         });
         const finalModelConfig = {
             ...modelConfig,

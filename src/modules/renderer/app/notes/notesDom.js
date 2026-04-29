@@ -60,6 +60,7 @@ function createNotesDom(deps = {}) {
     const messageRendererApi = deps.messageRendererApi || {};
     const flashcardsApi = deps.flashcardsApi || {
         getFlashcardSourceCount: () => 0,
+        getPendingGenerations: () => [],
         getPendingGeneration: () => null,
         hasStructuredFlashcards: () => false,
         openPractice: () => false,
@@ -346,6 +347,27 @@ function createNotesDom(deps = {}) {
         ));
     }
 
+    function getPendingFlashcardGenerationsForCurrentTopic() {
+        const agentId = String(state.currentSelectedItem?.id || '').trim();
+        const topicId = String(state.currentTopicId || '').trim();
+        if (!agentId || !topicId) {
+            return [];
+        }
+
+        const pendingItems = typeof flashcardsApi.getPendingGenerations === 'function'
+            ? flashcardsApi.getPendingGenerations()
+            : [];
+        const pendingFlashcards = Array.isArray(pendingItems) && pendingItems.length > 0
+            ? pendingItems
+            : (flashcardsApi.getPendingGeneration?.() ? [flashcardsApi.getPendingGeneration()] : []);
+
+        return pendingFlashcards.filter((pending) => (
+            pending
+            && String(pending.agentId || '') === agentId
+            && String(pending.topicId || '') === topicId
+        ));
+    }
+
     function renderPendingQuizCard(pending) {
         const pendingCard = documentObj.createElement('div');
         const questionCount = Number(pending?.questionCount || 0);
@@ -377,6 +399,80 @@ function createNotesDom(deps = {}) {
         return pendingCard;
     }
 
+    function renderPendingFlashcardCard(pending) {
+        const pendingCard = documentObj.createElement('div');
+        const cardCount = Number(pending?.cardCount || 0);
+        const difficultyLabel = QUIZ_DIFFICULTY_LABELS[pending?.difficulty] || '中等';
+        const sourceCount = Number(pending?.sourceCount || 0);
+        const focus = String(pending?.focus || '').trim();
+        const metaParts = [
+            cardCount > 0 ? `${cardCount} 张` : '闪卡',
+            difficultyLabel,
+            sourceCount > 0 ? `${sourceCount} 个来源` : '当前学习材料',
+        ];
+        pendingCard.className = 'note-card note-card--studio note-card--flashcard-entry note-card--pending note-card--active';
+        pendingCard.innerHTML = `
+            <div class="note-card__studio-main">
+                <div class="note-card__studio-icon note-card__flashcard-icon note-card__flashcard-icon--pending">
+                    <span class="material-symbols-outlined">hourglass_top</span>
+                </div>
+                <div class="note-card__studio-body">
+                    <div class="note-card__studio-heading">
+                        <strong class="note-card__flashcard-title">正在生成闪卡...</strong>
+                    </div>
+                    <div class="note-card__studio-preview">${escapeHtml(focus ? `主题：${focus}` : '正在整理卡片正面和答案')}</div>
+                    <div class="note-card__studio-meta">
+                        ${metaParts.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        return pendingCard;
+    }
+
+    function getManualLibraryAgentLabel(agentId) {
+        const normalizedAgentId = String(agentId || '').trim();
+        if (!normalizedAgentId) {
+            return '未归类学科';
+        }
+
+        const agent = (Array.isArray(state.agents) ? state.agents : [])
+            .find((item) => String(item?.id || '') === normalizedAgentId);
+        if (agent?.name) {
+            return agent.name;
+        }
+        if (String(state.currentSelectedItem?.id || '') === normalizedAgentId && state.currentSelectedItem?.name) {
+            return state.currentSelectedItem.name;
+        }
+        return normalizedAgentId;
+    }
+
+    function renderPendingAnalysisCard(pending) {
+        const pendingCard = documentObj.createElement('article');
+        const selectedNoteCount = Number(pending?.selectedNoteCount || 0);
+        const metaParts = [
+            selectedNoteCount > 0 ? `${selectedNoteCount} 条笔记` : '深度分析',
+            getManualLibraryAgentLabel(pending?.agentId),
+            getTopicDisplayLabel(pending?.topicId),
+        ].filter(Boolean);
+
+        pendingCard.className = 'manual-note-card manual-note-card--pending manual-note-card--analysis-pending';
+        pendingCard.setAttribute('aria-busy', 'true');
+        pendingCard.innerHTML = `
+            <div class="manual-note-card__pending-icon">
+                <span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span>
+            </div>
+            <div class="manual-note-card__pending-body">
+                <strong>正在生成深度分析...</strong>
+                <span>${escapeHtml(pending?.title || '深度分析报告')}</span>
+            </div>
+            <div class="manual-note-card__meta">
+                ${metaParts.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}
+            </div>
+        `;
+        return pendingCard;
+    }
+
     function renderNotesPanel() {
         if (state.notesScope !== 'topic') {
             state.notesScope = 'topic';
@@ -384,7 +480,9 @@ function createNotesDom(deps = {}) {
 
         const notes = getGeneratedVisibleNotes();
         const pendingQuizzes = getPendingQuizGenerationsForCurrentTopic();
+        const pendingFlashcards = getPendingFlashcardGenerationsForCurrentTopic();
         const hasPendingQuiz = pendingQuizzes.length > 0;
+        const hasPendingFlashcards = pendingFlashcards.length > 0;
         closeNoteActionMenu();
 
         el.topicNotesScopeBtn?.classList.toggle('notes-scope-btn--active', state.notesScope === 'topic');
@@ -405,6 +503,15 @@ function createNotesDom(deps = {}) {
                 quizArrow.textContent = hasPendingQuiz ? 'hourglass_top' : 'chevron_right';
             }
         }
+        if (el.generateFlashcardsBtn) {
+            el.generateFlashcardsBtn.classList.toggle('notes-tool-tile--active', hasPendingFlashcards);
+            el.generateFlashcardsBtn.setAttribute('aria-busy', hasPendingFlashcards ? 'true' : 'false');
+            el.generateFlashcardsBtn.removeAttribute('disabled');
+            const flashcardArrow = el.generateFlashcardsBtn.querySelector('.notes-tool-tile__arrow');
+            if (flashcardArrow) {
+                flashcardArrow.textContent = hasPendingFlashcards ? 'hourglass_top' : 'chevron_right';
+            }
+        }
         updateNotesSelectionSummary();
 
         if (!el.notesList) {
@@ -413,7 +520,6 @@ function createNotesDom(deps = {}) {
 
         cleanupRichPreviews(el.notesList);
         el.notesList.innerHTML = '';
-        const pendingFlashcards = flashcardsApi.getPendingGeneration();
 
         if (el.studioPomodoroPanel && state.studioPomodoroVisible) {
             el.studioPomodoroPanel.classList.remove('hidden');
@@ -427,26 +533,11 @@ function createNotesDom(deps = {}) {
             el.notesList.appendChild(renderPendingQuizCard(pending));
         });
 
-        if (pendingFlashcards) {
-            const pendingCard = documentObj.createElement('div');
-            pendingCard.className = 'note-card note-card--studio note-card--flashcard-entry note-card--pending note-card--active';
-            pendingCard.innerHTML = `
-                <div class="note-card__studio-main">
-                    <div class="note-card__studio-icon note-card__flashcard-icon note-card__flashcard-icon--pending">
-                        <span class="material-symbols-outlined">autorenew</span>
-                    </div>
-                    <div class="note-card__studio-body">
-                        <div class="note-card__studio-heading">
-                            <strong class="note-card__flashcard-title">正在生成闪卡...</strong>
-                        </div>
-                        <div class="note-card__flashcard-meta">${pendingFlashcards.sourceCount > 0 ? `基于 ${pendingFlashcards.sourceCount} 个来源` : '基于当前学习材料'}</div>
-                    </div>
-                </div>
-            `;
-            el.notesList.appendChild(pendingCard);
-        }
+        pendingFlashcards.forEach((pending) => {
+            el.notesList.appendChild(renderPendingFlashcardCard(pending));
+        });
 
-        if (notes.length === 0 && !pendingFlashcards && !hasPendingQuiz) {
+        if (notes.length === 0 && !hasPendingFlashcards && !hasPendingQuiz) {
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state';
             empty.innerHTML = `
@@ -563,10 +654,13 @@ function createNotesDom(deps = {}) {
         }
 
         const agents = Array.isArray(state.agents) ? state.agents : [];
-        const allManualNotes = getManualLibraryNotes();
-        const manualNotes = allManualNotes;
         const currentFilter = String(state.manualNotesLibraryFilter || 'all');
-        const currentAgent = currentFilter === 'all'
+        const isAnalysisFilter = currentFilter === 'analysis';
+        const libraryNotes = getManualLibraryNotes();
+        const pendingAnalysisGenerations = isAnalysisFilter && Array.isArray(state.pendingAnalysisGenerations)
+            ? state.pendingAnalysisGenerations
+            : [];
+        const currentAgent = currentFilter === 'all' || isAnalysisFilter
             ? null
             : agents.find((agent) => String(agent?.id || '') === currentFilter);
         const currentAgentName = currentAgent?.name || state.currentSelectedItem?.name || '当前学科';
@@ -574,37 +668,54 @@ function createNotesDom(deps = {}) {
             el.manualNotesLibraryGrid.classList.toggle('manual-notes-library-grid--empty', empty);
         };
 
-        if (el.manualNotesLibrarySubjectFilterSelect) {
-            const options = [
-                '<option value="all">全部学科</option>',
+        const tabsCollapsed = Boolean(state.manualNotesLibraryTabsCollapsed);
+        if (el.manualNotesLibrarySubjectTabsWrapper) {
+            el.manualNotesLibrarySubjectTabsWrapper.classList.toggle('manual-notes-library-page__subject-tabs-wrapper--collapsed', tabsCollapsed);
+        }
+        if (el.manualNotesLibrarySubjectToggle) {
+            el.manualNotesLibrarySubjectToggle.setAttribute('aria-expanded', String(!tabsCollapsed));
+        }
+        if (el.manualNotesLibrarySubjectTabs) {
+            const tabs = [
+                { id: 'all', label: '筛选' },
+                { id: 'analysis', label: '深度分析' },
                 ...agents.map((agent) => {
                     const agentId = String(agent?.id || '').trim();
                     if (!agentId) {
-                        return '';
+                        return null;
                     }
-                    return `<option value="${escapeHtml(agentId)}">${escapeHtml(agent?.name || agentId)}</option>`;
+                    return { id: agentId, label: agent?.name || agentId };
                 }),
             ].filter(Boolean);
-            el.manualNotesLibrarySubjectFilterSelect.innerHTML = options.join('');
-            el.manualNotesLibrarySubjectFilterSelect.value = currentFilter;
-            if (el.manualNotesLibrarySubjectFilterSelect.value !== currentFilter) {
-                el.manualNotesLibrarySubjectFilterSelect.value = 'all';
-            }
+            el.manualNotesLibrarySubjectTabs.innerHTML = tabs.map((tab) => {
+                const isActive = String(tab.id) === currentFilter;
+                return `<button type="button" class="manual-notes-library-page__subject-tab${isActive ? ' manual-notes-library-page__subject-tab--active' : ''}" data-subject-filter="${escapeHtml(tab.id)}" role="tab" aria-selected="${isActive ? 'true' : 'false'}">${escapeHtml(tab.label)}</button>`;
+            }).join('');
         }
 
         if (el.manualNotesLibraryTitle) {
-            el.manualNotesLibraryTitle.textContent = `${currentFilter === 'all' ? '全部学科' : currentAgentName} · 我的笔记`;
+            const titlePrefix = isAnalysisFilter
+                ? '深度分析'
+                : (currentFilter === 'all' ? '全部学科' : currentAgentName);
+            el.manualNotesLibraryTitle.textContent = `${titlePrefix} · 我的笔记`;
         }
         if (el.manualNotesLibrarySubtitle) {
-            const selectedCount = allManualNotes.filter((note) => state.selectedNoteIds.includes(note.id)).length;
-            el.manualNotesLibrarySubtitle.textContent = currentFilter === 'all'
-                ? `这里收纳全部学科收藏的 ${allManualNotes.length} 条手写笔记，已选 ${selectedCount} 条。`
-                : `这里收纳 ${currentAgentName} 的 ${allManualNotes.length} 条手写笔记，已选 ${selectedCount} 条。`;
+            if (isAnalysisFilter) {
+                const pendingText = pendingAnalysisGenerations.length > 0
+                    ? `，${pendingAnalysisGenerations.length} 份正在生成`
+                    : '';
+                el.manualNotesLibrarySubtitle.textContent = `这里收纳已生成的 ${libraryNotes.length} 份深度分析报告${pendingText}。`;
+            } else {
+                const selectedCount = libraryNotes.filter((note) => state.selectedNoteIds.includes(note.id)).length;
+                el.manualNotesLibrarySubtitle.textContent = currentFilter === 'all'
+                    ? `这里收纳全部学科收藏的 ${libraryNotes.length} 条手写笔记，已选 ${selectedCount} 条。`
+                    : `这里收纳 ${currentAgentName} 的 ${libraryNotes.length} 条手写笔记，已选 ${selectedCount} 条。`;
+            }
         }
 
         cleanupRichPreviews(el.manualNotesLibraryGrid);
         el.manualNotesLibraryGrid.innerHTML = '';
-        if (!state.currentSelectedItem?.id && currentFilter !== 'all') {
+        if (!state.currentSelectedItem?.id && currentFilter !== 'all' && !isAnalysisFilter) {
             setGridEmptyState(true);
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
@@ -616,13 +727,19 @@ function createNotesDom(deps = {}) {
             return;
         }
 
-        if (manualNotes.length === 0) {
+        if (libraryNotes.length === 0 && pendingAnalysisGenerations.length === 0) {
             setGridEmptyState(true);
             const empty = documentObj.createElement('div');
             empty.className = 'empty-list-state manual-notes-library-grid__empty';
+            const emptyTitle = isAnalysisFilter
+                ? '还没有深度分析报告'
+                : (currentFilter === 'all' ? '还没有收藏的手写笔记' : '当前学科还没有手写笔记');
+            const emptyDescription = isAnalysisFilter
+                ? '点击右上角“深度分析”，选择多条笔记后生成的报告会直接出现在这里。'
+                : '你可以使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。';
             empty.innerHTML = `
-                <strong>${currentFilter === 'all' ? '还没有收藏的手写笔记' : '当前学科还没有手写笔记'}</strong>
-                <span>你可以使用右侧的“新建笔记”或底部“添加笔记”，写下的内容会自动收纳到这里。</span>
+                <strong>${escapeHtml(emptyTitle)}</strong>
+                <span>${escapeHtml(emptyDescription)}</span>
             `;
             el.manualNotesLibraryGrid.appendChild(empty);
             return;
@@ -630,9 +747,14 @@ function createNotesDom(deps = {}) {
 
         setGridEmptyState(false);
 
-        manualNotes.forEach((note) => {
+        pendingAnalysisGenerations.forEach((pending) => {
+            el.manualNotesLibraryGrid.appendChild(renderPendingAnalysisCard(pending));
+        });
+
+        libraryNotes.forEach((note) => {
             const normalized = normalizeNote(note);
             const topicLabel = escapeHtml(getTopicDisplayLabel(normalized.topicId));
+            const agentLabel = escapeHtml(getManualLibraryAgentLabel(normalized.agentId));
             const updatedLabel = escapeHtml(formatRelativeTime(normalized.updatedAt) || '');
             const isSelected = state.selectedNoteIds.includes(normalized.id);
             const card = documentObj.createElement('article');
@@ -643,6 +765,7 @@ function createNotesDom(deps = {}) {
             card.innerHTML = `
                 <div class="manual-note-card__preview" data-note-preview="${escapeHtml(normalized.id)}"></div>
                 <div class="manual-note-card__meta">
+                    ${isAnalysisFilter ? `<span>${agentLabel}</span>` : ''}
                     <span>${topicLabel}</span>
                     <span>${updatedLabel}</span>
                     ${isSelected ? '<span class="manual-note-card__selection">已选用于生成</span>' : ''}

@@ -2,6 +2,7 @@ const MODEL_SERVICE_VERSION = 1;
 
 const MODEL_SERVICE_DEFAULT_KEYS = Object.freeze([
     'chat',
+    'thinkingChat',
     'chatFallback',
     'followUp',
     'studyTool',
@@ -146,6 +147,7 @@ const DEFAULT_MODEL_SERVICE = Object.freeze({
     providers: [],
     defaults: {
         chat: null,
+        thinkingChat: null,
         chatFallback: null,
         followUp: null,
         studyTool: null,
@@ -157,6 +159,7 @@ const DEFAULT_MODEL_SERVICE = Object.freeze({
 
 const TASK_KEY_BY_LEGACY_SETTINGS_KEY = Object.freeze({
     defaultModel: 'chat',
+    thinkingChatDefaultModel: 'thinkingChat',
     followUpDefaultModel: 'followUp',
     studyToolDefaultModel: 'studyTool',
     topicTitleDefaultModel: 'topicTitle',
@@ -170,6 +173,7 @@ function createDefaultModelService() {
         providers: [],
         defaults: {
             chat: null,
+            thinkingChat: null,
             chatFallback: null,
             followUp: null,
             studyTool: null,
@@ -571,6 +575,7 @@ function createBuiltInTestProviderDefaults(provider = {}) {
     const refFor = (modelId) => resolveDefaultRefForProvider(provider, modelId);
     return {
         chat: refFor(AIP_TEST_DEFAULT_MODEL),
+        thinkingChat: refFor(AIP_TEST_DEFAULT_MODEL),
         chatFallback: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         followUp: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         studyTool: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
@@ -710,6 +715,7 @@ function buildModelServiceFromSettings(settings = {}) {
 
     const chatModels = collectLegacyModels(settings, [
         [settings?.defaultModel, 'chat', { chat: true }],
+        [settings?.thinkingChatDefaultModel, 'chat', { chat: true }],
         [settings?.followUpDefaultModel, 'chat', { chat: true }],
         [settings?.studyToolDefaultModel, 'chat', { chat: true }],
         [settings?.topicTitleDefaultModel, 'chat', { chat: true }],
@@ -781,6 +787,12 @@ function buildModelServiceFromSettings(settings = {}) {
             )
             : null,
         chatFallback: null,
+        thinkingChat: primaryProvider
+            ? resolveDefaultRefForProvider(
+                primaryProvider,
+                normalizeText(settings?.thinkingChatDefaultModel) || normalizeText(settings?.defaultModel)
+            )
+            : null,
         followUp: primaryProvider
             ? resolveDefaultRefForProvider(
                 primaryProvider,
@@ -1039,6 +1051,7 @@ function resolveExecutionConfig(settings = {}, options = {}) {
     }
 
     const legacyModel = requestedModel
+        || (purpose === 'thinkingChat' ? normalizeText(settings?.thinkingChatDefaultModel) : '')
         || normalizeText(settings?.defaultModel)
         || normalizeText(options.fallbackModel);
     return {
@@ -1073,6 +1086,7 @@ function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVIC
     const rerankExecution = resolveExecutionConfig({ modelService: normalizedModelService }, { purpose: 'rerank' });
 
     const chatModel = getLegacyFallbackModel(normalizedModelService, 'chat');
+    const thinkingChatModel = getLegacyFallbackModel(normalizedModelService, 'thinkingChat') || chatModel;
     const followUpModel = getLegacyFallbackModel(normalizedModelService, 'followUp') || chatModel;
     const studyToolModel = getLegacyFallbackModel(normalizedModelService, 'studyTool') || chatModel;
     const topicTitleModel = getLegacyFallbackModel(normalizedModelService, 'topicTitle') || chatModel;
@@ -1086,6 +1100,7 @@ function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVIC
         chatEndpoint: chatExecution?.endpoint || '',
         chatApiKey: chatExecution?.apiKey || '',
         defaultModel: chatModel,
+        thinkingChatDefaultModel: thinkingChatModel,
         followUpDefaultModel: followUpModel,
         studyToolDefaultModel: studyToolModel,
         topicTitleDefaultModel: topicTitleModel,

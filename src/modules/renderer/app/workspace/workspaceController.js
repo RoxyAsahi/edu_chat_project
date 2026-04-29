@@ -11,6 +11,39 @@ function escapeHtml(text) {
         .replace(/'/g, '&#39;');
 }
 
+const PLACEHOLDER_TOPIC_ICON = '💬';
+const PLACEHOLDER_TOPIC_BASE_NAME = '新对话';
+const LEGACY_PLACEHOLDER_TOPIC_NAMES = new Set([
+    '主要对话',
+    'Main Conversation',
+]);
+
+function normalizeTopicName(name = '') {
+    return String(name || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function isPlaceholderTopicName(name = '') {
+    const normalized = normalizeTopicName(name);
+    if (!normalized) {
+        return false;
+    }
+
+    if (LEGACY_PLACEHOLDER_TOPIC_NAMES.has(normalized)) {
+        return true;
+    }
+
+    return new RegExp(`^${PLACEHOLDER_TOPIC_BASE_NAME}(?:\\s+\\d+)?$`).test(normalized);
+}
+
+function formatTopicDisplayTitle(title = '') {
+    const normalized = normalizeTopicName(title);
+    return isPlaceholderTopicName(normalized)
+        ? `${PLACEHOLDER_TOPIC_ICON} ${normalized}`
+        : normalized;
+}
+
 function shouldPersistTopicSelection(options = {}) {
     return options.fromWatcher !== true;
 }
@@ -1141,15 +1174,17 @@ function createWorkspaceController(deps = {}) {
         state.topics.forEach((topic) => {
             const li = documentObj.createElement('li');
             const isActive = topic.id === state.currentTopicId;
+            const rawTopicTitle = topic.name || topic.id;
+            const displayTopicTitle = formatTopicDisplayTitle(rawTopicTitle);
             li.className = 'list-item topic-item topic-item--compact';
             li.dataset.topicId = topic.id || '';
             li.dataset.agentId = state.currentSelectedItem.id || '';
-            li.dataset.searchText = `${topic.name || ''} ${new Date(topic.createdAt || Date.now()).toLocaleString()}`.toLowerCase();
+            li.dataset.searchText = `${displayTopicTitle} ${rawTopicTitle || ''} ${new Date(topic.createdAt || Date.now()).toLocaleString()}`.toLowerCase();
             li.classList.toggle('active', isActive);
 
             li.innerHTML = `
                 <div class="topic-item__body">
-                    <strong>${escapeHtml(topic.name || topic.id)}</strong>
+                    <strong title="${escapeHtml(displayTopicTitle)}">${escapeHtml(displayTopicTitle || rawTopicTitle)}</strong>
                 </div>
                 <div class="topic-item__actions">
                     <button

@@ -566,16 +566,14 @@ function buildSubjectOverviewMarkup({
                                 <img src="../assets/logo.png" alt="" />
                             </div>
                             <div class="home-hero__copy">
-                                <h2>${escapeHtml(heroTitle)}</h2>
-                                <p class="home-hero__tagline">资料理解 · 对话辅导 · 笔记复盘</p>
+                                <img class="home-hero__wordmark" src="../assets/UniStudy.png" alt="UniStudy" />
+                                <p class="home-hero__greeting">我是 Unico，你的个人 AI 学习助手</p>
                                 <div class="home-hero__actions">
                                     <button type="button" class="home-primary-action" data-home-action="${primaryAction}">
-                                        <span class="material-symbols-outlined" aria-hidden="true">${hasAgents ? 'play_arrow' : 'add'}</span>
                                         <span>${primaryActionText}</span>
                                     </button>
                                     <button type="button" class="home-secondary-action" data-home-action="open-notes">
-                                        <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-                                        <span>看笔记</span>
+                                        <span>我的笔记</span>
                                     </button>
                                 </div>
                             </div>
