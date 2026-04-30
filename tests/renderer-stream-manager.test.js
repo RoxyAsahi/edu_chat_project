@@ -750,6 +750,163 @@ test('streamManager renders native reasoning deltas before stream finalization',
     assert.doesNotMatch(contentDiv.innerHTML, /unistudy-live-reasoning-preview/);
 });
 
+test('streamManager keeps live reasoning elapsed time moving between upstream chunks', async (t) => {
+    const dom = new JSDOM(`
+        <body>
+          <div id="chatMessages">
+            <article class="message-item thinking" data-message-id="assistant-reasoning-timer">
+              <div class="name-time-block"></div>
+              <div class="md-content"><div class="thinking-indicator"></div></div>
+            </article>
+          </div>
+        </body>
+    `, { url: 'http://localhost' });
+    t.after(() => dom.window.close());
+
+    const originalWindow = global.window;
+    const originalDocument = global.document;
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalPerformance = global.performance;
+    const originalSetInterval = global.setInterval;
+    const originalClearInterval = global.clearInterval;
+
+    let now = 1000;
+    let intervalCallback = null;
+    let intervalDelay = 0;
+    let clearedTimer = null;
+    const timerId = { id: 'reasoning-timer', unref() {} };
+
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = () => 1;
+    global.performance = { now: () => now };
+    global.setInterval = (callback, delay) => {
+        intervalCallback = callback;
+        intervalDelay = delay;
+        return timerId;
+    };
+    global.clearInterval = (id) => {
+        clearedTimer = id;
+    };
+
+    t.after(() => {
+        global.window = originalWindow;
+        global.document = originalDocument;
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.performance = originalPerformance;
+        global.setInterval = originalSetInterval;
+        global.clearInterval = originalClearInterval;
+    });
+
+    const {
+        initStreamManager,
+        startStreamingMessage,
+        appendStreamChunk,
+        finalizeStreamedMessage,
+    } = await loadStreamManagerModule();
+
+    let currentHistory = cloneHistory([{
+        id: 'user-1',
+        role: 'user',
+        content: 'question',
+        timestamp: 1,
+    }]);
+    let parseCalls = 0;
+
+    initStreamManager({
+        currentSelectedItemRef: {
+            get: () => ({ id: 'agent-1' }),
+        },
+        currentTopicIdRef: {
+            get: () => 'topic-1',
+        },
+        currentChatHistoryRef: {
+            get: () => currentHistory,
+            set: (value) => {
+                currentHistory = cloneHistory(value);
+            },
+        },
+        globalSettingsRef: {
+            get: () => ({ enableSmoothStreaming: false }),
+        },
+        chatMessagesDiv: dom.window.document.getElementById('chatMessages'),
+        electronAPI: {
+            async getChatHistory() {
+                return cloneHistory(currentHistory);
+            },
+            async saveChatHistory() {
+                return { success: true };
+            },
+        },
+        uiHelper: {
+            scrollToBottom() {},
+        },
+        markedInstance: {
+            parse: (text) => {
+                parseCalls += 1;
+                return `<p>${text}</p>`;
+            },
+        },
+        preprocessFullContent: (text) => text,
+        setContentAndProcessImages(contentDiv, rawHtml) {
+            contentDiv.innerHTML = rawHtml;
+        },
+        processRenderedContent() {},
+        runTextHighlights() {},
+        processAnimationsInContent() {},
+        prependNativeReasoningBubble: (rawHtml, message) => {
+            const elapsed = message.reasoning_elapsed ? `（用时 ${message.reasoning_elapsed}）` : '';
+            return `<div class="native-reasoning-bubble unistudy-live-reasoning-bubble is-complete"><span class="unistudy-live-reasoning-label">已深度思考${elapsed}</span></div>${rawHtml}`;
+        },
+        renderMessage() {
+            throw new Error('existing DOM node should be reused');
+        },
+    });
+
+    const messageItem = dom.window.document.querySelector('.message-item[data-message-id="assistant-reasoning-timer"]');
+    await startStreamingMessage({
+        id: 'assistant-reasoning-timer',
+        role: 'assistant',
+        name: 'Agent One',
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+        content: 'Thinking',
+        isThinking: true,
+        timestamp: 2,
+    }, messageItem);
+
+    appendStreamChunk('assistant-reasoning-timer', {
+        reasoningDelta: 'first thought',
+        chunk: { choices: [{ delta: { reasoning_content: 'first thought' } }] },
+    }, {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    });
+
+    const contentDiv = dom.window.document.querySelector('.message-item[data-message-id="assistant-reasoning-timer"] .md-content');
+    assert.equal(intervalDelay, 250);
+    assert.equal(typeof intervalCallback, 'function');
+    assert.match(contentDiv.textContent, /思考中（用时 0\.1 秒）/);
+    assert.equal(parseCalls, 1);
+
+    now = 4750;
+    intervalCallback();
+
+    assert.match(contentDiv.textContent, /思考中（用时 3\.8 秒）/);
+    assert.equal(parseCalls, 1);
+
+    await finalizeStreamedMessage('assistant-reasoning-timer', 'completed', {
+        agentId: 'agent-1',
+        topicId: 'topic-1',
+    }, {
+        fullResponse: 'final answer',
+    });
+
+    assert.equal(clearedTimer, timerId);
+    const finalizedMessage = currentHistory.find((message) => message.id === 'assistant-reasoning-timer');
+    assert.match(finalizedMessage.reasoning_elapsed, /^3\.8 秒$/);
+});
+
 test('streamManager renders a completed tool request block before stream finalization', async (t) => {
     const dom = new JSDOM(`
         <body>

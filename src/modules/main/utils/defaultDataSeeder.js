@@ -1,6 +1,63 @@
 const fs = require('fs-extra');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { createClient } = require('@libsql/client');
+
+const KNOWLEDGE_BASE_SCHEMA = [
+    `CREATE TABLE IF NOT EXISTS knowledge_base (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS kb_document (
+        id TEXT PRIMARY KEY,
+        kb_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        stored_path TEXT NOT NULL,
+        mime_type TEXT,
+        file_size INTEGER DEFAULT 0,
+        file_hash TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        error TEXT,
+        chunk_count INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        processed_at INTEGER,
+        extracted_text TEXT,
+        extracted_content_type TEXT,
+        attempt_count INTEGER DEFAULT 0,
+        processing_started_at INTEGER,
+        failed_at INTEGER,
+        completed_at INTEGER,
+        last_error TEXT,
+        content_type TEXT,
+        guide_status TEXT DEFAULT 'idle',
+        guide_markdown TEXT,
+        guide_generated_at INTEGER,
+        guide_error TEXT,
+        FOREIGN KEY (kb_id) REFERENCES knowledge_base(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS kb_chunk (
+        id TEXT PRIMARY KEY,
+        kb_id TEXT NOT NULL,
+        document_id TEXT NOT NULL,
+        chunk_index INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        embedding TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        content_type TEXT,
+        char_length INTEGER DEFAULT 0,
+        section_title TEXT,
+        page_number INTEGER,
+        paragraph_index INTEGER,
+        FOREIGN KEY (kb_id) REFERENCES knowledge_base(id),
+        FOREIGN KEY (document_id) REFERENCES kb_document(id)
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_kb_document_kb_id ON kb_document(kb_id)',
+    'CREATE INDEX IF NOT EXISTS idx_kb_chunk_kb_id ON kb_chunk(kb_id)',
+    'CREATE INDEX IF NOT EXISTS idx_kb_chunk_document_id ON kb_chunk(document_id)',
+];
 
 async function copyMissingTree(sourcePath, targetPath) {
     if (!await fs.pathExists(sourcePath)) {
@@ -80,14 +137,100 @@ async function hydrateHistoryAttachmentPaths(historyPath, dataRoot) {
     return changed;
 }
 
+async function initializeKnowledgeBaseDb(dbPath) {
+    await fs.ensureDir(path.dirname(dbPath));
+    const db = createClient({
+        url: `file:${dbPath}`,
+    });
+
+    for (const statement of KNOWLEDGE_BASE_SCHEMA) {
+        await db.execute(statement);
+    }
+
+    return db;
+}
+
+async function getTableColumnNames(db, tableName) {
+    const result = await db.execute(`PRAGMA table_info(${tableName})`);
+    return (result.rows || []).map((row) => String(row.name));
+}
+
+async function insertRowsIfMissing(targetDb, tableName, rows, mutateRow = null) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+        return 0;
+    }
+
+    const targetColumns = await getTableColumnNames(targetDb, tableName);
+    const targetColumnSet = new Set(targetColumns);
+    let insertedRows = 0;
+
+    for (const sourceRow of rows) {
+        const row = mutateRow ? mutateRow({ ...sourceRow }) : { ...sourceRow };
+        const columns = Object.keys(row).filter((column) => targetColumnSet.has(column));
+        if (columns.length === 0) {
+            continue;
+        }
+
+        const placeholders = columns.map(() => '?').join(', ');
+        const result = await targetDb.execute({
+            sql: `INSERT OR IGNORE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`,
+            args: columns.map((column) => row[column]),
+        });
+        insertedRows += Number(result.rowsAffected || 0);
+    }
+
+    return insertedRows;
+}
+
+async function importSeedKnowledgeBase({ dataRoot, seedRoot }) {
+    const seedDbPath = path.join(seedRoot, 'KnowledgeBase', 'knowledge-base.db');
+    if (!await fs.pathExists(seedDbPath)) {
+        return { knowledgeBases: 0, documents: 0, chunks: 0 };
+    }
+
+    const targetDbPath = path.join(dataRoot, 'KnowledgeBase', 'knowledge-base.db');
+    const seedDb = createClient({ url: `file:${seedDbPath}` });
+    const targetDb = await initializeKnowledgeBaseDb(targetDbPath);
+    const targetFilesDir = path.join(dataRoot, 'KnowledgeBase', 'files');
+
+    try {
+        const knowledgeBases = (await seedDb.execute('SELECT * FROM knowledge_base')).rows || [];
+        const documents = (await seedDb.execute('SELECT * FROM kb_document')).rows || [];
+        const chunks = (await seedDb.execute('SELECT * FROM kb_chunk')).rows || [];
+
+        return {
+            knowledgeBases: await insertRowsIfMissing(targetDb, 'knowledge_base', knowledgeBases),
+            documents: await insertRowsIfMissing(targetDb, 'kb_document', documents, (row) => ({
+                ...row,
+                stored_path: path.join(targetFilesDir, path.basename(String(row.stored_path || ''))),
+            })),
+            chunks: await insertRowsIfMissing(targetDb, 'kb_chunk', chunks),
+        };
+    } finally {
+        if (typeof seedDb.close === 'function') {
+            await seedDb.close();
+        }
+        if (typeof targetDb.close === 'function') {
+            await targetDb.close();
+        }
+    }
+}
+
 async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
     if (!dataRoot || !seedRoot || !await fs.pathExists(seedRoot)) {
-        return { copiedFiles: 0, skippedFiles: 0, hydratedHistories: 0, seedRootMissing: true };
+        return {
+            copiedFiles: 0,
+            skippedFiles: 0,
+            hydratedHistories: 0,
+            knowledgeBaseImports: { knowledgeBases: 0, documents: 0, chunks: 0 },
+            seedRootMissing: true,
+        };
     }
 
     const seedTargets = [
         'Agents',
         'UserData',
+        path.join('KnowledgeBase', 'files'),
     ];
 
     let copiedFiles = 0;
@@ -116,6 +259,7 @@ async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
         copiedFiles,
         skippedFiles,
         hydratedHistories,
+        knowledgeBaseImports: await importSeedKnowledgeBase({ dataRoot, seedRoot }),
         seedRootMissing: false,
     };
 }
@@ -123,5 +267,6 @@ async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
 module.exports = {
     copyMissingTree,
     hydrateHistoryAttachmentPaths,
+    importSeedKnowledgeBase,
     seedDefaultDataRoot,
 };

@@ -1,0 +1,47 @@
+{
+  "name": "展示案例 | 综合（渲染能力展示）",
+  "systemPrompt": "你是 展示案例 | 综合。",
+  "model": "",
+  "topics": [
+    {
+      "id": "topic_1777534111708",
+      "name": "⚪ 白色背景时空模拟",
+      "createdAt": 1777534111708,
+      "locked": true,
+      "unread": false,
+      "creatorSource": "seed",
+      "selectedKnowledgeBaseDocumentIds": null
+    },
+    {
+      "id": "topic_1777494185646",
+      "name": "🤖 展示案例综合介绍",
+      "createdAt": 1777494185646,
+      "locked": true,
+      "unread": false,
+      "creatorSource": "seed",
+      "selectedKnowledgeBaseDocumentIds": null
+    },
+    {
+      "id": "topic_1777491184747",
+      "name": "🧊 Three.js 3D 魔方",
+      "createdAt": 1777491184747,
+      "locked": true,
+      "unread": false,
+      "creatorSource": "seed",
+      "selectedKnowledgeBaseDocumentIds": null
+    },
+    {
+      "id": "topic_1777474936539",
+      "name": "🧊 圆锥体积公式讲解",
+      "createdAt": 1777474936539,
+      "locked": true,
+      "unread": false,
+      "creatorSource": "seed",
+      "selectedKnowledgeBaseDocumentIds": null
+    }
+  ],
+  "avatarCalculatedColor": "rgb(226,193,54)",
+  "cardEmoji": "",
+  "promptMode": "original",
+  "originalSystemPrompt": "你是 展示案例 | 综合。"
+}

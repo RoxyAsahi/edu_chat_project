@@ -9,6 +9,7 @@ const accumulatedStreamText = new Map(); // messageId -> string
 const accumulatedStreamReasoning = new Map(); // messageId -> native reasoning string
 const reasoningExpandedState = new Map(); // messageId -> boolean
 const reasoningStartTimes = new Map(); // messageId -> performance timestamp
+const reasoningTickerTimers = new Map(); // messageId -> intervalId for live elapsed labels
 const streamSegmentStates = new Map(); // messageId -> { stableCutoff, stableHtml, lastTailText }
 let activeStreamingMessageId = null; // Track the currently active streaming message
 const elementContentLengthCache = new WeakMap(); // Track previous DOM content lengths without retaining discarded nodes.
@@ -579,6 +580,52 @@ function renderStreamingReasoning(reasoningRoot, messageId) {
         const safeMarkdown = escapeHtml(reasoningContent.trim());
         body.innerHTML = refs.markedInstance.parse(safeMarkdown);
     }
+}
+
+function updateLiveReasoningElapsedLabel(messageId) {
+    if (!reasoningStartTimes.has(messageId) || messageInitializationStatus.get(messageId) !== 'ready') {
+        return false;
+    }
+
+    const context = messageContextMap.get(messageId);
+    if (!isMessageForCurrentView(context)) {
+        return true;
+    }
+
+    const cachedDom = getCachedMessageDom(messageId);
+    const label = cachedDom?.contentDiv?.querySelector(
+        '.unistudy-live-reasoning-bubble:not(.is-complete) .unistudy-live-reasoning-label'
+    );
+    if (!label) {
+        return true;
+    }
+
+    label.textContent = `思考中（用时 ${formatReasoningElapsed(messageId)}）`;
+    return true;
+}
+
+function stopReasoningElapsedTicker(messageId) {
+    if (!reasoningTickerTimers.has(messageId)) {
+        return;
+    }
+
+    const timerId = reasoningTickerTimers.get(messageId);
+    clearInterval(timerId);
+    reasoningTickerTimers.delete(messageId);
+}
+
+function startReasoningElapsedTicker(messageId) {
+    if (reasoningTickerTimers.has(messageId) || typeof setInterval !== 'function') {
+        return;
+    }
+
+    const timerId = setInterval(() => {
+        if (!updateLiveReasoningElapsedLabel(messageId)) {
+            stopReasoningElapsedTicker(messageId);
+        }
+    }, 250);
+    timerId?.unref?.();
+    reasoningTickerTimers.set(messageId, timerId);
 }
 
 function getOrCreateStreamSegmentState(messageId) {
@@ -1325,6 +1372,7 @@ function cleanupFinalizedMessageState(messageId) {
     accumulatedStreamText.delete(messageId);
     accumulatedStreamReasoning.delete(messageId);
     reasoningExpandedState.delete(messageId);
+    stopReasoningElapsedTicker(messageId);
     reasoningStartTimes.delete(messageId);
     streamSegmentStates.delete(messageId);
     streamingTextDirtyMessages.delete(messageId);
@@ -1398,6 +1446,7 @@ export function appendStreamChunk(messageId, chunkData, context) {
         if (!reasoningStartTimes.has(messageId)) {
             reasoningStartTimes.set(messageId, getReasoningClockNow());
         }
+        startReasoningElapsedTicker(messageId);
         const currentReasoning = accumulatedStreamReasoning.get(messageId) || "";
         accumulatedStreamReasoning.set(messageId, currentReasoning + reasoningToAppend);
     }

@@ -208,6 +208,9 @@ function createNotesController(deps = {}) {
     const closeSourceFileActionMenu = deps.closeSourceFileActionMenu || (() => {});
     const updateCurrentChatHistory = deps.updateCurrentChatHistory || (() => []);
     const onManualNotesLibraryFilterChange = deps.onManualNotesLibraryFilterChange || (() => {});
+    const getDiaryWallTabs = deps.getDiaryWallTabs || (() => []);
+    const getDiaryWallActiveFilter = deps.getDiaryWallActiveFilter || (() => 'all');
+    const setDiaryWallAgentFilter = deps.setDiaryWallAgentFilter || (() => {});
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
     const getCurrentChatHistory = deps.getCurrentChatHistory || (() => store.getState().session.currentChatHistory);
@@ -413,6 +416,10 @@ function createNotesController(deps = {}) {
         manualNotesLibraryTabsCollapsed: {
             get: () => getNotesSlice().manualNotesLibraryTabsCollapsed === true,
             set: (value) => patchNotes({ manualNotesLibraryTabsCollapsed: value === true }),
+        },
+        manualNotesLibraryActivePanel: {
+            get: () => getNotesSlice().manualNotesLibraryActivePanel || 'notes',
+            set: (value) => patchNotes({ manualNotesLibraryActivePanel: String(value || 'notes') }),
         },
         noteAnalysisWizard: {
             get: () => normalizeNoteAnalysisWizardState(getNotesSlice().noteAnalysisWizard),
@@ -2377,7 +2384,12 @@ function createNotesController(deps = {}) {
         el.manualNotesLibrarySubjectTabs?.addEventListener('click', (event) => {
             const tab = event.target.closest('[data-subject-filter]');
             if (tab) {
-                setManualNotesLibraryFilter(tab.getAttribute('data-subject-filter') || 'all');
+                const filter = tab.getAttribute('data-subject-filter') || 'all';
+                if (state.manualNotesLibraryActivePanel === 'diary') {
+                    setDiaryWallAgentFilter(filter);
+                } else {
+                    setManualNotesLibraryFilter(filter);
+                }
             }
         });
         el.manualNotesLibrarySubjectToggle?.addEventListener('click', () => {
@@ -2576,6 +2588,8 @@ function createNotesController(deps = {}) {
         getGeneratedVisibleNotes,
         getManualLibraryNotes,
         getManualLibrarySubjectFilters,
+        getDiaryWallTabs,
+        getDiaryWallActiveFilter,
         resolveManualNotesLibraryFilter,
         getActiveNote,
         getCurrentTopicDisplayName,
@@ -2648,6 +2662,10 @@ function createNotesController(deps = {}) {
         renderNotesPanel: (...args) => notesDomApi.renderNotesPanel(...args),
         replaceNoteInCollections,
         resetState,
+        setManualNotesLibraryActivePanel: (panel) => {
+            state.manualNotesLibraryActivePanel = panel;
+            notesDomApi.renderManualNotesLibrary();
+        },
     };
 }
 
