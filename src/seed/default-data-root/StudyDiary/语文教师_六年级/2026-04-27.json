@@ -1,0 +1,57 @@
+{
+  "id": "study_diary_语文教师_六年级_2026-04-27",
+  "notebookId": "语文教师_六年级",
+  "notebookName": "语文教师👨‍🏫六年级",
+  "dateKey": "2026-04-27",
+  "createdAt": 1777291622184,
+  "updatedAt": 1777291622184,
+  "lastEntryAt": 1777291622184,
+  "entryIds": [
+    "study_log_1777291622184_53qofp"
+  ],
+  "entryRefs": [
+    {
+      "agentId": "_____________1777288955725",
+      "topicId": "default",
+      "entryId": "study_log_1777291622184_53qofp"
+    }
+  ],
+  "entryCount": 1,
+  "recallCount": 6,
+  "lastRecalledAt": 1777319632211,
+  "tags": [
+    "匆匆",
+    "朱自清",
+    "散文赏析",
+    "语文教学",
+    "时间哲学"
+  ],
+  "topicIds": [
+    "default"
+  ],
+  "topics": {
+    "default": {
+      "topicId": "default",
+      "topicName": "《匆匆》课文预习",
+      "entryIds": [
+        "study_log_1777291622184_53qofp"
+      ],
+      "count": 1
+    }
+  },
+  "agentIds": [
+    "_____________1777288955725"
+  ],
+  "agentNames": [
+    "语文教师👨‍🏫六年级"
+  ],
+  "sourceMessageIds": [
+    "user_1777291600978_6osbpk",
+    "assistant_1777291600986_0h72af"
+  ],
+  "subjectSignatures": [
+    "语文教师👨‍🏫六年级"
+  ],
+  "isPublicNotebook": false,
+  "contentMarkdown": "# DailyNote 2026-04-27\n\n> 日记本：[语文教师👨‍🏫六年级]\n\n## 《匆匆》课文预习\n\n#### 20:07:02 · 语文教师👨‍🏫六年级\n[20:06] 指导学生预习朱自清散文《匆匆》。\n核心教学点：\n1. 主旨：对时光流逝的感伤与对生命价值的追寻。\n2. 艺术手法：\n   - 叠词运用（头涔涔、泪潸潸）增加节奏感。\n   - 化无形为有形：将时间流逝具体化为洗手、吃饭等生活场景。\n   - 衬托手法：以自然界的循环（燕子、杨柳、桃花）衬托日子的不可逆。\n3. 关键数据：文中“八千多日子”对应作者约24岁，体现了作者对青春逝去的焦虑。\n4. 语言特色：柔婉清丽，充满诗意。\nTag: 匆匆, 朱自清, 散文赏析, 语文教学, 时间哲学\n\n\nSubject: [语文教师👨‍🏫六年级]语文教师👨‍🏫六年级\n\n\nTags: #匆匆 #朱自清 #散文赏析 #语文教学 #时间哲学"
+}

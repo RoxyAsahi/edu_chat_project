@@ -1,0 +1,56 @@
+{
+  "id": "study_diary_语文教师_六年级_2026-04-28",
+  "notebookId": "语文教师_六年级",
+  "notebookName": "语文教师👨‍🏫六年级",
+  "dateKey": "2026-04-28",
+  "createdAt": 1777317758007,
+  "updatedAt": 1777317758007,
+  "lastEntryAt": 1777317758007,
+  "entryIds": [
+    "study_log_1777317758007_ygff94"
+  ],
+  "entryRefs": [
+    {
+      "agentId": "_____________1777288955725",
+      "topicId": "default",
+      "entryId": "study_log_1777317758007_ygff94"
+    }
+  ],
+  "entryCount": 1,
+  "recallCount": 2,
+  "lastRecalledAt": 1777319632211,
+  "tags": [
+    "朱自清",
+    "文学常识",
+    "散文风格",
+    "民族气节"
+  ],
+  "topicIds": [
+    "default"
+  ],
+  "topics": {
+    "default": {
+      "topicId": "default",
+      "topicName": "《匆匆》课文预习",
+      "entryIds": [
+        "study_log_1777317758007_ygff94"
+      ],
+      "count": 1
+    }
+  },
+  "agentIds": [
+    "_____________1777288955725"
+  ],
+  "agentNames": [
+    "语文教师👨‍🏫六年级"
+  ],
+  "sourceMessageIds": [
+    "user_1777317630910_61y4x8",
+    "assistant_1777317630927_zxsiah"
+  ],
+  "subjectSignatures": [
+    "朱自清人物志"
+  ],
+  "isPublicNotebook": false,
+  "contentMarkdown": "# DailyNote 2026-04-28\n\n> 日记本：[语文教师👨‍🏫六年级]\n\n## 《匆匆》课文预习\n\n#### 03:22:38 · 朱自清人物志\n[03:25] 补充朱自清生平及文学成就资料。\n1. 人物特质：自号“自清”，典出《楚辞》，象征廉洁正直。晚年坚守民族气节，拒绝领取美国救济粮。\n2. 文学地位：现代著名散文家、诗人，白话散文的典范。\n3. 风格标签：细腻、真挚、音韵和谐（如《匆匆》中的排比与叠词）。\n4. 核心作品：\n   - 《背影》（亲情）\n   - 《荷塘月色》（景语情语）\n   - 《匆匆》（时间哲学）\n   - 《春》（自然生机）\nTag: 朱自清, 文学常识, 散文风格, 民族气节\n\n\nSubject: [语文教师👨‍🏫六年级]朱自清人物志\n\n\nTags: #朱自清 #文学常识 #散文风格 #民族气节"
+}
