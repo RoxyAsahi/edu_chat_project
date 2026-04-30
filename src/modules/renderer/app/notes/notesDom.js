@@ -70,6 +70,8 @@ function createNotesDom(deps = {}) {
     const getGeneratedVisibleNotes = deps.getGeneratedVisibleNotes || (() => []);
     const getManualLibraryNotes = deps.getManualLibraryNotes || (() => []);
     const getManualLibrarySubjectFilters = deps.getManualLibrarySubjectFilters || (() => []);
+    const getDiaryWallTabs = deps.getDiaryWallTabs || (() => []);
+    const getDiaryWallActiveFilter = deps.getDiaryWallActiveFilter || (() => 'all');
     const resolveManualNotesLibraryFilter = deps.resolveManualNotesLibraryFilter || ((filter) => String(filter || 'all'));
     const getActiveNote = deps.getActiveNote || (() => null);
     const getCurrentTopicDisplayName = deps.getCurrentTopicDisplayName || (() => '请选择一个话题');
@@ -868,13 +870,18 @@ function createNotesDom(deps = {}) {
             return;
         }
 
+        const isDiaryPanel = state.manualNotesLibraryActivePanel === 'diary';
         const agents = Array.isArray(state.agents) ? state.agents : [];
-        let currentFilter = resolveManualNotesLibraryFilter(state.manualNotesLibraryFilter || 'all') || 'all';
-        const requestedFilter = String(state.manualNotesLibraryFilter || 'all');
-        if (currentFilter !== requestedFilter) {
-            state.manualNotesLibraryFilter = currentFilter;
+        let currentFilter = isDiaryPanel
+            ? String(getDiaryWallActiveFilter() || 'all')
+            : resolveManualNotesLibraryFilter(state.manualNotesLibraryFilter || 'all') || 'all';
+        if (!isDiaryPanel) {
+            const requestedFilter = String(state.manualNotesLibraryFilter || 'all');
+            if (currentFilter !== requestedFilter) {
+                state.manualNotesLibraryFilter = currentFilter;
+            }
         }
-        const isAnalysisFilter = currentFilter === 'analysis';
+        const isAnalysisFilter = !isDiaryPanel && currentFilter === 'analysis';
         const libraryNotes = getManualLibraryNotes(currentFilter);
         const pendingAnalysisGenerations = isAnalysisFilter && Array.isArray(state.pendingAnalysisGenerations)
             ? state.pendingAnalysisGenerations
@@ -897,11 +904,21 @@ function createNotesDom(deps = {}) {
             el.manualNotesLibrarySubjectToggle.setAttribute('aria-expanded', String(!tabsCollapsed));
         }
         if (el.manualNotesLibrarySubjectTabs) {
-            const tabs = [
-                { id: 'all', label: '筛选' },
-                { id: 'analysis', label: '深度分析' },
-                ...subjectFilters,
-            ].filter(Boolean);
+            const isDiaryPanel = state.manualNotesLibraryActivePanel === 'diary';
+            let tabs;
+            if (isDiaryPanel) {
+                const diaryTabs = getDiaryWallTabs();
+                if (diaryTabs.length > 0 && diaryTabs[0].id === 'all') {
+                    diaryTabs[0] = { ...diaryTabs[0], label: '筛选' };
+                }
+                tabs = diaryTabs.filter(Boolean);
+            } else {
+                tabs = [
+                    { id: 'all', label: '筛选' },
+                    { id: 'analysis', label: '深度分析' },
+                    ...subjectFilters,
+                ].filter(Boolean);
+            }
             el.manualNotesLibrarySubjectTabs.innerHTML = tabs.map((tab) => {
                 const isActive = String(tab.id) === currentFilter;
                 return `<button type="button" class="manual-notes-library-page__subject-tab${isActive ? ' manual-notes-library-page__subject-tab--active' : ''}" data-subject-filter="${escapeHtml(tab.id)}" role="tab" aria-selected="${isActive ? 'true' : 'false'}">${escapeHtml(tab.label)}</button>`;

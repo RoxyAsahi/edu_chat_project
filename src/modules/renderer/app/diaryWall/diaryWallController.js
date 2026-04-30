@@ -250,6 +250,7 @@ function createDiaryWallController(deps = {}) {
     const showSubjectWorkspace = deps.showSubjectWorkspace || (() => {});
     const onOpen = deps.onOpen || (() => {});
     const onClose = deps.onClose || (() => {});
+    const onAfterRefresh = deps.onAfterRefresh || (() => {});
 
     const state = {
         open: false,
@@ -991,6 +992,7 @@ function createDiaryWallController(deps = {}) {
         renderCards();
         state.detail = null;
         renderDetail();
+        onAfterRefresh();
     }
 
     function open(options = {}) {
@@ -1009,6 +1011,7 @@ function createDiaryWallController(deps = {}) {
             renderAgentNav();
             renderSummary();
             renderCards();
+            onAfterRefresh();
             return;
         }
         void refresh();
@@ -1185,6 +1188,10 @@ function createDiaryWallController(deps = {}) {
         open,
         refresh,
         setAgentFilter,
+        getAgentTabs,
+        get activeAgentFilter() {
+            return state.activeAgentFilter;
+        },
     };
 }
 

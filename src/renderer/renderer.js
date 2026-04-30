@@ -299,6 +299,12 @@ notesController = createNotesController({
     closeSourceFileActionMenu,
     updateCurrentChatHistory,
     onManualNotesLibraryFilterChange: (filter) => diaryWallController?.setAgentFilter?.(filter),
+    getDiaryWallTabs: () => diaryWallController?.getAgentTabs?.() || [],
+    getDiaryWallActiveFilter: () => diaryWallController?.activeAgentFilter || 'all',
+    setDiaryWallAgentFilter: (filter) => {
+        diaryWallController?.setAgentFilter?.(filter);
+        notesController?.renderManualNotesLibrary?.();
+    },
 });
   logsController = createLogsController({
       store,
@@ -332,6 +338,9 @@ diaryWallController = createDiaryWallController({
     },
     onClose: () => {
         setManualNotesLibraryPanel('notes', { skipDiaryClose: true });
+    },
+    onAfterRefresh: () => {
+        notesController?.renderManualNotesLibrary?.();
     },
 });
 dynamicIslandController = createDynamicIslandController({
@@ -717,6 +726,8 @@ function setManualNotesLibraryPanel(panel, options = {}) {
     el.manualNotesLibraryDiaryTabBtn?.classList.toggle('notes-studio-panel-switch__btn--active', showDiary);
     el.manualNotesLibraryNotesTabBtn?.setAttribute('aria-selected', showDiary ? 'false' : 'true');
     el.manualNotesLibraryDiaryTabBtn?.setAttribute('aria-selected', showDiary ? 'true' : 'false');
+
+    notesController?.setManualNotesLibraryActivePanel?.(nextPanel);
 
     if (showDiary && options.skipDiaryOpen !== true) {
         diaryWallController?.open?.();
