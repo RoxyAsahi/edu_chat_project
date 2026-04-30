@@ -215,6 +215,11 @@ function createTopicListDom() {
     };
 }
 
+async function flushAsyncWork() {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 test('workspace subject fallback avatar uses the app logo', async () => {
     const { DEFAULT_AGENT_AVATAR } = await loadWorkspaceModule();
 
@@ -580,6 +585,97 @@ test('overview subject cards open subject management from the right-click menu',
     assert.match(subjectPanelCalls[0].triggerText, /学科管理/);
     assert.deepEqual(subjectPanelCalls[0].optionKeys, []);
     assert.equal(harness.state.session.currentSelectedItem.id, 'math');
+});
+
+test('new subject dialog configures the emoji picker as soon as it is created', async (t) => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const dom = new JSDOM('<body></body>');
+    const previousDocument = global.document;
+    const previousRequestAnimationFrame = global.requestAnimationFrame;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = (callback) => dom.window.setTimeout(callback, 0);
+    t.after(() => {
+        global.document = previousDocument;
+        global.requestAnimationFrame = previousRequestAnimationFrame;
+        dom.window.close();
+    });
+
+    const configureCalls = [];
+    dom.window.UniStudyEmojiPicker = {
+        configure(picker, options) {
+            configureCalls.push({ picker, options });
+        },
+    };
+    const harness = createControllerHarness();
+    harness.state.session.agents = [{ id: 'agent-1', name: '语文' }];
+
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        windowObj: dom.window,
+        documentObj: dom.window.document,
+    });
+
+    const createPromise = controller.createAgent();
+    const picker = dom.window.document.querySelector('emoji-picker');
+    assert.ok(picker);
+    assert.equal(configureCalls.length, 1);
+    assert.equal(configureCalls[0].picker, picker);
+
+    dom.window.document.querySelector('.subject-emoji-picker__trigger').click();
+    await flushAsyncWork();
+    assert.equal(configureCalls.length, 1);
+    assert.equal(dom.window.document.querySelector('.subject-emoji-picker__popover').classList.contains('hidden'), false);
+
+    dom.window.document.querySelector('.confirm-dialog-cancel').click();
+    await createPromise;
+});
+
+test('new subject dialog waits for the bundled emoji picker before opening', async (t) => {
+    const { createWorkspaceController } = await loadWorkspaceModule();
+    const dom = new JSDOM('<body></body>');
+    const previousDocument = global.document;
+    const previousRequestAnimationFrame = global.requestAnimationFrame;
+    global.document = dom.window.document;
+    global.requestAnimationFrame = (callback) => dom.window.setTimeout(callback, 0);
+    t.after(() => {
+        global.document = previousDocument;
+        global.requestAnimationFrame = previousRequestAnimationFrame;
+        dom.window.close();
+    });
+
+    let resolveWhenDefined;
+    const whenDefinedPromise = new Promise((resolve) => {
+        resolveWhenDefined = resolve;
+    });
+    dom.window.customElements.whenDefined = () => whenDefinedPromise;
+
+    const configureCalls = [];
+    const harness = createControllerHarness();
+    const controller = createWorkspaceController({
+        ...harness.deps,
+        windowObj: dom.window,
+        documentObj: dom.window.document,
+    });
+
+    const createPromise = controller.createAgent();
+    dom.window.document.querySelector('.subject-emoji-picker__trigger').click();
+    await flushAsyncWork();
+    assert.equal(configureCalls.length, 0);
+    assert.equal(dom.window.document.querySelector('.subject-emoji-picker__popover').classList.contains('hidden'), true);
+
+    dom.window.UniStudyEmojiPicker = {
+        configure(picker, options) {
+            configureCalls.push({ picker, options });
+        },
+    };
+    resolveWhenDefined();
+    await flushAsyncWork();
+
+    assert.equal(configureCalls.length, 1);
+    assert.equal(dom.window.document.querySelector('.subject-emoji-picker__popover').classList.contains('hidden'), false);
+
+    dom.window.document.querySelector('.confirm-dialog-cancel').click();
+    await createPromise;
 });
 
 test('createTopic creates a placeholder topic without opening the prompt dialog', async () => {
