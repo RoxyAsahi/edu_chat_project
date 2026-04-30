@@ -1,0 +1,111 @@
+[
+  {
+    "id": "study_log_1777317758007_ygff94",
+    "agentId": "_____________1777288955725",
+    "agentNameSnapshot": "语文教师👨‍🏫六年级",
+    "topicId": "default",
+    "topicNameSnapshot": "《匆匆》课文预习",
+    "createdAt": 1777317758007,
+    "updatedAt": 1777317758007,
+    "dateKey": "2026-04-28",
+    "studentNameSnapshot": "多多",
+    "workspaceSnapshot": "",
+    "environmentSnapshot": "",
+    "sourceMessageIds": [
+      "user_1777317630910_61y4x8",
+      "assistant_1777317630927_zxsiah"
+    ],
+    "toolRequest": {
+      "toolName": "DailyNote",
+      "command": "create",
+      "args": {
+        "subject": "[语文教师👨‍🏫六年级]朱自清人物志",
+        "command": "create",
+        "Date": "2026-04-28",
+        "Content": "[03:25] 补充朱自清生平及文学成就资料。\n1. 人物特质：自号“自清”，典出《楚辞》，象征廉洁正直。晚年坚守民族气节，拒绝领取美国救济粮。\n2. 文学地位：现代著名散文家、诗人，白话散文的典范。\n3. 风格标签：细腻、真挚、音韵和谐（如《匆匆》中的排比与叠词）。\n4. 核心作品：\n   - 《背影》（亲情）\n   - 《荷塘月色》（景语情语）\n   - 《匆匆》（时间哲学）\n   - 《春》（自然生机）\nTag: 朱自清, 文学常识, 散文风格, 民族气节",
+        "Tag": "",
+        "target": "",
+        "replace": "",
+        "archery": "no_reply"
+      }
+    },
+    "contentMarkdown": "[03:25] 补充朱自清生平及文学成就资料。\n1. 人物特质：自号“自清”，典出《楚辞》，象征廉洁正直。晚年坚守民族气节，拒绝领取美国救济粮。\n2. 文学地位：现代著名散文家、诗人，白话散文的典范。\n3. 风格标签：细腻、真挚、音韵和谐（如《匆匆》中的排比与叠词）。\n4. 核心作品：\n   - 《背影》（亲情）\n   - 《荷塘月色》（景语情语）\n   - 《匆匆》（时间哲学）\n   - 《春》（自然生机）\nTag: 朱自清, 文学常识, 散文风格, 民族气节",
+    "tags": [
+      "朱自清",
+      "文学常识",
+      "散文风格",
+      "民族气节"
+    ],
+    "status": "written",
+    "recallCount": 2,
+    "lastRecalledAt": 1777319632216,
+    "filePath": "",
+    "topicTag": "",
+    "agentTag": "",
+    "modelSnapshot": "",
+    "notebookId": "语文教师_六年级",
+    "notebookName": "语文教师👨‍🏫六年级",
+    "diaryId": "study_diary_语文教师_六年级_2026-04-28",
+    "subjectRaw": "[语文教师👨‍🏫六年级]朱自清人物志",
+    "subjectSignature": "朱自清人物志",
+    "requestedToolName": "DailyNote",
+    "requestedCommand": "create",
+    "archery": "no_reply",
+    "isPublicNotebook": false
+  },
+  {
+    "id": "study_log_1777291622184_53qofp",
+    "agentId": "_____________1777288955725",
+    "agentNameSnapshot": "语文教师👨‍🏫六年级",
+    "topicId": "default",
+    "topicNameSnapshot": "《匆匆》课文预习",
+    "createdAt": 1777291622184,
+    "updatedAt": 1777291622184,
+    "dateKey": "2026-04-27",
+    "studentNameSnapshot": "多多",
+    "workspaceSnapshot": "",
+    "environmentSnapshot": "",
+    "sourceMessageIds": [
+      "user_1777291600978_6osbpk",
+      "assistant_1777291600986_0h72af"
+    ],
+    "toolRequest": {
+      "toolName": "DailyNote",
+      "command": "create",
+      "args": {
+        "subject": "[语文教师👨‍🏫六年级]语文教师👨‍🏫六年级",
+        "command": "create",
+        "Date": "2026-04-27",
+        "Content": "[20:06] 指导学生预习朱自清散文《匆匆》。\n核心教学点：\n1. 主旨：对时光流逝的感伤与对生命价值的追寻。\n2. 艺术手法：\n   - 叠词运用（头涔涔、泪潸潸）增加节奏感。\n   - 化无形为有形：将时间流逝具体化为洗手、吃饭等生活场景。\n   - 衬托手法：以自然界的循环（燕子、杨柳、桃花）衬托日子的不可逆。\n3. 关键数据：文中“八千多日子”对应作者约24岁，体现了作者对青春逝去的焦虑。\n4. 语言特色：柔婉清丽，充满诗意。\nTag: 匆匆, 朱自清, 散文赏析, 语文教学, 时间哲学",
+        "Tag": "",
+        "target": "",
+        "replace": "",
+        "archery": "no_reply"
+      }
+    },
+    "contentMarkdown": "[20:06] 指导学生预习朱自清散文《匆匆》。\n核心教学点：\n1. 主旨：对时光流逝的感伤与对生命价值的追寻。\n2. 艺术手法：\n   - 叠词运用（头涔涔、泪潸潸）增加节奏感。\n   - 化无形为有形：将时间流逝具体化为洗手、吃饭等生活场景。\n   - 衬托手法：以自然界的循环（燕子、杨柳、桃花）衬托日子的不可逆。\n3. 关键数据：文中“八千多日子”对应作者约24岁，体现了作者对青春逝去的焦虑。\n4. 语言特色：柔婉清丽，充满诗意。\nTag: 匆匆, 朱自清, 散文赏析, 语文教学, 时间哲学",
+    "tags": [
+      "匆匆",
+      "朱自清",
+      "散文赏析",
+      "语文教学",
+      "时间哲学"
+    ],
+    "status": "written",
+    "recallCount": 6,
+    "lastRecalledAt": 1777319632216,
+    "filePath": "",
+    "topicTag": "",
+    "agentTag": "",
+    "modelSnapshot": "",
+    "notebookId": "语文教师_六年级",
+    "notebookName": "语文教师👨‍🏫六年级",
+    "diaryId": "study_diary_语文教师_六年级_2026-04-27",
+    "subjectRaw": "[语文教师👨‍🏫六年级]语文教师👨‍🏫六年级",
+    "subjectSignature": "语文教师👨‍🏫六年级",
+    "requestedToolName": "DailyNote",
+    "requestedCommand": "create",
+    "archery": "no_reply",
+    "isPublicNotebook": false
+  }
+]

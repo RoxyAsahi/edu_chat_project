@@ -1,4 +1,5 @@
 const fs = require('fs-extra');
+const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { createClient } = require('@libsql/client');
@@ -59,12 +60,35 @@ const KNOWLEDGE_BASE_SCHEMA = [
     'CREATE INDEX IF NOT EXISTS idx_kb_chunk_document_id ON kb_chunk(document_id)',
 ];
 
+function isAsarPath(filePath) {
+    return String(filePath || '').split(path.sep).includes('app.asar')
+        || String(filePath || '').includes('.asar/');
+}
+
+async function getSourceStat(sourcePath) {
+    try {
+        return await fs.stat(sourcePath);
+    } catch (_error) {
+        return null;
+    }
+}
+
+async function sourcePathExists(sourcePath) {
+    return Boolean(await getSourceStat(sourcePath));
+}
+
+async function copySourceFile(sourcePath, targetPath) {
+    await fs.ensureDir(path.dirname(targetPath));
+    const contents = await fs.readFile(sourcePath);
+    await fs.writeFile(targetPath, contents);
+}
+
 async function copyMissingTree(sourcePath, targetPath) {
-    if (!await fs.pathExists(sourcePath)) {
+    const stat = await getSourceStat(sourcePath);
+    if (!stat) {
         return { copiedFiles: 0, skippedFiles: 0, copiedFilePaths: [] };
     }
 
-    const stat = await fs.stat(sourcePath);
     if (stat.isDirectory()) {
         await fs.ensureDir(targetPath);
         let copiedFiles = 0;
@@ -89,8 +113,7 @@ async function copyMissingTree(sourcePath, targetPath) {
         return { copiedFiles: 0, skippedFiles: 1, copiedFilePaths: [] };
     }
 
-    await fs.ensureDir(path.dirname(targetPath));
-    await fs.copy(sourcePath, targetPath, { overwrite: false, errorOnExist: false });
+    await copySourceFile(sourcePath, targetPath);
     return { copiedFiles: 1, skippedFiles: 0, copiedFilePaths: [targetPath] };
 }
 
@@ -182,16 +205,54 @@ async function insertRowsIfMissing(targetDb, tableName, rows, mutateRow = null) 
     return insertedRows;
 }
 
+async function rewriteKnowledgeBaseStoredPaths(dbPath, targetFilesDir) {
+    const db = createClient({ url: `file:${dbPath}` });
+
+    try {
+        const result = await db.execute('SELECT id, stored_path FROM kb_document');
+        for (const row of result.rows || []) {
+            const documentId = String(row.id || '').trim();
+            const storedPath = String(row.stored_path || '').trim();
+            if (!documentId || !storedPath) {
+                continue;
+            }
+
+            await db.execute({
+                sql: 'UPDATE kb_document SET stored_path = ? WHERE id = ?',
+                args: [path.join(targetFilesDir, path.basename(storedPath)), documentId],
+            });
+        }
+    } finally {
+        if (typeof db.close === 'function') {
+            await db.close();
+        }
+    }
+}
+
 async function importSeedKnowledgeBase({ dataRoot, seedRoot }) {
     const seedDbPath = path.join(seedRoot, 'KnowledgeBase', 'knowledge-base.db');
-    if (!await fs.pathExists(seedDbPath)) {
+    if (!await sourcePathExists(seedDbPath)) {
         return { knowledgeBases: 0, documents: 0, chunks: 0 };
     }
 
     const targetDbPath = path.join(dataRoot, 'KnowledgeBase', 'knowledge-base.db');
-    const seedDb = createClient({ url: `file:${seedDbPath}` });
-    const targetDb = await initializeKnowledgeBaseDb(targetDbPath);
     const targetFilesDir = path.join(dataRoot, 'KnowledgeBase', 'files');
+    if (isAsarPath(seedDbPath) && !await fs.pathExists(targetDbPath)) {
+        await copySourceFile(seedDbPath, targetDbPath);
+        await rewriteKnowledgeBaseStoredPaths(targetDbPath, targetFilesDir);
+        return { knowledgeBases: 0, documents: 0, chunks: 0 };
+    }
+
+    let readableSeedDbPath = seedDbPath;
+    let tempSeedDbRoot = null;
+    if (isAsarPath(seedDbPath)) {
+        tempSeedDbRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-seed-kb-'));
+        readableSeedDbPath = path.join(tempSeedDbRoot, 'knowledge-base.db');
+        await copySourceFile(seedDbPath, readableSeedDbPath);
+    }
+
+    const seedDb = createClient({ url: `file:${readableSeedDbPath}` });
+    const targetDb = await initializeKnowledgeBaseDb(targetDbPath);
 
     try {
         const knowledgeBases = (await seedDb.execute('SELECT * FROM knowledge_base')).rows || [];
@@ -213,11 +274,14 @@ async function importSeedKnowledgeBase({ dataRoot, seedRoot }) {
         if (typeof targetDb.close === 'function') {
             await targetDb.close();
         }
+        if (tempSeedDbRoot) {
+            await fs.remove(tempSeedDbRoot);
+        }
     }
 }
 
 async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
-    if (!dataRoot || !seedRoot || !await fs.pathExists(seedRoot)) {
+    if (!dataRoot || !seedRoot || !await sourcePathExists(seedRoot)) {
         return {
             copiedFiles: 0,
             skippedFiles: 0,
@@ -231,6 +295,8 @@ async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
         'Agents',
         'UserData',
         path.join('KnowledgeBase', 'files'),
+        'StudyLogs',
+        'StudyDiary',
     ];
 
     let copiedFiles = 0;
@@ -269,4 +335,5 @@ module.exports = {
     hydrateHistoryAttachmentPaths,
     importSeedKnowledgeBase,
     seedDefaultDataRoot,
+    sourcePathExists,
 };
