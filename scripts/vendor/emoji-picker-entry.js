@@ -233,10 +233,12 @@ function configurePicker(picker, options = {}) {
     }
     const locale = normalizeLocale(options.locale || navigator.language || 'zh-CN');
     const dataSource = getDataSource(locale);
+    const database = getDatabase(locale);
+    setPickerDatabase(picker, database);
     picker.i18n = I18N_BY_LOCALE[locale] || en;
     picker.locale = locale;
     picker.dataSource = dataSource;
-    setPickerDatabase(picker, getDatabase(locale));
+    setPickerDatabase(picker, database);
 }
 
 function configureExistingPickers() {

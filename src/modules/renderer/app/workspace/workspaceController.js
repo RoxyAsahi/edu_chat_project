@@ -1931,6 +1931,52 @@ function createWorkspaceController(deps = {}) {
             document.body.appendChild(overlay);
 
             const picker = emojiPopover.querySelector('emoji-picker');
+            let isEmojiPickerConfigured = false;
+            let emojiPickerConfigurePromise = null;
+
+            const applyEmojiPickerConfig = () => {
+                if (!picker) {
+                    return false;
+                }
+                picker.classList.toggle('dark', documentObj.body.classList.contains('dark-theme'));
+                picker.classList.toggle('light', !documentObj.body.classList.contains('dark-theme'));
+                const configure = windowObj.UniStudyEmojiPicker?.configure;
+                if (typeof configure !== 'function') {
+                    return false;
+                }
+                configure(picker, {
+                    locale: windowObj.navigator?.language || 'zh-CN',
+                });
+                isEmojiPickerConfigured = true;
+                return true;
+            };
+
+            const configureEmojiPicker = async () => {
+                if (isEmojiPickerConfigured) {
+                    return true;
+                }
+                if (applyEmojiPickerConfig()) {
+                    return true;
+                }
+                if (!emojiPickerConfigurePromise) {
+                    emojiPickerConfigurePromise = Promise.resolve()
+                        .then(() => windowObj.customElements?.whenDefined?.('emoji-picker'))
+                        .then(() => new Promise((resolveReady) => {
+                            windowObj.requestAnimationFrame?.(() => resolveReady()) || windowObj.setTimeout?.(resolveReady, 0) || resolveReady();
+                        }))
+                        .then(() => applyEmojiPickerConfig())
+                        .catch((error) => {
+                            console.error('[UniStudyEmojiPicker] Failed to configure new subject picker:', error);
+                            return false;
+                        })
+                        .finally(() => {
+                            emojiPickerConfigurePromise = null;
+                        });
+                }
+                return emojiPickerConfigurePromise;
+            };
+
+            void configureEmojiPicker();
 
             const cleanup = (value) => {
                 document.removeEventListener('keydown', handleKeydown);
@@ -1962,12 +2008,7 @@ function createWorkspaceController(deps = {}) {
             };
 
             const openEmojiPicker = async () => {
-                const configure = windowObj.UniStudyEmojiPicker?.configure;
-                if (typeof configure === 'function') {
-                    configure(picker, {
-                        locale: windowObj.navigator?.language || 'zh-CN',
-                    });
-                }
+                await configureEmojiPicker();
                 emojiPopover.classList.remove('hidden');
                 emojiPopover.setAttribute('aria-hidden', 'false');
                 emojiTrigger.setAttribute('aria-expanded', 'true');
