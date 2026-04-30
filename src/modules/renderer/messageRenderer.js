@@ -57,11 +57,55 @@ import * as contextMenu from './messageContextMenu.js';
 function protectLatexBlocks(text) {
     const map = new Map();
     let id = 0;
+    const codeFenceMap = new Map();
+    let codeFenceId = 0;
 
-    // Preserve display math before inline math, and keep both \[...\] and \(...\).
+    // Protect fenced code first so $ and $$ inside code never consume nearby math blocks.
+    const lines = text.split('\n');
+    const resultLines = [];
+    let fenceStartLine = -1;
+    let fenceBacktickCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const trimmed = lines[i].trimStart();
+
+        if (fenceStartLine === -1) {
+            const openMatch = trimmed.match(/^(`{3,})/);
+            if (openMatch) {
+                fenceStartLine = resultLines.length;
+                fenceBacktickCount = openMatch[1].length;
+            }
+            resultLines.push(lines[i]);
+            continue;
+        }
+
+        resultLines.push(lines[i]);
+        const closeMatch = trimmed.match(/^(`{3,})\s*$/);
+        if (closeMatch && closeMatch[1].length >= fenceBacktickCount) {
+            const blockLines = resultLines.splice(fenceStartLine);
+            const blockContent = blockLines.join('\n');
+            const placeholder = `%%CODEFENCE_FOR_LATEX_${codeFenceId}%%`;
+            codeFenceMap.set(placeholder, blockContent);
+            codeFenceId++;
+            resultLines.push(placeholder);
+            fenceStartLine = -1;
+            fenceBacktickCount = 0;
+        }
+    }
+
+    if (fenceStartLine !== -1) {
+        const blockLines = resultLines.splice(fenceStartLine);
+        const blockContent = blockLines.join('\n');
+        const placeholder = `%%CODEFENCE_FOR_LATEX_${codeFenceId}%%`;
+        codeFenceMap.set(placeholder, blockContent);
+        codeFenceId++;
+        resultLines.push(placeholder);
+    }
+
+    let processed = resultLines.join('\n');
 
     // 1. Protect $$...$$ display math blocks.
-    text = text.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+    processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
         const placeholder = `%%LATEX_BLOCK_${id}%%`;
         map.set(placeholder, match);
         id++;
@@ -69,7 +113,7 @@ function protectLatexBlocks(text) {
     });
 
     // 2. Protect \[...\] display math blocks.
-    text = text.replace(/\\\[([\s\S]*?)\\\]/g, (match) => {
+    processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, (match) => {
         const placeholder = `%%LATEX_BLOCK_${id}%%`;
         map.set(placeholder, match);
         id++;
@@ -77,7 +121,7 @@ function protectLatexBlocks(text) {
     });
 
     // 3. Protect \(...\) inline math blocks.
-    text = text.replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
+    processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
         const placeholder = `%%LATEX_BLOCK_${id}%%`;
         map.set(placeholder, match);
         id++;
@@ -85,7 +129,7 @@ function protectLatexBlocks(text) {
     });
 
     // 4. Protect $...$ inline math without crossing lines or catching prices.
-    text = text.replace(/\$([^\$\n]+?)\$/g, (match, content) => {
+    processed = processed.replace(/\$([^\$\n]+?)\$/g, (match, content) => {
         // Skip values that look like prices, for example $100.
         if (/^\d/.test(content.trim())) return match;
         const placeholder = `%%LATEX_BLOCK_${id}%%`;
@@ -94,7 +138,11 @@ function protectLatexBlocks(text) {
         return placeholder;
     });
 
-    return { text, map };
+    for (const [placeholder, original] of codeFenceMap.entries()) {
+        processed = processed.split(placeholder).join(original);
+    }
+
+    return { text: processed, map };
 }
 
 /**
@@ -120,8 +168,8 @@ const BUTTON_CLICK_REGEX = /\[\[(?:\u70b9\u51fb\u6309\u94ae):(.*?)\]\]/gs;
 const CANVAS_PLACEHOLDER_REGEX = /\{\{ChatCanvas\}\}/g;
 const STYLE_REGEX = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
 const MERMAID_CODE_REGEX = /<code.*?>\s*(flowchart|graph|mermaid)\s+([\s\S]*?)<\/code>/gi;
-const MERMAID_FENCE_REGEX = /```(mermaid|flowchart|graph)\n([\s\S]*?)```/g;
-const CODE_FENCE_REGEX = /```\w*([\s\S]*?)```/g;
+const MERMAID_FENCE_REGEX = /```(mermaid|flowchart|graph)[^\S\n]*\n([\s\S]*?)```/g;
+const CODE_FENCE_REGEX = /```[^\n]*([\s\S]*?)```/g;
 const THOUGHT_CHAIN_REGEX = /\[--- \u6a21\u578b\u601d\u8003\u8fc7\u7a0b(?::\s*"([^"]*)")?\s*---\]([\s\S]*?)\[--- \u6a21\u578b\u601d\u8003\u8fc7\u7a0b\u7ed3\u675f ---\]/gs;
 const CONVENTIONAL_THOUGHT_REGEX = /<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/gi;
 const ROLE_DIVIDER_REGEX = /<<<\[(END_)?ROLE_DIVIDE_(SYSTEM|ASSISTANT|USER)\]>>>/g;
@@ -990,7 +1038,7 @@ function extractAssistantScopedStyles(text, scopeId, options = {}) {
 
     let restoredContent = processedContent;
     protectedBlocks.forEach((block, i) => {
-        restoredContent = restoredContent.replace(`__STYLE_PROTECT_${i}__`, block);
+        restoredContent = restoredContent.split(`__STYLE_PROTECT_${i}__`).join(block);
     });
 
     return { content: restoredContent, styleText };
