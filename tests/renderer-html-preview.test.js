@@ -198,6 +198,40 @@ test('messageRenderer renders open-webui style thinking skeleton with synced tex
     );
 });
 
+test('messageRenderer keeps dollars inside code fences from consuming LaTeX blocks', async (t) => {
+    const { chatMessages, history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-code-latex-race',
+        role: 'assistant',
+        name: 'Tutor',
+        content: [
+            'Check this parser case:',
+            '```python',
+            "if b'$$' in data:",
+            '    pass',
+            '```',
+            '',
+            '$$',
+            'a+b',
+            '$$',
+        ].join('\n'),
+        timestamp: Date.UTC(2026, 3, 26, 8, 0),
+    };
+    history.push(message);
+
+    await messageRenderer.renderMessage(message);
+
+    const content = chatMessages.querySelector('.message-item[data-message-id="assistant-code-latex-race"] .md-content');
+    assert.ok(content);
+    const code = content.querySelector('pre code');
+    assert.ok(code);
+    assert.match(code.textContent, /if b'\$\$' in data:/);
+    assert.match(code.textContent, /pass/);
+    assert.doesNotMatch(code.textContent, /a\+b/);
+    assert.match(content.textContent, /\$\$\s*a\+b\s*\$\$/);
+    assert.doesNotMatch(content.textContent, /%%LATEX_BLOCK_/);
+});
+
 test('messageRenderer wraps raw doctype HTML into a VCPChat-style preview toggle', async (t) => {
     const { chatMessages, history, messageRenderer } = await createHarness(t);
     const message = {

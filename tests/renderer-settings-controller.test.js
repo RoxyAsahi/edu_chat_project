@@ -1227,7 +1227,11 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
                 return {
                     chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
                     chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
-                    defaultModel: 'Qwen/Qwen3.5-397B-A17B',
+                    defaultModel: 'glm-5.1',
+                    thinkingChatDefaultModel: 'Qwen/Qwen3.5-397B-A17B',
+                    studyToolDefaultModel: 'glm-5.1',
+                    guideModel: 'Qwen/Qwen3.5-35B-A3B',
+                    imageTranscriptionModel: 'Qwen/Qwen3.5-35B-A3B',
                     kbUseRerank: true,
                     kbTopK: 6,
                     kbCandidateTopK: 20,
@@ -1292,7 +1296,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     await controller.loadSettings();
     await flushAsyncWork();
 
-    assert.equal(el.defaultModelInput.value, 'Qwen/Qwen3.5-397B-A17B');
+    assert.equal(el.defaultModelInput.value, 'glm-5.1');
     assert.equal(el.thinkingChatDefaultModelInput.value, 'Qwen/Qwen3.5-397B-A17B');
     assert.match(el.modelServiceProviderList.textContent, /AI&P创新实践项目测试专用预设/);
     assert.match(el.modelServiceProviderList.textContent, /竞赛测试专用/);
@@ -1305,9 +1309,10 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3\.5-397B-A17B/);
     assert.match(el.modelServiceModelsPanel.textContent, /Qwen\/Qwen3\.5-122B-A10B/);
     assert.match(el.modelServiceModelsPanel.textContent, /deepseek-ai\/DeepSeek-V4-Flash/);
+    assert.match(el.modelServiceModelsPanel.textContent, /glm-5\.1/);
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chat"]')?.value || '',
-        /::Qwen\/Qwen3\.5-397B-A17B$/
+        /::glm-5\.1$/
     );
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="thinkingChat"]')?.value || '',
@@ -1315,7 +1320,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     );
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="chatFallback"]')?.value || '',
-        /::Qwen\/Qwen3\.5-122B-A10B$/
+        /::Pro\/moonshotai\/Kimi-K2\.6$/
     );
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="followUp"]')?.value || '',
@@ -1323,11 +1328,11 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
     );
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="sourceGuide"]')?.value || '',
-        /::Qwen\/Qwen3\.5-397B-A17B$/
+        /::Qwen\/Qwen3\.5-35B-A3B$/
     );
     assert.match(
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="imageTranscription"]')?.value || '',
-        /::Qwen\/Qwen3\.5-397B-A17B$/
+        /::Qwen\/Qwen3\.5-35B-A3B$/
     );
 });
 

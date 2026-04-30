@@ -123,6 +123,7 @@ test('ensureBuiltInTestProvider keeps the built-in provider models in the intend
             'Qwen/Qwen3.5-397B-A17B',
             'deepseek-ai/DeepSeek-V4-Flash',
             'Qwen/Qwen3.5-122B-A10B',
+            'glm-5.1',
         ]
     );
     assert.deepEqual(service.defaults.chat, {
@@ -165,11 +166,11 @@ test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P pre
     });
     assert.deepEqual(service.defaults.thinkingChat, {
         providerId: 'aip-test-provider',
-        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
+        modelId: modelService.AIP_TEST_THINKING_DEFAULT_MODEL,
     });
     assert.deepEqual(service.defaults.chatFallback, {
         providerId: 'aip-test-provider',
-        modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+        modelId: modelService.AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL,
     });
     assert.deepEqual(service.defaults.followUp, {
         providerId: 'aip-test-provider',
@@ -177,7 +178,7 @@ test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P pre
     });
     assert.deepEqual(service.defaults.studyTool, {
         providerId: 'aip-test-provider',
-        modelId: modelService.AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
     });
     assert.deepEqual(service.defaults.topicTitle, {
         providerId: 'aip-test-provider',
@@ -185,11 +186,11 @@ test('ensureBuiltInTestProvider fills current built-in defaults for the AI&P pre
     });
     assert.deepEqual(service.defaults.sourceGuide, {
         providerId: 'aip-test-provider',
-        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
+        modelId: modelService.AIP_TEST_SOURCE_DEFAULT_MODEL,
     });
     assert.deepEqual(service.defaults.imageTranscription, {
         providerId: 'aip-test-provider',
-        modelId: modelService.AIP_TEST_DEFAULT_MODEL,
+        modelId: modelService.AIP_TEST_SOURCE_DEFAULT_MODEL,
     });
 });
 

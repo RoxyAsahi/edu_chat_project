@@ -149,8 +149,11 @@ const AIP_TEST_PROVIDER_PRESET_ID = 'aip-innovation-practice-test';
 const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
 const AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
 const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
-const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
+const AIP_TEST_DEFAULT_MODEL = 'glm-5.1';
+const AIP_TEST_THINKING_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
+const AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL = 'Pro/moonshotai/Kimi-K2.6';
 const AIP_TEST_AUXILIARY_DEFAULT_MODEL = 'Qwen/Qwen3.5-122B-A10B';
+const AIP_TEST_SOURCE_DEFAULT_MODEL = 'Qwen/Qwen3.5-35B-A3B';
 const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
     {
         id: 'Qwen/Qwen3.6-35B-A3B',
@@ -202,7 +205,7 @@ const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
     },
     {
         id: 'deepseek-ai/DeepSeek-V4-Flash',
-        name: 'new-model',
+        name: 'deepseek-ai/DeepSeek-V4-Flash',
         group: 'chat',
         capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: true },
     },
@@ -211,6 +214,12 @@ const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
         name: 'Qwen/Qwen3.5-122B-A10B',
         group: 'chat',
         capabilities: { chat: true, embedding: false, rerank: false, vision: false, reasoning: false },
+    },
+    {
+        id: 'glm-5.1',
+        name: 'glm-5.1',
+        group: 'chat',
+        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
     },
 ]);
 const MODEL_SERVICE_PRESETS = Object.freeze([
@@ -650,13 +659,13 @@ function createBuiltInTestProviderDefaults(provider = {}) {
     );
     return {
         chat: refFor(AIP_TEST_DEFAULT_MODEL),
-        thinkingChat: refFor(AIP_TEST_DEFAULT_MODEL),
-        chatFallback: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        thinkingChat: refFor(AIP_TEST_THINKING_DEFAULT_MODEL),
+        chatFallback: refFor(AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL),
         followUp: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
-        studyTool: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
+        studyTool: refFor(AIP_TEST_DEFAULT_MODEL),
         topicTitle: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
-        sourceGuide: refFor(AIP_TEST_DEFAULT_MODEL),
-        imageTranscription: refFor(AIP_TEST_DEFAULT_MODEL),
+        sourceGuide: refFor(AIP_TEST_SOURCE_DEFAULT_MODEL),
+        imageTranscription: refFor(AIP_TEST_SOURCE_DEFAULT_MODEL),
         embedding: refFor('Qwen/Qwen3-VL-Embedding-8B'),
         rerank: refFor('Qwen/Qwen3-VL-Reranker-8B'),
     };

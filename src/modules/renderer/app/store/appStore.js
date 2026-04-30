@@ -19,8 +19,10 @@ function createDefaultModelService() {
 
 const AIP_TEST_CHAT_ENDPOINT = 'https://api.uniquest.top/v1/chat/completions';
 const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
-const AIP_TEST_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
+const AIP_TEST_DEFAULT_MODEL = 'glm-5.1';
+const AIP_TEST_THINKING_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
 const AIP_TEST_AUXILIARY_DEFAULT_MODEL = 'Qwen/Qwen3.5-122B-A10B';
+const AIP_TEST_SOURCE_DEFAULT_MODEL = 'Qwen/Qwen3.5-35B-A3B';
 
 const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{RenderingGuide}}
 
@@ -60,8 +62,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     modelService: createDefaultModelService(),
     chatEndpoint: AIP_TEST_CHAT_ENDPOINT,
     chatApiKey: AIP_TEST_API_KEY,
-    guideModel: '',
-    imageTranscriptionModel: '',
+    guideModel: AIP_TEST_SOURCE_DEFAULT_MODEL,
+    imageTranscriptionModel: AIP_TEST_SOURCE_DEFAULT_MODEL,
     kbBaseUrl: '',
     kbApiKey: '',
     kbEmbeddingModel: 'BAAI/bge-m3',
@@ -72,10 +74,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     kbScoreThreshold: 0.25,
     currentThemeMode: 'system',
     defaultModel: AIP_TEST_DEFAULT_MODEL,
-    thinkingChatDefaultModel: AIP_TEST_DEFAULT_MODEL,
+    thinkingChatDefaultModel: AIP_TEST_THINKING_DEFAULT_MODEL,
     thinkingChatReasoningEffort: 'low',
     followUpDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
-    studyToolDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
+    studyToolDefaultModel: AIP_TEST_DEFAULT_MODEL,
     topicTitleDefaultModel: AIP_TEST_AUXILIARY_DEFAULT_MODEL,
     enableRenderingPrompt: true,
     enableEmoticonPrompt: true,
