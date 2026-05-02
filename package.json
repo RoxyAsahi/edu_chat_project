@@ -70,8 +70,10 @@
   "build": {
     "appId": "com.unistudy.desktop",
     "productName": "UniStudy",
-    "icon": "src/assets/icon.png",
+    "icon": "icon.png",
+    "afterPack": "scripts/after-pack-win.js",
     "directories": {
+      "buildResources": "build-resources",
       "output": "dist"
     },
     "files": [
@@ -91,6 +93,7 @@
     ],
     "npmRebuild": false,
     "win": {
+      "icon": "icon.ico",
       "signAndEditExecutable": false,
       "target": [
         {
@@ -125,7 +128,13 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "installerIcon": "installerIcon.ico",
+      "uninstallerIcon": "uninstallerIcon.ico",
+      "installerHeaderIcon": "installerHeaderIcon.ico",
+      "installerHeader": "installerHeader.bmp",
+      "installerSidebar": "installerSidebar.bmp",
+      "uninstallerSidebar": "uninstallerSidebar.bmp"
     }
   }
 }
