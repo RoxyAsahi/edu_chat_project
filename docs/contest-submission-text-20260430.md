@@ -56,7 +56,7 @@ UniStudy 是一款面向多学科复习场景的桌面端个人 AI 学习终端�
 
 打包复现方式：
 
-项目提供 Windows 打包脚本，可执行 `npm run pack:win` 生成目录版应用，或执行 `npm run dist:win` 生成安装包与单文件绿色版 exe。当前提交材料建议同时包含 Windows 运行程序和源程序：运行程序首选根目录下的 `1-先运行-UniStudy安装包.exe`，备选包括 `2-免安装备用-UniStudy/UniStudy.exe`、`dist/UniStudy Setup 0.1.0.exe` 和 `dist/UniStudy 0.1.0.exe`；源程序包括 `src`、`scripts`、`vendor`、`package.json`、`package-lock.json`、`README.md`、`start.bat` 等源码和配置文件。
+项目提供 Windows 打包脚本，可执行 `npm run pack:win` 生成目录版应用，或执行 `npm run dist:win` 生成安装包与单文件绿色版 exe。当前提交材料建议同时包含 Windows 运行程序和源程序：运行程序首选根目录下的 `1-先运行-UniStudy安装包.exe`；`dist/` 和免安装目录版属于本地打包产物，可按需重新生成，不建议作为源码仓库根目录内容长期保留。源程序包括 `src`、`scripts`、`vendor`、`package.json`、`package-lock.json`、`README.md`、`start.bat` 等源码和配置文件。
 
 离线与联网说明：
 

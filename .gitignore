@@ -3,10 +3,14 @@
 AppData/
 node_modules/
 .tmp/
+.kilo/
+.lite-regression-data/
+.vs/
 tmp-*
 build/
 dist*/
 docs/test-reports/*.json
+debug-screenshot.png
 
 2-免安装备用-UniStudy/
 UniStudy-contest/
