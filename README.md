@@ -75,15 +75,47 @@ UniStudy 的功能围绕“建立学习空间 -> 对话探究 -> 接入资料 ->
 
 ### 环境要求
 
-- Node.js：建议使用当前 LTS 版本。
-- npm：随 Node.js 安装。
+- 推荐运行环境：Windows 10 / Windows 11 x64。
+- 评测或演示时优先使用根目录下的 `1-先运行-UniStudy安装包.exe` 安装包。安装包已包含 Electron 运行环境，不需要在评测电脑上额外安装 Node.js 或 npm。
+- 源程序运行仅用于开发调试和代码复现，需要 Node.js 与 npm。当前开发机版本为 Node.js v22.17.1、npm v11.6.4，Electron 实际锁定版本为 v37.10.3。
 - Windows / macOS / Linux：Electron 理论上跨平台，当前项目启动脚本和打包说明对 Windows 更完整。
-- 可访问 npm registry 与 Electron 下载镜像；国内网络环境可使用项目启动脚本内置的 npmmirror 配置。
+- 如果从源程序安装依赖，需要可访问 npm registry 与 Electron 下载镜像；国内网络环境可使用项目启动脚本内置的 npmmirror 配置。
 
-### 安装依赖
+### 推荐运行方式
+
+Windows 用户优先运行根目录下的安装包：
+
+```text
+1-先运行-UniStudy安装包.exe
+```
+
+安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。安装包会安装应用运行所需的 Electron 环境，不需要 Node.js 或 npm。
+
+如评测电脑不便安装，也可以使用免安装目录版：
+
+```text
+2-免安装备用-UniStudy/UniStudy.exe
+```
+
+这个 exe 需要和 `2-免安装备用-UniStudy` 文件夹内的 `resources`、`locales`、dll、`UniStudySeedData`，以及 `UniStudyData/.unistudy-portable` 标记文件放在一起，因此不要把 `UniStudy.exe` 单独移出该文件夹。应用运行数据会保存到 `2-免安装备用-UniStudy\UniStudyData`，不会写入安装目录。不要再使用根目录里的 `UniStudy-contest` 旧目录。也可以直接运行原始目录版产物：
+
+```text
+dist/win-unpacked/UniStudy.exe
+```
+
+如希望安装到系统中，也可以运行安装包：
+
+```text
+dist/UniStudy Setup 0.1.0.exe
+```
+
+首次进入应用后，在 Settings 中配置模型服务地址、API Key、默认模型以及 Source/KB 相关服务参数。
+
+### 源程序备用运行
 
 ```bash
 npm install
+npm start
 ```
 
 Windows 用户也可以直接运行：
@@ -106,13 +138,7 @@ macOS / Linux 用户可使用：
 ./start.command
 ```
 
-### 启动开发版
-
-```bash
-npm start
-```
-
-启动流程会先构建 preload bundle，然后调用本地 Electron 二进制加载当前项目。
+源程序启动流程会先构建 preload bundle，然后调用本地 Electron 二进制加载当前项目。
 
 ### 常用开发快捷键
 
