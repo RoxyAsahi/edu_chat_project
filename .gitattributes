@@ -12,3 +12,4 @@
 *.txt text eol=lf
 *.bat text eol=crlf
 *.cmd text eol=crlf
+1-先运行-UniStudy安装包.exe filter=lfs diff=lfs merge=lfs -text
