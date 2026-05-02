@@ -27,29 +27,36 @@ UniStudy 是一款面向多学科复习场景的桌面端个人 AI 学习终端�
 
 ## 环境说明
 
-本作品为 Electron 桌面端软件作品，不需要外接硬件设备。当前主要面向 Windows x64 环境运行，同时代码结构也支持在 macOS、Linux 上进行开发调试。
+本作品为 Electron 桌面端软件作品，不需要外接硬件设备。作品已打包为 Windows x64 安装包、免安装目录版和单文件绿色版。评测时建议优先运行根目录下的 `1-先运行-UniStudy安装包.exe`，安装完成后从桌面快捷方式或开始菜单启动 UniStudy；源程序运行方式仅作为代码复现和开发调试的备用方案。
 
-开发与运行环境如下：
+推荐运行方式：
+
+1. 在 Windows 10 / Windows 11 64 位系统下，双击项目根目录中的 `1-先运行-UniStudy安装包.exe`。
+2. 按安装向导完成安装；安装包为当前用户安装方式，通常不需要额外安装 Node.js、npm 或其他开发环境。
+3. 安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
+4. 如评测环境不便安装，可改用免安装目录版：打开 `2-免安装备用-UniStudy` 文件夹，双击其中的 `UniStudy.exe`；该目录版会把运行数据保存在同目录的 `UniStudyData` 文件夹中。
+5. 首次进入应用后，在 Settings 中配置模型服务地址、API Key、默认模型以及 Source/KB 相关服务参数。配置完成后，新建或选择学科 Agent 和 Topic，导入资料后即可进行 AI 对话、笔记整理和复习工具生成。
+
+主要开发与运行环境如下：
 
 - 操作系统：Windows 10 / Windows 11，建议 Windows 11 x64。
-- 编程语言与运行时：JavaScript，Node.js。当前开发机版本为 Node.js v22.17.1、npm 11.6.4；建议使用 Node.js 当前 LTS 版本或与开发环境接近的版本。
-- 桌面应用框架：Electron 37.2.6。
+- 编程软件/平台：Visual Studio Code；JavaScript / Node.js + Electron。
+- 软件版本：Visual Studio Code 1.117.0；Node.js v22.17.1；npm v11.6.4；Electron v37.10.3。
 - 主要依赖：electron-builder、@libsql/client、axios、mammoth、pdf-parse、pdf-poppler、sharp、DOMPurify、jsdom、Vitest 等。
-- 数据存储：应用默认使用 Electron `app.getPath("userData")` 下的 UniStudy 数据目录保存设置、Agent、Topic、聊天历史、附件、知识库和笔记；也可通过环境变量 `UNISTUDY_DATA_ROOT` 指定独立数据目录。
+- 数据存储：安装版默认使用当前用户的 `AppData\Roaming\UniStudyContest` 保存设置、Agent、Topic、聊天历史、附件、知识库和笔记；安装目录中的 `UniStudySeedData` 仅作为只读演示种子数据。免安装备用版会把运行数据保存在同目录的 `UniStudyData`，并通过 `.unistudy-portable` 标记启用。也可通过环境变量 `UNISTUDY_DATA_ROOT` 指定独立数据目录。
 - 模型服务：需要在应用 Settings 中配置聊天模型服务地址、API Key、默认聊天模型；若使用 Source 资料检索增强能力，还需要配置 embedding 服务，启用 rerank 时还需要配置 rerank 服务。模型接口采用 OpenAI-compatible 风格，可接入兼容服务。
 - 支持资料类型：PDF、DOCX、TXT、Markdown、CSV、HTML、JSON、XML、CSS 以及常见图片文件。
 
-源程序运行方式：
+源程序备用运行方式：
 
 1. 解压或克隆项目源代码。
-2. 在项目根目录执行 `npm install` 安装依赖。
-3. 执行 `npm start` 启动开发版应用；Windows 环境也可以直接运行 `start.bat`，脚本会检查依赖并启动 Electron。
-4. 首次进入应用后，在 Settings 中配置模型服务地址、API Key、默认模型以及 Source/KB 相关服务参数。
-5. 新建或选择学科 Agent 和 Topic，导入资料后即可进行 AI 对话、笔记整理和复习工具生成。
+2. 在源程序运行电脑上安装 Node.js v22.17.1 或兼容版本。
+3. 在项目根目录执行 `npm install` 安装依赖。
+4. 执行 `npm start` 启动开发版应用；Windows 环境也可以直接运行 `start.bat`，脚本会检查依赖并启动 Electron。
 
-打包运行方式：
+打包复现方式：
 
-项目提供 Windows 打包脚本，可执行 `npm run pack:win` 生成目录版应用，或执行 `npm run dist:win` 生成安装包与绿色版 exe。当前项目目录下已有 Windows 打包产物，包括 `dist/win-unpacked`、`UniStudy 0.1.0.exe` 和 `UniStudy Setup 0.1.0.exe`。打包后的应用仍需在首次使用时配置模型服务和知识库相关服务参数。
+项目提供 Windows 打包脚本，可执行 `npm run pack:win` 生成目录版应用，或执行 `npm run dist:win` 生成安装包与单文件绿色版 exe。当前提交材料建议同时包含 Windows 运行程序和源程序：运行程序首选根目录下的 `1-先运行-UniStudy安装包.exe`，备选包括 `2-免安装备用-UniStudy/UniStudy.exe`、`dist/UniStudy Setup 0.1.0.exe` 和 `dist/UniStudy 0.1.0.exe`；源程序包括 `src`、`scripts`、`vendor`、`package.json`、`package-lock.json`、`README.md`、`start.bat` 等源码和配置文件。
 
 离线与联网说明：
 

@@ -2,8 +2,10 @@
 const fs = require('fs-extra');
 const path = require('path');
 const chokidar = require('chokidar');
+const util = require('util');
 
 let mainProcessLogDir = null;
+const PACKAGED_DATA_SEED_DIR_NAME = 'UniStudySeedData';
 
 function isBrokenPipeError(error) {
     if (!error) {
@@ -26,6 +28,29 @@ function resolveMainProcessLogDir() {
     }
 }
 
+function formatLogArg(arg) {
+    if (typeof arg === 'string') {
+        return arg;
+    }
+    if (arg instanceof Error) {
+        return arg.stack || arg.message;
+    }
+    return util.inspect(arg, { depth: 5, breakLength: 160 });
+}
+
+function appendMainProcessLog(methodName, args) {
+    try {
+        const logDir = resolveMainProcessLogDir();
+        fs.ensureDirSync(logDir);
+        fs.appendFileSync(
+            path.join(logDir, 'main-process.log'),
+            `[${new Date().toISOString()}][${methodName}] ${args.map(formatLogArg).join(' ')}\n`
+        );
+    } catch (_error) {
+        // Logging must never be able to break app startup.
+    }
+}
+
 function installSafeConsoleWrite() {
     const safeWrap = (methodName) => {
         const originalMethod = console[methodName];
@@ -34,6 +59,7 @@ function installSafeConsoleWrite() {
         }
 
         console[methodName] = (...args) => {
+            appendMainProcessLog(methodName, args);
             try {
                 return originalMethod.apply(console, args);
             } catch (error) {
@@ -122,6 +148,33 @@ function ensureDataRootPaths() {
     return DATA_ROOT_PATHS;
 }
 
+function resolveDefaultDataSeedRoot() {
+    const candidates = [];
+
+    try {
+        const exePath = app.getPath('exe');
+        if (exePath) {
+            candidates.push(path.join(path.dirname(exePath), PACKAGED_DATA_SEED_DIR_NAME));
+        }
+    } catch (_error) {
+        // app.getPath('exe') can be unavailable in tests or early startup.
+    }
+
+    candidates.push(DEFAULT_DATA_SEED_ROOT);
+
+    for (const candidate of candidates) {
+        try {
+            if (candidate && fs.existsSync(candidate)) {
+                return candidate;
+            }
+        } catch (_error) {
+            // Continue to the next candidate.
+        }
+    }
+
+    return DEFAULT_DATA_SEED_ROOT;
+}
+
 let mainWindow = null;
 const openChildWindows = [];
 let settingsManager = null;
@@ -193,16 +246,22 @@ const fileWatcher = {
 async function bootstrapIndependentDataRoot() {
     ensureDataRootPaths();
     await fs.ensureDir(DATA_ROOT);
+    const seedRoot = resolveDefaultDataSeedRoot();
     const seedResult = await seedDefaultDataRoot({
         dataRoot: DATA_ROOT,
-        seedRoot: DEFAULT_DATA_SEED_ROOT,
+        seedRoot,
     });
     console.log(`[UniStudyBootstrap] Data root: ${DATA_ROOT}`);
+    console.log(`[UniStudyBootstrap] Seed root: ${seedRoot}`);
     if (seedResult.copiedFiles > 0) {
         console.log(`[UniStudyBootstrap] Seeded ${seedResult.copiedFiles} default data file(s).`);
     }
     if (DATA_ROOT_PATHS.source === 'env-override') {
         console.log('[UniStudyBootstrap] Using UNISTUDY_DATA_ROOT override.');
+    } else if (DATA_ROOT_PATHS.source === 'portable-sibling') {
+        console.log('[UniStudyBootstrap] Using portable sibling data root.');
+    } else if (DATA_ROOT_PATHS.source === 'installed-contest-userData') {
+        console.log('[UniStudyBootstrap] Using installed contest AppData root.');
     } else {
         console.log('[UniStudyBootstrap] Using Electron userData default.');
     }
@@ -428,6 +487,20 @@ function createWindow() {
         broadcastWindowState();
         themeHandlers.broadcastThemeUpdate(nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
     });
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        console.error('[UniStudyWindow] did-fail-load:', {
+            errorCode,
+            errorDescription,
+            validatedURL,
+            isMainFrame,
+        });
+    });
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+        console.error('[UniStudyWindow] render-process-gone:', details);
+    });
+    mainWindow.on('unresponsive', () => {
+        console.error('[UniStudyWindow] main window became unresponsive.');
+    });
 
     mainWindow.on('closed', () => {
         mainWindow = null;
@@ -613,15 +686,42 @@ async function loadMainWindow() {
         return;
     }
 
-    await win.loadFile(path.join(SRC_ROOT, 'renderer', 'index.html'));
+    const indexPath = path.join(SRC_ROOT, 'renderer', 'index.html');
+    try {
+        await win.loadFile(indexPath);
+    } catch (error) {
+        console.error('[UniStudyWindow] Failed to load main renderer:', {
+            indexPath,
+            error: error?.stack || error,
+        });
+        throw error;
+    }
 }
 
 app.whenReady().then(async () => {
-    createWindow();
-    await bootstrap();
-    const windowLoadPromise = loadMainWindow();
-    startDeferredServices();
-    await windowLoadPromise;
+    try {
+        createWindow();
+        await bootstrap();
+        const windowLoadPromise = loadMainWindow();
+        startDeferredServices();
+        await windowLoadPromise;
+    } catch (error) {
+        console.error('[UniStudyBootstrap] Startup failed:', error);
+        const win = getMainWindow();
+        if (win && !win.isDestroyed()) {
+            const message = String(error?.stack || error || 'Unknown startup error')
+                .replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]));
+            await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent([
+                '<!doctype html>',
+                '<html><head><meta charset="utf-8"><title>UniStudy startup error</title>',
+                '<style>body{font-family:system-ui,Segoe UI,sans-serif;background:#efe7db;color:#271f18;margin:48px;line-height:1.55}pre{white-space:pre-wrap;background:rgba(255,255,255,.72);padding:16px;border-radius:8px}</style>',
+                '</head><body><h1>UniStudy 启动失败</h1>',
+                '<p>请查看数据目录中的 <code>.tmp/main-process.log</code> 获取详细错误信息。</p>',
+                `<pre>${message}</pre>`,
+                '</body></html>',
+            ].join(''))}`);
+        }
+    }
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

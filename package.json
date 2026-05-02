@@ -79,6 +79,12 @@
       "vendor/**/*",
       "package.json"
     ],
+    "extraFiles": [
+      {
+        "from": "src/seed/default-data-root",
+        "to": "UniStudySeedData"
+      }
+    ],
     "asar": true,
     "asarUnpack": [
       "node_modules/pdf-poppler/**"
