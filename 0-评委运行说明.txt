@@ -3,9 +3,9 @@ UniStudy 评委运行说明
 推荐方式：
 1. 打开 GitHub Releases 下载页面：
    https://github.com/RoxyAsahi/edu_chat_project/releases/latest
-2. 在 Assets 中下载 1-先运行-UniStudy安装包.exe。
+2. 在 Assets 中下载 UniStudy-v0.1.0-Setup.exe。
 3. 确认文件大小约 149 MB。若文件只有 1 KB 或 134 字节，说明下载到的是 Git LFS 指针文件，不是真安装包，请不要运行。
-4. 双击下载到本机的 1-先运行-UniStudy安装包.exe，按安装向导完成安装。
+4. 双击下载到本机的 UniStudy-v0.1.0-Setup.exe，按安装向导完成安装。
 5. 安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
 
 说明：
