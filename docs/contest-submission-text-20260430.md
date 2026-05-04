@@ -29,12 +29,12 @@ UniStudy 是一款面向多学科复习场景的桌面端个人 AI 学习终端�
 
 ## 环境说明
 
-本作品为 Electron 桌面端软件作品，不需要外接硬件设备。作品已打包为 Windows x64 安装包，正式运行程序通过 GitHub Releases 附件交付。评测时建议优先从 `https://github.com/RoxyAsahi/edu_chat_project/releases/latest` 下载 `1-先运行-UniStudy安装包.exe`，安装完成后从桌面快捷方式或开始菜单启动 UniStudy；源程序运行方式仅作为代码复现和开发调试的备用方案。
+本作品为 Electron 桌面端软件作品，不需要外接硬件设备。作品已打包为 Windows x64 安装包，正式运行程序通过 GitHub Releases 附件交付。评测时建议优先从 `https://github.com/RoxyAsahi/edu_chat_project/releases/latest` 下载 `UniStudy-v0.1.0-Setup.exe`，安装完成后从桌面快捷方式或开始菜单启动 UniStudy；源程序运行方式仅作为代码复现和开发调试的备用方案。
 
 推荐运行方式：
 
 1. 在 Windows 10 / Windows 11 64 位系统下，打开 GitHub Releases 下载页：`https://github.com/RoxyAsahi/edu_chat_project/releases/latest`。
-2. 在 Assets 中下载 `1-先运行-UniStudy安装包.exe`。正确文件约 149 MB；若只有 1 KB 或 134 字节，说明下载到的是 Git LFS 指针文件，不是真安装包，请不要运行。
+2. 在 Assets 中下载 `UniStudy-v0.1.0-Setup.exe`。正确文件约 149 MB；若只有 1 KB 或 134 字节，说明下载到的是 Git LFS 指针文件，不是真安装包，请不要运行。
 3. 双击下载到本机的安装包，按安装向导完成安装；安装包为当前用户安装方式，通常不需要额外安装 Node.js、npm、Git、Git LFS 或其他开发环境。
 4. 安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
 5. 首次进入应用后，在 Settings 中配置模型服务地址、API Key、默认模型以及 Source/KB 相关服务参数。配置完成后，新建或选择学科 Agent 和 Topic，导入资料后即可进行 AI 对话、笔记整理和复习工具生成。
@@ -58,7 +58,7 @@ UniStudy 是一款面向多学科复习场景的桌面端个人 AI 学习终端�
 
 打包复现方式：
 
-项目提供 Windows 打包脚本，可执行 `npm run pack:win` 生成目录版应用，或执行 `npm run dist:win` 生成安装包与单文件绿色版 exe。当前提交材料建议同时包含 Windows 运行程序和源程序：运行程序首选 GitHub Releases 附件中的 `1-先运行-UniStudy安装包.exe`；源码仓库和 Source ZIP 不再直接携带安装包，避免下载到 Git LFS 指针文件。源程序包括 `src`、`scripts`、`vendor`、`package.json`、`package-lock.json`、`README.md`、`start.bat` 等源码和配置文件。
+项目提供 Windows 打包脚本，可执行 `npm run pack:win` 生成目录版应用，或执行 `npm run dist:win` 生成安装包与单文件绿色版 exe。当前提交材料建议同时包含 Windows 运行程序和源程序：运行程序首选 GitHub Releases 附件中的 `UniStudy-v0.1.0-Setup.exe`；源码仓库和 Source ZIP 不再直接携带安装包，避免下载到 Git LFS 指针文件。源程序包括 `src`、`scripts`、`vendor`、`package.json`、`package-lock.json`、`README.md`、`start.bat` 等源码和配置文件。
 
 离线与联网说明：
 

@@ -76,7 +76,7 @@ UniStudy 的功能围绕“建立学习空间 -> 对话探究 -> 接入资料 ->
 ### 环境要求
 
 - 推荐运行环境：Windows 10 / Windows 11 x64。
-- 评测或演示时优先从 GitHub Releases 下载 `1-先运行-UniStudy安装包.exe` 安装包：<https://github.com/RoxyAsahi/edu_chat_project/releases/latest>
+- 评测或演示时优先从 GitHub Releases 下载 `UniStudy-v0.1.0-Setup.exe` 安装包：<https://github.com/RoxyAsahi/edu_chat_project/releases/latest>
 - 安装包已包含 Electron 运行环境，不需要在评测电脑上额外安装 Node.js、npm、Git、Git LFS 或 VS Code。
 - 源程序运行仅用于开发调试和代码复现，需要 Node.js 与 npm。当前开发机版本为 Node.js v22.17.1、npm v11.6.4，Electron 实际锁定版本为 v37.10.3。
 - Windows / macOS / Linux：Electron 理论上跨平台，当前项目启动脚本和打包说明对 Windows 更完整。
@@ -90,7 +90,7 @@ Windows 用户优先到 Releases 页面下载安装包：
 https://github.com/RoxyAsahi/edu_chat_project/releases/latest
 ```
 
-在 Assets 中下载 `1-先运行-UniStudy安装包.exe`。正确文件约 149 MB，SHA256 为 `9162C089332FCC68D9C07CF03F30F13796165E18E98A65637F7FFE5F91A858D2`。如果看到文件只有 1 KB 或 134 字节，说明下载到的是 Git LFS 指针文件，不是真安装包，请不要运行。安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
+在 Assets 中下载 `UniStudy-v0.1.0-Setup.exe`。正确文件约 149 MB，SHA256 为 `9162C089332FCC68D9C07CF03F30F13796165E18E98A65637F7FFE5F91A858D2`。如果看到文件只有 1 KB 或 134 字节，说明下载到的是 Git LFS 指针文件，不是真安装包，请不要运行。安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
 
 不建议从 GitHub 的 `Code -> Download ZIP` 源码包中直接运行安装包；源码 ZIP 用于查看和复现代码，运行程序以 Releases 附件为准。开发者也可以在本地重新生成目录版产物：
 

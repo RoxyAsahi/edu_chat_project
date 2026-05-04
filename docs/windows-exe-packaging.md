@@ -10,7 +10,7 @@
 - `NSIS` 安装包
 - `portable exe` 绿色版
 
-正式给评委或同学运行时，优先使用 GitHub Releases 附件中的 `1-先运行-UniStudy安装包.exe`。不要把安装包作为源码仓库文件或 Source ZIP 里的可运行入口交付；如果安装包被 Git LFS 指针替代，文件可能只有 1 KB 或 134 字节，Windows 会提示“此应用无法在你的电脑上运行”。
+正式给评委或同学运行时，优先使用 GitHub Releases 附件中的 `UniStudy-v0.1.0-Setup.exe`。不要把安装包作为源码仓库文件或 Source ZIP 里的可运行入口交付；如果安装包被 Git LFS 指针替代，文件可能只有 1 KB 或 134 字节，Windows 会提示“此应用无法在你的电脑上运行”。
 
 本轮不包含:
 
