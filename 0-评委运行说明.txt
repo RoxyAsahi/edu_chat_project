@@ -1,20 +1,20 @@
 UniStudy 评委运行说明
 
 推荐方式：
-1. 双击根目录下的 1-先运行-UniStudy安装包.exe。
-2. 按安装向导完成安装。
-3. 安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
+1. 打开 GitHub Releases 下载页面：
+   https://github.com/RoxyAsahi/edu_chat_project/releases/latest
+2. 在 Assets 中下载 1-先运行-UniStudy安装包.exe。
+3. 确认文件大小约 149 MB。若文件只有 1 KB 或 134 字节，说明下载到的是 Git LFS 指针文件，不是真安装包，请不要运行。
+4. 双击下载到本机的 1-先运行-UniStudy安装包.exe，按安装向导完成安装。
+5. 安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
 
 说明：
 - 安装包已包含 Electron 运行环境。
-- 评测电脑不需要额外安装 Node.js、npm 或 VS Code。
+- 评测电脑不需要额外安装 Node.js、npm、Git、Git LFS 或 VS Code。
+- 不建议从 GitHub 的 Code -> Download ZIP 源码包中直接运行安装包；源码包用于查看代码，不作为安装包交付渠道。
+- 完整安装包 SHA256：
+  9162C089332FCC68D9C07CF03F30F13796165E18E98A65637F7FFE5F91A858D2
 - 首次使用 AI 对话、资料检索等联网能力时，需要在 Settings 中配置模型服务地址、API Key 和默认模型。
-
-备用方式：
-- 如果评测电脑不便安装，可打开 2-免安装备用-UniStudy 文件夹，双击其中的 UniStudy.exe。
-- 不要把 2-免安装备用-UniStudy 文件夹里的 UniStudy.exe 单独移出文件夹，它依赖同目录下的 resources、locales、dll、UniStudySeedData，以及 UniStudyData/.unistudy-portable 标记文件。
-- 免安装备用版的运行数据会保存在 2-免安装备用-UniStudy\UniStudyData，不会写入 Program Files。
-- 如果根目录里还看到 UniStudy-contest 文件夹，那是调试旧目录，请不要提交、不要运行。
 
 源程序复现：
 - 如需从源代码运行，请安装 Node.js v22.17.1 或兼容版本。

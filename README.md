@@ -76,34 +76,29 @@ UniStudy 的功能围绕“建立学习空间 -> 对话探究 -> 接入资料 ->
 ### 环境要求
 
 - 推荐运行环境：Windows 10 / Windows 11 x64。
-- 评测或演示时优先使用根目录下的 `1-先运行-UniStudy安装包.exe` 安装包。安装包已包含 Electron 运行环境，不需要在评测电脑上额外安装 Node.js 或 npm。
+- 评测或演示时优先从 GitHub Releases 下载 `1-先运行-UniStudy安装包.exe` 安装包：<https://github.com/RoxyAsahi/edu_chat_project/releases/latest>
+- 安装包已包含 Electron 运行环境，不需要在评测电脑上额外安装 Node.js、npm、Git、Git LFS 或 VS Code。
 - 源程序运行仅用于开发调试和代码复现，需要 Node.js 与 npm。当前开发机版本为 Node.js v22.17.1、npm v11.6.4，Electron 实际锁定版本为 v37.10.3。
 - Windows / macOS / Linux：Electron 理论上跨平台，当前项目启动脚本和打包说明对 Windows 更完整。
 - 如果从源程序安装依赖，需要可访问 npm registry 与 Electron 下载镜像；国内网络环境可使用项目启动脚本内置的 npmmirror 配置。
 
 ### 推荐运行方式
 
-Windows 用户优先运行根目录下的安装包：
+Windows 用户优先到 Releases 页面下载安装包：
 
 ```text
-1-先运行-UniStudy安装包.exe
+https://github.com/RoxyAsahi/edu_chat_project/releases/latest
 ```
 
-安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。安装包会安装应用运行所需的 Electron 环境，不需要 Node.js 或 npm。
+在 Assets 中下载 `1-先运行-UniStudy安装包.exe`。正确文件约 149 MB，SHA256 为 `9162C089332FCC68D9C07CF03F30F13796165E18E98A65637F7FFE5F91A858D2`。如果看到文件只有 1 KB 或 134 字节，说明下载到的是 Git LFS 指针文件，不是真安装包，请不要运行。安装完成后，从桌面快捷方式或开始菜单启动 UniStudy。
 
-如评测电脑不便安装，也可以使用免安装目录版：
-
-```text
-2-免安装备用-UniStudy/UniStudy.exe
-```
-
-这个 exe 需要和 `2-免安装备用-UniStudy` 文件夹内的 `resources`、`locales`、dll、`UniStudySeedData`，以及 `UniStudyData/.unistudy-portable` 标记文件放在一起，因此不要把 `UniStudy.exe` 单独移出该文件夹。应用运行数据会保存到 `2-免安装备用-UniStudy\UniStudyData`，不会写入安装目录。不要再使用根目录里的 `UniStudy-contest` 旧目录。也可以直接运行原始目录版产物：
+不建议从 GitHub 的 `Code -> Download ZIP` 源码包中直接运行安装包；源码 ZIP 用于查看和复现代码，运行程序以 Releases 附件为准。开发者也可以在本地重新生成目录版产物：
 
 ```text
 dist/win-unpacked/UniStudy.exe
 ```
 
-如希望安装到系统中，也可以运行安装包：
+或重新生成安装包：
 
 ```text
 dist/UniStudy Setup 0.1.0.exe
@@ -198,7 +193,6 @@ Source 能力依赖 embedding 服务；如果启用 rerank，还需要配置 rer
 ```text
 .
 ├── 0-评委运行说明.txt              # 比赛评审运行入口说明
-├── 1-先运行-UniStudy安装包.exe     # Windows 安装包，评委首选入口
 ├── build-resources/               # Windows 打包图标、安装器图片与源素材
 ├── docs/                         # 项目说明、测试报告、架构与打包文档
 ├── scripts/                      # 启动、打包、迁移、smoke 与 KB 验证脚本
