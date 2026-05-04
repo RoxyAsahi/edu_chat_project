@@ -15,4 +15,3 @@
 *.bmp binary
 *.ico binary
 *.png binary
-1-先运行-UniStudy安装包.exe filter=lfs diff=lfs merge=lfs -text

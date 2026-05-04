@@ -11,7 +11,9 @@ build/
 dist*/
 docs/test-reports/*.json
 debug-screenshot.png
+.release-assets/
 
+1-先运行-UniStudy安装包.exe
 2-免安装备用-UniStudy/
 UniStudy-contest/
 
