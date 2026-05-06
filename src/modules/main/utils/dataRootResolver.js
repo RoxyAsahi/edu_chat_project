@@ -5,22 +5,6 @@ const DEFAULT_INSTALLED_DATA_ROOT_NAME = 'UniStudyContest';
 const PORTABLE_DATA_ROOT_NAME = 'UniStudyData';
 const PORTABLE_MARKER_FILE = '.unistudy-portable';
 
-function hasMeaningfulDataRoot(rootPath) {
-    if (!rootPath) {
-        return false;
-    }
-
-    const checks = [
-        path.join(rootPath, 'settings.json'),
-        path.join(rootPath, 'Agents'),
-        path.join(rootPath, 'UserData'),
-        path.join(rootPath, 'KnowledgeBase'),
-        path.join(rootPath, 'Notes'),
-    ];
-
-    return checks.some((targetPath) => fs.existsSync(targetPath));
-}
-
 function resolveOverrideRoot(env = process.env, cwd = process.cwd()) {
     const rawOverride = String(env.UNISTUDY_DATA_ROOT || '').trim();
     if (!rawOverride) {
@@ -95,11 +79,6 @@ function resolveInstalledContestRoot({ app } = {}) {
     return null;
 }
 
-function resolveLegacyProjectRoot(cwd = process.cwd()) {
-    const candidate = path.resolve(cwd, 'AppData');
-    return hasMeaningfulDataRoot(candidate) ? candidate : null;
-}
-
 function resolveDataRootPaths({ app, env = process.env, cwd = process.cwd() }) {
     if (!app || typeof app.getPath !== 'function' || typeof app.setPath !== 'function') {
         throw new Error('resolveDataRootPaths requires an Electron app with getPath/setPath support.');
@@ -135,10 +114,8 @@ module.exports = {
     PORTABLE_DATA_ROOT_NAME,
     PORTABLE_MARKER_FILE,
     canWriteDirectory,
-    hasMeaningfulDataRoot,
     resolveDataRootPaths,
     resolveInstalledContestRoot,
-    resolveLegacyProjectRoot,
     resolveOverrideRoot,
     resolvePortableSiblingRoot,
 };

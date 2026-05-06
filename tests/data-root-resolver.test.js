@@ -6,10 +6,8 @@ const path = require('path');
 
 const {
     PORTABLE_MARKER_FILE,
-    hasMeaningfulDataRoot,
     resolveDataRootPaths,
     resolveInstalledContestRoot,
-    resolveLegacyProjectRoot,
     resolveOverrideRoot,
     resolvePortableSiblingRoot,
 } = require('../src/modules/main/utils/dataRootResolver');
@@ -161,21 +159,6 @@ test('resolveInstalledContestRoot falls back beside userData when appData is una
         resolveInstalledContestRoot({ app }),
         path.join(path.dirname(path.resolve(defaultUserData)), 'UniStudyContest')
     );
-});
-
-test('resolveLegacyProjectRoot remains available for explicit legacy tooling only', async () => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'legacy-data-root-'));
-
-    try {
-        const legacyRoot = path.join(tempRoot, 'AppData');
-        await fs.ensureDir(legacyRoot);
-        await fs.writeJson(path.join(legacyRoot, 'settings.json'), { userName: 'legacy-user' });
-
-        assert.equal(resolveLegacyProjectRoot(tempRoot), legacyRoot);
-        assert.equal(hasMeaningfulDataRoot(legacyRoot), true);
-    } finally {
-        await fs.remove(tempRoot);
-    }
 });
 
 test('resolveDataRootPaths does not depend on legacy project AppData during main startup', async () => {

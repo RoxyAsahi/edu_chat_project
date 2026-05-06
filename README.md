@@ -218,8 +218,7 @@ Source 能力依赖 embedding 服务；如果启用 rerank，还需要配置 rer
 ├── 0-评委运行说明.txt              # 比赛评审运行入口说明
 ├── build-resources/               # Windows 打包图标、安装器图片与源素材
 ├── docs/                         # 项目说明、测试报告、架构与打包文档
-├── scripts/                      # 启动、打包、迁移、smoke 与 KB 验证脚本
-│   └── dev/                      # 临时诊断与开发辅助脚本
+├── scripts/                      # 启动、打包、smoke 与 KB 验证脚本
 ├── src/
 │   ├── assets/                   # 应用图标等静态资源
 │   ├── main/                     # Electron 主进程入口
