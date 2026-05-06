@@ -281,6 +281,82 @@ test('composerController shows user and thinking bubbles before persistence, ret
     );
 });
 
+test('composerController ignores the legacy agent default model when a different global chat model is configured', async (t) => {
+    const { createComposerController } = await loadComposerControllerModule();
+    const harness = createComposerHarness();
+    t.after(() => harness.dom.window.close());
+
+    harness.state.session.currentSelectedItem.config.model = 'gemini-3.1-flash-lite-preview';
+    harness.state.settings.settings.defaultModel = 'glm-5.1';
+
+    let requestPayload = null;
+    const controller = createComposerController({
+        store: harness.store,
+        el: harness.el,
+        chatAPI: {
+            async getActiveSystemPrompt() {
+                return { success: false, systemPrompt: '' };
+            },
+            async retrieveKnowledgeBaseContext() {
+                return { success: true, refs: [], contextText: '' };
+            },
+            async sendChatRequest(payload) {
+                requestPayload = payload;
+                return {
+                    response: {
+                        choices: [{ message: { content: '助手回复' } }],
+                    },
+                };
+            },
+        },
+        ui: {
+            updateAttachmentPreview() {},
+            showToastNotification() {},
+            scrollToBottom() {},
+        },
+        windowObj: harness.dom.window,
+        documentObj: harness.dom.window.document,
+        interruptRequest: async () => ({ success: true }),
+        messageRendererApi: {
+            async renderMessage() {},
+            async startStreamingMessage() {},
+            async finalizeStreamedMessage() {},
+        },
+        createId: createIdFactory(),
+        getCurrentTopic: () => ({
+            id: 'topic-1',
+            name: 'Topic One',
+            knowledgeBaseId: 'kb-1',
+        }),
+        loadTopics: async () => {},
+        loadAgents: async () => {},
+        buildTopicContext: () => ({
+            agentId: 'agent-1',
+            topicId: 'topic-1',
+        }),
+        persistHistory: async () => {},
+        resolveLivePrompt: async () => '',
+        autoResizeTextarea: () => {},
+        decorateChatMessages: () => {},
+        generateFollowUpsForAssistantMessage: async () => [],
+        generateTopicTitleForAssistantMessage: async () => '',
+        updateCurrentChatHistory: (updater) => {
+            harness.state.session.currentChatHistory = updater(harness.state.session.currentChatHistory);
+            return harness.state.session.currentChatHistory;
+        },
+        getCurrentSelectedItem: () => harness.state.session.currentSelectedItem,
+        getCurrentTopicId: () => harness.state.session.currentTopicId,
+        getCurrentChatHistory: () => harness.state.session.currentChatHistory,
+        getGlobalSettings: () => harness.state.settings.settings,
+    });
+
+    harness.el.messageInput.value = '继续讲解';
+    await controller.handleSend();
+
+    assert.equal(requestPayload?.modelConfig?.fallbackModel, undefined);
+    assert.equal(requestPayload?.modelConfig?.model, undefined);
+});
+
 test('composerController cancels a locally prepared request before model send starts', async (t) => {
     const { createComposerController } = await loadComposerControllerModule();
     const harness = createComposerHarness();

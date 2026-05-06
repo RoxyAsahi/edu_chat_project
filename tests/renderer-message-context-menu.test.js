@@ -27,7 +27,7 @@ test('buildChatContextMenuModel returns assistant actions with regenerate and de
     );
     assert.deepEqual(
         model.sections[1].items.map((item) => item.id),
-        ['read-mode', 'add-to-notes', 'regenerate']
+        ['add-to-notes', 'regenerate']
     );
     assert.deepEqual(
         model.sections[2].items.map((item) => item.id),

@@ -9,6 +9,8 @@ import {
     resolveComposerSendAction,
 } from './composerUtils.js';
 
+const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
+
 function escapeHtml(text) {
     return String(text || '')
         .replace(/&/g, '&amp;')
@@ -91,6 +93,19 @@ function extractReasoningContentFromResponseMessage(message = {}) {
     }
 
     return '';
+}
+
+function normalizeAgentModelOverride(rawModel, globalDefaultModel = '') {
+    const normalizedModel = String(rawModel || '').trim();
+    const normalizedGlobalDefaultModel = String(globalDefaultModel || '').trim();
+    if (
+        normalizedModel === LEGACY_AGENT_MODEL
+        && normalizedGlobalDefaultModel
+        && normalizedGlobalDefaultModel !== LEGACY_AGENT_MODEL
+    ) {
+        return '';
+    }
+    return normalizedModel;
 }
 
 function getReasoningContentForRequest(message = {}) {
@@ -899,7 +914,10 @@ function createComposerController(deps = {}) {
 
         const chatMode = state.chatModelMode;
         const modeMeta = CHAT_MODEL_MODE_META[chatMode] || CHAT_MODEL_MODE_META.fast;
-        const agentModel = String(requestContext.selectedItem.config?.model || '').trim();
+        const agentModel = normalizeAgentModelOverride(
+            requestContext.selectedItem.config?.model,
+            requestContext.settings?.defaultModel
+        );
         const modelConfig = {
             purpose: modeMeta.purpose,
             ...(agentModel ? { fallbackModel: agentModel } : {}),

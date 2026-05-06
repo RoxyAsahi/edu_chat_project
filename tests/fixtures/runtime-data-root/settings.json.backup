@@ -1,8 +1,8 @@
 {
   "sidebarWidth": 260,
   "notificationsSidebarWidth": 300,
-  "layoutLeftWidth": 410,
-  "layoutRightWidth": 400,
+  "layoutLeftWidth": 360,
+  "layoutRightWidth": 340,
   "layoutLeftTopHeight": 360,
   "userName": "Fixture User",
   "modelService": {

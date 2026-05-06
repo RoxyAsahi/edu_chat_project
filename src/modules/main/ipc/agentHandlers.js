@@ -486,7 +486,7 @@ function initialize(context) {
                 configToSave = {
                     name: agentName,
                     systemPrompt: `你是 ${agentName}。`,
-                    model: 'gemini-3.1-flash-lite-preview',
+                    model: '',
                     topics: [buildDefaultPlaceholderTopic()],
 
                 };

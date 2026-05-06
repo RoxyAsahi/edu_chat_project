@@ -34,6 +34,23 @@ const store = createAppStore(createInitialAppState());
 let markedInstance;
 let agentAvatarPreviewObjectUrl = null;
 let agentAvatarPreviewListenerCleanup = null;
+const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
+
+function getGlobalChatDefaultModel() {
+    return String(getSettingsSlice().settings?.defaultModel || '').trim();
+}
+
+function normalizeAgentModelOverride(rawModel, globalDefaultModel = getGlobalChatDefaultModel()) {
+    const normalizedModel = String(rawModel || '').trim();
+    if (
+        normalizedModel === LEGACY_AGENT_MODEL
+        && globalDefaultModel
+        && globalDefaultModel !== LEGACY_AGENT_MODEL
+    ) {
+        return '';
+    }
+    return normalizedModel;
+}
 
 function clearAgentAvatarPreviewListeners() {
     if (typeof agentAvatarPreviewListenerCleanup === 'function') {
@@ -857,7 +874,8 @@ async function populateAgentForm(config) {
     }
     revokeAgentAvatarPreviewObjectUrl();
     el.agentAvatarPreview.src = config.avatarUrl || DEFAULT_AGENT_AVATAR;
-    el.agentModel.value = config.model || '';
+    el.agentModel.value = normalizeAgentModelOverride(config.model);
+    el.agentModel.placeholder = getGlobalChatDefaultModel();
 
     await syncPromptModule(session.currentSelectedItem.id, config);
 }

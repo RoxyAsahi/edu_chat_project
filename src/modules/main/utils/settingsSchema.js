@@ -115,8 +115,8 @@ const THINKING_CHAT_REASONING_EFFORT_SET = new Set(THINKING_CHAT_REASONING_EFFOR
 const DEFAULT_SETTINGS = Object.freeze({
     sidebarWidth: 260,
     notificationsSidebarWidth: 300,
-    layoutLeftWidth: 410,
-    layoutRightWidth: 400,
+    layoutLeftWidth: 360,
+    layoutRightWidth: 340,
     layoutLeftTopHeight: 360,
     userName: 'User',
     modelService: createDefaultModelService(),

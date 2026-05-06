@@ -3,6 +3,7 @@
 let mainRefs = {};
 let contextMenuDependencies = {};
 let isInitialized = false;
+const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const CHAT_CONTEXT_MENU_VIEWPORT_GAP = 12;
 
@@ -13,7 +14,6 @@ const CHAT_CONTEXT_MENU_ACTIONS = Object.freeze({
     cut: 'cut',
     paste: 'paste',
     cancelEdit: 'cancel-edit',
-    readMode: 'read-mode',
     addToNotes: 'add-to-notes',
     regenerate: 'regenerate',
     delete: 'delete',
@@ -83,6 +83,19 @@ function normalizeTextContent(content) {
     return '';
 }
 
+function normalizeAgentModelOverride(rawModel, globalDefaultModel = '') {
+    const normalizedModel = String(rawModel || '').trim();
+    const normalizedGlobalDefaultModel = String(globalDefaultModel || '').trim();
+    if (
+        normalizedModel === LEGACY_AGENT_MODEL
+        && normalizedGlobalDefaultModel
+        && normalizedGlobalDefaultModel !== LEGACY_AGENT_MODEL
+    ) {
+        return '';
+    }
+    return normalizedModel;
+}
+
 export function buildChatContextMenuModel({
     isEditing = false,
     isThinkingOrStreaming = false,
@@ -145,35 +158,33 @@ export function buildChatContextMenuModel({
         ],
     });
 
-    model.sections.push({
-        items: [
-            {
-                id: CHAT_CONTEXT_MENU_ACTIONS.readMode,
-                icon: 'menu_book',
-                label: '阅读模式',
-                tone: 'info',
-            },
-            ...(canCreateNote
-                ? [
-                    {
-                        id: CHAT_CONTEXT_MENU_ACTIONS.addToNotes,
-                        icon: 'note_add',
-                        label: '记入笔记',
-                    },
-                ]
-                : []),
-            ...(canRegenerate
-                ? [
-                    {
-                        id: CHAT_CONTEXT_MENU_ACTIONS.regenerate,
-                        icon: 'autorenew',
-                        label: '重新生成',
-                        tone: 'success',
-                    },
-                ]
-                : []),
-        ],
-    });
+    const assistantActions = [
+        ...(canCreateNote
+            ? [
+                {
+                    id: CHAT_CONTEXT_MENU_ACTIONS.addToNotes,
+                    icon: 'note_add',
+                    label: '记入笔记',
+                },
+            ]
+            : []),
+        ...(canRegenerate
+            ? [
+                {
+                    id: CHAT_CONTEXT_MENU_ACTIONS.regenerate,
+                    icon: 'autorenew',
+                    label: '重新生成',
+                    tone: 'success',
+                },
+            ]
+            : []),
+    ];
+
+    if (assistantActions.length > 0) {
+        model.sections.push({
+            items: assistantActions,
+        });
+    }
 
     model.sections.push({
         items: [
@@ -324,30 +335,6 @@ function showContextMenu(event, messageItem, message) {
         [CHAT_CONTEXT_MENU_ACTIONS.cancelEdit]: async () => {
             toggleEditMode(messageItem, message);
             closeContextMenu();
-        },
-        [CHAT_CONTEXT_MENU_ACTIONS.readMode]: async () => {
-            closeContextMenu();
-            if (!currentSelectedItemVal.id || !currentTopicIdVal || !message.id) {
-                uiHelper.showToastNotification('当前消息无法进入阅读模式。', 'error');
-                return;
-            }
-
-            const result = await electronAPI.getOriginalMessageContent(
-                currentSelectedItemVal.id,
-                currentSelectedItemVal.type,
-                currentTopicIdVal,
-                message.id
-            ).catch((error) => ({ success: false, error: error.message }));
-
-            if (!result?.success || result.content === undefined) {
-                uiHelper.showToastNotification(`读取原始消息失败：${result?.error || '未知错误'}`, 'error');
-                return;
-            }
-
-            const rawContent = result.content;
-            const contentString = typeof rawContent === 'string' ? rawContent : (rawContent?.text || '');
-            const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
-            await electronAPI.openTextInNewWindow(contentString, `Read: ${String(message.id).slice(0, 10)}...`, currentTheme);
         },
         [CHAT_CONTEXT_MENU_ACTIONS.addToNotes]: async () => {
             closeContextMenu();
@@ -678,8 +665,12 @@ async function handleRegenerateResponse(originalAssistantMessage) {
             });
         }
 
+        const resolvedAgentModel = normalizeAgentModelOverride(
+            agentConfig.model || currentSelectedItemVal.config?.model,
+            globalSettingsVal.defaultModel
+        );
         const modelConfigForChat = {
-            model: agentConfig.model || currentSelectedItemVal.config?.model || 'gemini-3.1-flash-lite-preview',
+            ...(resolvedAgentModel ? { model: resolvedAgentModel } : {}),
             stream: agentConfig.streamOutput !== false,
         };
 

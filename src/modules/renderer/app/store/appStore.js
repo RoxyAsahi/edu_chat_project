@@ -96,8 +96,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     chatFontPreset: 'system',
     chatCodeFontPreset: 'cascadia',
     chatBubbleMaxWidthWideDefault: 92,
-    layoutLeftWidth: 410,
-    layoutRightWidth: 400,
+    layoutLeftWidth: 360,
+    layoutRightWidth: 340,
     layoutLeftTopHeight: 360,
     studyProfile: {
         studentName: '',

@@ -1,6 +1,6 @@
 const LAYOUT_DEFAULTS = Object.freeze({
-    leftWidth: 410,
-    rightWidth: 400,
+    leftWidth: 360,
+    rightWidth: 340,
     leftMin: 220,
     rightMin: 300,
     centerMin: 560,

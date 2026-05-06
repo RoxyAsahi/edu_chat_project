@@ -49,6 +49,7 @@ let ipcHandlersRegistered = false;
 let studyServices = null;
 let chatHistoryStore = null;
 const DEFAULT_CHAT_MODEL = 'gemini-3.1-flash-lite-preview';
+const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
 const FOLLOW_UP_HISTORY_LIMIT = 6;
 const FOLLOW_UP_RESULT_LIMIT = 5;
 const FOLLOW_UP_MESSAGE_CHAR_LIMIT = 900;
@@ -1287,6 +1288,19 @@ function resolvePreferredTaskKey(preferredSettingsKeys = []) {
     return null;
 }
 
+function normalizeAgentModelOverride(rawModel, globalDefaultModel = '') {
+    const normalizedModel = String(rawModel || '').trim();
+    const normalizedGlobalDefaultModel = String(globalDefaultModel || '').trim();
+    if (
+        normalizedModel === LEGACY_AGENT_MODEL
+        && normalizedGlobalDefaultModel
+        && normalizedGlobalDefaultModel !== LEGACY_AGENT_MODEL
+    ) {
+        return '';
+    }
+    return normalizedModel;
+}
+
 async function resolveTaskModel({
     agentId = '',
     requestedModel = '',
@@ -1313,8 +1327,9 @@ async function resolveTaskModel({
     if (agentId && agentConfigManager && typeof agentConfigManager.readAgentConfig === 'function') {
         try {
             const agentConfig = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
-            if (typeof agentConfig?.model === 'string' && agentConfig.model.trim()) {
-                return agentConfig.model.trim();
+            const agentModel = normalizeAgentModelOverride(agentConfig?.model, settings?.defaultModel);
+            if (agentModel) {
+                return agentModel;
             }
         } catch (error) {
             console.warn(`[Main - ${logLabel}] Failed to read agent config for ${agentId}:`, error);

@@ -115,6 +115,7 @@ test('agent config manager allowDefault uses the new placeholder topic name', as
     const config = await manager.readAgentConfig('missing-agent', { allowDefault: true });
 
     assert.equal(config.topics[0].name, '新对话 1');
+    assert.equal(config.model, '');
 });
 
 test('create-agent, delete-topic fallback, and create-new-topic all use placeholder topic names', async (t) => {
@@ -168,6 +169,7 @@ test('create-agent, delete-topic fallback, and create-new-topic all use placehol
     const createResult = await createAgent({}, '数学', null);
     assert.equal(createResult.success, true);
     assert.equal(createResult.config.topics[0].name, '新对话 1');
+    assert.equal(createResult.config.model, '');
 
     const deleteResult = await deleteTopic({}, createResult.agentId, 'default');
     assert.equal(deleteResult.success, true);
