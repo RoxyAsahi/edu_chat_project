@@ -473,7 +473,7 @@ test('send-chat-request does not append the bubble theme prompt twice', async (t
     });
 
     assert.ok(capturedRequest);
-    const matches = capturedRequest.messages[0].content.match(/Output formatting requirement:/g) || [];
+    const matches = capturedRequest.messages[0].content.match(/你输出的目标不是普通文本/g) || [];
     assert.equal(matches.length, 1);
 });
 
@@ -547,9 +547,10 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
                     userName: 'StudyUser',
                     studyProfile: {
                         studentName: 'Alice',
+                        grade: '高二',
                         studyWorkspace: 'Dorm A-301',
                         workEnvironment: 'Laptop',
-                        timezone: 'Asia/Hong_Kong',
+                        timezone: 'Asia/Shanghai',
                     },
                     studyLogPolicy: {
                         enabled: true,

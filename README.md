@@ -121,6 +121,22 @@ start.bat
 
 `start.bat` 会检查依赖和 Electron 二进制是否完整，必要时自动执行 `npm install`，然后启动应用。
 
+如果你要测试“开箱即用”的首启体验，而不想读到自己电脑上的已有数据，可以直接运行：
+
+```bat
+start-fresh.bat
+```
+
+它会为当前这次启动自动创建一个全新的隔离数据目录，保留默认种子数据，但不会碰你平时的本地数据。
+
+如果你想测试真正的“零数据 / 空白首次启动”，可以运行：
+
+```bat
+start-empty.bat
+```
+
+它同样使用独立数据目录，并额外关闭默认种子数据注入，启动后就是完全空白的数据环境。
+
 macOS / Linux 用户可使用：
 
 ```bash
@@ -158,6 +174,13 @@ Windows PowerShell 示例：
 
 ```powershell
 $env:UNISTUDY_DATA_ROOT="D:\UniStudyData"
+npm start
+```
+
+如需关闭默认首启种子数据，可额外设置：
+
+```powershell
+$env:UNISTUDY_SKIP_DEFAULT_SEED="1"
 npm start
 ```
 

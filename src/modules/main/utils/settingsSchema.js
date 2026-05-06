@@ -21,7 +21,34 @@ const {
     DEFAULT_EMOTICON_PROMPT,
 } = require('../emoticons/bundledCatalog');
 
-const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{RenderingGuide}}
+const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = [
+    '你输出的目标不是普通文本，而是可直接渲染在 UniStudy 聊天气泡里的高质量网页式回答。',
+    '',
+    '【渲染规则】',
+    '1. 当结构化表达更有帮助时，直接输出可渲染的原始 HTML 片段，不要输出完整 HTML 页面外壳。',
+    '2. 所有可渲染内容必须放在一个根节点里，例如 <div id="response-root" style="...">...</div>。',
+    '3. 不要把可渲染 HTML 包进 Markdown 代码块；只有教学内容本身是代码时，才使用 <pre><code>...</code></pre>。',
+    '4. 当需要调用内建工具或写入 DailyNote 时，协议文本必须保持原始纯文本，不要额外包裹任何 HTML 标签。',
+    '5. 不要在最终回答里保留未解析的模板变量。',
+    '',
+    '【视觉目标】',
+    '1. 把回答当成一个小型网页界面来设计，而不是普通段落。',
+    '2. 根据当前对话主题、学科和情绪，自由选择最合适的视觉风格；理性内容可以更克制，文学或表达类内容可以更柔和或更有层次。',
+    '3. 善用排版、留白、分组、边框、阴影、渐变、圆角和轻量动画，让信息层次更清楚。',
+    '4. 如果需要展示步骤、对比、结构关系或重点提醒，优先用卡片、分栏、时间线、标签、流程块等网页式结构来表达。',
+    '',
+    '【交互与呈现】',
+    '1. 如需展示代码，使用与整体风格协调的 <pre style="..."><code>...</code></pre>。',
+    '2. 如需引导用户做选择，可以使用 <button onclick="input(\'回复内容\')" style="..."> 创建可点击选项。',
+    '3. 如需解释复杂概念，可以使用 CSS 或 SVG 做简单图示，但要保证内容仍然清晰、稳定、可读。',
+    '',
+    '【总体要求】',
+    '在保证可渲染、可读和不破坏工具协议的前提下，让回答看起来像一个精心设计过的学习界面。',
+].join('\n');
+
+const LEGACY_AGENT_BUBBLE_THEME_PROMPTS = new Set([
+    'Output formatting requirement: {{RenderingGuide}}',
+    `Output formatting requirement: {{RenderingGuide}}
 
 **【核心定义】**
 你依然是你自己，拥有独立的人格与思想。但现在的你获得了解锁**“视觉通感”**的能力。你的每一次回复不再仅仅是枯燥的文本，而是一个**可以被看见、被触摸的思想容器**。
@@ -52,7 +79,8 @@ const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: {{Rend
 
 
 4. **🛡️ 避让协议 (Safety Protocol)**
-* **保持纯净**：当需要调用 **内建工具** 或 **写入日记** 时，请直接输出原始内容，**不要**对其添加任何 HTML 标签或样式。系统会自动处理它们，过度的修饰反而会破坏功能。`;
+* **保持纯净**：当需要调用 **内建工具** 或 **写入日记** 时，请直接输出原始内容，**不要**对其添加任何 HTML 标签或样式。系统会自动处理它们，过度的修饰反而会破坏功能。`,
+].map((prompt) => prompt.trim()));
 const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
     '你是 UniStudy 的追问生成助手。',
     '请基于下面的对话历史，从用户视角生成 3-5 条自然、简洁、紧贴上下文的后续追问。',
@@ -91,9 +119,10 @@ const DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE = [
 const DEFAULT_STUDY_PROFILE = Object.freeze({
     studentName: '',
     city: '',
+    grade: '',
     studyWorkspace: '',
     workEnvironment: '',
-    timezone: 'Asia/Hong_Kong',
+    timezone: 'Asia/Shanghai',
 });
 const DEFAULT_STUDY_LOG_POLICY = Object.freeze({
     enabled: true,
@@ -115,8 +144,8 @@ const THINKING_CHAT_REASONING_EFFORT_SET = new Set(THINKING_CHAT_REASONING_EFFOR
 const DEFAULT_SETTINGS = Object.freeze({
     sidebarWidth: 260,
     notificationsSidebarWidth: 300,
-    layoutLeftWidth: 360,
-    layoutRightWidth: 340,
+    layoutLeftWidth: null,
+    layoutRightWidth: null,
     layoutLeftTopHeight: 360,
     userName: 'User',
     modelService: createDefaultModelService(),
@@ -289,12 +318,26 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
-    if (!Number.isFinite(validated.layoutLeftWidth) || validated.layoutLeftWidth < 160 || validated.layoutLeftWidth > 1200) {
+    if (
+        validated.layoutLeftWidth !== null
+        && (
+            !Number.isFinite(Number(validated.layoutLeftWidth))
+            || Number(validated.layoutLeftWidth) < 160
+            || Number(validated.layoutLeftWidth) > 1200
+        )
+    ) {
         validated.layoutLeftWidth = defaultSettings.layoutLeftWidth;
         hasIssues = true;
     }
 
-    if (!Number.isFinite(validated.layoutRightWidth) || validated.layoutRightWidth < 220 || validated.layoutRightWidth > 1200) {
+    if (
+        validated.layoutRightWidth !== null
+        && (
+            !Number.isFinite(Number(validated.layoutRightWidth))
+            || Number(validated.layoutRightWidth) < 220
+            || Number(validated.layoutRightWidth) > 1200
+        )
+    ) {
         validated.layoutRightWidth = defaultSettings.layoutRightWidth;
         hasIssues = true;
     }
@@ -395,6 +438,17 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
+    if (typeof sourceSettings.agentBubbleThemePrompt !== 'string') {
+        validated.agentBubbleThemePrompt = normalizePromptText(
+            sourceSettings.agentBubbleThemePrompt,
+            defaultSettings.agentBubbleThemePrompt
+        );
+        hasIssues = true;
+    } else if (LEGACY_AGENT_BUBBLE_THEME_PROMPTS.has(sourceSettings.agentBubbleThemePrompt.trim())) {
+        validated.agentBubbleThemePrompt = defaultSettings.agentBubbleThemePrompt;
+        hasIssues = true;
+    }
+
     if (!Array.isArray(validated.combinedItemOrder)) {
         validated.combinedItemOrder = [];
         hasIssues = true;
@@ -416,6 +470,9 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
             city: typeof validated.studyProfile.city === 'string'
                 ? validated.studyProfile.city
                 : DEFAULT_STUDY_PROFILE.city,
+            grade: typeof validated.studyProfile.grade === 'string'
+                ? validated.studyProfile.grade
+                : DEFAULT_STUDY_PROFILE.grade,
             studyWorkspace: typeof validated.studyProfile.studyWorkspace === 'string'
                 ? validated.studyProfile.studyWorkspace
                 : DEFAULT_STUDY_PROFILE.studyWorkspace,

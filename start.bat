@@ -14,6 +14,11 @@ if defined UNISTUDY_DATA_ROOT (
 ) else (
   echo [UniStudy] Data root: Electron userData default (UniStudy namespace)
 )
+if /i "%UNISTUDY_SKIP_DEFAULT_SEED%"=="1" (
+  echo [UniStudy] Default seed: disabled ^(blank data root^)
+) else (
+  echo [UniStudy] Default seed: enabled ^(first-run seed data^)
+)
 
 if not exist package.json (
   echo [UniStudy] package.json not found.

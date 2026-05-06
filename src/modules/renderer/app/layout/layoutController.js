@@ -1,6 +1,6 @@
 const LAYOUT_DEFAULTS = Object.freeze({
-    leftWidth: 360,
-    rightWidth: 340,
+    leftWidth: null,
+    rightWidth: null,
     leftMin: 220,
     rightMin: 300,
     centerMin: 560,
@@ -24,6 +24,9 @@ function clamp(value, min, max) {
 }
 
 function normalizeStoredLayoutWidth(value, fallback) {
+    if (value === null || value === undefined || value === '') {
+        return fallback;
+    }
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : fallback;
 }
@@ -42,6 +45,17 @@ function consumeWidth(value, floor, requested) {
     };
 }
 
+function resolveAutoLayoutWidths({
+    panelBudget = 0,
+    collapsed = false,
+} = {}) {
+    const sideWidth = Math.max(0, panelBudget / 5);
+    return {
+        left: sideWidth,
+        right: collapsed ? 0 : sideWidth,
+    };
+}
+
 function resolveLayoutWidths({
     desiredLeft = LAYOUT_DEFAULTS.leftWidth,
     desiredRight = LAYOUT_DEFAULTS.rightWidth,
@@ -52,9 +66,13 @@ function resolveLayoutWidths({
     const dividerWidth = defaults.dividerWidth;
     const effectiveRightDividerWidth = collapsed ? 0 : dividerWidth;
     const panelBudget = Math.max(0, contentWidth - dividerWidth - effectiveRightDividerWidth);
+    const autoWidths = resolveAutoLayoutWidths({
+        panelBudget,
+        collapsed,
+    });
 
     let left = Math.min(
-        Math.max(normalizeStoredLayoutWidth(desiredLeft, defaults.leftWidth), defaults.leftCompactMin),
+        Math.max(normalizeStoredLayoutWidth(desiredLeft, autoWidths.left), defaults.leftCompactMin),
         panelBudget,
     );
     let right = 0;
@@ -62,7 +80,7 @@ function resolveLayoutWidths({
     if (!collapsed) {
         const remainingAfterLeft = Math.max(0, panelBudget - left);
         right = Math.min(
-            Math.max(normalizeStoredLayoutWidth(desiredRight, defaults.rightWidth), defaults.rightCompactMin),
+            Math.max(normalizeStoredLayoutWidth(desiredRight, autoWidths.right), defaults.rightCompactMin),
             remainingAfterLeft,
         );
     }
@@ -474,6 +492,7 @@ function createLayoutController(deps = {}) {
         clamp,
         normalizeStoredLayoutWidth,
         normalizeStoredLayoutHeight,
+        resolveAutoLayoutWidths,
         resolveLayoutWidths,
         resolveLeftSidebarHeights,
         applyLayoutWidths,
@@ -495,6 +514,7 @@ export {
     clamp,
     normalizeStoredLayoutWidth,
     normalizeStoredLayoutHeight,
+    resolveAutoLayoutWidths,
     resolveLayoutWidths,
     resolveLeftSidebarHeights,
     createLayoutController,

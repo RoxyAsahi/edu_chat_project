@@ -200,7 +200,7 @@ function buildPromptVariableMap(options = {}) {
     const adaptiveBubbleTipEnabled = settings.enableAdaptiveBubbleTip !== false;
     const protocolVariablesEnabled = studyLogPolicy.enabled !== false
         && studyLogPolicy.enableDailyNotePromptVariables !== false;
-    const timeZone = context.timeZone || studyProfile.timezone || 'Asia/Hong_Kong';
+    const timeZone = context.timeZone || studyProfile.timezone || 'Asia/Shanghai';
     const formattedNow = formatDateParts(new Date(), timeZone);
     const dailyNoteInstruction = resolveDailyNoteGuideInstruction(settings.dailyNoteGuide, {
         agentConfig,
@@ -226,6 +226,7 @@ function buildPromptVariableMap(options = {}) {
     mergeVariable(variableMap, 'UserName', settings.userName || studyProfile.studentName, 'settings');
     mergeVariable(variableMap, 'StudentName', studyProfile.studentName || settings.userName, 'settings');
     mergeVariable(variableMap, 'City', studyProfile.city, 'settings');
+    mergeVariable(variableMap, 'Grade', studyProfile.grade, 'settings');
     mergeVariable(variableMap, 'StudyWorkspace', studyProfile.studyWorkspace, 'settings');
     mergeVariable(variableMap, 'WorkEnvironment', studyProfile.workEnvironment, 'settings');
     mergeVariable(variableMap, 'CurrentDate', formattedNow.date, 'builtin');

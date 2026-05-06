@@ -51,11 +51,12 @@ test('resolvePromptVariables resolves RenderingGuide locally', () => {
 });
 
 test('resolvePromptVariables resolves study profile variables and DailyNoteGuide locally', () => {
-    const result = resolvePromptVariables('{{StudentName}} @ {{StudyWorkspace}} / {{WorkEnvironment}}\n{{DailyNoteGuide}}', {
+    const result = resolvePromptVariables('{{StudentName}} / {{Grade}} @ {{StudyWorkspace}} / {{WorkEnvironment}}\n{{DailyNoteGuide}}', {
         settings: {
             userName: 'FallbackUser',
             studyProfile: {
                 studentName: 'Alice',
+                grade: '高二',
                 studyWorkspace: 'Dorm A-301',
                 workEnvironment: 'Laptop + Pen Tablet',
             },
@@ -65,7 +66,7 @@ test('resolvePromptVariables resolves study profile variables and DailyNoteGuide
         },
     });
 
-    assert.match(result.resolvedPrompt, /Alice @ Dorm A-301 \/ Laptop \+ Pen Tablet/);
+    assert.match(result.resolvedPrompt, /Alice \/ 高二 @ Dorm A-301 \/ Laptop \+ Pen Tablet/);
     assert.match(result.resolvedPrompt, /DailyNote/);
     assert.match(result.resolvedPrompt, /<<<\[TOOL_REQUEST\]>>>/);
     assert.match(result.resolvedPrompt, /\[Hornet_验收\]Hornet_验收/);

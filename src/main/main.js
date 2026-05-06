@@ -118,6 +118,7 @@ const modelUsageTracker = require('../modules/main/modelUsageTracker');
 const SettingsManager = require('../modules/main/utils/appSettingsManager');
 const AgentConfigManager = require('../modules/main/utils/agentConfigManager');
 const { resolveDataRootPaths } = require('../modules/main/utils/dataRootResolver');
+const { shouldSeedDefaultDataRoot } = require('../modules/main/utils/bootstrapSettings');
 const { seedDefaultDataRoot } = require('../modules/main/utils/defaultDataSeeder');
 const { PRELOAD_ROLES, resolveProjectPreload } = require('../modules/main/services/preloadPaths');
 
@@ -246,15 +247,28 @@ const fileWatcher = {
 async function bootstrapIndependentDataRoot() {
     ensureDataRootPaths();
     await fs.ensureDir(DATA_ROOT);
+    const seedingEnabled = shouldSeedDefaultDataRoot(process.env);
     const seedRoot = resolveDefaultDataSeedRoot();
-    const seedResult = await seedDefaultDataRoot({
-        dataRoot: DATA_ROOT,
-        seedRoot,
-    });
+    const seedResult = seedingEnabled
+        ? await seedDefaultDataRoot({
+            dataRoot: DATA_ROOT,
+            seedRoot,
+        })
+        : {
+            copiedFiles: 0,
+            skippedFiles: 0,
+            hydratedHistories: 0,
+            knowledgeBaseImports: { knowledgeBases: 0, documents: 0, chunks: 0 },
+            seedRootMissing: false,
+        };
     console.log(`[UniStudyBootstrap] Data root: ${DATA_ROOT}`);
-    console.log(`[UniStudyBootstrap] Seed root: ${seedRoot}`);
-    if (seedResult.copiedFiles > 0) {
-        console.log(`[UniStudyBootstrap] Seeded ${seedResult.copiedFiles} default data file(s).`);
+    if (seedingEnabled) {
+        console.log(`[UniStudyBootstrap] Seed root: ${seedRoot}`);
+        if (seedResult.copiedFiles > 0) {
+            console.log(`[UniStudyBootstrap] Seeded ${seedResult.copiedFiles} default data file(s).`);
+        }
+    } else {
+        console.log('[UniStudyBootstrap] Default seed skipped by UNISTUDY_SKIP_DEFAULT_SEED.');
     }
     if (DATA_ROOT_PATHS.source === 'env-override') {
         console.log('[UniStudyBootstrap] Using UNISTUDY_DATA_ROOT override.');

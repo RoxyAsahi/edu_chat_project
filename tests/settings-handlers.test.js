@@ -370,9 +370,8 @@ test('save-settings persists study profile and study log policy fields', async (
     const result = await saveSettings({}, {
         studyProfile: {
             studentName: 'Alice',
-            studyWorkspace: 'Dorm A-301',
-            workEnvironment: 'Laptop',
-            timezone: 'Asia/Hong_Kong',
+            city: '上海',
+            grade: '高二',
         },
         promptVariables: {
             CourseName: '高数',
@@ -388,6 +387,7 @@ test('save-settings persists study profile and study log policy fields', async (
     const rawSettings = await fs.readJson(settingsPath);
     assert.equal(result.success, true);
     assert.equal(rawSettings.studyProfile.studentName, 'Alice');
+    assert.equal(rawSettings.studyProfile.grade, '高二');
     assert.equal(rawSettings.promptVariables.CourseName, '高数');
     assert.equal(rawSettings.studyLogPolicy.maxToolRounds, 5);
 });

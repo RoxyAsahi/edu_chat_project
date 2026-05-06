@@ -48,9 +48,7 @@ function createDom() {
           <input id="topicTitleDefaultModelInput" />
           <input id="studentNameInput" />
           <input id="studyCityInput" />
-          <input id="studyWorkspaceInput" />
-          <input id="workEnvironmentInput" />
-          <input id="studyTimezoneInput" />
+          <input id="studyGradeInput" />
           <input id="studyLogEnabledInput" type="checkbox" />
           <input id="studyLogEnablePromptVariablesInput" type="checkbox" />
           <input id="studyLogAutoInjectProtocolInput" type="checkbox" />
@@ -121,11 +119,13 @@ function createDom() {
           <button id="settingsNavDefaultModelBtn" type="button" data-settings-section-button="default-model">default-model</button>
           <button id="settingsNavRetrievalBtn" type="button" data-settings-section-button="retrieval">retrieval</button>
           <button id="settingsNavPromptsBtn" type="button" data-settings-section-button="prompts">prompts</button>
+          <button id="settingsNavPromptAdvancedBtn" type="button" data-settings-section-button="prompt-advanced">prompt-advanced</button>
           <button id="settingsNavDisplayBtn" type="button" data-settings-section-button="display">display</button>
           <section id="settingsModalSectionServices"></section>
           <section id="settingsModalSectionDefaultModel" class="hidden"></section>
           <section id="settingsModalSectionRetrieval" class="hidden"></section>
           <section id="settingsModalSectionPrompts" class="hidden"></section>
+          <section id="settingsModalSectionPromptAdvanced" class="hidden"></section>
           <section id="settingsModalSectionDisplay" class="hidden"></section>
           <section id="settingsModalSectionKnowledgeBase" class="hidden"></section>
           <div id="subjectSettingsPanel" class="hidden" aria-hidden="true">
@@ -169,9 +169,7 @@ function createElementMap(documentObj) {
         topicTitleDefaultModelInput: documentObj.getElementById('topicTitleDefaultModelInput'),
         studentNameInput: documentObj.getElementById('studentNameInput'),
         studyCityInput: documentObj.getElementById('studyCityInput'),
-        studyWorkspaceInput: documentObj.getElementById('studyWorkspaceInput'),
-        workEnvironmentInput: documentObj.getElementById('workEnvironmentInput'),
-        studyTimezoneInput: documentObj.getElementById('studyTimezoneInput'),
+        studyGradeInput: documentObj.getElementById('studyGradeInput'),
         studyLogEnabledInput: documentObj.getElementById('studyLogEnabledInput'),
         studyLogEnablePromptVariablesInput: documentObj.getElementById('studyLogEnablePromptVariablesInput'),
         studyLogAutoInjectProtocolInput: documentObj.getElementById('studyLogAutoInjectProtocolInput'),
@@ -236,6 +234,7 @@ function createElementMap(documentObj) {
         settingsModalSectionDefaultModel: documentObj.getElementById('settingsModalSectionDefaultModel'),
         settingsModalSectionRetrieval: documentObj.getElementById('settingsModalSectionRetrieval'),
         settingsModalSectionPrompts: documentObj.getElementById('settingsModalSectionPrompts'),
+        settingsModalSectionPromptAdvanced: documentObj.getElementById('settingsModalSectionPromptAdvanced'),
         settingsModalSectionDisplay: documentObj.getElementById('settingsModalSectionDisplay'),
         settingsModalSectionGlobal: null,
         settingsModalSectionKnowledgeBase: documentObj.getElementById('settingsModalSectionKnowledgeBase'),
@@ -946,7 +945,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.topicTitlePromptTemplateInput.readOnly, true);
     assert.equal(el.topicTitlePromptTemplateInput.classList.contains('settings-textarea--readonly'), true);
     assert.match(el.finalSystemPromptPreview.value, /RENDER::rendering prompt/);
-    assert.match(el.promptSegmentPreview.textContent, /结构化渲染/);
     assert.match(el.promptSegmentPreview.textContent, /表情包提示/);
     el.modelServiceAddProviderBtn.click();
     await flushAsyncWork();

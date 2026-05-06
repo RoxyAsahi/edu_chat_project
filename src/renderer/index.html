@@ -936,6 +936,10 @@
                   <span class="material-symbols-outlined">text_snippet</span>
                   <span>提示词设置</span>
                 </button>
+                <button id="settingsNavPromptAdvancedBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="prompt-advanced">
+                  <span class="material-symbols-outlined">science</span>
+                  <span>高级与调试</span>
+                </button>
                 <button id="settingsNavDisplayBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="display">
                   <span class="material-symbols-outlined">brush</span>
                   <span>显示设置</span>
@@ -1040,9 +1044,7 @@
                 <div class="settings-list">
                   <div class="settings-row"><div class="settings-row__main"><strong>学生姓名</strong><span>用于 {{StudentName}}。</span></div><input id="studentNameInput" type="text" placeholder="未设置" /></div>
                   <div class="settings-row"><div class="settings-row__main"><strong>所在城市</strong><span>用于 {{City}}。</span></div><input id="studyCityInput" type="text" placeholder="未设置" /></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>学习工作区</strong><span>用于 {{StudyWorkspace}}。</span></div><input id="studyWorkspaceInput" type="text" placeholder="例如 A-301" /></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>工作环境</strong><span>用于 {{WorkEnvironment}}。</span></div><input id="workEnvironmentInput" type="text" placeholder="例如 Laptop + Pen Tablet" /></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>默认时区</strong><span>用于日期和日记时间。</span></div><input id="studyTimezoneInput" type="text" placeholder="Asia/Hong_Kong" /></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>年级</strong><span>用于 {{Grade}}，帮助调整讲解难度和表达方式。</span></div><input id="studyGradeInput" type="text" placeholder="例如 六年级 / 初二 / 高三 / 大一" /></div>
                 </div>
                 <div class="field-grid hidden">
                   <label><span>日志工具回合上限</span><input id="studyLogMaxRoundsInput" type="number" min="1" step="1" /></label>
@@ -1055,22 +1057,35 @@
               </section>
 
               <section class="settings-list-card">
-                <h3>学习日志</h3>
+                <h3>DailyNote 协议</h3>
                 <div class="settings-list">
-                  <div class="settings-row"><div class="settings-row__main"><strong>本地学习日志</strong><span>关闭后 DailyNote 工具、自动协议注入和日志写入都会停用。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnabledInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>作为提示变量</strong><span>允许 {{DailyNoteGuide}} 展开为 DailyNote 协议。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnablePromptVariablesInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>发送前自动补上协议</strong><span>工具对话时自动把 DailyNote 协议追加到 system prompt。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogAutoInjectProtocolInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>DailyNote 协议文本</strong><span>留空时使用内置默认协议。</span></div><textarea id="dailyNoteGuideInput" rows="6" placeholder="这里定义全局 DailyNote 协议文本。"></textarea></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>启用学习日志</strong><span>允许 AI 在合适的时候写入 DailyNote，作为长期学习记忆。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnabledInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>DailyNote 协议文本</strong><span>定义写入学习日志时使用的协议格式，留空时使用内置默认协议。</span></div><textarea id="dailyNoteGuideInput" rows="6" placeholder="这里定义全局 DailyNote 协议文本。"></textarea></div>
                 </div>
               </section>
 
               <section class="settings-list-card">
-                <h3>回答表现</h3>
+                <h3>气泡提示词</h3>
                 <div class="settings-list">
-                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>结构化渲染提示</strong><span>控制回答是否携带结构化渲染指导。</span></div><label class="toggle-switch settings-row__control"><input id="enableRenderingPromptInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="renderingPromptInput" rows="4" placeholder="用于控制结构化 div 渲染风格。"></textarea></div>
-                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>表情包提示</strong><span>让模型知道可用表情包和图片伪路径。</span></div><label class="toggle-switch settings-row__control"><input id="enableEmoticonPromptInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="emoticonPromptInput" rows="5" placeholder="用于控制内置表情包的文件列表和伪路径提示。"></textarea></div>
-                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>简洁气泡补充</strong><span>控制回答偏紧凑还是偏展开。</span></div><label class="toggle-switch settings-row__control"><input id="enableAdaptiveBubbleTipInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="adaptiveBubbleTipInput" rows="3" placeholder="用于补充气泡风格自适应提示。"></textarea></div>
-                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>视觉气泡主题注入</strong><span>额外追加到 system prompt 末尾的视觉风格提示。</span></div><label class="toggle-switch settings-row__control"><input id="enableAgentBubbleTheme" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="agentBubbleThemePrompt" rows="4" placeholder="启用后，这段提示词会额外追加到发送给上游的 system 消息中。"></textarea><span id="agentBubbleThemePersistStatus" class="settings-caption"></span></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>气泡渲染提示词</strong><span>这是全局最重要的一段提示词，用来约束 AI 生成可直接渲染的网页式回答气泡。</span></div><label class="toggle-switch settings-row__control"><input id="enableAgentBubbleTheme" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="agentBubbleThemePrompt" rows="6" placeholder="启用后，这段提示词会额外追加到发送给上游的 system 消息中。"></textarea><span id="agentBubbleThemePersistStatus" class="settings-caption">建议把主要的 HTML/CSS 渲染风格约束集中写在这里。</span></div>
+                </div>
+              </section>
+            </section>
+
+            <section id="settingsModalSectionPromptAdvanced" class="settings-modal__section hidden" data-settings-section="prompt-advanced">
+              <section class="settings-list-card">
+                <h3>协议注入方式</h3>
+                <div class="settings-list">
+                  <div class="settings-row"><div class="settings-row__main"><strong>手动引用 DailyNote 变量</strong><span>允许 {{DailyNoteGuide}} 在提示词中展开成完整协议。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnablePromptVariablesInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>工具对话自动注入协议</strong><span>在需要工具协议的对话里，系统会自动把 DailyNote 协议补到 system prompt 末尾。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogAutoInjectProtocolInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                </div>
+              </section>
+
+              <section class="settings-list-card">
+                <h3>内部提示片段</h3>
+                <div class="settings-list">
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>表情包提示</strong><span>告诉模型可用表情包和图片伪路径，通常无需对外展示。</span></div><label class="toggle-switch settings-row__control"><input id="enableEmoticonPromptInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="emoticonPromptInput" rows="5" placeholder="用于控制内置表情包的文件列表和伪路径提示。"></textarea></div>
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>简洁气泡补充</strong><span>用于补充回答偏紧凑还是偏展开的说明。</span></div><label class="toggle-switch settings-row__control"><input id="enableAdaptiveBubbleTipInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="adaptiveBubbleTipInput" rows="3" placeholder="用于补充气泡风格自适应提示。"></textarea></div>
                 </div>
               </section>
 
@@ -1092,6 +1107,10 @@
             </section>
 
             <section id="settingsModalSectionDisplay" class="settings-modal__section hidden" data-settings-section="display">
+              <div class="hidden" aria-hidden="true">
+                <input id="enableRenderingPromptInput" type="checkbox" checked />
+                <textarea id="renderingPromptInput"></textarea>
+              </div>
               <section class="settings-list-card">
                 <h3>聊天显示</h3>
                 <div class="settings-list">

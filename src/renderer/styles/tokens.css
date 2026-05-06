@@ -81,9 +81,9 @@
   --unistudy-chat-max-width: 92%;
   --unistudy-chat-font: 'Segoe UI', 'PingFang SC', sans-serif;
   --unistudy-code-font: 'Cascadia Code', 'Consolas', monospace;
-  --unistudy-left-width: 360px;
-  --unistudy-right-width: 340px;
-  --unistudy-effective-right-width: 340px;
+  --unistudy-left-width: calc((100vw - 64px) / 5);
+  --unistudy-right-width: calc((100vw - 64px) / 5);
+  --unistudy-effective-right-width: calc((100vw - 64px) / 5);
   --unistudy-center-min: 560px;
   --unistudy-divider-width: 12px;
   --unistudy-effective-right-divider-width: 12px;

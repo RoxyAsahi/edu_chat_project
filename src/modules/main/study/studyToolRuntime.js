@@ -136,6 +136,7 @@ function createStudyToolRuntime(options = {}) {
             topicNameSnapshot: runtimeContext.topicName,
             dateKey,
             studentNameSnapshot: runtimeContext.studentName,
+            gradeSnapshot: runtimeContext.grade,
             workspaceSnapshot: runtimeContext.studyWorkspace,
             environmentSnapshot: runtimeContext.workEnvironment,
             sourceMessageIds: runtimeContext.sourceMessageIds,

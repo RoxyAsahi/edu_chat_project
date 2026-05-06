@@ -80,9 +80,10 @@
   "studyProfile": {
     "studentName": "",
     "city": "",
+    "grade": "",
     "studyWorkspace": "",
     "workEnvironment": "",
-    "timezone": "Asia/Hong_Kong"
+    "timezone": "Asia/Shanghai"
   },
   "promptVariables": {},
   "studyLogPolicy": {

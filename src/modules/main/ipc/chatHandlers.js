@@ -2039,6 +2039,7 @@ function initialize(mainWindow, context) {
             topicName: promptVariableResolution.substitutions.TopicName || context?.topicName || '',
             agentName: promptVariableResolution.substitutions.AgentName || context?.agentName || '',
             studentName: studyProfile.studentName || settings.userName || '',
+            grade: studyProfile.grade || '',
             studyWorkspace: studyProfile.studyWorkspace || '',
             workEnvironment: studyProfile.workEnvironment || '',
             currentDate,

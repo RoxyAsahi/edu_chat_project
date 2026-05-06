@@ -24,6 +24,21 @@ test('resolveLayoutWidths preserves center space by shrinking side panels', asyn
     assert.equal(resolved.center, 560);
 });
 
+test('resolveLayoutWidths uses a 1:3:1 default split when no widths are stored', async () => {
+    const { resolveLayoutWidths } = await loadLayoutModule();
+
+    const resolved = resolveLayoutWidths({
+        desiredLeft: null,
+        desiredRight: null,
+        contentWidth: 1524,
+        collapsed: false,
+    });
+
+    assert.equal(resolved.left, 300);
+    assert.equal(resolved.right, 300);
+    assert.equal(resolved.center, 900);
+});
+
 test('resolveLeftSidebarHeights falls back to compact minimums in short sidebars', async () => {
     const { resolveLeftSidebarHeights } = await loadLayoutModule();
 
@@ -44,6 +59,7 @@ test('layout normalizers keep numeric values and fall back for invalid ones', as
     } = await loadLayoutModule();
 
     assert.equal(normalizeStoredLayoutWidth('512', 410), 512);
+    assert.equal(normalizeStoredLayoutWidth(null, 300), 300);
     assert.equal(normalizeStoredLayoutWidth('invalid', 410), 410);
     assert.equal(normalizeStoredLayoutHeight(280, 360), 280);
     assert.equal(normalizeStoredLayoutHeight(undefined, 360), 360);
