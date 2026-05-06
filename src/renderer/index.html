@@ -954,10 +954,6 @@
                   <span class="material-symbols-outlined">science</span>
                   <span>高级与调试</span>
                 </button>
-                <button id="settingsNavDisplayBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="display">
-                  <span class="material-symbols-outlined">brush</span>
-                  <span>显示设置</span>
-                </button>
               </div>
             </div>
           </nav>
@@ -1116,34 +1112,6 @@
                 <div class="settings-list">
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>当前提示词片段</strong><span>查看哪些片段会被加入最终 system prompt。</span></div><button id="refreshFinalSystemPromptPreviewBtn" class="ghost-button icon-text-btn settings-row__button" type="button"><span class="material-symbols-outlined">preview</span> 刷新</button><div id="promptSegmentPreview" class="settings-token-grid" aria-label="当前提示词片段总览"></div></div>
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>最终完整 system prompt</strong><span>当前选中学科实际发送给上游的完整 system prompt。</span></div><textarea id="finalSystemPromptPreview" class="settings-textarea--preview" rows="10" readonly aria-readonly="true" placeholder="这里会显示完整 system prompt。"></textarea><div id="finalSystemPromptPreviewMeta" class="settings-preview-meta"></div></div>
-                </div>
-              </section>
-            </section>
-
-            <section id="settingsModalSectionDisplay" class="settings-modal__section hidden" data-settings-section="display">
-              <div class="hidden" aria-hidden="true">
-                <input id="enableRenderingPromptInput" type="checkbox" checked />
-                <textarea id="renderingPromptInput"></textarea>
-              </div>
-              <section class="settings-list-card">
-                <h3>聊天显示</h3>
-                <div class="settings-list">
-                  <div class="settings-row">
-                    <div class="settings-row__main"><strong>聊天字体</strong><span>控制普通对话内容的字体风格。</span></div>
-                    <select id="chatFontPreset" class="settings-row__control">
-                      <option value="system">系统</option>
-                      <option value="serif">衬线</option>
-                      <option value="monospace">等宽</option>
-                    </select>
-                  </div>
-                  <div class="settings-row">
-                    <div class="settings-row__main"><strong>代码字体</strong><span>控制代码块和等宽内容的字体。</span></div>
-                    <select id="chatCodeFontPreset" class="settings-row__control">
-                      <option value="cascadia">Cascadia Code</option>
-                      <option value="monospace">等宽</option>
-                      <option value="system">系统</option>
-                    </select>
-                  </div>
                 </div>
               </section>
             </section>

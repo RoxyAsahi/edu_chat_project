@@ -4,7 +4,5 @@
   "vcpApiKey": "123456",
   "currentThemeMode": "light",
   "enableAgentBubbleTheme": true,
-  "enableWideChatLayout": true,
-  "chatFontPreset": "system",
-  "chatCodeFontPreset": "consolas"
+  "enableWideChatLayout": true
 }

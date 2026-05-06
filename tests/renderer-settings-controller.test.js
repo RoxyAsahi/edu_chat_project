@@ -72,8 +72,6 @@ function createDom() {
           <input id="kbScoreThreshold" />
           <input id="enableRenderingPromptInput" type="checkbox" />
           <input id="enableEmoticonPromptInput" type="checkbox" />
-          <select id="chatFontPreset"><option value="system">system</option></select>
-          <select id="chatCodeFontPreset"><option value="cascadia">cascadia</option></select>
           <input id="enableAgentBubbleTheme" type="checkbox" />
           <textarea id="agentBubbleThemePrompt"></textarea>
           <textarea id="agentBubbleThemeResolvedPreview"></textarea>
@@ -115,7 +113,6 @@ function createDom() {
           <button id="settingsNavAiMemoryBtn" type="button" data-settings-section-button="ai-memory">ai-memory</button>
           <button id="settingsNavAssistBtn" type="button" data-settings-section-button="assist">assist</button>
           <button id="settingsNavPromptAdvancedBtn" type="button" data-settings-section-button="prompt-advanced">prompt-advanced</button>
-          <button id="settingsNavDisplayBtn" type="button" data-settings-section-button="display">display</button>
           <section id="settingsModalSectionServices"></section>
           <section id="settingsModalSectionDefaultModel" class="hidden"></section>
           <section id="settingsModalSectionRetrieval" class="hidden"></section>
@@ -125,7 +122,6 @@ function createDom() {
           <section id="settingsModalSectionAiMemory" class="hidden"></section>
           <section id="settingsModalSectionAssist" class="hidden"></section>
           <section id="settingsModalSectionPromptAdvanced" class="hidden"></section>
-          <section id="settingsModalSectionDisplay" class="hidden"></section>
           <section id="settingsModalSectionKnowledgeBase" class="hidden"></section>
           <div id="subjectSettingsPanel" class="hidden" aria-hidden="true">
             <div id="subjectSettingsPanelBackdrop"></div>
@@ -191,8 +187,6 @@ function createElementMap(documentObj) {
         kbScoreThreshold: documentObj.getElementById('kbScoreThreshold'),
         enableRenderingPromptInput: documentObj.getElementById('enableRenderingPromptInput'),
         enableEmoticonPromptInput: documentObj.getElementById('enableEmoticonPromptInput'),
-        chatFontPreset: documentObj.getElementById('chatFontPreset'),
-        chatCodeFontPreset: documentObj.getElementById('chatCodeFontPreset'),
         enableAgentBubbleTheme: documentObj.getElementById('enableAgentBubbleTheme'),
         agentBubbleThemePrompt: documentObj.getElementById('agentBubbleThemePrompt'),
         agentBubbleThemeResolvedPreview: documentObj.getElementById('agentBubbleThemeResolvedPreview'),
@@ -229,7 +223,6 @@ function createElementMap(documentObj) {
         settingsModalSectionAiMemory: documentObj.getElementById('settingsModalSectionAiMemory'),
         settingsModalSectionAssist: documentObj.getElementById('settingsModalSectionAssist'),
         settingsModalSectionPromptAdvanced: documentObj.getElementById('settingsModalSectionPromptAdvanced'),
-        settingsModalSectionDisplay: documentObj.getElementById('settingsModalSectionDisplay'),
         settingsModalSectionGlobal: null,
         settingsModalSectionKnowledgeBase: documentObj.getElementById('settingsModalSectionKnowledgeBase'),
         subjectSettingsPanel: documentObj.getElementById('subjectSettingsPanel'),
@@ -703,8 +696,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     kbTopK: 6,
                     kbCandidateTopK: 20,
                     kbScoreThreshold: 0.25,
-                    chatFontPreset: 'system',
-                    chatCodeFontPreset: 'consolas',
                     enableEmoticonPrompt: false,
                     emoticonPrompt: 'emoticon prompt with {{GeneralEmoticonPath}}',
                     renderingPrompt: 'rendering prompt',
@@ -1075,8 +1066,6 @@ test('settingsController shows the default follow-up template in the UI but save
                     kbTopK: 6,
                     kbCandidateTopK: 20,
                     kbScoreThreshold: 0.25,
-                    chatFontPreset: 'system',
-                    chatCodeFontPreset: 'consolas',
                     enableEmoticonPrompt: true,
                     enableTopicTitleGeneration: true,
                     currentThemeMode: 'system',
@@ -1197,8 +1186,6 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
                     kbTopK: 6,
                     kbCandidateTopK: 20,
                     kbScoreThreshold: 0.25,
-                    chatFontPreset: 'system',
-                    chatCodeFontPreset: 'consolas',
                     enableEmoticonPrompt: true,
                     enableTopicTitleGeneration: true,
                     enableAgentBubbleTheme: false,
@@ -1330,16 +1317,16 @@ test('settingsController lets the global settings navigation switch between moda
     assert.equal(el.settingsModal.classList.contains('hidden'), false);
     assert.equal(el.settingsModalTitle.textContent, '模型服务');
 
-    const displayNavButton = documentObj.getElementById('settingsNavDisplayBtn');
-    displayNavButton.click();
+    const promptsNavButton = documentObj.getElementById('settingsNavPromptsBtn');
+    promptsNavButton.click();
 
-    assert.equal(store.getState().settings.settingsModalSection, 'display');
-    assert.equal(el.settingsModalSectionDisplay.classList.contains('hidden'), false);
+    assert.equal(store.getState().settings.settingsModalSection, 'prompts');
+    assert.equal(el.settingsModalSectionPrompts.classList.contains('hidden'), false);
     assert.equal(el.settingsModalSectionServices.classList.contains('hidden'), true);
-    assert.equal(displayNavButton.classList.contains('settings-modal__nav-button--active'), true);
-    assert.equal(displayNavButton.getAttribute('aria-current'), 'page');
-    assert.equal(el.settingsModalTitle.textContent, '显示设置');
-    assert.equal(el.settingsModalSubtitle.textContent, '调整聊天字体、宽度和流式显示效果。');
+    assert.equal(promptsNavButton.classList.contains('settings-modal__nav-button--active'), true);
+    assert.equal(promptsNavButton.getAttribute('aria-current'), 'page');
+    assert.equal(el.settingsModalTitle.textContent, '气泡渲染');
+    assert.equal(el.settingsModalSubtitle.textContent, '集中管理气泡渲染提示词。');
 });
 
 test('settingsController saves agent settings without legacy compatibility fields', async (t) => {

@@ -99,8 +99,6 @@ const DEFAULT_SETTINGS = Object.freeze({
     enableAgentBubbleTheme: true,
     agentBubbleThemePrompt: DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
     enableWideChatLayout: true,
-    chatFontPreset: 'system',
-    chatCodeFontPreset: 'cascadia',
     layoutLeftWidth: null,
     layoutRightWidth: null,
     layoutLeftTopHeight: 360,

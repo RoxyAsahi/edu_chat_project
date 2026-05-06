@@ -301,6 +301,23 @@ test('readSettings drops removed smooth streaming settings entirely', async (t) 
     assert.equal('smoothStreamIntervalMs' in settings, false);
 });
 
+test('readSettings drops removed font preset settings entirely', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await fs.writeJson(settingsPath, {
+        userName: 'Legacy Font User',
+        chatFontPreset: 'serif',
+        chatCodeFontPreset: 'consolas',
+    }, { spaces: 2 });
+
+    const settings = await manager.readSettings();
+    assert.equal('chatFontPreset' in settings, false);
+    assert.equal('chatCodeFontPreset' in settings, false);
+});
+
 test('readSettings upgrades legacy default agent bubble theme prompt to the concatenated merged default prompt', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');

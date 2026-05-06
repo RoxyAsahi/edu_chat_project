@@ -37,10 +37,6 @@ const SETTINGS_MODAL_META = Object.freeze({
         title: '高级与调试',
         subtitle: '查看提示词片段和最终 system prompt 的实际注入结果。',
     },
-    display: {
-        title: '显示设置',
-        subtitle: '调整聊天字体、宽度和流式显示效果。',
-    },
     global: {
         title: '模型服务',
         subtitle: '管理全局连接、检索模型和来源服务参数。',
@@ -2683,18 +2679,9 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
     }
 
     function applyRendererSettings() {
-        const settings = getGlobalSettings();
-        const chatFonts = {
-            system: '"Segoe UI", "PingFang SC", sans-serif',
-            serif: 'Georgia, "Noto Serif SC", serif',
-            cascadia: '"UniStudy Code", "Cascadia Code", "Consolas", "Courier New", monospace',
-            monospace: '"UniStudy Code", "Cascadia Code", "Consolas", "Courier New", monospace',
-            consolas: '"UniStudy Code", "Cascadia Code", "Consolas", "Courier New", monospace',
-        };
-
         documentObj.documentElement.style.setProperty('--unistudy-chat-max-width', '92%');
-        documentObj.documentElement.style.setProperty('--unistudy-chat-font', chatFonts[settings.chatFontPreset] || chatFonts.system);
-        documentObj.documentElement.style.setProperty('--unistudy-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.cascadia);
+        documentObj.documentElement.style.setProperty('--unistudy-chat-font', '"Segoe UI", "PingFang SC", sans-serif');
+        documentObj.documentElement.style.setProperty('--unistudy-code-font', '"UniStudy Code", "Cascadia Code", "Consolas", "Courier New", monospace');
     }
 
     function syncPromptTextareaState(node, enabled) {
@@ -3285,10 +3272,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (el.enableEmoticonPromptInput) {
             el.enableEmoticonPromptInput.checked = settings.enableEmoticonPrompt !== false;
         }
-        el.chatFontPreset.value = settings.chatFontPreset || 'system';
-        el.chatCodeFontPreset.value = settings.chatCodeFontPreset === 'consolas'
-            ? 'cascadia'
-            : (settings.chatCodeFontPreset || 'cascadia');
         el.enableAgentBubbleTheme.checked = settings.enableAgentBubbleTheme === true;
         const storedBubbleThemePrompt = typeof settings.agentBubbleThemePrompt === 'string'
             ? settings.agentBubbleThemePrompt
@@ -3429,8 +3412,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             kbScoreThreshold: Number(el.kbScoreThreshold.value || 0.25),
             enableRenderingPrompt: el.enableRenderingPromptInput?.checked !== false,
             enableEmoticonPrompt: el.enableEmoticonPromptInput?.checked !== false,
-            chatFontPreset: el.chatFontPreset.value,
-            chatCodeFontPreset: el.chatCodeFontPreset.value,
             enableAgentBubbleTheme: el.enableAgentBubbleTheme.checked,
             agentBubbleThemePrompt: getPromptTextareaRawValue(el.agentBubbleThemePrompt),
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
@@ -3541,7 +3522,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             ['ai-memory', el.settingsModalSectionAiMemory],
             ['assist', el.settingsModalSectionAssist],
             ['prompt-advanced', el.settingsModalSectionPromptAdvanced],
-            ['display', el.settingsModalSectionDisplay],
             ['knowledge-base', el.settingsModalSectionKnowledgeBase],
         ];
         sections.forEach(([name, node]) => {
@@ -3560,7 +3540,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         }
         const contentHero = el.settingsModalTitle?.closest('.settings-modal__content-hero');
         contentHero?.classList.toggle('settings-modal__content-hero--hidden', nextSection === 'services');
-        if (['services', 'default-model', 'profile', 'prompts', 'emoticons', 'ai-memory', 'prompt-advanced', 'display'].includes(nextSection)) {
+        if (['services', 'default-model', 'profile', 'prompts', 'emoticons', 'ai-memory', 'prompt-advanced'].includes(nextSection)) {
             void refreshFinalSystemPromptPreview();
         }
     }
@@ -4559,8 +4539,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
 
         [
             el.kbUseRerank,
-            el.chatFontPreset,
-            el.chatCodeFontPreset,
         ].forEach((node) => {
             node?.addEventListener('change', () => scheduleGlobalSettingsSave());
         });
