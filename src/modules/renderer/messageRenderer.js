@@ -181,7 +181,7 @@ const NOTE_PREVIEW_STYLE_ATTR = 'data-unistudy-note-preview-scope-id';
 const SNAPSHOT_ALLOWED_ROLES = new Set(['assistant', 'user', 'system']);
 
 
-// --- Enhanced Rendering Styles (from UserScript) ---
+// --- Enhanced Rendering Styles Injection ---
 function injectEnhancedStyles() {
     try {
         // Skip injection if the stylesheet is already present.
@@ -1058,7 +1058,7 @@ function prepareAssistantScopedStyles(text, scopeId) {
 /**
  * Wraps full doctype HTML documents in markdown code fences if they aren't already.
  * Bare HTML fragments, including <div id="response-root"> render bubbles, must stay
- * untouched so streaming can pass them through marked/morphdom like VCPChat.
+ * untouched so streaming can pass them through marked/morphdom directly.
  * Skip HTML inside protected start/end markers so tool payloads are not fenced by mistake.
  */
 function ensureHtmlFenced(text) {

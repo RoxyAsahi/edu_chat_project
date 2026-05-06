@@ -1,7 +1,7 @@
 # UniStudy Windows EXE 打包与内部试发布说明
 
 更新时间: 2026-04-13  
-适用仓库: `C:\VCP\Eric\VCPChatLite`
+适用仓库: `C:\VCP\Eric\edu_chat_project`
 
 ## 当前目标
 

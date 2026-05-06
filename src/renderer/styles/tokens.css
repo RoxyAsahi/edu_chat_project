@@ -13,6 +13,22 @@
   src: url('../../assets/font/MaterialSymbolsOutlined-latin-wght-normal.woff2') format('woff2');
 }
 
+@font-face {
+  font-family: 'UniStudy Code';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../assets/font/CascadiaCode.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'UniStudy Code';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../assets/font/CascadiaCodeItalic.woff2') format('woff2');
+}
+
 :root {
   --color-text-primary: #202124;
   --color-text-secondary: #3c4043;
@@ -78,9 +94,10 @@
   --macaron-purple: #f3e8fd;
   --macaron-yellow: #fef7e0;
 
+  --font-family-monospace: 'UniStudy Code', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
   --unistudy-chat-max-width: 92%;
   --unistudy-chat-font: 'Segoe UI', 'PingFang SC', sans-serif;
-  --unistudy-code-font: 'Cascadia Code', 'Consolas', monospace;
+  --unistudy-code-font: var(--font-family-monospace);
   --unistudy-left-width: calc((100vw - 64px) / 5);
   --unistudy-right-width: calc((100vw - 64px) / 5);
   --unistudy-effective-right-width: calc((100vw - 64px) / 5);

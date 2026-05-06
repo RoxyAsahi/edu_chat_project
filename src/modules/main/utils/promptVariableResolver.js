@@ -192,8 +192,7 @@ function buildPromptVariableMap(options = {}) {
     const emoticonPromptData = isPlainObject(context.emoticonPromptData) ? context.emoticonPromptData : {};
     const renderingPromptEnabled = settings.enableRenderingPrompt !== false;
     const emoticonPromptEnabled = settings.enableEmoticonPrompt !== false;
-    const protocolVariablesEnabled = studyLogPolicy.enabled !== false
-        && studyLogPolicy.enableDailyNotePromptVariables !== false;
+    const protocolVariablesEnabled = studyLogPolicy.enabled !== false;
     const timeZone = context.timeZone || studyProfile.timezone || 'Asia/Shanghai';
     const formattedNow = formatDateParts(new Date(), timeZone);
     const dailyNoteInstruction = resolveDailyNoteGuideInstruction(settings.dailyNoteGuide, {

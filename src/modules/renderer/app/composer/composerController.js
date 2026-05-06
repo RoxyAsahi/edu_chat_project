@@ -739,8 +739,7 @@ function createComposerController(deps = {}) {
 
     function buildRequestContext(snapshot, extra = {}) {
         const studyLogPolicy = snapshot?.settings?.studyLogPolicy || {};
-        const shouldUseStudyToolLoop = studyLogPolicy.enabled !== false
-            && studyLogPolicy.autoInjectDailyNoteProtocol !== false;
+        const shouldUseStudyToolLoop = studyLogPolicy.enabled !== false;
 
         return {
             agentId: snapshot?.selectedItem?.id || '',

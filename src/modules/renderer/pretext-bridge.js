@@ -35,7 +35,7 @@
 
     const FONTS = {
         body: "15px 'Segoe UI'",
-        code: "14px 'Consolas'",
+        code: "14px 'UniStudy Code'",
         system: "14px 'Segoe UI'",
         viewer: "15px 'Segoe UI'",
         widget: "14px 'Segoe UI'",
@@ -165,7 +165,7 @@
             : "'Segoe UI'";
         const resolvedCode = codeFontFamily && String(codeFontFamily).trim()
             ? String(codeFontFamily).trim()
-            : "'Consolas', monospace";
+            : "'UniStudy Code', 'Cascadia Code', 'Consolas', monospace";
 
         FONTS.body = `15px ${resolvedBody}`;
         FONTS.system = `14px ${resolvedBody}`;

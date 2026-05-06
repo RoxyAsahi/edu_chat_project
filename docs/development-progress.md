@@ -70,26 +70,26 @@ UniStudy 让 AI 帮用户生成理解资料的学习场景。
 
 因此，交互式渲染不应被视为普通消息渲染的附属功能，而应作为 UniStudy 的核心产品能力之一，与 Source、Topic、Notes、Practice 和 Memory 一起构成学习闭环。
 
-## 2026-04-26 VCPChat 渲染链路对照
-本轮排查重点对照了 `C:\VCP\VCPChat` 中的流式渲染路径，主要参考:
+## 2026-04-26 流式渲染架构基准对齐
+本轮重点梳理了 UniStudy 的流式渲染路径，主要参考模块:
 - `modules\renderer\streamManager.js`
 - `modules\messageRenderer.js`
 - `modules\renderer\contentProcessor.js`
 
-对照结论:
-- VCPChat 的流式阶段采用 stable / tail 双区结构。只有已经闭合的代码块、工具请求块、工具结果块和桌面推送块会进入 stable root；未闭合内容继续留在 tail root 中轻量重绘。
-- VCPChat 普通聊天气泡里的交互式渲染不是 desktop push，也不是流式 iframe 预览；它依赖模型按 `{{VarDivRender}}` 输出裸 HTML 片段，然后由 `marked.parse()` / `morphdom` 在 tail root 中边流式边变成 DOM。
+架构决策:
+- UniStudy 的流式阶段采用 stable / tail 双区结构。只有已经闭合的代码块、工具请求块、工具结果块和桌面推送块会进入 stable root；未闭合内容继续留在 tail root 中轻量重绘。
+- 普通聊天气泡里的交互式渲染不是 desktop push，也不是流式 iframe 预览；它依赖模型按 `{{VarDivRender}}` 输出裸 HTML 片段，然后由 `marked.parse()` / `morphdom` 在 tail root 中边流式边变成 DOM。
 - 完整高保真渲染只在消息最终完成后执行: `messageRenderer -> preprocessFullContent -> marked.parse -> processRenderedContent -> setupHtmlPreview`。
-- HTML 预览按钮和 iframe 属于完整后处理能力，只适合处理明确的 fenced HTML / doctype 完整网页源码，不应拦截普通聊天中的裸 `<div id="response-root">` 渲染片段。否则最终重绘时很容易把正在显示的 iframe 或按钮状态替换掉，表现为“渲染出来又消失”。
+- HTML 预览按钮和 iframe 属于完整后处理能力，只适合处理明确的 fenced HTML / doctype 完整网页源码，不应拦截普通聊天中的裸 `<div id="response-root">` 渲染片段。否则最终重绘时很容易把正在显示的 iframe 或按钮状态替换掉，表现为"渲染出来又消失"。
 - 工具请求块不同于 HTML iframe。工具块在 `<<<[END_TOOL_REQUEST]>>>` 到达后已经具备完整边界，可以立即进入 stable root 并通过 Markdown / 特殊块处理提前美化，不必等整条回复结束。
 
-本次 UniStudy 发现的实际断点:
-- `ensureHtmlFenced()` 在迁移后留下了错误保护标记占位，导致 `「始」/「末」` 与 `「始ESCAPE」/「末ESCAPE」` 内的内容保护不可靠。
+本次发现的实际断点:
+- `ensureHtmlFenced()` 在早期实现中留下了错误保护标记占位，导致 `「始」/「末」` 与 `「始ESCAPE」/「末ESCAPE」` 内的内容保护不可靠。
 - 直接输出 `<!DOCTYPE html> ... </html>` 会被包成 ` ```html ` 代码块，但 `ensureNewlineAfterCodeBlock()` 又把合法的 ` ```html ` 拆成普通围栏加一行 `html` 文本，导致后续 `<code>` 失去 `language-html`，`setupHtmlPreview()` 无法识别并创建播放按钮。
-- 后续又尝试在 stream tail 中把裸 HTML 或未闭合 fenced HTML 改造成 iframe 预览，这偏离了 VCPChat 普通聊天路径，也是“边渲染边输出”没有对齐预期的主要原因。
+- 后续又尝试在 stream tail 中把裸 HTML 或未闭合 fenced HTML 改造成 iframe 预览，这偏离了 UniStudy 普通聊天路径，也是"边渲染边输出"没有对齐预期的主要原因。
 
 当前修复原则:
-- 保留 VCPChat 的流式架构边界: 流式阶段不主动把裸 HTML 包成 iframe，而是让裸 HTML 直接通过 `marked.parse()` / `morphdom` 进入当前消息 DOM。
+- 保留 UniStudy 的流式架构边界: 流式阶段不主动把裸 HTML 包成 iframe，而是让裸 HTML 直接通过 `marked.parse()` / `morphdom` 进入当前消息 DOM。
 - 默认渲染提示词要求模型输出 `<div id="response-root">` 等 HTML 片段，不输出 ` ```html ` 代码围栏，也不输出 `<!DOCTYPE html>`、`<html>`、`<head>`、`<body>` 完整网页外壳。
 - `ensureNewlineAfterCodeBlock()` 必须保留合法代码块 info string，例如 ` ```html `、` ```js `、` ```mermaid `。
 - `ensureHtmlFenced()` 仅处理 `<!DOCTYPE html> ... </html>` 这类完整网页源码；普通 `<div>` / `<section>` / `<svg>` / `<html>` 片段保持裸 HTML，避免被误转成代码预览。

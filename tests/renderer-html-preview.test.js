@@ -232,7 +232,7 @@ test('messageRenderer keeps dollars inside code fences from consuming LaTeX bloc
     assert.doesNotMatch(content.textContent, /%%LATEX_BLOCK_/);
 });
 
-test('messageRenderer wraps raw doctype HTML into a VCPChat-style preview toggle', async (t) => {
+test('messageRenderer wraps raw doctype HTML into an HTML preview toggle', async (t) => {
     const { chatMessages, history, messageRenderer } = await createHarness(t);
     const message = {
         id: 'assistant-html-doctype',

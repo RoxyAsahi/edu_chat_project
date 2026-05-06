@@ -529,7 +529,7 @@ function buildThreeJsPreviewHtml(codeContent, frameId) {
                     color: #fecaca;
                     background: #450a0a;
                     border: 1px solid #ef4444;
-                    font: 13px/1.5 Consolas, Monaco, monospace;
+                    font: 13px/1.5 'UniStudy Code', 'Cascadia Code', Consolas, Monaco, monospace;
                     margin: 16px;
                     padding: 14px;
                     border-radius: 8px;
@@ -539,7 +539,7 @@ function buildThreeJsPreviewHtml(codeContent, frameId) {
                     color: #bae6fd;
                     background: rgba(14, 116, 144, 0.18);
                     border: 1px solid rgba(56, 189, 248, 0.35);
-                    font: 13px/1.5 Consolas, Monaco, monospace;
+                    font: 13px/1.5 'UniStudy Code', 'Cascadia Code', Consolas, Monaco, monospace;
                     margin: 16px;
                     padding: 14px;
                     border-radius: 8px;

@@ -89,7 +89,7 @@ const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = `Output formatting requirement: ${DEFA
 
 2. **⚛️ 容器哲学 (Technical Canvas)**
 * **唯一根节点**：为了让你的艺术品完整呈现，请务必将所有内容包裹在一个 <div id="response-root" style="..."> 容器中。
-* **流式直渲染**：请直接输出可插入聊天气泡的裸 HTML 片段。不要使用 \`\`\`html 代码围栏，不要输出 <!DOCTYPE html>、<html>、<head>、<body> 完整网页外壳；系统会像 VCPChat 普通聊天一样，在流式过程中把 <div id="response-root"> 等元素直接渲染为 DOM。
+* **流式直渲染**：请直接输出可插入聊天气泡的裸 HTML 片段。不要使用 \`\`\`html 代码围栏，不要输出 <!DOCTYPE html>、<html>、<head>、<body> 完整网页外壳；系统会在流式过程中直接把这些元素渲染为 DOM。
 * **排版美学**：拒绝原本Markdown的平庸渲染。利用 Flex/Grid 布局，使用 CSS 渐变、阴影 (box-shadow) 和圆角 (border-radius) 来增加层次感。
 * **动态呼吸**：适量添加 CSS 进场动画（如淡入、上浮），让回复像是有生命般“流”入屏幕，而非生硬弹出。
 
@@ -163,8 +163,6 @@ const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
     enableRenderingPrompt: '结构化渲染提示',
     enableEmoticonPrompt: '表情包提示',
     emoticonPrompt: '表情包提示模板',
-    'studyLogPolicy.enableDailyNotePromptVariables': '内建 DailyNote 变量',
-    'studyLogPolicy.autoInjectDailyNoteProtocol': '自动注入 DailyNote 协议',
 });
 const MODEL_SERVICE_VERSION = 1;
 const MODEL_SERVICE_TASK_META = Object.freeze({
@@ -2689,12 +2687,12 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         const chatFonts = {
             system: '"Segoe UI", "PingFang SC", sans-serif',
             serif: 'Georgia, "Noto Serif SC", serif',
-            cascadia: '"Cascadia Code", "Consolas", monospace',
-            monospace: '"Cascadia Code", "Consolas", monospace',
-            consolas: '"Cascadia Code", "Consolas", monospace',
+            cascadia: '"UniStudy Code", "Cascadia Code", "Consolas", "Courier New", monospace',
+            monospace: '"UniStudy Code", "Cascadia Code", "Consolas", "Courier New", monospace',
+            consolas: '"UniStudy Code", "Cascadia Code", "Consolas", "Courier New", monospace',
         };
 
-        documentObj.documentElement.style.setProperty('--unistudy-chat-max-width', `${Number(settings.chatBubbleMaxWidthWideDefault || 92)}%`);
+        documentObj.documentElement.style.setProperty('--unistudy-chat-max-width', '92%');
         documentObj.documentElement.style.setProperty('--unistudy-chat-font', chatFonts[settings.chatFontPreset] || chatFonts.system);
         documentObj.documentElement.style.setProperty('--unistudy-code-font', chatFonts[settings.chatCodeFontPreset] || chatFonts.cascadia);
     }
@@ -2714,15 +2712,14 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         syncPromptTextareaState(el.emoticonPromptInput, el.enableEmoticonPromptInput?.checked !== false);
         syncPromptTextareaState(el.topicTitlePromptTemplateInput, el.enableTopicTitleGenerationInput?.checked !== false);
         syncPromptTextareaState(el.agentBubbleThemePrompt, el.enableAgentBubbleTheme?.checked === true);
-        const dailyNoteEnabled = (el.studyLogEnabledInput?.checked !== false)
-            && ((el.studyLogEnablePromptVariablesInput?.checked !== false)
-            || (el.studyLogAutoInjectProtocolInput?.checked !== false));
+        const dailyNoteEnabled = el.studyLogEnabledInput?.checked !== false;
         syncPromptTextareaState(el.dailyNoteGuideInput, dailyNoteEnabled);
     }
 
     function getDailyNoteDefaultPromptText() {
         return sanitizeText(
-            lastFinalSystemPromptPreview?.segments?.dailyNoteVariable?.rawPrompt
+            lastFinalSystemPromptPreview?.segments?.dailyNote?.rawPrompt
+            || lastFinalSystemPromptPreview?.segments?.dailyNoteVariable?.rawPrompt
             || lastFinalSystemPromptPreview?.segments?.dailyNoteAutoInject?.rawPrompt,
             ''
         );
@@ -2820,14 +2817,9 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                 description: '启用后会自动把内置表情包说明追加到当前智能体提示词；若主 prompt 已显式引用 {{EmoticonGuide}}，则会跳过重复追加。',
             },
             {
-                key: 'dailyNoteVariable',
-                title: 'DailyNote 变量',
-                description: '控制 {{DailyNoteGuide}} 是否展开。',
-            },
-            {
-                key: 'dailyNoteAutoInject',
-                title: 'DailyNote 自动追加',
-                description: '作为全局兜底，在主 prompt 没自带协议时再追加一段 DailyNote 说明。',
+                key: 'dailyNote',
+                title: 'DailyNote 协议',
+                description: '学习日志开启后，{{DailyNoteGuide}} 会自动可用；若主 prompt 没写协议，发送前也会自动补上。',
             },
             {
                 key: 'bubbleTheme',
@@ -2840,9 +2832,12 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             const segment = preview?.segments?.[item.key] || {};
             let status = '当前不会加入';
             let reason = '这一段当前不会进入最终 system prompt。';
-            if (item.key === 'dailyNoteAutoInject') {
+            if (item.key === 'dailyNote') {
                 if (segment.enabled) {
-                    if (segment.appended) {
+                    if (segment.referencedInBasePrompt) {
+                        status = '会进入当前 prompt';
+                        reason = '当前 agent prompt 已经显式引用 DailyNote 协议变量，所以发送时会直接展开。';
+                    } else if (segment.appended) {
                         status = '发送前会自动补上';
                         reason = '当前 agent prompt 没自带协议，所以会在真正发送前追加一段 DailyNote 说明。';
                     } else if (segment.skippedBecausePromptAlreadyContainsProtocol) {
@@ -2850,11 +2845,11 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                         reason = '当前 agent prompt 已经自带 DailyNote 协议，所以这里会主动跳过，避免重复。';
                     } else {
                         status = '已启用，当前无需追加';
-                        reason = '当前没有额外追加，但开关仍处于启用状态。';
+                        reason = '学习日志协议已经准备好，发送时会按当前 prompt 的内容自动决定是展开还是兜底追加。';
                     }
                 } else {
-                    status = '自动追加已关闭';
-                    reason = '只有显式写进 agent prompt 的协议内容才会生效。';
+                    status = '学习日志已关闭';
+                    reason = '最终 prompt 不会携带 DailyNote 协议。';
                 }
             } else if (item.key === 'bubbleTheme') {
                 if (segment.enabled) {
@@ -2905,7 +2900,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                 : '关闭';
             const previewText = truncatePreviewText(
                 segment.resolvedPrompt || segment.rawPrompt || '',
-                item.key === 'dailyNoteVariable' || item.key === 'dailyNoteAutoInject' ? 150 : 120
+                item.key === 'dailyNote' ? 150 : 120
             );
 
             return `
@@ -2938,8 +2933,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         ];
         const notes = [];
         const emoticonPrompt = preview?.segments?.emoticonPrompt || {};
-        const dailyNoteVariable = preview?.segments?.dailyNoteVariable || {};
-        const dailyNoteAutoInject = preview?.segments?.dailyNoteAutoInject || {};
+        const dailyNote = preview?.segments?.dailyNote || {};
         const bubbleTheme = preview?.segments?.bubbleTheme || {};
 
         if (emoticonPrompt.enabled && emoticonPrompt.available === false) {
@@ -2956,16 +2950,16 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             notes.push('表情包提示已准备好；如果当前 prompt 没有显式自带说明，发送前会自动补上。');
         }
 
-        if (dailyNoteVariable.enabled && dailyNoteVariable.referencedInBasePrompt) {
+        if (dailyNote.enabled && dailyNote.referencedInBasePrompt) {
             notes.push('当前 agent prompt 自己引用了 DailyNote 协议变量，所以发送时会直接展开。');
-        } else if (dailyNoteAutoInject.appended) {
+        } else if (dailyNote.appended) {
             notes.push('当前 agent prompt 没自带协议，因此发送前会自动补上一段 DailyNote 说明。');
-        } else if (dailyNoteAutoInject.skippedBecausePromptAlreadyContainsProtocol) {
+        } else if (dailyNote.skippedBecausePromptAlreadyContainsProtocol) {
             notes.push('当前 agent prompt 已经自带 DailyNote 协议，所以系统不会重复追加。');
-        } else if (!dailyNoteVariable.enabled && !dailyNoteAutoInject.enabled) {
+        } else if (!dailyNote.enabled) {
             notes.push('DailyNote 协议当前整体关闭，最终 prompt 不会携带写日记指令。');
         } else {
-            notes.push('DailyNote 协议已准备好，但当前是否进入最终 prompt 取决于 agent 自身是否引用。');
+            notes.push('DailyNote 协议已准备好；发送时会按当前 prompt 的内容自动决定是展开还是兜底追加。');
         }
 
         if (bubbleTheme.appended) {
@@ -3014,8 +3008,8 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             promptVariables: parsePromptVariablesInput(el.promptVariablesInput?.value) || {},
             studyLogPolicy: {
                 enabled: el.studyLogEnabledInput?.checked !== false,
-                enableDailyNotePromptVariables: el.studyLogEnablePromptVariablesInput?.checked !== false,
-                autoInjectDailyNoteProtocol: el.studyLogAutoInjectProtocolInput?.checked !== false,
+                enableDailyNotePromptVariables: true,
+                autoInjectDailyNoteProtocol: true,
             },
         };
     }
@@ -3067,7 +3061,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             settings.enableEmoticonPrompt !== false && !promptAlreadyContainsEmoticon
                 ? emoticonRaw
                 : '',
-            dailyNoteEnabled && settings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false && !promptAlreadyContainsDailyNote
+            dailyNoteEnabled && !promptAlreadyContainsDailyNote
                 ? dailyNoteRaw
                 : '',
         ].filter(Boolean).join('\n\n').trim();
@@ -3102,17 +3096,11 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                     rawPrompt: emoticonRaw,
                     resolvedPrompt: emoticonRaw,
                 },
-                dailyNoteVariable: {
-                    enabled: dailyNoteEnabled && settings.studyLogPolicy?.enableDailyNotePromptVariables !== false,
+                dailyNote: {
+                    enabled: dailyNoteEnabled,
                     source: String(settings.dailyNoteGuide || '').trim() ? 'custom' : 'default',
                     referencedInBasePrompt: /{{\s*DailyNoteGuide\s*}}/.test(normalizedBasePrompt),
-                    rawPrompt: dailyNoteRaw,
-                    resolvedPrompt: dailyNoteRaw,
-                },
-                dailyNoteAutoInject: {
-                    enabled: dailyNoteEnabled && settings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false,
-                    source: String(settings.dailyNoteGuide || '').trim() ? 'custom' : 'default',
-                    appended: dailyNoteEnabled && settings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false && !promptAlreadyContainsDailyNote,
+                    appended: dailyNoteEnabled && !promptAlreadyContainsDailyNote,
                     skippedBecausePromptAlreadyContainsProtocol: promptAlreadyContainsDailyNote,
                     rawPrompt: dailyNoteRaw,
                     resolvedPrompt: dailyNoteRaw,
@@ -3280,15 +3268,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (el.studyCityInput) el.studyCityInput.value = settings.studyProfile?.city || '';
         if (el.studyGradeInput) el.studyGradeInput.value = settings.studyProfile?.grade || '';
         if (el.studyLogEnabledInput) el.studyLogEnabledInput.checked = settings.studyLogPolicy?.enabled !== false;
-        if (el.studyLogEnablePromptVariablesInput) {
-            el.studyLogEnablePromptVariablesInput.checked = settings.studyLogPolicy?.enableDailyNotePromptVariables !== false;
-        }
-        if (el.studyLogAutoInjectProtocolInput) {
-            el.studyLogAutoInjectProtocolInput.checked = settings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false;
-        }
-        if (el.studyLogMaxRoundsInput) el.studyLogMaxRoundsInput.value = settings.studyLogPolicy?.maxToolRounds ?? 3;
-        if (el.studyMemoryTopKInput) el.studyMemoryTopKInput.value = settings.studyLogPolicy?.memoryTopK ?? 4;
-        if (el.studyMemoryFallbackTopKInput) el.studyMemoryFallbackTopKInput.value = settings.studyLogPolicy?.memoryFallbackTopK ?? 2;
         if (el.promptVariablesInput) el.promptVariablesInput.value = JSON.stringify(settings.promptVariables || {}, null, 2);
         if (el.chatEndpoint) el.chatEndpoint.value = settings.chatEndpoint || '';
         if (el.chatApiKey) el.chatApiKey.value = settings.chatApiKey || '';
@@ -3310,7 +3289,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         el.chatCodeFontPreset.value = settings.chatCodeFontPreset === 'consolas'
             ? 'cascadia'
             : (settings.chatCodeFontPreset || 'cascadia');
-        el.chatBubbleMaxWidthWideDefault.value = settings.chatBubbleMaxWidthWideDefault ?? 92;
         el.enableAgentBubbleTheme.checked = settings.enableAgentBubbleTheme === true;
         const storedBubbleThemePrompt = typeof settings.agentBubbleThemePrompt === 'string'
             ? settings.agentBubbleThemePrompt
@@ -3369,7 +3347,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                 markPromptTextareaDefault(el.topicTitlePromptTemplateInput, DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE);
             }
         }
-        el.enableSmoothStreaming.checked = settings.enableSmoothStreaming === true;
         syncPromptInjectionState();
         void refreshAgentBubbleThemePreview();
         void refreshFinalSystemPromptPreview();
@@ -3434,11 +3411,11 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             promptVariables,
             studyLogPolicy: {
                 enabled: el.studyLogEnabledInput?.checked !== false,
-                enableDailyNotePromptVariables: el.studyLogEnablePromptVariablesInput?.checked !== false,
-                autoInjectDailyNoteProtocol: el.studyLogAutoInjectProtocolInput?.checked !== false,
-                maxToolRounds: Number(el.studyLogMaxRoundsInput?.value || 3),
-                memoryTopK: Number(el.studyMemoryTopKInput?.value || 4),
-                memoryFallbackTopK: Number(el.studyMemoryFallbackTopKInput?.value || 2),
+                enableDailyNotePromptVariables: true,
+                autoInjectDailyNoteProtocol: true,
+                maxToolRounds: 3,
+                memoryTopK: 4,
+                memoryFallbackTopK: 2,
             },
             chatEndpoint: modelServiceMirror.chatEndpoint || '',
             chatApiKey: modelServiceMirror.chatApiKey || '',
@@ -3454,7 +3431,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             enableEmoticonPrompt: el.enableEmoticonPromptInput?.checked !== false,
             chatFontPreset: el.chatFontPreset.value,
             chatCodeFontPreset: el.chatCodeFontPreset.value,
-            chatBubbleMaxWidthWideDefault: Number(el.chatBubbleMaxWidthWideDefault.value || 92),
             enableAgentBubbleTheme: el.enableAgentBubbleTheme.checked,
             agentBubbleThemePrompt: getPromptTextareaRawValue(el.agentBubbleThemePrompt),
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
@@ -3463,7 +3439,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             followUpPromptTemplate: getPromptTextareaRawValue(el.followUpPromptTemplateInput),
             enableTopicTitleGeneration: el.enableTopicTitleGenerationInput?.checked !== false,
             topicTitlePromptTemplate: getPromptTextareaRawValue(el.topicTitlePromptTemplateInput),
-            enableSmoothStreaming: el.enableSmoothStreaming.checked,
             currentThemeMode: themeMode,
         };
         isSavingGlobalSettings = true;
@@ -4450,16 +4425,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             void refreshFinalSystemPromptPreview();
             scheduleGlobalSettingsSave();
         });
-        el.studyLogEnablePromptVariablesInput?.addEventListener('change', () => {
-            syncPromptInjectionState();
-            void refreshFinalSystemPromptPreview();
-            scheduleGlobalSettingsSave();
-        });
-        el.studyLogAutoInjectProtocolInput?.addEventListener('change', () => {
-            syncPromptInjectionState();
-            void refreshFinalSystemPromptPreview();
-            scheduleGlobalSettingsSave();
-        });
         el.enableRenderingPromptInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             void refreshFinalSystemPromptPreview();
@@ -4587,7 +4552,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             el.kbTopK,
             el.kbCandidateTopK,
             el.kbScoreThreshold,
-            el.chatBubbleMaxWidthWideDefault,
         ].forEach((node) => {
             node?.addEventListener('input', () => scheduleGlobalSettingsSave());
             node?.addEventListener('change', () => scheduleGlobalSettingsSave());
@@ -4595,7 +4559,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
 
         [
             el.kbUseRerank,
-            el.enableSmoothStreaming,
             el.chatFontPreset,
             el.chatCodeFontPreset,
         ].forEach((node) => {

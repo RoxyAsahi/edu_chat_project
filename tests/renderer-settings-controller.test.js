@@ -50,11 +50,6 @@ function createDom() {
           <input id="studyCityInput" />
           <input id="studyGradeInput" />
           <input id="studyLogEnabledInput" type="checkbox" />
-          <input id="studyLogEnablePromptVariablesInput" type="checkbox" />
-          <input id="studyLogAutoInjectProtocolInput" type="checkbox" />
-          <input id="studyLogMaxRoundsInput" />
-          <input id="studyMemoryTopKInput" />
-          <input id="studyMemoryFallbackTopKInput" />
           <textarea id="promptVariablesInput"></textarea>
           <input id="chatEndpoint" />
           <input id="chatApiKey" />
@@ -79,7 +74,6 @@ function createDom() {
           <input id="enableEmoticonPromptInput" type="checkbox" />
           <select id="chatFontPreset"><option value="system">system</option></select>
           <select id="chatCodeFontPreset"><option value="cascadia">cascadia</option></select>
-          <input id="chatBubbleMaxWidthWideDefault" />
           <input id="enableAgentBubbleTheme" type="checkbox" />
           <textarea id="agentBubbleThemePrompt"></textarea>
           <textarea id="agentBubbleThemeResolvedPreview"></textarea>
@@ -96,7 +90,6 @@ function createDom() {
           <div id="finalSystemPromptPreviewMeta"></div>
           <button id="refreshFinalSystemPromptPreviewBtn" type="button">preview</button>
           <input id="enableWideChatLayout" type="checkbox" />
-          <input id="enableSmoothStreaming" type="checkbox" />
           <input type="radio" name="themeMode" value="light" />
           <input type="radio" name="themeMode" value="dark" />
           <input type="radio" name="themeMode" value="system" checked />
@@ -177,11 +170,6 @@ function createElementMap(documentObj) {
         studyCityInput: documentObj.getElementById('studyCityInput'),
         studyGradeInput: documentObj.getElementById('studyGradeInput'),
         studyLogEnabledInput: documentObj.getElementById('studyLogEnabledInput'),
-        studyLogEnablePromptVariablesInput: documentObj.getElementById('studyLogEnablePromptVariablesInput'),
-        studyLogAutoInjectProtocolInput: documentObj.getElementById('studyLogAutoInjectProtocolInput'),
-        studyLogMaxRoundsInput: documentObj.getElementById('studyLogMaxRoundsInput'),
-        studyMemoryTopKInput: documentObj.getElementById('studyMemoryTopKInput'),
-        studyMemoryFallbackTopKInput: documentObj.getElementById('studyMemoryFallbackTopKInput'),
         promptVariablesInput: documentObj.getElementById('promptVariablesInput'),
         chatEndpoint: documentObj.getElementById('chatEndpoint'),
         chatApiKey: documentObj.getElementById('chatApiKey'),
@@ -205,7 +193,6 @@ function createElementMap(documentObj) {
         enableEmoticonPromptInput: documentObj.getElementById('enableEmoticonPromptInput'),
         chatFontPreset: documentObj.getElementById('chatFontPreset'),
         chatCodeFontPreset: documentObj.getElementById('chatCodeFontPreset'),
-        chatBubbleMaxWidthWideDefault: documentObj.getElementById('chatBubbleMaxWidthWideDefault'),
         enableAgentBubbleTheme: documentObj.getElementById('enableAgentBubbleTheme'),
         agentBubbleThemePrompt: documentObj.getElementById('agentBubbleThemePrompt'),
         agentBubbleThemeResolvedPreview: documentObj.getElementById('agentBubbleThemeResolvedPreview'),
@@ -222,7 +209,6 @@ function createElementMap(documentObj) {
         finalSystemPromptPreviewMeta: documentObj.getElementById('finalSystemPromptPreviewMeta'),
         refreshFinalSystemPromptPreviewBtn: documentObj.getElementById('refreshFinalSystemPromptPreviewBtn'),
         enableWideChatLayout: documentObj.getElementById('enableWideChatLayout'),
-        enableSmoothStreaming: documentObj.getElementById('enableSmoothStreaming'),
         saveGlobalSettingsBtn: documentObj.getElementById('saveGlobalSettingsBtn'),
         currentAgentSettingsBtn: documentObj.getElementById('currentAgentSettingsBtn'),
         globalSettingsBtn: documentObj.getElementById('globalSettingsBtn'),
@@ -719,7 +705,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     kbScoreThreshold: 0.25,
                     chatFontPreset: 'system',
                     chatCodeFontPreset: 'consolas',
-                    chatBubbleMaxWidthWideDefault: 92,
                     enableEmoticonPrompt: false,
                     emoticonPrompt: 'emoticon prompt with {{GeneralEmoticonPath}}',
                     renderingPrompt: 'rendering prompt',
@@ -730,7 +715,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     enableAgentBubbleTheme: false,
                     agentBubbleThemePrompt: 'Custom bubble prompt: {{RenderingGuide}}',
                     enableWideChatLayout: true,
-                    enableSmoothStreaming: false,
                     currentThemeMode: 'dark',
                 };
             },
@@ -775,8 +759,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     ? ''
                     : (payload.settings?.emoticonPrompt || 'default emoticon prompt');
                 const dailyText = payload.settings?.studyLogPolicy?.enabled === false
-                    || (payload.settings?.studyLogPolicy?.enableDailyNotePromptVariables === false
-                        && payload.settings?.studyLogPolicy?.autoInjectDailyNoteProtocol === false)
                     ? ''
                     : (payload.settings?.dailyNoteGuide || 'default daily note guide');
                 const bubbleText = payload.settings?.enableAgentBubbleTheme === true
@@ -816,18 +798,10 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                                 rawPrompt: emoticonText,
                                 resolvedPrompt: emoticonText.replace('{{GeneralEmoticonPath}}', '/表情包'),
                             },
-                            dailyNoteVariable: {
-                                enabled: payload.settings?.studyLogPolicy?.enabled !== false
-                                    && payload.settings?.studyLogPolicy?.enableDailyNotePromptVariables !== false,
+                            dailyNote: {
+                                enabled: payload.settings?.studyLogPolicy?.enabled !== false,
                                 source: payload.settings?.dailyNoteGuide ? 'custom' : 'default',
                                 referencedInBasePrompt: true,
-                                rawPrompt: dailyText,
-                                resolvedPrompt: dailyText,
-                            },
-                            dailyNoteAutoInject: {
-                                enabled: payload.settings?.studyLogPolicy?.enabled !== false
-                                    && payload.settings?.studyLogPolicy?.autoInjectDailyNoteProtocol !== false,
-                                source: payload.settings?.dailyNoteGuide ? 'custom' : 'default',
                                 appended: false,
                                 skippedBecausePromptAlreadyContainsProtocol: true,
                                 rawPrompt: dailyText,
@@ -1103,8 +1077,6 @@ test('settingsController shows the default follow-up template in the UI but save
                     kbScoreThreshold: 0.25,
                     chatFontPreset: 'system',
                     chatCodeFontPreset: 'consolas',
-                    chatBubbleMaxWidthWideDefault: 92,
-                    enableSmoothStreaming: false,
                     enableEmoticonPrompt: true,
                     enableTopicTitleGeneration: true,
                     currentThemeMode: 'system',
@@ -1148,8 +1120,7 @@ test('settingsController shows the default follow-up template in the UI but save
                         segments: {
                             rendering: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             emoticonPrompt: { enabled: true, available: true, packCount: 1, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
-                            dailyNoteVariable: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
-                            dailyNoteAutoInject: { enabled: true, source: 'default', appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
+                            dailyNote: { enabled: true, source: 'default', referencedInBasePrompt: false, appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
                             bubbleTheme: { enabled: false, source: 'default', appended: false, rawPrompt: '', resolvedPrompt: '' },
                         },
                     },
@@ -1228,8 +1199,6 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
                     kbScoreThreshold: 0.25,
                     chatFontPreset: 'system',
                     chatCodeFontPreset: 'consolas',
-                    chatBubbleMaxWidthWideDefault: 92,
-                    enableSmoothStreaming: false,
                     enableEmoticonPrompt: true,
                     enableTopicTitleGeneration: true,
                     enableAgentBubbleTheme: false,
@@ -1261,8 +1230,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
                         segments: {
                             rendering: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             emoticonPrompt: { enabled: true, available: true, packCount: 1, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
-                            dailyNoteVariable: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
-                            dailyNoteAutoInject: { enabled: true, source: 'default', appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
+                            dailyNote: { enabled: true, source: 'default', referencedInBasePrompt: false, appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
                             bubbleTheme: { enabled: false, source: 'default', appended: false, rawPrompt: '', resolvedPrompt: '' },
                         },
                     },

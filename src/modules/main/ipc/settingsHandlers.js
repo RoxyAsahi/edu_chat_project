@@ -165,16 +165,6 @@ const SETTINGS_PERSISTENCE_FIELD_SPECS = [
         path: ['emoticonPrompt'],
         type: 'string',
     },
-    {
-        id: 'studyLogPolicy.enableDailyNotePromptVariables',
-        path: ['studyLogPolicy', 'enableDailyNotePromptVariables'],
-        type: 'boolean',
-    },
-    {
-        id: 'studyLogPolicy.autoInjectDailyNoteProtocol',
-        path: ['studyLogPolicy', 'autoInjectDailyNoteProtocol'],
-        type: 'boolean',
-    },
 ];
 
 function collectRequestedPersistenceFields(settings = {}) {
@@ -366,9 +356,6 @@ function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions
     if (settings?.studyLogPolicy?.enabled === false) {
         return { messages, appended: false, skippedByToken: false };
     }
-    if (settings?.studyLogPolicy?.autoInjectDailyNoteProtocol === false) {
-        return { messages, appended: false, skippedByToken: false };
-    }
 
     const dailyNotePrompt = resolveDailyNoteGuideInstruction(settings?.dailyNoteGuide, {
         agentConfig: promptResolutionOptions.agentConfig,
@@ -540,8 +527,6 @@ function initialize(paths) {
                     promptToggleFieldsMatched: [
                         'enableRenderingPrompt',
                         'enableEmoticonPrompt',
-                        'studyLogPolicy.enableDailyNotePromptVariables',
-                        'studyLogPolicy.autoInjectDailyNoteProtocol',
                     ].every((fieldId) => persistenceSummary.fieldChecks[fieldId]?.matched !== false),
                 },
             };
@@ -693,11 +678,7 @@ function initialize(paths) {
                 ? ''
                 : (sanitizeText(previewSettings.emoticonPrompt) || DEFAULT_EMOTICON_PROMPT);
             const studyLogEnabled = previewSettings.studyLogPolicy?.enabled !== false;
-            const dailyNoteVariablesEnabled = studyLogEnabled
-                && previewSettings.studyLogPolicy?.enableDailyNotePromptVariables !== false;
-            const dailyNoteAutoInjectEnabled = studyLogEnabled
-                && previewSettings.studyLogPolicy?.autoInjectDailyNoteProtocol !== false;
-            const dailyNoteRaw = !dailyNoteVariablesEnabled && !dailyNoteAutoInjectEnabled
+            const dailyNoteRaw = !studyLogEnabled
                 ? ''
                 : resolveDailyNoteGuideInstruction(previewSettings.dailyNoteGuide, {
                     agentConfig,
@@ -787,18 +768,10 @@ function initialize(paths) {
                             unresolvedTokens: emoticonResolved.unresolvedTokens,
                             legacyTokenSuggestions: emoticonResolved.legacyTokenSuggestions,
                         },
-                        dailyNoteVariable: {
-                            enabled: dailyNoteVariablesEnabled,
+                        dailyNote: {
+                            enabled: studyLogEnabled,
                             source: dailyNoteSource,
                             referencedInBasePrompt: references.dailyNoteInBasePrompt,
-                            rawPrompt: dailyNoteRaw,
-                            resolvedPrompt: dailyNoteResolved.resolvedPrompt || '',
-                            unresolvedTokens: dailyNoteResolved.unresolvedTokens,
-                            legacyTokenSuggestions: dailyNoteResolved.legacyTokenSuggestions,
-                        },
-                        dailyNoteAutoInject: {
-                            enabled: dailyNoteAutoInjectEnabled,
-                            source: dailyNoteSource,
                             appended: dailyNoteApplied.appended === true,
                             skippedBecausePromptAlreadyContainsProtocol: dailyNoteApplied.skippedByToken === true,
                             rawPrompt: dailyNoteRaw,

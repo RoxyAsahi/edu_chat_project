@@ -11,6 +11,22 @@
   src: url('../assets/font/MaterialSymbolsOutlined-latin-wght-normal.woff2') format('woff2');
 }
 
+@font-face {
+  font-family: 'UniStudy Code';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/font/CascadiaCode.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'UniStudy Code';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/font/CascadiaCodeItalic.woff2') format('woff2');
+}
+
 :root {
   --paper: #f0f4f9;
   --ink: #1f1f1f;
@@ -29,9 +45,10 @@
   --macaron-purple: #f3e8fd;
   --macaron-yellow: #fef7e0;
 
+  --font-family-monospace: 'UniStudy Code', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
   --lite-chat-max-width: 92%;
   --lite-chat-font: 'Segoe UI', 'PingFang SC', sans-serif;
-  --lite-code-font: 'Cascadia Code', 'Consolas', monospace;
+  --lite-code-font: var(--font-family-monospace);
   --unistudy-left-width: calc((100vw - 64px) / 5);
   --unistudy-right-width: calc((100vw - 64px) / 5);
   --unistudy-effective-right-width: calc((100vw - 64px) / 5);
@@ -2061,7 +2078,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .settings-card textarea { min-height: 100px; resize: vertical; background: rgba(0,0,0,0.04); border: none; }
 body.dark-theme .settings-card textarea { background: rgba(255,255,255,0.04); border: none; }
 .settings-card textarea.settings-textarea--readonly { opacity: 0.65; cursor: default; }
-.settings-card textarea.settings-textarea--preview { font-family: var(--font-family-monospace, "Cascadia Code", "Consolas", monospace); }
+.settings-card textarea.settings-textarea--preview { font-family: var(--font-family-monospace, "UniStudy Code", "Cascadia Code", "Consolas", monospace); }
 .settings-caption.settings-caption--success { color: #188038; }
 .settings-caption.settings-caption--warning { color: #b06000; }
 

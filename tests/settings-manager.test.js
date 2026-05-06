@@ -284,6 +284,23 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.topicTitlePromptTemplate, DEFAULT_SETTINGS.topicTitlePromptTemplate);
 });
 
+test('readSettings drops removed smooth streaming settings entirely', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await fs.writeJson(settingsPath, {
+        userName: 'Smooth Streaming Legacy User',
+        enableSmoothStreaming: true,
+        smoothStreamIntervalMs: 25,
+    }, { spaces: 2 });
+
+    const settings = await manager.readSettings();
+    assert.equal('enableSmoothStreaming' in settings, false);
+    assert.equal('smoothStreamIntervalMs' in settings, false);
+});
+
 test('readSettings upgrades legacy default agent bubble theme prompt to the concatenated merged default prompt', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
@@ -311,7 +328,7 @@ test('readSettings upgrades legacy default agent bubble theme prompt to the conc
 
 2. **⚛️ 容器哲学 (Technical Canvas)**
 * **唯一根节点**：为了让你的艺术品完整呈现，请务必将所有内容包裹在一个 <div id="response-root" style="..."> 容器中。
-* **流式直渲染**：请直接输出可插入聊天气泡的裸 HTML 片段。不要使用 \`\`\`html 代码围栏，不要输出 <!DOCTYPE html>、<html>、<head>、<body> 完整网页外壳；系统会像 VCPChat 普通聊天一样，在流式过程中把 <div id="response-root"> 等元素直接渲染为 DOM。
+* **流式直渲染**：请直接输出可插入聊天气泡的裸 HTML 片段。不要使用 \`\`\`html 代码围栏，不要输出 <!DOCTYPE html>、<html>、<head>、<body> 完整网页外壳；系统会在流式过程中直接把这些元素渲染为 DOM。
 * **排版美学**：拒绝原本Markdown的平庸渲染。利用 Flex/Grid 布局，使用 CSS 渐变、阴影 (box-shadow) 和圆角 (border-radius) 来增加层次感。
 * **动态呼吸**：适量添加 CSS 进场动画（如淡入、上浮），让回复像是有生命般“流”入屏幕，而非生硬弹出。
 

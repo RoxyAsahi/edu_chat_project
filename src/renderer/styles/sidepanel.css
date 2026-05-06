@@ -3398,7 +3398,7 @@ body.dark-theme .settings-card textarea { background: rgba(0,0,0,0.1); }
 }
 
 .settings-card textarea.settings-textarea--preview {
-  font-family: var(--font-family-monospace, "Cascadia Code", "Consolas", monospace);
+  font-family: var(--font-family-monospace, "UniStudy Code", "Cascadia Code", "Consolas", monospace);
 }
 
 .settings-subsection {

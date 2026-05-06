@@ -5,8 +5,6 @@
   "currentThemeMode": "light",
   "enableAgentBubbleTheme": true,
   "enableWideChatLayout": true,
-  "enableSmoothStreaming": true,
   "chatFontPreset": "system",
-  "chatCodeFontPreset": "consolas",
-  "chatBubbleMaxWidthWideDefault": 92
+  "chatCodeFontPreset": "consolas"
 }

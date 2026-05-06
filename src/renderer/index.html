@@ -1090,13 +1090,6 @@
               <section class="settings-list-card settings-list-card--untitled settings-list-card--airy">
                 <div class="settings-list">
                   <div class="settings-row"><div class="settings-row__main"><strong>启用学习日志</strong><span>允许 AI 在合适的时候写入 DailyNote，作为长期学习记忆。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnabledInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>手动引用 DailyNote 变量</strong><span>允许 {{DailyNoteGuide}} 在提示词中展开成完整协议。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnablePromptVariablesInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>工具对话自动注入协议</strong><span>在需要工具协议的对话里，系统会自动把 DailyNote 协议补到 system prompt 末尾。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogAutoInjectProtocolInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                </div>
-                <div class="field-grid field-grid--airy">
-                  <label><span>日志工具回合上限</span><input id="studyLogMaxRoundsInput" type="number" min="1" step="1" /></label>
-                  <label><span>长期记忆 Top K</span><input id="studyMemoryTopKInput" type="number" min="1" step="1" /></label>
-                  <label><span>Fallback Top K</span><input id="studyMemoryFallbackTopKInput" type="number" min="1" step="1" /></label>
                 </div>
               </section>
 
@@ -1150,14 +1143,6 @@
                       <option value="monospace">等宽</option>
                       <option value="system">系统</option>
                     </select>
-                  </div>
-                  <div class="settings-row">
-                    <div class="settings-row__main"><strong>气泡宽度</strong><span>控制宽屏聊天气泡最大宽度百分比。</span></div>
-                    <input id="chatBubbleMaxWidthWideDefault" class="settings-row__number" type="number" min="50" max="96" />
-                  </div>
-                  <div class="settings-row">
-                    <div class="settings-row__main"><strong>平滑流式输出</strong><span>让模型回复逐步展开，视觉上更顺滑。</span></div>
-                    <label class="toggle-switch settings-row__control" aria-label="启用平滑流式输出"><input id="enableSmoothStreaming" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label>
                   </div>
                 </div>
               </section>

@@ -49,7 +49,7 @@ const LEGACY_AGENT_BUBBLE_THEME_BASE_PROMPT = `Output formatting requirement: {{
 
 2. **⚛️ 容器哲学 (Technical Canvas)**
 * **唯一根节点**：为了让你的艺术品完整呈现，请务必将所有内容包裹在一个 <div id="response-root" style="..."> 容器中。
-* **流式直渲染**：请直接输出可插入聊天气泡的裸 HTML 片段。不要使用 \`\`\`html 代码围栏，不要输出 <!DOCTYPE html>、<html>、<head>、<body> 完整网页外壳；系统会像 VCPChat 普通聊天一样，在流式过程中把 <div id="response-root"> 等元素直接渲染为 DOM。
+* **流式直渲染**：请直接输出可插入聊天气泡的裸 HTML 片段。不要使用 \`\`\`html 代码围栏，不要输出 <!DOCTYPE html>、<html>、<head>、<body> 完整网页外壳；系统会在流式过程中直接把这些元素渲染为 DOM。
 * **排版美学**：拒绝原本Markdown的平庸渲染。利用 Flex/Grid 布局，使用 CSS 渐变、阴影 (box-shadow) 和圆角 (border-radius) 来增加层次感。
 * **动态呼吸**：适量添加 CSS 进场动画（如淡入、上浮），让回复像是有生命般“流”入屏幕，而非生硬弹出。
 
@@ -197,12 +197,10 @@ const DEFAULT_SETTINGS = Object.freeze({
     topicTitlePromptTemplate: '',
     enableAgentBubbleTheme: true,
     agentBubbleThemePrompt: DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
-    enableSmoothStreaming: false,
     enableWideChatLayout: false,
     chatBubbleMaxWidthDefault: 82,
     chatBubbleMaxWidthNotifications: 90,
     chatBubbleMaxWidthNarrow: 85,
-    chatBubbleMaxWidthWideDefault: 92,
     chatBubbleMaxWidthWideNotifications: 96,
     chatBubbleMaxWidthWideNarrow: 92,
     chatFontPreset: 'system',
@@ -216,7 +214,6 @@ const DEFAULT_SETTINGS = Object.freeze({
     enableUserChatBubbleUi: true,
     showUserMetaInChatBubbleUi: true,
     minChunkBufferSize: 1,
-    smoothStreamIntervalMs: 25,
     lastOpenItemId: null,
     lastOpenItemType: null,
     lastOpenTopicId: null,
@@ -503,8 +500,8 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
     } else {
         validated.studyLogPolicy = {
             enabled: validated.studyLogPolicy.enabled !== false,
-            enableDailyNotePromptVariables: validated.studyLogPolicy.enableDailyNotePromptVariables !== false,
-            autoInjectDailyNoteProtocol: validated.studyLogPolicy.autoInjectDailyNoteProtocol !== false,
+            enableDailyNotePromptVariables: true,
+            autoInjectDailyNoteProtocol: true,
             maxToolRounds: Number.isFinite(Number(validated.studyLogPolicy.maxToolRounds))
                 ? Math.max(1, Number(validated.studyLogPolicy.maxToolRounds))
                 : DEFAULT_STUDY_LOG_POLICY.maxToolRounds,

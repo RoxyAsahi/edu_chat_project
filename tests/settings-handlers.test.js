@@ -259,8 +259,6 @@ test('preview-final-system-prompt reports segment states and final prompt', asyn
         studyLogPolicy: {
             ...DEFAULT_SETTINGS.studyLogPolicy,
             enabled: true,
-            enableDailyNotePromptVariables: true,
-            autoInjectDailyNoteProtocol: true,
         },
     });
 
@@ -297,7 +295,7 @@ test('preview-final-system-prompt reports segment states and final prompt', asyn
     assert.equal(result.preview.segments.emoticonPrompt.appended, false);
     assert.equal(result.preview.segments.emoticonPrompt.skippedBecausePromptAlreadyContainsVariable, true);
     assert.match(result.preview.finalSystemPrompt, /Path \/表情包/);
-    assert.equal(result.preview.segments.dailyNoteVariable.enabled, true);
+    assert.equal(result.preview.segments.dailyNote.enabled, true);
     assert.equal(result.preview.segments.bubbleTheme.appended, true);
 });
 
@@ -391,7 +389,7 @@ test('save-settings persists study profile and study log policy fields', async (
     assert.equal(rawSettings.studyLogPolicy.maxToolRounds, 5);
 });
 
-test('save-settings persists prompt injection toggles when explicitly disabled', async (t) => {
+test('save-settings keeps DailyNote prompt plumbing enabled internally', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
@@ -415,8 +413,6 @@ test('save-settings persists prompt injection toggles when explicitly disabled',
         studyLogPolicy: {
             ...DEFAULT_SETTINGS.studyLogPolicy,
             enabled: true,
-            enableDailyNotePromptVariables: false,
-            autoInjectDailyNoteProtocol: false,
         },
     });
 
@@ -424,12 +420,10 @@ test('save-settings persists prompt injection toggles when explicitly disabled',
     assert.equal(result.success, true);
     assert.equal(rawSettings.enableRenderingPrompt, false);
     assert.equal(rawSettings.enableEmoticonPrompt, false);
-    assert.equal(rawSettings.studyLogPolicy.enableDailyNotePromptVariables, false);
-    assert.equal(rawSettings.studyLogPolicy.autoInjectDailyNoteProtocol, false);
+    assert.equal(rawSettings.studyLogPolicy.enableDailyNotePromptVariables, true);
+    assert.equal(rawSettings.studyLogPolicy.autoInjectDailyNoteProtocol, true);
     assert.equal(result.persistenceCheck.fieldChecks.enableRenderingPrompt.matched, true);
     assert.equal(result.persistenceCheck.fieldChecks.enableEmoticonPrompt.matched, true);
-    assert.equal(result.persistenceCheck.fieldChecks['studyLogPolicy.enableDailyNotePromptVariables'].matched, true);
-    assert.equal(result.persistenceCheck.fieldChecks['studyLogPolicy.autoInjectDailyNoteProtocol'].matched, true);
     assert.equal(result.persistenceCheck.promptToggleFieldsMatched, true);
     assert.deepEqual(result.persistenceCheck.mismatchedFields, []);
 });

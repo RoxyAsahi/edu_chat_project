@@ -179,7 +179,7 @@
 
 .search-result-item .search-code-block code {
     white-space: pre;
-    font-family: 'Consolas', 'Monaco', monospace;
+    font-family: 'UniStudy Code', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
 }
 
 /* 搜索高亮 */

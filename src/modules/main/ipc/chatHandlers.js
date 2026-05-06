@@ -468,9 +468,6 @@ function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions
     if (settings?.studyLogPolicy?.enabled === false) {
         return messages;
     }
-    if (settings?.studyLogPolicy?.autoInjectDailyNoteProtocol === false) {
-        return messages;
-    }
 
     const dailyNotePrompt = resolveDailyNoteGuideInstruction(settings?.dailyNoteGuide, {
         agentConfig: promptResolutionOptions.agentConfig,

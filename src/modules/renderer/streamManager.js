@@ -104,8 +104,7 @@ export function initStreamManager(dependencies) {
 }
 
 function shouldEnableSmoothStreaming() {
-    const globalSettings = refs.globalSettingsRef.get();
-    return globalSettings.enableSmoothStreaming === true;
+    return false;
 }
 
 function messageIsFinalized(messageId) {
