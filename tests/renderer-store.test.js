@@ -28,8 +28,10 @@ test('createInitialAppState groups renderer state into the expected slices', asy
         'composer',
     ]);
     assert.equal(state.settings.settings.currentThemeMode, 'system');
+    assert.equal(state.settings.settings.enableAgentBubbleTheme, true);
     assert.equal(state.settings.settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
-    assert.match(state.settings.settings.agentBubbleThemePrompt, /高质量网页式回答/);
+    assert.match(state.settings.settings.agentBubbleThemePrompt, /Output formatting requirement:/);
+    assert.match(state.settings.settings.agentBubbleThemePrompt, /【核心定义】/);
     assert.match(state.settings.settings.agentBubbleThemePrompt, /response-root/);
     assert.equal(state.settings.settings.modelService.defaults.chatFallback, null);
     assert.equal(state.settings.settings.modelService.defaults.thinkingChat, null);

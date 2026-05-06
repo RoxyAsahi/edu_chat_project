@@ -284,7 +284,7 @@ test('readSettings fills in missing schema fields from older settings files', as
     assert.equal(settings.topicTitlePromptTemplate, DEFAULT_SETTINGS.topicTitlePromptTemplate);
 });
 
-test('readSettings upgrades legacy default agent bubble theme prompt to the merged default prompt', async (t) => {
+test('readSettings upgrades legacy default agent bubble theme prompt to the concatenated merged default prompt', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
     const settingsPath = path.join(tempRoot, 'settings.json');
     const manager = new SettingsManager(settingsPath);
@@ -328,7 +328,50 @@ test('readSettings upgrades legacy default agent bubble theme prompt to the merg
 
     const settings = await manager.readSettings();
     assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
-    assert.match(settings.agentBubbleThemePrompt, /高质量网页式回答/);
+    assert.match(settings.agentBubbleThemePrompt, /Output formatting requirement:/);
+    assert.match(settings.agentBubbleThemePrompt, /When structured rendering helps/);
+    assert.match(settings.agentBubbleThemePrompt, /【核心定义】/);
+});
+
+test('readSettings upgrades the summarized merged bubble prompt to the concatenated merged default prompt', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await fs.writeJson(settingsPath, {
+        userName: 'Summarized Prompt User',
+        agentBubbleThemePrompt: [
+            '你输出的目标不是普通文本，而是可直接渲染在 UniStudy 聊天气泡里的高质量网页式回答。',
+            '',
+            '【渲染规则】',
+            '1. 当结构化表达更有帮助时，直接输出可渲染的原始 HTML 片段，不要输出完整 HTML 页面外壳。',
+            '2. 所有可渲染内容必须放在一个根节点里，例如 <div id="response-root" style="...">...</div>。',
+            '3. 不要把可渲染 HTML 包进 Markdown 代码块；只有教学内容本身是代码时，才使用 <pre><code>...</code></pre>。',
+            '4. 当需要调用内建工具或写入 DailyNote 时，协议文本必须保持原始纯文本，不要额外包裹任何 HTML 标签。',
+            '5. 不要在最终回答里保留未解析的模板变量。',
+            '',
+            '【视觉目标】',
+            '1. 把回答当成一个小型网页界面来设计，而不是普通段落。',
+            '2. 根据当前对话主题、学科和情绪，自由选择最合适的视觉风格；理性内容可以更克制，文学或表达类内容可以更柔和或更有层次。',
+            '3. 善用排版、留白、分组、边框、阴影、渐变、圆角和轻量动画，让信息层次更清楚。',
+            '4. 如果需要展示步骤、对比、结构关系或重点提醒，优先用卡片、分栏、时间线、标签、流程块等网页式结构来表达。',
+            '',
+            '【交互与呈现】',
+            '1. 如需展示代码，使用与整体风格协调的 <pre style="..."><code>...</code></pre>。',
+            '2. 如需引导用户做选择，可以使用 <button onclick="input(\'回复内容\')" style="..."> 创建可点击选项。',
+            '3. 如需解释复杂概念，可以使用 CSS 或 SVG 做简单图示，但要保证内容仍然清晰、稳定、可读。',
+            '',
+            '【总体要求】',
+            '在保证可渲染、可读和不破坏工具协议的前提下，让回答看起来像一个精心设计过的学习界面。',
+        ].join('\n'),
+    }, { spaces: 2 });
+
+    const settings = await manager.readSettings();
+    assert.equal(settings.agentBubbleThemePrompt, DEFAULT_SETTINGS.agentBubbleThemePrompt);
+    assert.match(settings.agentBubbleThemePrompt, /Output formatting requirement:/);
+    assert.match(settings.agentBubbleThemePrompt, /When structured rendering helps/);
+    assert.match(settings.agentBubbleThemePrompt, /【核心定义】/);
 });
 
 test('readSettings flags legacy vcpLite prompt fields without migrating them', async (t) => {

@@ -118,13 +118,21 @@ function createDom() {
           <button id="settingsNavServicesBtn" type="button" data-settings-section-button="services">services</button>
           <button id="settingsNavDefaultModelBtn" type="button" data-settings-section-button="default-model">default-model</button>
           <button id="settingsNavRetrievalBtn" type="button" data-settings-section-button="retrieval">retrieval</button>
+          <button id="settingsNavProfileBtn" type="button" data-settings-section-button="profile">profile</button>
           <button id="settingsNavPromptsBtn" type="button" data-settings-section-button="prompts">prompts</button>
+          <button id="settingsNavEmoticonsBtn" type="button" data-settings-section-button="emoticons">emoticons</button>
+          <button id="settingsNavAiMemoryBtn" type="button" data-settings-section-button="ai-memory">ai-memory</button>
+          <button id="settingsNavAssistBtn" type="button" data-settings-section-button="assist">assist</button>
           <button id="settingsNavPromptAdvancedBtn" type="button" data-settings-section-button="prompt-advanced">prompt-advanced</button>
           <button id="settingsNavDisplayBtn" type="button" data-settings-section-button="display">display</button>
           <section id="settingsModalSectionServices"></section>
           <section id="settingsModalSectionDefaultModel" class="hidden"></section>
           <section id="settingsModalSectionRetrieval" class="hidden"></section>
+          <section id="settingsModalSectionProfile" class="hidden"></section>
           <section id="settingsModalSectionPrompts" class="hidden"></section>
+          <section id="settingsModalSectionEmoticons" class="hidden"></section>
+          <section id="settingsModalSectionAiMemory" class="hidden"></section>
+          <section id="settingsModalSectionAssist" class="hidden"></section>
           <section id="settingsModalSectionPromptAdvanced" class="hidden"></section>
           <section id="settingsModalSectionDisplay" class="hidden"></section>
           <section id="settingsModalSectionKnowledgeBase" class="hidden"></section>
@@ -233,7 +241,11 @@ function createElementMap(documentObj) {
         settingsModalSectionServices: documentObj.getElementById('settingsModalSectionServices'),
         settingsModalSectionDefaultModel: documentObj.getElementById('settingsModalSectionDefaultModel'),
         settingsModalSectionRetrieval: documentObj.getElementById('settingsModalSectionRetrieval'),
+        settingsModalSectionProfile: documentObj.getElementById('settingsModalSectionProfile'),
         settingsModalSectionPrompts: documentObj.getElementById('settingsModalSectionPrompts'),
+        settingsModalSectionEmoticons: documentObj.getElementById('settingsModalSectionEmoticons'),
+        settingsModalSectionAiMemory: documentObj.getElementById('settingsModalSectionAiMemory'),
+        settingsModalSectionAssist: documentObj.getElementById('settingsModalSectionAssist'),
         settingsModalSectionPromptAdvanced: documentObj.getElementById('settingsModalSectionPromptAdvanced'),
         settingsModalSectionDisplay: documentObj.getElementById('settingsModalSectionDisplay'),
         settingsModalSectionGlobal: null,

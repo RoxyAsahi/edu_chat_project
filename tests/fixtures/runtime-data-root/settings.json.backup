@@ -42,7 +42,7 @@
   "followUpPromptTemplate": "",
   "enableTopicTitleGeneration": true,
   "topicTitlePromptTemplate": "",
-  "enableAgentBubbleTheme": false,
+  "enableAgentBubbleTheme": true,
   "agentBubbleThemePrompt": "Output formatting requirement: {{RenderingGuide}}",
   "enableSmoothStreaming": false,
   "enableWideChatLayout": false,

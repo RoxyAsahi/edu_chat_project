@@ -905,8 +905,6 @@
     <div id="settingsModal" class="settings-modal hidden" aria-hidden="true">
       <div id="settingsModalBackdrop" class="settings-modal__backdrop"></div>
       <div class="settings-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
-        <h2 id="settingsModalTitle" class="hidden">设置</h2>
-        <p id="settingsModalSubtitle" class="settings-caption hidden">统一管理全局连接、智能体参数与 Source 配置。</p>
         <button id="settingsModalCloseBtn" class="ghost-button icon-btn settings-modal__close hidden" type="button" aria-label="关闭设置" tabindex="-1" aria-hidden="true">
           <span class="material-symbols-outlined">close</span>
         </button>
@@ -932,9 +930,25 @@
                   <span class="material-symbols-outlined">tune</span>
                   <span>检索调优</span>
                 </button>
+                <button id="settingsNavProfileBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="profile">
+                  <span class="material-symbols-outlined">school</span>
+                  <span>学习档案</span>
+                </button>
                 <button id="settingsNavPromptsBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="prompts">
                   <span class="material-symbols-outlined">text_snippet</span>
-                  <span>提示词设置</span>
+                  <span>气泡渲染</span>
+                </button>
+                <button id="settingsNavEmoticonsBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="emoticons">
+                  <span class="material-symbols-outlined">mood</span>
+                  <span>表情包设置</span>
+                </button>
+                <button id="settingsNavAiMemoryBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="ai-memory">
+                  <span class="material-symbols-outlined">auto_stories</span>
+                  <span>AI日记记忆</span>
+                </button>
+                <button id="settingsNavAssistBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="assist">
+                  <span class="material-symbols-outlined">assistant</span>
+                  <span>对话辅助</span>
                 </button>
                 <button id="settingsNavPromptAdvancedBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="prompt-advanced">
                   <span class="material-symbols-outlined">science</span>
@@ -949,6 +963,10 @@
           </nav>
 
           <div class="settings-modal__content">
+            <div class="settings-modal__content-hero">
+              <h2 id="settingsModalTitle" class="settings-modal__content-title settings-modal__content-title--page">设置</h2>
+              <p id="settingsModalSubtitle" class="settings-modal__content-subtitle">统一管理全局连接、智能体参数与 Source 配置。</p>
+            </div>
             <div class="settings-modal__content-scroll">
             <section id="settingsModalSectionServices" class="settings-modal__section" data-settings-section="services">
               <section class="settings-card settings-card--modal model-service-card">
@@ -1038,66 +1056,76 @@
               </section>
             </section>
 
-            <section id="settingsModalSectionPrompts" class="settings-modal__section hidden" data-settings-section="prompts">
-              <section class="settings-list-card">
-                <h3>学习档案</h3>
+            <section id="settingsModalSectionProfile" class="settings-modal__section hidden" data-settings-section="profile">
+              <section class="settings-list-card settings-list-card--untitled">
                 <div class="settings-list">
                   <div class="settings-row"><div class="settings-row__main"><strong>学生姓名</strong><span>用于 {{StudentName}}。</span></div><input id="studentNameInput" type="text" placeholder="未设置" /></div>
                   <div class="settings-row"><div class="settings-row__main"><strong>所在城市</strong><span>用于 {{City}}。</span></div><input id="studyCityInput" type="text" placeholder="未设置" /></div>
                   <div class="settings-row"><div class="settings-row__main"><strong>年级</strong><span>用于 {{Grade}}，帮助调整讲解难度和表达方式。</span></div><input id="studyGradeInput" type="text" placeholder="例如 六年级 / 初二 / 高三 / 大一" /></div>
                 </div>
-                <div class="field-grid hidden">
-                  <label><span>日志工具回合上限</span><input id="studyLogMaxRoundsInput" type="number" min="1" step="1" /></label>
-                  <label><span>长期记忆 Top K</span><input id="studyMemoryTopKInput" type="number" min="1" step="1" /></label>
-                  <label><span>Fallback Top K</span><input id="studyMemoryFallbackTopKInput" type="number" min="1" step="1" /></label>
-                </div>
                 <div class="field-grid hidden" style="grid-template-columns: 1fr;">
                   <label><span>自定义提示词变量(JSON)</span><textarea id="promptVariablesInput" rows="5" placeholder='{"CourseName":"高数","Classroom":"A-301"}'></textarea></label>
                 </div>
               </section>
+            </section>
 
-              <section class="settings-list-card">
-                <h3>DailyNote 协议</h3>
-                <div class="settings-list">
-                  <div class="settings-row"><div class="settings-row__main"><strong>启用学习日志</strong><span>允许 AI 在合适的时候写入 DailyNote，作为长期学习记忆。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnabledInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>DailyNote 协议文本</strong><span>定义写入学习日志时使用的协议格式，留空时使用内置默认协议。</span></div><textarea id="dailyNoteGuideInput" rows="6" placeholder="这里定义全局 DailyNote 协议文本。"></textarea></div>
-                </div>
-              </section>
-
-              <section class="settings-list-card">
+            <section id="settingsModalSectionPrompts" class="settings-modal__section hidden" data-settings-section="prompts">
+              <section class="settings-list-card settings-list-card--flat">
                 <h3>气泡提示词</h3>
                 <div class="settings-list">
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>气泡渲染提示词</strong><span>这是全局最重要的一段提示词，用来约束 AI 生成可直接渲染的网页式回答气泡。</span></div><label class="toggle-switch settings-row__control"><input id="enableAgentBubbleTheme" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="agentBubbleThemePrompt" rows="6" placeholder="启用后，这段提示词会额外追加到发送给上游的 system 消息中。"></textarea><span id="agentBubbleThemePersistStatus" class="settings-caption">建议把主要的 HTML/CSS 渲染风格约束集中写在这里。</span></div>
                 </div>
               </section>
-            </section>
 
-            <section id="settingsModalSectionPromptAdvanced" class="settings-modal__section hidden" data-settings-section="prompt-advanced">
-              <section class="settings-list-card">
-                <h3>协议注入方式</h3>
+              <section class="settings-list-card settings-list-card--flat">
+                <h3>气泡补充</h3>
                 <div class="settings-list">
-                  <div class="settings-row"><div class="settings-row__main"><strong>手动引用 DailyNote 变量</strong><span>允许 {{DailyNoteGuide}} 在提示词中展开成完整协议。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnablePromptVariablesInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                  <div class="settings-row"><div class="settings-row__main"><strong>工具对话自动注入协议</strong><span>在需要工具协议的对话里，系统会自动把 DailyNote 协议补到 system prompt 末尾。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogAutoInjectProtocolInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
-                </div>
-              </section>
-
-              <section class="settings-list-card">
-                <h3>内部提示片段</h3>
-                <div class="settings-list">
-                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>表情包提示</strong><span>告诉模型可用表情包和图片伪路径，通常无需对外展示。</span></div><label class="toggle-switch settings-row__control"><input id="enableEmoticonPromptInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="emoticonPromptInput" rows="5" placeholder="用于控制内置表情包的文件列表和伪路径提示。"></textarea></div>
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>简洁气泡补充</strong><span>用于补充回答偏紧凑还是偏展开的说明。</span></div><label class="toggle-switch settings-row__control"><input id="enableAdaptiveBubbleTipInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="adaptiveBubbleTipInput" rows="3" placeholder="用于补充气泡风格自适应提示。"></textarea></div>
                 </div>
               </section>
+            </section>
 
-              <section class="settings-list-card">
-                <h3>自动辅助</h3>
+            <section id="settingsModalSectionEmoticons" class="settings-modal__section hidden" data-settings-section="emoticons">
+              <section class="settings-list-card settings-list-card--flat settings-list-card--untitled">
+                <div class="settings-list">
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>表情包提示</strong><span>告诉模型可用表情包和图片伪路径，通常无需对外展示。</span></div><label class="toggle-switch settings-row__control"><input id="enableEmoticonPromptInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="emoticonPromptInput" rows="5" placeholder="用于控制内置表情包的文件列表和伪路径提示。"></textarea></div>
+                </div>
+              </section>
+            </section>
+
+            <section id="settingsModalSectionAiMemory" class="settings-modal__section settings-modal__section--airy hidden" data-settings-section="ai-memory">
+              <section class="settings-list-card settings-list-card--untitled settings-list-card--airy">
+                <div class="settings-list">
+                  <div class="settings-row"><div class="settings-row__main"><strong>启用学习日志</strong><span>允许 AI 在合适的时候写入 DailyNote，作为长期学习记忆。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnabledInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>手动引用 DailyNote 变量</strong><span>允许 {{DailyNoteGuide}} 在提示词中展开成完整协议。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogEnablePromptVariablesInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                  <div class="settings-row"><div class="settings-row__main"><strong>工具对话自动注入协议</strong><span>在需要工具协议的对话里，系统会自动把 DailyNote 协议补到 system prompt 末尾。</span></div><label class="toggle-switch settings-row__control"><input id="studyLogAutoInjectProtocolInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label></div>
+                </div>
+                <div class="field-grid field-grid--airy">
+                  <label><span>日志工具回合上限</span><input id="studyLogMaxRoundsInput" type="number" min="1" step="1" /></label>
+                  <label><span>长期记忆 Top K</span><input id="studyMemoryTopKInput" type="number" min="1" step="1" /></label>
+                  <label><span>Fallback Top K</span><input id="studyMemoryFallbackTopKInput" type="number" min="1" step="1" /></label>
+                </div>
+              </section>
+
+              <section class="settings-list-card settings-list-card--flat settings-list-card--airy">
+                <h3>协议文本</h3>
+                <div class="settings-list">
+                  <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>DailyNote 协议文本</strong><span>定义写入学习日志时使用的协议格式，留空时使用内置默认协议。</span></div><textarea id="dailyNoteGuideInput" rows="6" placeholder="这里定义全局 DailyNote 协议文本。"></textarea></div>
+                </div>
+              </section>
+            </section>
+
+            <section id="settingsModalSectionAssist" class="settings-modal__section hidden" data-settings-section="assist">
+              <section class="settings-list-card settings-list-card--flat settings-list-card--untitled">
                 <div class="settings-list">
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>追问提示词模板</strong><span>用于回复完成后生成后续追问。</span></div><textarea id="followUpPromptTemplateInput" rows="5" placeholder="这里定义回复完成后自动生成追问时使用的全局模板。"></textarea></div>
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>自动命名话题</strong><span>首轮助手回复成功后尝试自动生成话题标题。</span></div><label class="toggle-switch settings-row__control"><input id="enableTopicTitleGenerationInput" type="checkbox" /><span class="toggle-switch__track"><span class="toggle-switch__thumb"></span></span></label><textarea id="topicTitlePromptTemplateInput" rows="5" placeholder="这里定义首轮回复完成后自动命名话题时使用的全局模板。"></textarea></div>
                 </div>
               </section>
+            </section>
 
-              <section class="settings-list-card">
+            <section id="settingsModalSectionPromptAdvanced" class="settings-modal__section hidden" data-settings-section="prompt-advanced">
+              <section class="settings-list-card settings-list-card--flat">
                 <h3>协议预览</h3>
                 <div class="settings-list">
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>当前提示词片段</strong><span>查看哪些片段会被加入最终 system prompt。</span></div><button id="refreshFinalSystemPromptPreviewBtn" class="ghost-button icon-text-btn settings-row__button" type="button"><span class="material-symbols-outlined">preview</span> 刷新</button><div id="promptSegmentPreview" class="settings-token-grid" aria-label="当前提示词片段总览"></div></div>
