@@ -20,7 +20,6 @@ test('cleanupLegacyPromptConfigProfile rewrites configured prompt files, preserv
     const originalSettings = {
         renderingPrompt: 'Format {{VarDivRender}}\n<div id="vcp-root" style="display:grid">\nVCP工具\n[--- VCP元思考链 ---]',
         emoticonPrompt: 'Emoji {{VarEmojiPrompt}}',
-        adaptiveBubbleTip: 'Tip {{VarAdaptiveBubbleTip}}',
         dailyNoteGuide: 'Guide {{StudyLogTool}}',
         followUpPromptTemplate: 'Next {{VarUser}}',
         topicTitlePromptTemplate: 'Time {{VarTimeNow}}',
@@ -67,7 +66,6 @@ test('cleanupLegacyPromptConfigProfile rewrites configured prompt files, preserv
     assert.equal(rewrittenSettings.followUpPromptTemplate, 'Next {{UserName}}');
     assert.equal(rewrittenSettings.topicTitlePromptTemplate, 'Time {{CurrentDateTime}}');
     assert.equal(rewrittenSettings.dailyNoteGuide, 'Guide {{DailyNoteGuide}}');
-    assert.equal(rewrittenSettings.adaptiveBubbleTip, 'Tip {{AdaptiveBubbleTip}}');
     assert.equal(rewrittenSettings.emoticonPrompt, 'Emoji {{EmoticonGuide}}');
     assert.equal(rewrittenSettings.agentBubbleThemePrompt, 'Theme {{RenderingGuide}}');
 

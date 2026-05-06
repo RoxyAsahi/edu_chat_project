@@ -6,7 +6,6 @@ const {
     resolvePromptVariables,
     resolvePromptMessageSet,
     DEFAULT_DIV_RENDER_INSTRUCTION,
-    DEFAULT_ADAPTIVE_BUBBLE_TIP,
 } = require('../utils/promptVariableResolver');
 const {
     DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
@@ -159,11 +158,6 @@ const SETTINGS_PERSISTENCE_FIELD_SPECS = [
     {
         id: 'enableEmoticonPrompt',
         path: ['enableEmoticonPrompt'],
-        type: 'boolean',
-    },
-    {
-        id: 'enableAdaptiveBubbleTip',
-        path: ['enableAdaptiveBubbleTip'],
         type: 'boolean',
     },
     {
@@ -546,7 +540,6 @@ function initialize(paths) {
                     promptToggleFieldsMatched: [
                         'enableRenderingPrompt',
                         'enableEmoticonPrompt',
-                        'enableAdaptiveBubbleTip',
                         'studyLogPolicy.enableDailyNotePromptVariables',
                         'studyLogPolicy.autoInjectDailyNoteProtocol',
                     ].every((fieldId) => persistenceSummary.fieldChecks[fieldId]?.matched !== false),
@@ -686,9 +679,6 @@ function initialize(paths) {
             const emoticonPromptSource = sanitizeText(previewSettings.emoticonPrompt)
                 ? 'custom'
                 : 'default';
-            const adaptiveBubbleSource = sanitizeText(previewSettings.adaptiveBubbleTip)
-                ? 'custom'
-                : 'default';
             const dailyNoteSource = sanitizeText(previewSettings.dailyNoteGuide)
                 ? 'custom'
                 : 'default';
@@ -702,9 +692,6 @@ function initialize(paths) {
             const emoticonRaw = previewSettings.enableEmoticonPrompt === false
                 ? ''
                 : (sanitizeText(previewSettings.emoticonPrompt) || DEFAULT_EMOTICON_PROMPT);
-            const adaptiveBubbleRaw = previewSettings.enableAdaptiveBubbleTip === false
-                ? ''
-                : (sanitizeText(previewSettings.adaptiveBubbleTip) || DEFAULT_ADAPTIVE_BUBBLE_TIP);
             const studyLogEnabled = previewSettings.studyLogPolicy?.enabled !== false;
             const dailyNoteVariablesEnabled = studyLogEnabled
                 && previewSettings.studyLogPolicy?.enableDailyNotePromptVariables !== false;
@@ -743,9 +730,6 @@ function initialize(paths) {
             const emoticonResolved = emoticonRaw
                 ? toPromptResolutionPayload(resolvePromptVariables(emoticonRaw, promptResolutionOptions))
                 : createEmptyPromptResolution();
-            const adaptiveBubbleResolved = adaptiveBubbleRaw
-                ? toPromptResolutionPayload(resolvePromptVariables(adaptiveBubbleRaw, promptResolutionOptions))
-                : createEmptyPromptResolution();
             const dailyNoteResolved = dailyNoteRaw
                 ? toPromptResolutionPayload(resolvePromptVariables(dailyNoteRaw, promptResolutionOptions))
                 : createEmptyPromptResolution();
@@ -757,7 +741,6 @@ function initialize(paths) {
             const references = {
                 renderingInBasePrompt: /{{\s*RenderingGuide\s*}}/.test(normalizedBasePrompt),
                 emoticonInBasePrompt: /{{\s*EmoticonGuide\s*}}/.test(normalizedBasePrompt),
-                adaptiveInBasePrompt: /{{\s*AdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
                 dailyNoteInBasePrompt: /{{\s*DailyNoteGuide\s*}}/.test(normalizedBasePrompt),
             };
             const finalResolution = toPromptResolutionPayload(resolution);
@@ -777,7 +760,6 @@ function initialize(paths) {
                         finalResolution.legacyTokenSuggestions,
                         renderingResolved.legacyTokenSuggestions,
                         emoticonResolved.legacyTokenSuggestions,
-                        adaptiveBubbleResolved.legacyTokenSuggestions,
                         dailyNoteResolved.legacyTokenSuggestions,
                         bubbleThemeResolved.legacyTokenSuggestions
                     ),
@@ -804,15 +786,6 @@ function initialize(paths) {
                             resolvedPrompt: emoticonResolved.resolvedPrompt || '',
                             unresolvedTokens: emoticonResolved.unresolvedTokens,
                             legacyTokenSuggestions: emoticonResolved.legacyTokenSuggestions,
-                        },
-                        adaptiveBubbleTip: {
-                            enabled: previewSettings.enableAdaptiveBubbleTip !== false,
-                            source: adaptiveBubbleSource,
-                            referencedInBasePrompt: references.adaptiveInBasePrompt,
-                            rawPrompt: adaptiveBubbleRaw,
-                            resolvedPrompt: adaptiveBubbleResolved.resolvedPrompt || '',
-                            unresolvedTokens: adaptiveBubbleResolved.unresolvedTokens,
-                            legacyTokenSuggestions: adaptiveBubbleResolved.legacyTokenSuggestions,
                         },
                         dailyNoteVariable: {
                             enabled: dailyNoteVariablesEnabled,

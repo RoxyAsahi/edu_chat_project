@@ -19,7 +19,7 @@ const SETTINGS_MODAL_META = Object.freeze({
     },
     prompts: {
         title: '气泡渲染',
-        subtitle: '集中管理气泡渲染提示词和气泡风格补充。',
+        subtitle: '集中管理气泡渲染提示词。',
     },
     emoticons: {
         title: '表情包设置',
@@ -111,10 +111,6 @@ const DEFAULT_EMOTICON_PROMPT = [
     'When you want to use an emoticon, output HTML like <img src="{{GeneralEmoticonPath}}/文件名" width="120">.',
     'Only use filenames from the provided lists, keep width between 60 and 180, and do not invent missing files.',
 ].join('\n');
-const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
-    'Keep answers readable and compact when rich layout is unnecessary.',
-    'Only switch to more structured rendering when it clearly helps comprehension.',
-].join(' ');
 
 function normalizeAgentCardEmoji(value) {
     return normalizeSubjectCardEmoji(value);
@@ -166,7 +162,6 @@ const SETTINGS_PERSISTENCE_FIELD_LABELS = Object.freeze({
     topicTitlePromptTemplate: '话题命名提示词模板',
     enableRenderingPrompt: '结构化渲染提示',
     enableEmoticonPrompt: '表情包提示',
-    enableAdaptiveBubbleTip: '简洁气泡补充',
     emoticonPrompt: '表情包提示模板',
     'studyLogPolicy.enableDailyNotePromptVariables': '内建 DailyNote 变量',
     'studyLogPolicy.autoInjectDailyNoteProtocol': '自动注入 DailyNote 协议',
@@ -2717,7 +2712,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
     function syncPromptInjectionState() {
         syncPromptTextareaState(el.renderingPromptInput, el.enableRenderingPromptInput?.checked !== false);
         syncPromptTextareaState(el.emoticonPromptInput, el.enableEmoticonPromptInput?.checked !== false);
-        syncPromptTextareaState(el.adaptiveBubbleTipInput, el.enableAdaptiveBubbleTipInput?.checked !== false);
         syncPromptTextareaState(el.topicTitlePromptTemplateInput, el.enableTopicTitleGenerationInput?.checked !== false);
         syncPromptTextareaState(el.agentBubbleThemePrompt, el.enableAgentBubbleTheme?.checked === true);
         const dailyNoteEnabled = (el.studyLogEnabledInput?.checked !== false)
@@ -2824,11 +2818,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                 key: 'emoticonPrompt',
                 title: '表情包提示',
                 description: '启用后会自动把内置表情包说明追加到当前智能体提示词；若主 prompt 已显式引用 {{EmoticonGuide}}，则会跳过重复追加。',
-            },
-            {
-                key: 'adaptiveBubbleTip',
-                title: '简洁气泡补充',
-                description: '控制 {{AdaptiveBubbleTip}} 是否进入当前智能体提示词。',
             },
             {
                 key: 'dailyNoteVariable',
@@ -3009,10 +2998,8 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             userName: el.userNameInput?.value.trim() || 'User',
             enableRenderingPrompt: el.enableRenderingPromptInput?.checked !== false,
             enableEmoticonPrompt: el.enableEmoticonPromptInput?.checked !== false,
-            enableAdaptiveBubbleTip: el.enableAdaptiveBubbleTipInput?.checked !== false,
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
             emoticonPrompt: getPromptTextareaRawValue(el.emoticonPromptInput),
-            adaptiveBubbleTip: getPromptTextareaRawValue(el.adaptiveBubbleTipInput),
             dailyNoteGuide: getPromptTextareaRawValue(el.dailyNoteGuideInput),
             enableAgentBubbleTheme: el.enableAgentBubbleTheme?.checked === true,
             agentBubbleThemePrompt: getPromptTextareaRawValue(el.agentBubbleThemePrompt),
@@ -3064,9 +3051,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         const emoticonRaw = settings.enableEmoticonPrompt === false
             ? ''
             : (settings.emoticonPrompt || el.emoticonPromptInput?.value || DEFAULT_EMOTICON_PROMPT);
-        const adaptiveRaw = settings.enableAdaptiveBubbleTip === false
-            ? ''
-            : (settings.adaptiveBubbleTip || el.adaptiveBubbleTipInput?.value || DEFAULT_ADAPTIVE_BUBBLE_TIP);
         const dailyNoteEnabled = settings.studyLogPolicy?.enabled !== false;
         const dailyNoteRaw = !dailyNoteEnabled
             ? ''
@@ -3117,13 +3101,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                     skippedBecausePromptAlreadyContainsSameContent: false,
                     rawPrompt: emoticonRaw,
                     resolvedPrompt: emoticonRaw,
-                },
-                adaptiveBubbleTip: {
-                    enabled: settings.enableAdaptiveBubbleTip !== false,
-                    source: String(settings.adaptiveBubbleTip || '').trim() ? 'custom' : 'default',
-                    referencedInBasePrompt: /{{\s*AdaptiveBubbleTip\s*}}/.test(normalizedBasePrompt),
-                    rawPrompt: adaptiveRaw,
-                    resolvedPrompt: adaptiveRaw,
                 },
                 dailyNoteVariable: {
                     enabled: dailyNoteEnabled && settings.studyLogPolicy?.enableDailyNotePromptVariables !== false,
@@ -3207,7 +3184,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
 
         hydratePromptTextarea(el.renderingPromptInput, preview?.segments?.rendering?.rawPrompt || DEFAULT_RENDERING_PROMPT);
         hydratePromptTextarea(el.emoticonPromptInput, preview?.segments?.emoticonPrompt?.rawPrompt || DEFAULT_EMOTICON_PROMPT);
-        hydratePromptTextarea(el.adaptiveBubbleTipInput, preview?.segments?.adaptiveBubbleTip?.rawPrompt || DEFAULT_ADAPTIVE_BUBBLE_TIP);
         hydratePromptTextarea(el.agentBubbleThemePrompt, preview?.segments?.bubbleTheme?.rawPrompt || DEFAULT_AGENT_BUBBLE_THEME_PROMPT);
         hydratePromptTextarea(el.dailyNoteGuideInput, getDailyNoteDefaultPromptText());
 
@@ -3330,9 +3306,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (el.enableEmoticonPromptInput) {
             el.enableEmoticonPromptInput.checked = settings.enableEmoticonPrompt !== false;
         }
-        if (el.enableAdaptiveBubbleTipInput) {
-            el.enableAdaptiveBubbleTipInput.checked = settings.enableAdaptiveBubbleTip !== false;
-        }
         el.chatFontPreset.value = settings.chatFontPreset || 'system';
         el.chatCodeFontPreset.value = settings.chatCodeFontPreset === 'consolas'
             ? 'cascadia'
@@ -3364,15 +3337,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                 markPromptTextareaCustom(el.emoticonPromptInput);
             } else {
                 markPromptTextareaDefault(el.emoticonPromptInput, DEFAULT_EMOTICON_PROMPT);
-            }
-        }
-        if (el.adaptiveBubbleTipInput) {
-            const storedAdaptiveBubbleTip = settings.adaptiveBubbleTip || '';
-            el.adaptiveBubbleTipInput.value = storedAdaptiveBubbleTip || DEFAULT_ADAPTIVE_BUBBLE_TIP;
-            if (storedAdaptiveBubbleTip.trim()) {
-                markPromptTextareaCustom(el.adaptiveBubbleTipInput);
-            } else {
-                markPromptTextareaDefault(el.adaptiveBubbleTipInput, DEFAULT_ADAPTIVE_BUBBLE_TIP);
             }
         }
         if (el.dailyNoteGuideInput) {
@@ -3488,7 +3452,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             kbScoreThreshold: Number(el.kbScoreThreshold.value || 0.25),
             enableRenderingPrompt: el.enableRenderingPromptInput?.checked !== false,
             enableEmoticonPrompt: el.enableEmoticonPromptInput?.checked !== false,
-            enableAdaptiveBubbleTip: el.enableAdaptiveBubbleTipInput?.checked !== false,
             chatFontPreset: el.chatFontPreset.value,
             chatCodeFontPreset: el.chatCodeFontPreset.value,
             chatBubbleMaxWidthWideDefault: Number(el.chatBubbleMaxWidthWideDefault.value || 92),
@@ -3496,7 +3459,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             agentBubbleThemePrompt: getPromptTextareaRawValue(el.agentBubbleThemePrompt),
             renderingPrompt: getPromptTextareaRawValue(el.renderingPromptInput),
             emoticonPrompt: getPromptTextareaRawValue(el.emoticonPromptInput),
-            adaptiveBubbleTip: getPromptTextareaRawValue(el.adaptiveBubbleTipInput),
             dailyNoteGuide: getPromptTextareaRawValue(el.dailyNoteGuideInput),
             followUpPromptTemplate: getPromptTextareaRawValue(el.followUpPromptTemplateInput),
             enableTopicTitleGeneration: el.enableTopicTitleGenerationInput?.checked !== false,
@@ -4508,11 +4470,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             void refreshFinalSystemPromptPreview();
             scheduleGlobalSettingsSave();
         });
-        el.enableAdaptiveBubbleTipInput?.addEventListener('change', () => {
-            syncPromptInjectionState();
-            void refreshFinalSystemPromptPreview();
-            scheduleGlobalSettingsSave();
-        });
         el.enableTopicTitleGenerationInput?.addEventListener('change', () => {
             syncPromptInjectionState();
             scheduleGlobalSettingsSave();
@@ -4559,21 +4516,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             hydratePromptTextarea(el.emoticonPromptInput, DEFAULT_EMOTICON_PROMPT);
             if (el.emoticonPromptInput?.value.trim()) {
                 el.emoticonPromptInput.dataset.usingDefaultPrompt = el.emoticonPromptInput.value.trim() === DEFAULT_EMOTICON_PROMPT.trim()
-                    ? 'true'
-                    : 'false';
-            }
-            void refreshFinalSystemPromptPreview();
-            scheduleGlobalSettingsSave();
-        });
-        el.adaptiveBubbleTipInput?.addEventListener('input', () => {
-            markPromptTextareaCustom(el.adaptiveBubbleTipInput);
-            void refreshFinalSystemPromptPreview();
-            scheduleGlobalSettingsSave();
-        });
-        el.adaptiveBubbleTipInput?.addEventListener('blur', () => {
-            hydratePromptTextarea(el.adaptiveBubbleTipInput, DEFAULT_ADAPTIVE_BUBBLE_TIP);
-            if (el.adaptiveBubbleTipInput?.value.trim()) {
-                el.adaptiveBubbleTipInput.dataset.usingDefaultPrompt = el.adaptiveBubbleTipInput.value.trim() === DEFAULT_ADAPTIVE_BUBBLE_TIP.trim()
                     ? 'true'
                     : 'false';
             }

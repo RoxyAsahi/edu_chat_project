@@ -6,7 +6,6 @@ const SETTINGS_PROMPT_FIELDS = Object.freeze([
     'agentBubbleThemePrompt',
     'renderingPrompt',
     'emoticonPrompt',
-    'adaptiveBubbleTip',
     'dailyNoteGuide',
     'followUpPromptTemplate',
     'topicTitlePromptTemplate',

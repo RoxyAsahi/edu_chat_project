@@ -77,7 +77,6 @@ function createDom() {
           <input id="kbScoreThreshold" />
           <input id="enableRenderingPromptInput" type="checkbox" />
           <input id="enableEmoticonPromptInput" type="checkbox" />
-          <input id="enableAdaptiveBubbleTipInput" type="checkbox" />
           <select id="chatFontPreset"><option value="system">system</option></select>
           <select id="chatCodeFontPreset"><option value="cascadia">cascadia</option></select>
           <input id="chatBubbleMaxWidthWideDefault" />
@@ -88,7 +87,6 @@ function createDom() {
           <div id="agentBubbleThemePersistStatus"></div>
           <textarea id="renderingPromptInput"></textarea>
           <textarea id="emoticonPromptInput"></textarea>
-          <textarea id="adaptiveBubbleTipInput"></textarea>
           <textarea id="dailyNoteGuideInput"></textarea>
           <textarea id="followUpPromptTemplateInput"></textarea>
           <input id="enableTopicTitleGenerationInput" type="checkbox" />
@@ -205,7 +203,6 @@ function createElementMap(documentObj) {
         kbScoreThreshold: documentObj.getElementById('kbScoreThreshold'),
         enableRenderingPromptInput: documentObj.getElementById('enableRenderingPromptInput'),
         enableEmoticonPromptInput: documentObj.getElementById('enableEmoticonPromptInput'),
-        enableAdaptiveBubbleTipInput: documentObj.getElementById('enableAdaptiveBubbleTipInput'),
         chatFontPreset: documentObj.getElementById('chatFontPreset'),
         chatCodeFontPreset: documentObj.getElementById('chatCodeFontPreset'),
         chatBubbleMaxWidthWideDefault: documentObj.getElementById('chatBubbleMaxWidthWideDefault'),
@@ -216,7 +213,6 @@ function createElementMap(documentObj) {
         agentBubbleThemePersistStatus: documentObj.getElementById('agentBubbleThemePersistStatus'),
         renderingPromptInput: documentObj.getElementById('renderingPromptInput'),
         emoticonPromptInput: documentObj.getElementById('emoticonPromptInput'),
-        adaptiveBubbleTipInput: documentObj.getElementById('adaptiveBubbleTipInput'),
         dailyNoteGuideInput: documentObj.getElementById('dailyNoteGuideInput'),
         followUpPromptTemplateInput: documentObj.getElementById('followUpPromptTemplateInput'),
         enableTopicTitleGenerationInput: documentObj.getElementById('enableTopicTitleGenerationInput'),
@@ -727,7 +723,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                     enableEmoticonPrompt: false,
                     emoticonPrompt: 'emoticon prompt with {{GeneralEmoticonPath}}',
                     renderingPrompt: 'rendering prompt',
-                    adaptiveBubbleTip: 'adaptive tip',
                     dailyNoteGuide: 'daily guide',
                     followUpPromptTemplate: 'follow-up template with {{CHAT_HISTORY}}',
                     enableTopicTitleGeneration: false,
@@ -779,9 +774,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                 const emoticonText = payload.settings?.enableEmoticonPrompt === false
                     ? ''
                     : (payload.settings?.emoticonPrompt || 'default emoticon prompt');
-                const adaptiveText = payload.settings?.enableAdaptiveBubbleTip === false
-                    ? ''
-                    : (payload.settings?.adaptiveBubbleTip || 'default adaptive');
                 const dailyText = payload.settings?.studyLogPolicy?.enabled === false
                     || (payload.settings?.studyLogPolicy?.enableDailyNotePromptVariables === false
                         && payload.settings?.studyLogPolicy?.autoInjectDailyNoteProtocol === false)
@@ -801,7 +793,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                             payload.systemPrompt || 'Base prompt',
                             renderingText && `RENDER::${renderingText}`,
                             emoticonText && `EMOTICON::${emoticonText.replace('{{GeneralEmoticonPath}}', '/表情包')}`,
-                            adaptiveText && `ADAPTIVE::${adaptiveText}`,
                             dailyText && `DAILY::${dailyText}`,
                             bubbleText && `BUBBLE::${bubbleText.replace('{{RenderingGuide}}', 'DIV_RENDER')}`,
                         ].filter(Boolean).join('\n'),
@@ -824,13 +815,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
                                 referencedInBasePrompt: true,
                                 rawPrompt: emoticonText,
                                 resolvedPrompt: emoticonText.replace('{{GeneralEmoticonPath}}', '/表情包'),
-                            },
-                            adaptiveBubbleTip: {
-                                enabled: payload.settings?.enableAdaptiveBubbleTip !== false,
-                                source: payload.settings?.adaptiveBubbleTip ? 'custom' : 'default',
-                                referencedInBasePrompt: true,
-                                rawPrompt: adaptiveText,
-                                resolvedPrompt: adaptiveText,
                             },
                             dailyNoteVariable: {
                                 enabled: payload.settings?.studyLogPolicy?.enabled !== false
@@ -949,7 +933,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(el.emoticonPromptInput.value, 'emoticon prompt with {{GeneralEmoticonPath}}');
     assert.equal(el.emoticonPromptInput.readOnly, true);
     assert.equal(el.emoticonPromptInput.classList.contains('settings-textarea--readonly'), true);
-    assert.equal(el.adaptiveBubbleTipInput.value, 'adaptive tip');
     assert.equal(el.dailyNoteGuideInput.value, 'daily guide');
     assert.equal(el.followUpPromptTemplateInput.value, 'follow-up template with {{CHAT_HISTORY}}');
     assert.equal(el.enableTopicTitleGenerationInput.checked, false);
@@ -1023,7 +1006,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     el.renderingPromptInput.value = 'native rendering text';
     el.emoticonPromptInput.value = 'native emoticon prompt: {{GeneralEmoticonPath}}';
     el.emoticonPromptInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
-    el.adaptiveBubbleTipInput.value = 'native adaptive tip';
     el.dailyNoteGuideInput.value = 'native daily guide';
     el.followUpPromptTemplateInput.value = 'native follow-up template';
     el.followUpPromptTemplateInput.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
@@ -1069,7 +1051,6 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(savedPatch.agentBubbleThemePrompt, 'Editable prompt: {{RenderingGuide}}');
     assert.equal(savedPatch.renderingPrompt, 'native rendering text');
     assert.equal(savedPatch.emoticonPrompt, 'native emoticon prompt: {{GeneralEmoticonPath}}');
-    assert.equal(savedPatch.adaptiveBubbleTip, 'native adaptive tip');
     assert.equal(savedPatch.dailyNoteGuide, 'native daily guide');
     assert.equal(savedPatch.followUpPromptTemplate, 'native follow-up template');
     assert.equal(savedPatch.enableTopicTitleGeneration, true);
@@ -1167,7 +1148,6 @@ test('settingsController shows the default follow-up template in the UI but save
                         segments: {
                             rendering: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             emoticonPrompt: { enabled: true, available: true, packCount: 1, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
-                            adaptiveBubbleTip: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             dailyNoteVariable: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             dailyNoteAutoInject: { enabled: true, source: 'default', appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
                             bubbleTheme: { enabled: false, source: 'default', appended: false, rawPrompt: '', resolvedPrompt: '' },
@@ -1281,7 +1261,6 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
                         segments: {
                             rendering: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             emoticonPrompt: { enabled: true, available: true, packCount: 1, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
-                            adaptiveBubbleTip: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             dailyNoteVariable: { enabled: true, source: 'default', referencedInBasePrompt: false, rawPrompt: '', resolvedPrompt: '' },
                             dailyNoteAutoInject: { enabled: true, source: 'default', appended: false, skippedBecausePromptAlreadyContainsProtocol: false, rawPrompt: '', resolvedPrompt: '' },
                             bubbleTheme: { enabled: false, source: 'default', appended: false, rawPrompt: '', resolvedPrompt: '' },

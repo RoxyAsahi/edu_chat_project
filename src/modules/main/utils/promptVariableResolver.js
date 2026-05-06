@@ -9,10 +9,6 @@ const DEFAULT_DIV_RENDER_INSTRUCTION = [
     'When emitting tool or DailyNote protocol blocks, keep the protocol text raw and unstyled.',
     'Do not echo unresolved template variables in the final answer.',
 ].join(' ');
-const DEFAULT_ADAPTIVE_BUBBLE_TIP = [
-    'Keep answers readable and compact when rich layout is unnecessary.',
-    'Only switch to more structured rendering when it clearly helps comprehension.',
-].join(' ');
 
 const LEGACY_PROMPT_TOKEN_REPLACEMENTS = Object.freeze({
     VarUser: 'UserName',
@@ -25,7 +21,6 @@ const LEGACY_PROMPT_TOKEN_REPLACEMENTS = Object.freeze({
     VarRendering: 'RenderingGuide',
     VarEmoticonPrompt: 'EmoticonGuide',
     VarEmojiPrompt: 'EmoticonGuide',
-    VarAdaptiveBubbleTip: 'AdaptiveBubbleTip',
 });
 
 function isPlainObject(value) {
@@ -197,7 +192,6 @@ function buildPromptVariableMap(options = {}) {
     const emoticonPromptData = isPlainObject(context.emoticonPromptData) ? context.emoticonPromptData : {};
     const renderingPromptEnabled = settings.enableRenderingPrompt !== false;
     const emoticonPromptEnabled = settings.enableEmoticonPrompt !== false;
-    const adaptiveBubbleTipEnabled = settings.enableAdaptiveBubbleTip !== false;
     const protocolVariablesEnabled = studyLogPolicy.enabled !== false
         && studyLogPolicy.enableDailyNotePromptVariables !== false;
     const timeZone = context.timeZone || studyProfile.timezone || 'Asia/Shanghai';
@@ -284,17 +278,6 @@ function buildPromptVariableMap(options = {}) {
             'EmoticonGuide',
             emoticonPromptEnabled ? 'bundled-emoticon-unavailable' : 'emoticon-prompt-disabled'
         );
-    }
-
-    if (adaptiveBubbleTipEnabled) {
-        mergeVariable(
-            variableMap,
-            'AdaptiveBubbleTip',
-            normalizeVariableValue(settings.adaptiveBubbleTip) || DEFAULT_ADAPTIVE_BUBBLE_TIP,
-            'builtin'
-        );
-    } else {
-        setForceResolvedVariable(variableMap, 'AdaptiveBubbleTip', 'adaptive-bubble-tip-disabled');
     }
 
     addDerivedAliasVariables(variableMap, [
@@ -408,7 +391,6 @@ function resolvePromptMessageSet(messages, options = {}) {
 
 module.exports = {
     DEFAULT_DIV_RENDER_INSTRUCTION,
-    DEFAULT_ADAPTIVE_BUBBLE_TIP,
     LEGACY_PROMPT_TOKEN_REPLACEMENTS,
     buildPromptVariableMap,
     buildLegacyTokenSuggestions,

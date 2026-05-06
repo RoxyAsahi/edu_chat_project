@@ -256,7 +256,6 @@ test('preview-final-system-prompt reports segment states and final prompt', asyn
         userName: 'PersistedUser',
         enableRenderingPrompt: true,
         enableEmoticonPrompt: true,
-        enableAdaptiveBubbleTip: true,
         studyLogPolicy: {
             ...DEFAULT_SETTINGS.studyLogPolicy,
             enabled: true,
@@ -413,7 +412,6 @@ test('save-settings persists prompt injection toggles when explicitly disabled',
     const result = await saveSettings({}, {
         enableRenderingPrompt: false,
         enableEmoticonPrompt: false,
-        enableAdaptiveBubbleTip: false,
         studyLogPolicy: {
             ...DEFAULT_SETTINGS.studyLogPolicy,
             enabled: true,
@@ -426,12 +424,10 @@ test('save-settings persists prompt injection toggles when explicitly disabled',
     assert.equal(result.success, true);
     assert.equal(rawSettings.enableRenderingPrompt, false);
     assert.equal(rawSettings.enableEmoticonPrompt, false);
-    assert.equal(rawSettings.enableAdaptiveBubbleTip, false);
     assert.equal(rawSettings.studyLogPolicy.enableDailyNotePromptVariables, false);
     assert.equal(rawSettings.studyLogPolicy.autoInjectDailyNoteProtocol, false);
     assert.equal(result.persistenceCheck.fieldChecks.enableRenderingPrompt.matched, true);
     assert.equal(result.persistenceCheck.fieldChecks.enableEmoticonPrompt.matched, true);
-    assert.equal(result.persistenceCheck.fieldChecks.enableAdaptiveBubbleTip.matched, true);
     assert.equal(result.persistenceCheck.fieldChecks['studyLogPolicy.enableDailyNotePromptVariables'].matched, true);
     assert.equal(result.persistenceCheck.fieldChecks['studyLogPolicy.autoInjectDailyNoteProtocol'].matched, true);
     assert.equal(result.persistenceCheck.promptToggleFieldsMatched, true);

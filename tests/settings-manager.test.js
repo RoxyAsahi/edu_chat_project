@@ -384,7 +384,6 @@ test('readSettings flags legacy vcpLite prompt fields without migrating them', a
         userName: 'Legacy Prompt User',
         vcpLite: {
             renderingPrompt: 'legacy rendering prompt',
-            adaptiveBubbleTip: 'legacy bubble tip',
             dailyNoteGuide: 'legacy daily note guide',
         },
     }, { spaces: 2 });
@@ -393,7 +392,6 @@ test('readSettings flags legacy vcpLite prompt fields without migrating them', a
     const rawWritten = await fs.readJson(settingsPath);
 
     assert.equal(settings.renderingPrompt, '');
-    assert.equal(settings.adaptiveBubbleTip, '');
     assert.equal(settings.dailyNoteGuide, '');
     assert.equal('vcpLite' in rawWritten, false);
     assert.deepEqual(

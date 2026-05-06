@@ -189,10 +189,8 @@ const DEFAULT_SETTINGS = Object.freeze({
     networkNotesPaths: [],
     enableRenderingPrompt: true,
     enableEmoticonPrompt: true,
-    enableAdaptiveBubbleTip: true,
     renderingPrompt: '',
     emoticonPrompt: '',
-    adaptiveBubbleTip: '',
     dailyNoteGuide: '',
     followUpPromptTemplate: '',
     enableTopicTitleGeneration: true,
@@ -251,7 +249,7 @@ const LEGACY_SETTINGS_REPLACEMENTS = Object.freeze({
         message: '旧字段 vcpLogKey 已废弃，请改用 chatLogKey。',
     },
     vcpLite: {
-        replacement: 'renderingPrompt / emoticonPrompt / adaptiveBubbleTip / dailyNoteGuide',
+        replacement: 'renderingPrompt / emoticonPrompt / dailyNoteGuide',
         message: '旧字段 vcpLite 已废弃，相关提示词字段不再自动迁移，请手动改到新的顶层设置字段。',
     },
 });
@@ -389,11 +387,6 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         hasIssues = true;
     }
 
-    if (typeof validated.enableAdaptiveBubbleTip !== 'boolean') {
-        validated.enableAdaptiveBubbleTip = defaultSettings.enableAdaptiveBubbleTip;
-        hasIssues = true;
-    }
-
     const normalizePromptText = (value, fallback = '') => {
         if (typeof value === 'string') {
             return value;
@@ -413,14 +406,6 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
         validated.emoticonPrompt = normalizePromptText(
             sourceSettings.emoticonPrompt,
             defaultSettings.emoticonPrompt
-        );
-        hasIssues = true;
-    }
-
-    if (typeof sourceSettings.adaptiveBubbleTip !== 'string') {
-        validated.adaptiveBubbleTip = normalizePromptText(
-            sourceSettings.adaptiveBubbleTip,
-            defaultSettings.adaptiveBubbleTip
         );
         hasIssues = true;
     }
