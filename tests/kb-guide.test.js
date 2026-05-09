@@ -170,6 +170,133 @@ test('guideService forwards the global chat fallback execution into guide genera
     assert.equal(capturedRequest.fallbackExecution.endpoint, 'https://fallback.example.com/base/v1/chat/completions');
 });
 
+test('guideService recovers interrupted guide jobs before renderer refresh checks', async () => {
+    const documents = {
+        'doc-stale-empty': {
+            id: 'doc-stale-empty',
+            name: 'stale.png',
+            status: 'done',
+            guideStatus: 'processing',
+            guideMarkdown: '',
+            guideGeneratedAt: null,
+            guideError: null,
+        },
+        'doc-stale-cached': {
+            id: 'doc-stale-cached',
+            name: 'cached.png',
+            status: 'done',
+            guideStatus: 'processing',
+            guideMarkdown: '# 已缓存指南',
+            guideGeneratedAt: 123,
+            guideError: null,
+        },
+        'doc-active': {
+            id: 'doc-active',
+            name: 'active.png',
+            status: 'done',
+            guideStatus: 'processing',
+            guideMarkdown: '',
+            guideGeneratedAt: null,
+            guideError: null,
+        },
+    };
+    const patches = [];
+    const service = createGuideService({
+        runtime: {
+            hasGuideJob(documentId) {
+                return documentId === 'doc-active';
+            },
+        },
+        repository: {
+            async getDocumentById(documentId) {
+                return documents[documentId] ? { ...documents[documentId] } : null;
+            },
+            async updateDocumentGuideState(documentId, patch) {
+                patches.push([documentId, patch]);
+                documents[documentId] = {
+                    ...documents[documentId],
+                    ...patch,
+                };
+                return { ...documents[documentId] };
+            },
+        },
+        parseKnowledgeBaseDocument: async () => ({
+            contentType: 'markdown',
+            text: '# 正文',
+        }),
+        chatClient: {},
+    });
+
+    const emptyGuide = await service.getKnowledgeBaseDocumentGuide('doc-stale-empty');
+    assert.equal(emptyGuide.guideStatus, 'idle');
+    assert.equal(emptyGuide.guideMarkdown, '');
+    assert.match(emptyGuide.guideError, /生成被中断/);
+
+    const cachedGuide = await service.getKnowledgeBaseDocumentGuide('doc-stale-cached');
+    assert.equal(cachedGuide.guideStatus, 'done');
+    assert.equal(cachedGuide.guideMarkdown, '# 已缓存指南');
+
+    const activeGuide = await service.getKnowledgeBaseDocumentGuide('doc-active');
+    assert.equal(activeGuide.guideStatus, 'processing');
+    assert.equal(patches.length, 2);
+});
+
+test('guideService hydrates image source guides from persisted image transcription', async () => {
+    const document = {
+        id: 'doc-image-guide',
+        name: '十五夜望月.png',
+        status: 'done',
+        mimeType: 'image/png',
+        contentType: 'markdown',
+        extractedText: '# 图片概览\n\n月夜诗歌资料\n\n# 可继续追问的问题\n\n- 这首诗表达了什么？',
+        guideStatus: 'idle',
+        guideMarkdown: '',
+        guideGeneratedAt: null,
+        completedAt: 456,
+        guideError: null,
+    };
+    const patches = [];
+    const service = createGuideService({
+        runtime: {
+            hasGuideJob() {
+                return false;
+            },
+        },
+        repository: {
+            async getDocumentById(documentId) {
+                assert.equal(documentId, document.id);
+                return { ...document };
+            },
+            async updateDocumentGuideState(documentId, patch) {
+                assert.equal(documentId, document.id);
+                patches.push(patch);
+                Object.assign(document, patch);
+                return { ...document };
+            },
+        },
+        parseKnowledgeBaseDocument: async () => {
+            throw new Error('cached image transcription should be used as the source guide');
+        },
+        chatClient: {
+            async send() {
+                throw new Error('source guide model should not be called for cached image transcription');
+            },
+        },
+    });
+
+    const guide = await service.generateKnowledgeBaseDocumentGuide(document.id, { forceRefresh: false });
+
+    assert.equal(guide.guideStatus, 'done');
+    assert.match(guide.guideMarkdown, /月夜诗歌资料/);
+    assert.equal(guide.guideGeneratedAt, 456);
+    assert.deepEqual(patches, [{
+        guideStatus: 'done',
+        guideMarkdown: document.extractedText,
+        guideGeneratedAt: 456,
+        guideError: null,
+    }]);
+});
+
 test('imageDocumentTranscriber routes image transcription through a vision-capable model and forwards fallback execution', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-image-transcriber-'));
     const storedPath = path.join(tempRoot, 'diagram.png');

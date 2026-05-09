@@ -4,6 +4,7 @@ import {
     formatDocumentStatus,
     getKnowledgeBaseDocumentVisual,
 } from '../source/sourceModel.js';
+import { isReaderSupportedDocument } from '../reader/readerUtils.js';
 import { positionFloatingElement } from '../dom/positionFloatingElement.js';
 
 function createShelfController(deps = {}) {
@@ -19,6 +20,8 @@ function createShelfController(deps = {}) {
     const loadCurrentTopicKnowledgeBaseDocuments = deps.loadCurrentTopicKnowledgeBaseDocuments || (async () => []);
     const loadKnowledgeBases = deps.loadKnowledgeBases || (async () => {});
     const updateTopicSourceSelection = deps.updateTopicSourceSelection || (() => {});
+    const openShelfReaderDocument = deps.openShelfReaderDocument || (async () => {});
+    const isShelfReaderDocumentActive = deps.isShelfReaderDocumentActive || (() => false);
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => store.getState().session.currentSelectedItem);
     const getCurrentTopicId = deps.getCurrentTopicId || (() => store.getState().session.currentTopicId);
     const getCurrentTopic = deps.getCurrentTopic || (() => null);
@@ -193,6 +196,67 @@ function createShelfController(deps = {}) {
 
     function isDocumentReusable(documentItem = {}) {
         return documentItem.status === 'done';
+    }
+
+    function isShelfDocumentReadable(documentItem = {}) {
+        return documentItem.status === 'done' && isReaderSupportedDocument(documentItem);
+    }
+
+    async function openShelfDocumentReader(documentItem = {}) {
+        if (!isShelfDocumentReadable(documentItem)) {
+            return;
+        }
+        closeShelfDocumentActionMenu();
+        await openShelfReaderDocument(documentItem.id);
+        renderShelfPage();
+    }
+
+    function patchShelfDocument(documentId, patch = {}) {
+        const normalizedDocumentId = String(documentId || '').trim();
+        if (!normalizedDocumentId) {
+            return;
+        }
+        const normalizedFileHash = String(patch?.fileHash || '').trim();
+
+        const applyPatch = (items = []) => (Array.isArray(items) ? items : []).map((item) => {
+            const sameDocument = item?.id === normalizedDocumentId;
+            const sameFile = normalizedFileHash && String(item?.fileHash || '').trim() === normalizedFileHash;
+            if (!sameDocument && !sameFile) {
+                return item;
+            }
+            const nextItem = { ...item, ...patch };
+            return sameDocument
+                ? nextItem
+                : { ...nextItem, id: item.id, kbId: item.kbId };
+        });
+        const nextDocumentsByGroupId = Object.fromEntries(Object.entries(state.documentsByGroupId || {}).map(([groupId, items]) => [
+            groupId,
+            applyPatch(items),
+        ]));
+        const nextPickerDocumentsByGroupId = Object.fromEntries(Object.entries(state.pickerDocumentsByGroupId || {}).map(([groupId, items]) => [
+            groupId,
+            applyPatch(items),
+        ]));
+
+        state.documents = applyPatch(state.documents);
+        state.documentsByGroupId = nextDocumentsByGroupId;
+        state.pickerDocumentsByGroupId = nextPickerDocumentsByGroupId;
+        renderShelfPage();
+        if (state.pickerOpen) {
+            renderPicker();
+        }
+    }
+
+    function patchShelfDocumentGuideState(documentId, patch = {}) {
+        patchShelfDocument(documentId, patch);
+    }
+
+    function patchShelfDocumentName(documentId, patch = {}) {
+        const name = String(patch?.name || '').trim();
+        if (!name) {
+            return;
+        }
+        patchShelfDocument(documentId, { ...patch, name });
     }
 
     function getTopicDocumentHashSet() {
@@ -561,7 +625,10 @@ function createShelfController(deps = {}) {
             ui.showToastNotification(`重命名资料失败：${result?.error || '未知错误'}`, 'error');
             return;
         }
-        await loadShelfGroups({ silent: true });
+        await Promise.all([
+            loadShelfGroups({ silent: true }),
+            loadCurrentTopicKnowledgeBaseDocuments({ silent: true, reuseSelected: false }),
+        ]);
         if (state.pickerOpen) {
             await loadPickerData({ silent: true });
         }
@@ -861,10 +928,18 @@ function createShelfController(deps = {}) {
     function renderShelfDocumentCard(documentItem) {
         const visual = getKnowledgeBaseDocumentVisual(documentItem);
         const preview = getShelfDocumentPreview(documentItem);
+        const readable = isShelfDocumentReadable(documentItem);
         const card = documentObj.createElement('article');
         card.className = `source-shelf-card source-shelf-card--${visual.tone}`;
         card.classList.toggle('source-shelf-card--processing', visual.spinning === true);
         card.classList.toggle('source-shelf-card--failed', Boolean(documentItem.lastError));
+        card.classList.toggle('source-shelf-card--clickable', readable);
+        card.classList.toggle('source-shelf-card--active', isShelfReaderDocumentActive(documentItem.id));
+        if (readable) {
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.setAttribute('aria-label', `打开 ${documentItem.name || '资料'}`);
+        }
         card.innerHTML = `
             <header class="source-shelf-card__header">
                 <div class="source-shelf-card__title">
@@ -885,6 +960,18 @@ function createShelfController(deps = {}) {
         card.addEventListener('contextmenu', (event) => {
             openShelfDocumentActionMenu(event, documentItem);
         });
+        if (readable) {
+            card.addEventListener('click', () => {
+                void openShelfDocumentReader(documentItem);
+            });
+            card.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') {
+                    return;
+                }
+                event.preventDefault();
+                void openShelfDocumentReader(documentItem);
+            });
+        }
         if (documentItem.thumbnailUrl) {
             applyShelfThumbnail(card, {
                 thumbnailUrl: documentItem.thumbnailUrl,
@@ -1080,22 +1167,43 @@ function createShelfController(deps = {}) {
         const remainingSlots = Math.max(0, TOPIC_SOURCE_FILE_LIMIT - (getSourceSlice().topicKnowledgeBaseDocuments || []).length);
         const selectionLimitReached = reusable && !selected && state.pickerSelectedDocumentIds.length >= remainingSlots;
         const visual = getKnowledgeBaseDocumentVisual(documentItem);
+        const preview = getShelfDocumentPreview(documentItem);
+        const statusText = alreadyInTopic ? '已在当前来源' : (selectionLimitReached ? '已达到当前来源上限' : formatDocumentStatus(documentItem));
         const button = documentObj.createElement('button');
         button.type = 'button';
-        button.className = `source-shelf-picker-card${selected ? ' source-shelf-picker-card--selected' : ''}`;
+        button.className = `source-shelf-card source-shelf-picker-card source-shelf-picker-card--book source-shelf-card--${visual.tone}${selected ? ' source-shelf-picker-card--selected' : ''}`;
+        button.classList.toggle('source-shelf-card--processing', visual.spinning === true);
+        button.classList.toggle('source-shelf-card--failed', Boolean(documentItem.lastError));
         button.disabled = !reusable || selectionLimitReached;
         button.dataset.shelfPickerDoc = documentItem.id;
         button.innerHTML = `
             <span class="source-shelf-picker-card__check material-symbols-outlined" aria-hidden="true">${selected ? 'check_circle' : 'radio_button_unchecked'}</span>
-            <span class="source-shelf-picker-card__icon source-shelf-card__icon--${escapeHtml(visual.tone)} material-symbols-outlined ${visual.spinning ? 'source-shelf-card__icon--spinning' : ''}" aria-hidden="true">${escapeHtml(visual.icon)}</span>
-            <span class="source-shelf-picker-card__body">
-                <strong>${escapeHtml(documentItem.name)}</strong>
-                <span>${alreadyInTopic ? '已在当前来源' : (selectionLimitReached ? '已达到当前来源上限' : escapeHtml(formatDocumentStatus(documentItem)))}</span>
+            <header class="source-shelf-card__header">
+                <span class="source-shelf-card__title">
+                    <strong>${escapeHtml(documentItem.name)}</strong>
+                </span>
+            </header>
+            <span class="source-shelf-card__cover">
+                <span class="source-shelf-card__thumbnail hidden" data-shelf-thumbnail>
+                    <img alt="" loading="lazy" />
+                </span>
+                <span class="source-shelf-card__cover-topline">
+                    <span class="source-shelf-card__icon source-shelf-card__icon--${escapeHtml(visual.tone)} material-symbols-outlined ${visual.spinning ? 'source-shelf-card__icon--spinning' : ''}" aria-hidden="true">${escapeHtml(visual.icon)}</span>
+                    <span class="source-shelf-card__status">${escapeHtml(statusText)}</span>
+                </span>
+                <span class="source-shelf-card__preview">${escapeHtml(preview)}</span>
             </span>
         `;
         button.addEventListener('click', () => {
             togglePickerDocument(documentItem.id);
         });
+        if (documentItem.thumbnailUrl) {
+            applyShelfThumbnail(button, {
+                thumbnailUrl: documentItem.thumbnailUrl,
+                kind: documentItem.thumbnailKind || visual.tone,
+            });
+        }
+        queueShelfThumbnailLoad(documentItem, button);
         return button;
     }
 
@@ -1112,7 +1220,7 @@ function createShelfController(deps = {}) {
             } else if (selectedCount > 0) {
                 el.sourceShelfPickerSummary.textContent = `已选择 ${selectedCount} 份资料，还可加入 ${Math.max(0, remainingSlots - selectedCount)} 份。`;
             } else {
-                el.sourceShelfPickerSummary.textContent = '只可选择已完成入库、且当前来源尚未包含的资料。';
+                el.sourceShelfPickerSummary.textContent = '可从资料书架选择，也可以从本地上传新资料。';
             }
         }
         if (el.sourceShelfPickerConfirmBtn) {
@@ -1121,7 +1229,7 @@ function createShelfController(deps = {}) {
 
         el.sourceShelfPickerBody.innerHTML = '';
         if (state.pickerGroups.length === 0) {
-            el.sourceShelfPickerBody.innerHTML = '<div class="empty-list-state source-shelf-picker-empty"><strong>资料书架还是空的</strong><span>先到资料书架页面创建分组并上传资料。</span></div>';
+            el.sourceShelfPickerBody.innerHTML = '<div class="empty-list-state source-shelf-picker-empty"><strong>资料书架还是空的</strong><span>可以先从本地上传资料到当前来源。</span></div>';
             syncPolling();
             return;
         }
@@ -1346,6 +1454,8 @@ function createShelfController(deps = {}) {
         loadShelfGroups,
         openShelfPage,
         openShelfPicker,
+        patchShelfDocumentGuideState,
+        patchShelfDocumentName,
         renameShelfDocument,
         renameShelfGroup,
         renderPicker,

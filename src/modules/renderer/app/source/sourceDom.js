@@ -529,10 +529,6 @@ function createSourceDom(deps = {}) {
             el.importTopicKnowledgeBaseFilesBtn.classList.add('workspace-card__cta--list-item');
             el.topicKnowledgeBaseFiles.appendChild(el.importTopicKnowledgeBaseFilesBtn);
         }
-        if (el.addTopicSourceFromShelfBtn) {
-            el.addTopicSourceFromShelfBtn.classList.add('workspace-card__cta--list-item');
-            el.topicKnowledgeBaseFiles.appendChild(el.addTopicSourceFromShelfBtn);
-        }
 
         if (!kbId) {
             getFacade().syncKnowledgeBasePolling();

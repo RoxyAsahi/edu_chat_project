@@ -242,22 +242,80 @@
                   <span>分组名称</span>
                   <input id="sourceShelfGroupNameInput" type="text" placeholder="例如：教材 / 试卷 / 论文" />
                 </label>
-                <div class="source-shelf-page__actions">
-                  <button id="renameSourceShelfGroupBtn" class="ghost-button source-shelf-page__action" type="button">
-                    <span class="material-symbols-outlined" aria-hidden="true">drive_file_rename_outline</span>
-                    <span>重命名</span>
-                  </button>
-                  <button id="deleteSourceShelfGroupBtn" class="ghost-button ghost-button--danger source-shelf-page__action" type="button">
-                    <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-                    <span>删除分组</span>
-                  </button>
-                  <button id="importSourceShelfFilesBtn" class="ghost-button source-shelf-page__action" type="button">
-                    <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
-                    <span>上传资料</span>
-                  </button>
-                </div>
               </div>
               <div id="sourceShelfDocuments" class="source-shelf-grid" aria-live="polite"></div>
+              <section id="sourceShelfReaderPanel" class="source-shelf-reader-modal hidden" aria-hidden="true">
+                <div id="sourceShelfReaderBackdrop" class="source-shelf-reader-modal__backdrop"></div>
+                <div class="workspace-reader-panel source-shelf-reader-panel" role="dialog" aria-modal="true" aria-labelledby="sourceShelfReaderDocumentTitle" aria-live="polite">
+                  <div class="workspace-card__header workspace-reader-panel__header">
+                    <div class="workspace-card__titleblock">
+                      <p class="workspace-card__title">资料内容</p>
+                    </div>
+                    <button id="sourceShelfReaderBackBtn" class="ghost-button icon-text-btn workspace-reader-panel__close" type="button">
+                      <span class="material-symbols-outlined">arrow_back</span>
+                      <span>返回资料书架</span>
+                    </button>
+                  </div>
+
+                  <div class="workspace-reader-panel__body">
+                    <div class="workspace-reader-panel__title-block">
+                      <h2 id="sourceShelfReaderDocumentTitle">选择一份资料开始阅读</h2>
+                      <p id="sourceShelfReaderDocumentMeta" class="settings-caption hidden">打开资料后，系统会异步生成来源指南；你也可以随时切到原文进行阅读。</p>
+                    </div>
+
+                    <div class="workspace-reader-panel__compat hidden" aria-hidden="true">
+                      <div class="workspace-reader-panel__header-actions">
+                        <button id="sourceShelfRefreshReaderGuideBtn" class="ghost-button icon-text-btn" type="button">
+                          <span class="material-symbols-outlined">refresh</span> 刷新指南
+                        </button>
+                        <button id="sourceShelfReaderPrevBtn" class="ghost-button icon-btn" type="button" title="上一页 / 上一段"><span class="material-symbols-outlined">navigate_before</span></button>
+                        <button id="sourceShelfReaderNextBtn" class="ghost-button icon-btn" type="button" title="下一页 / 下一段"><span class="material-symbols-outlined">navigate_next</span></button>
+                      </div>
+                      <div class="reader-toolbar workspace-reader-panel__badges">
+                        <div id="sourceShelfReaderLocationBadge" class="reader-badge">未打开文档</div>
+                        <div id="sourceShelfReaderIndexStatusBadge" class="reader-badge">尚未入库</div>
+                        <div id="sourceShelfReaderProcessingStatusBadge" class="reader-badge">等待中</div>
+                        <div id="sourceShelfReaderGuideStatusBadge" class="reader-badge">指南未生成</div>
+                      </div>
+                      <div class="workspace-reader-tabs">
+                        <button id="sourceShelfReaderGuideTabBtn" class="workspace-reader-tab workspace-reader-tab--active" type="button">来源指南</button>
+                        <button id="sourceShelfReaderContentTabBtn" class="workspace-reader-tab" type="button">原文</button>
+                      </div>
+                      <div id="sourceShelfReaderSelectionBar" class="reader-selection-bar hidden">
+                        <div>
+                          <strong>已选中片段</strong>
+                          <p id="sourceShelfReaderSelectionSummary" class="settings-caption">当前没有选中内容。</p>
+                        </div>
+                        <div class="panel__actions">
+                          <button id="sourceShelfClearReaderSelectionBtn" class="ghost-button icon-text-btn" type="button"><span class="material-symbols-outlined">close</span> 清空</button>
+                          <button id="sourceShelfInjectReaderSelectionBtn" class="accent-button icon-text-btn" type="button"><span class="material-symbols-outlined">arrow_circle_up</span> 注入当前对话</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="sourceShelfReaderGuidePane" class="workspace-reader-pane workspace-reader-pane--stacked">
+                      <div class="reader-guide-shell">
+                        <div id="sourceShelfReaderGuideContent" class="reader-guide-content">
+                          <div class="reader-guide-content__title">来源指南</div>
+                          <div class="empty-list-state">
+                            <strong>来源指南会显示在这里</strong>
+                            <span>打开资料书架中的资料后，系统会先展示或生成一份学习导向的阅读指南。</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="sourceShelfReaderContentPane" class="workspace-reader-pane workspace-reader-pane--stacked">
+                      <div id="sourceShelfReaderContent" class="reader-content reader-content--plain">
+                        <div class="empty-list-state">
+                          <strong>原文阅读区已就绪</strong>
+                          <span>你可以在这里查看 PDF 页级内容、DOCX 段落结构和文本资料。</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </section>
           </div>
         </div>
@@ -311,10 +369,8 @@
 
           <div class="source-sidebar-card__actions">
             <button id="importTopicKnowledgeBaseFilesBtn" class="ghost-button workspace-card__cta" type="button">
-              <span class="material-symbols-outlined">upload_file</span> 上传来源
-            </button>
-            <button id="addTopicSourceFromShelfBtn" class="ghost-button workspace-card__cta" type="button">
-              <span class="material-symbols-outlined">shelves</span> 资料书架
+              <span class="material-symbols-outlined">upload_file</span>
+              <span>上传来源</span>
             </button>
           </div>
 
@@ -1343,20 +1399,29 @@
     <section class="source-shelf-picker-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="sourceShelfPickerTitle">
       <header class="source-shelf-picker-modal__header">
         <div>
-          <h2 id="sourceShelfPickerTitle">从资料书架选择</h2>
-          <p id="sourceShelfPickerSummary" class="settings-caption">选择已完成入库的资料，加入当前话题来源。</p>
+          <h2 id="sourceShelfPickerTitle">上传来源</h2>
+          <p id="sourceShelfPickerSummary" class="settings-caption">可从资料书架选择，也可以从本地上传新资料。</p>
         </div>
-        <button id="sourceShelfPickerCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭资料书架选择器">
+        <button id="sourceShelfPickerCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭上传来源">
           <span class="material-symbols-outlined">close</span>
         </button>
       </header>
+      <div class="source-shelf-picker-modal__upload-area">
+        <button id="sourceUploadLocalBtn" class="source-shelf-card source-shelf-upload-card source-shelf-picker-upload-card" type="button">
+          <span class="source-shelf-upload-card__icon material-symbols-outlined" aria-hidden="true">upload_file</span>
+          <span class="source-shelf-upload-card__title">从本地上传</span>
+          <span class="source-shelf-upload-card__hint">上传到当前话题来源</span>
+        </button>
+      </div>
       <div id="sourceShelfPickerBody" class="source-shelf-picker-modal__body"></div>
       <footer class="source-shelf-picker-modal__footer">
-        <button id="sourceShelfPickerCancelBtn" class="ghost-button" type="button">取消</button>
-        <button id="sourceShelfPickerConfirmBtn" class="accent-button" type="button">
-          <span class="material-symbols-outlined" aria-hidden="true">add_link</span>
-          <span>加入当前来源</span>
-        </button>
+        <div class="source-shelf-picker-modal__footer-actions">
+          <button id="sourceShelfPickerCancelBtn" class="ghost-button" type="button">取消</button>
+          <button id="sourceShelfPickerConfirmBtn" class="accent-button" type="button">
+            <span class="material-symbols-outlined" aria-hidden="true">add_link</span>
+            <span>加入当前来源</span>
+          </button>
+        </div>
       </footer>
     </section>
   </div>

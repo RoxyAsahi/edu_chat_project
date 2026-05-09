@@ -120,6 +120,15 @@ test('documentProcessor transcribes image documents and persists extracted conte
         true,
     );
     assert.equal(
+        operations.some(([name, , patch]) => (
+            name === 'updateDocumentGuideState'
+            && patch.guideStatus === 'done'
+            && /转写正文/.test(patch.guideMarkdown || '')
+            && patch.guideGeneratedAt
+        )),
+        true,
+    );
+    assert.equal(
         operations.some(([name]) => name === 'requestEmbeddings'),
         true,
     );
@@ -291,6 +300,9 @@ test('repository renames documents, validates display names, and touches the par
                 if (/SELECT id, kb_id, name, stored_path/.test(sql)) {
                     return { rows: [row] };
                 }
+                if (sql === 'SELECT DISTINCT kb_id FROM kb_document WHERE file_hash = ?') {
+                    return { rows: [{ kb_id: 'kb-1' }, { kb_id: 'kb-shelf' }] };
+                }
                 return { rows: [] };
             },
         }),
@@ -300,14 +312,19 @@ test('repository renames documents, validates display names, and touches the par
 
     assert.equal(renamed.name, '新标题.png');
     assert.equal(
-        calls.some((statement) => statement.sql === 'UPDATE kb_document SET name = ?, updated_at = ? WHERE id = ?'
+        calls.some((statement) => statement.sql === 'UPDATE kb_document SET name = ?, updated_at = ? WHERE file_hash = ?'
             && statement.args[0] === '新标题.png'
-            && statement.args[2] === 'doc-image'),
+            && statement.args[2] === 'hash-1'),
         true,
     );
     assert.equal(
         calls.some((statement) => statement.sql === 'UPDATE knowledge_base SET updated_at = ? WHERE id = ?'
             && statement.args[1] === 'kb-1'),
+        true,
+    );
+    assert.equal(
+        calls.some((statement) => statement.sql === 'UPDATE knowledge_base SET updated_at = ? WHERE id = ?'
+            && statement.args[1] === 'kb-shelf'),
         true,
     );
     await assert.rejects(

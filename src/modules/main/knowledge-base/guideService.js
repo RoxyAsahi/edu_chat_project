@@ -178,6 +178,91 @@ function createGuideService(deps = {}) {
     const parseKnowledgeBaseDocument = deps.parseKnowledgeBaseDocument;
     const chatClient = deps.chatClient;
 
+    function hasActiveGuideJob(documentId) {
+        return typeof runtime?.hasGuideJob === 'function' && runtime.hasGuideJob(documentId);
+    }
+
+    function buildGuideResult(document) {
+        return {
+            documentId: document.id,
+            guideStatus: document.guideStatus || 'idle',
+            guideMarkdown: document.guideMarkdown || '',
+            guideGeneratedAt: document.guideGeneratedAt || null,
+            guideError: document.guideError || null,
+        };
+    }
+
+    function isImageDocument(document = {}) {
+        const mimeType = String(document.mimeType || '').trim().toLowerCase();
+        const name = String(document.name || '').trim().toLowerCase();
+        return mimeType.startsWith('image/')
+            || ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'].some((extension) => name.endsWith(extension));
+    }
+
+    async function updateGuideState(document, patch) {
+        if (typeof repository.updateDocumentGuideState !== 'function') {
+            return {
+                ...document,
+                ...patch,
+            };
+        }
+
+        const updated = await repository.updateDocumentGuideState(document.id, patch);
+        return updated || {
+            ...document,
+            ...patch,
+        };
+    }
+
+    async function hydrateImageGuideFromTranscription(document) {
+        if (!document || hasActiveGuideJob(document.id)) {
+            return document;
+        }
+
+        const existingGuideMarkdown = String(document.guideMarkdown || '').trim();
+        const extractedText = String(document.extractedText || '').trim();
+        if (existingGuideMarkdown || !extractedText || !isImageDocument(document)) {
+            return document;
+        }
+
+        return updateGuideState(document, {
+            guideStatus: 'done',
+            guideMarkdown: extractedText,
+            guideGeneratedAt: document.guideGeneratedAt || document.completedAt || document.updatedAt || Date.now(),
+            guideError: null,
+        });
+    }
+
+    async function recoverInterruptedGuideState(document) {
+        if (!document) {
+            return document;
+        }
+
+        const guideStatus = String(document.guideStatus || '').trim().toLowerCase();
+        const inProgress = guideStatus === 'pending' || guideStatus === 'processing';
+        if (!inProgress || hasActiveGuideJob(document.id)) {
+            return document;
+        }
+
+        const guideMarkdown = String(document.guideMarkdown || '');
+        const patch = guideMarkdown
+            ? {
+                guideStatus: 'done',
+                guideError: null,
+            }
+            : {
+                guideStatus: 'idle',
+                guideGeneratedAt: null,
+                guideError: document.guideError || '上次来源指南生成被中断，重新打开时会继续生成。',
+            };
+
+        return updateGuideState(document, patch);
+    }
+
+    async function prepareDocumentGuideState(document) {
+        return recoverInterruptedGuideState(await hydrateImageGuideFromTranscription(document));
+    }
+
     async function requestGuideFromModel(document, parsed, prompt, requestSuffix) {
         const settings = await runtime.readSettings();
         const execution = resolveExecutionConfig(settings, { purpose: 'sourceGuide' });
@@ -272,22 +357,16 @@ function createGuideService(deps = {}) {
     }
 
     async function getKnowledgeBaseDocumentGuide(documentId) {
-        const document = await repository.getDocumentById(documentId);
+        const document = await prepareDocumentGuideState(await repository.getDocumentById(documentId));
         if (!document) {
             throw new Error('Knowledge base document not found.');
         }
 
-        return {
-            documentId: document.id,
-            guideStatus: document.guideStatus || 'idle',
-            guideMarkdown: document.guideMarkdown || '',
-            guideGeneratedAt: document.guideGeneratedAt || null,
-            guideError: document.guideError || null,
-        };
+        return buildGuideResult(document);
     }
 
     async function generateKnowledgeBaseDocumentGuide(documentId, options = {}) {
-        const document = await repository.getDocumentById(documentId);
+        const document = await prepareDocumentGuideState(await repository.getDocumentById(documentId));
         if (!document) {
             throw new Error('Knowledge base document not found.');
         }
@@ -304,16 +383,13 @@ function createGuideService(deps = {}) {
         }
 
         if (!forceRefresh && document.guideStatus === 'done' && document.guideMarkdown) {
-            return {
-                documentId: document.id,
-                guideStatus: document.guideStatus,
-                guideMarkdown: document.guideMarkdown,
-                guideGeneratedAt: document.guideGeneratedAt || null,
+            return buildGuideResult({
+                ...document,
                 guideError: null,
-            };
+            });
         }
 
-        if (!forceRefresh && runtime.hasGuideJob(documentId)) {
+        if (!forceRefresh && hasActiveGuideJob(documentId)) {
             return getKnowledgeBaseDocumentGuide(documentId);
         }
 

@@ -15,6 +15,7 @@ import { createFollowUpController } from '../modules/renderer/app/followUps/foll
 import { createLogsController } from '../modules/renderer/app/logs/logsController.js';
 import { createNotesController } from '../modules/renderer/app/notes/notesController.js';
 import { createReaderController } from '../modules/renderer/app/reader/readerController.js';
+import { createInitialReaderState } from '../modules/renderer/app/reader/readerUtils.js';
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
 import { createShelfController } from '../modules/renderer/app/shelf/shelfController.js';
 import { createSourceController } from '../modules/renderer/app/source/sourceController.js';
@@ -83,6 +84,7 @@ const renderMarkdownFragment = createMarkdownFragmentRenderer({
 let sourceController = null;
 let workspaceController = null;
 let readerController = null;
+let shelfReaderController = null;
 let shelfController = null;
 let flashcardController = null;
 let notesController = null;
@@ -92,6 +94,7 @@ let dynamicIslandController = null;
 let composerController = null;
 let followUpController = null;
 let topicTitleController = null;
+let shelfReaderActiveTab = 'guide';
 const mobileWorkspaceController = createMobileWorkspaceController({
     store,
     el,
@@ -258,6 +261,7 @@ sourceController = createSourceController({
     syncReaderFromDocuments: (...args) => readerController?.syncFromSourceDocuments?.(...args),
     getNativePathForFile: (...args) => composerController?.getNativePathForFile?.(...args),
     openShelfPicker: (...args) => shelfController?.openShelfPicker?.(...args),
+    closeShelfPicker: (...args) => shelfController?.closeShelfPicker?.(...args),
     openShelfPage: (...args) => shelfController?.openShelfPage?.(...args),
     loadTopics: (...args) => workspaceController?.loadTopics?.(...args),
     getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
@@ -412,6 +416,26 @@ workspaceController = createWorkspaceController({
     syncMobileWorkspaceLayout,
     refreshWorkspaceLayout: scheduleLayoutRefresh,
 });
+shelfReaderController = createReaderController({
+    store: createScopedReaderStore(),
+    el: createShelfReaderElements(),
+    chatAPI,
+    ui,
+    windowObj: window,
+    documentObj: document,
+    renderMarkdownToSafeHtml,
+    getMarkedInstance: () => markedInstance,
+    setLeftSidebarMode: setShelfReaderMode,
+    setLeftReaderTab: setShelfReaderTab,
+    getLeftReaderActiveTab: () => shelfReaderActiveTab,
+    renderTopicKnowledgeBaseFiles: (...args) => shelfController?.renderShelfPage?.(...args),
+    syncKnowledgeBasePolling: (...args) => shelfController?.syncPolling?.(...args),
+    hideSourceFileTooltip: () => {},
+    onInjectSelection: (selection) => composerController?.injectSelection?.(selection),
+    patchDocumentGuideStateInSource: (...args) => shelfController?.patchShelfDocumentGuideState?.(...args),
+    patchDocumentNameInSource,
+    listenForKnowledgeBaseRefs: false,
+});
 shelfController = createShelfController({
     store,
     el,
@@ -425,6 +449,8 @@ shelfController = createShelfController({
     loadCurrentTopicKnowledgeBaseDocuments,
     loadKnowledgeBases,
     updateTopicSourceSelection,
+    openShelfReaderDocument: (...args) => shelfReaderController?.openReaderDocument?.(...args),
+    isShelfReaderDocumentActive: (...args) => shelfReaderController?.isDocumentActive?.(...args),
     getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
     getCurrentTopicId: () => getSessionSlice().currentTopicId,
     getCurrentTopic: (...args) => workspaceController?.getCurrentTopic?.(...args),
@@ -452,6 +478,9 @@ const {
 const {
     bindEvents: bindShelfEvents,
 } = shelfController;
+const {
+    bindEvents: bindShelfReaderEvents,
+} = shelfReaderController;
 const {
     bindEvents: bindNotesEvents,
 } = notesController;
@@ -684,17 +713,98 @@ function patchDocumentNameInSource(documentId, patch = {}) {
         return;
     }
 
-    const applyPatch = (items = []) => items.map((item) => (
-        item.id === normalizedDocumentId
-            ? { ...item, ...patch, name: nextName }
-            : item
-    ));
+    const normalizedFileHash = String(patch?.fileHash || '').trim();
+    const applyPatch = (items = []) => items.map((item) => {
+        const sameDocument = item.id === normalizedDocumentId;
+        const sameFile = normalizedFileHash && String(item?.fileHash || '').trim() === normalizedFileHash;
+        if (!sameDocument && !sameFile) {
+            return item;
+        }
+        const nextItem = { ...item, ...patch, name: nextName };
+        return sameDocument
+            ? nextItem
+            : { ...nextItem, id: item.id, kbId: item.kbId };
+    });
 
     store.patchState('source', (current) => ({
         ...current,
         knowledgeBaseDocuments: applyPatch(current.knowledgeBaseDocuments),
         topicKnowledgeBaseDocuments: applyPatch(current.topicKnowledgeBaseDocuments),
     }));
+    shelfController?.patchShelfDocumentName?.(normalizedDocumentId, {
+        ...patch,
+        name: nextName,
+    });
+}
+
+function createScopedReaderStore() {
+    const state = {
+        reader: createInitialReaderState(),
+    };
+    return {
+        getState() {
+            return state;
+        },
+        patchState(slice, patch) {
+            if (slice !== 'reader') {
+                return state[slice];
+            }
+            state.reader = typeof patch === 'function'
+                ? patch(state.reader, state)
+                : { ...state.reader, ...patch };
+            return state.reader;
+        },
+    };
+}
+
+function createShelfReaderElements() {
+    return {
+        readerDocumentTitle: el.sourceShelfReaderDocumentTitle,
+        readerDocumentMeta: el.sourceShelfReaderDocumentMeta,
+        readerLocationBadge: el.sourceShelfReaderLocationBadge,
+        readerIndexStatusBadge: el.sourceShelfReaderIndexStatusBadge,
+        readerProcessingStatusBadge: el.sourceShelfReaderProcessingStatusBadge,
+        readerGuideStatusBadge: el.sourceShelfReaderGuideStatusBadge,
+        readerPrevBtn: el.sourceShelfReaderPrevBtn,
+        readerNextBtn: el.sourceShelfReaderNextBtn,
+        injectReaderSelectionBtn: el.sourceShelfInjectReaderSelectionBtn,
+        clearReaderSelectionBtn: el.sourceShelfClearReaderSelectionBtn,
+        refreshReaderGuideBtn: el.sourceShelfRefreshReaderGuideBtn,
+        workspaceReaderBackBtn: el.sourceShelfReaderBackBtn,
+        leftReaderGuideTabBtn: el.sourceShelfReaderGuideTabBtn,
+        leftReaderContentTabBtn: el.sourceShelfReaderContentTabBtn,
+        readerSelectionBar: el.sourceShelfReaderSelectionBar,
+        readerSelectionSummary: el.sourceShelfReaderSelectionSummary,
+        readerGuideContent: el.sourceShelfReaderGuideContent,
+        readerContent: el.sourceShelfReaderContent,
+    };
+}
+
+function setShelfReaderMode(mode) {
+    const readerOpen = mode === 'reader';
+    el.sourceShelfDocumentsPanel?.classList.toggle('source-shelf-documents-panel--reader-open', readerOpen);
+    el.sourceShelfReaderPanel?.classList.toggle('hidden', !readerOpen);
+    el.sourceShelfReaderPanel?.setAttribute('aria-hidden', readerOpen ? 'false' : 'true');
+    if (readerOpen) {
+        requestAnimationFrame(() => {
+            el.sourceShelfReaderBackBtn?.focus?.();
+        });
+    }
+    if (!readerOpen) {
+        shelfReaderController?.resetReaderState?.();
+    }
+}
+
+function setShelfReaderTab(tab) {
+    const nextTab = tab === 'content' ? 'content' : 'guide';
+    shelfReaderActiveTab = nextTab;
+    el.sourceShelfReaderGuideTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'guide');
+    el.sourceShelfReaderContentTabBtn?.classList.toggle('workspace-reader-tab--active', nextTab === 'content');
+    el.sourceShelfReaderGuidePane?.classList.remove('hidden');
+    el.sourceShelfReaderGuidePane?.classList.add('workspace-reader-pane--active');
+    el.sourceShelfReaderContentPane?.classList.remove('hidden');
+    el.sourceShelfReaderContentPane?.classList.add('workspace-reader-pane--active');
+    el.sourceShelfReaderSelectionBar?.classList.add('hidden');
 }
 
 function updateCurrentChatHistory(updater) {
@@ -996,6 +1106,8 @@ function bindFeatureEvents() {
     bindLayoutEvents();
     bindSettingsEvents();
     bindReaderEvents();
+    bindShelfReaderEvents();
+    bindShelfReaderModalEvents();
     bindSourceEvents();
     bindWorkspaceEvents();
     bindShelfEvents();
@@ -1007,6 +1119,23 @@ function bindFeatureEvents() {
     bindComposerEvents();
     bindMobileWorkspaceEvents();
     bindShellEvents();
+}
+
+function closeShelfReaderModal() {
+    setShelfReaderMode('source-list');
+    setShelfReaderTab('guide');
+    shelfController?.renderShelfPage?.();
+}
+
+function bindShelfReaderModalEvents() {
+    el.sourceShelfReaderBackdrop?.addEventListener('click', closeShelfReaderModal);
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || el.sourceShelfReaderPanel?.classList.contains('hidden')) {
+            return;
+        }
+        event.preventDefault();
+        closeShelfReaderModal();
+    });
 }
 
 function bindShellEvents() {

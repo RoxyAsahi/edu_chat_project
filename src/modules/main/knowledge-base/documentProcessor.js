@@ -55,8 +55,9 @@ function createDocumentProcessor(deps = {}) {
                 contentType,
                 structure,
             } = parsed;
+            const imageDocument = isImageMimeType(mimeType) || isImageMimeType(resolvedMimeType);
 
-            if (isImageMimeType(mimeType) || isImageMimeType(resolvedMimeType)) {
+            if (imageDocument) {
                 await repository.updateDocumentDerivedContent(documentId, {
                     extractedText: text,
                     extractedContentType: contentType || 'markdown',
@@ -112,12 +113,19 @@ function createDocumentProcessor(deps = {}) {
                 completedAt,
                 contentType,
             });
-            await repository.updateDocumentGuideState(documentId, {
-                guideStatus: 'idle',
-                guideMarkdown: '',
-                guideGeneratedAt: null,
-                guideError: null,
-            });
+            await repository.updateDocumentGuideState(documentId, imageDocument
+                ? {
+                    guideStatus: 'done',
+                    guideMarkdown: text || '',
+                    guideGeneratedAt: completedAt,
+                    guideError: null,
+                }
+                : {
+                    guideStatus: 'idle',
+                    guideMarkdown: '',
+                    guideGeneratedAt: null,
+                    guideError: null,
+                });
             await repository.updateDocumentMimeType(documentId, mimeType);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);

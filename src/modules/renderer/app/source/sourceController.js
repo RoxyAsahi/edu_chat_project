@@ -27,6 +27,7 @@ function createSourceController(deps = {}) {
     const getNativePathForFile = deps.getNativePathForFile || (async () => '');
     const loadTopics = deps.loadTopics || (async () => {});
     const openShelfPicker = deps.openShelfPicker || (() => {});
+    const closeShelfPicker = deps.closeShelfPicker || (() => {});
     const openShelfPage = deps.openShelfPage || (() => {});
     const getLeftSidebarMode = deps.getLeftSidebarMode || (() => 'source-list');
     const getSourceListScrollTop = deps.getSourceListScrollTop || (() => 0);
@@ -235,6 +236,13 @@ function createSourceController(deps = {}) {
         return getFacade()[methodName](...args);
     }
 
+    async function openLocalTopicSourceUpload() {
+        const kbId = getCurrentTopicKnowledgeBaseId() || await invokeFacade('ensureTopicSource', { silent: true });
+        if (kbId) {
+            el.hiddenTopicKnowledgeBaseFileInput?.click();
+        }
+    }
+
     function bindEvents() {
         windowObj.addEventListener('resize', () => {
             invokeFacade('hideSourceFileTooltip');
@@ -243,6 +251,7 @@ function createSourceController(deps = {}) {
 
         documentObj.addEventListener('click', (event) => {
             const target = event.target;
+
             if (!state.activeSourceFileMenu) {
                 return;
             }
@@ -278,19 +287,18 @@ function createSourceController(deps = {}) {
         el.openKnowledgeBaseManagerBtn?.addEventListener('click', () => {
             void invokeFacade('openKnowledgeBaseManager');
         });
-        el.importTopicKnowledgeBaseFilesBtn?.addEventListener('click', async () => {
-            const kbId = getCurrentTopicKnowledgeBaseId() || await invokeFacade('ensureTopicSource', { silent: true });
-            if (kbId) {
-                el.hiddenTopicKnowledgeBaseFileInput?.click();
-            }
-        });
-        el.addTopicSourceFromShelfBtn?.addEventListener('click', () => {
+        el.importTopicKnowledgeBaseFilesBtn?.addEventListener('click', () => {
             void openShelfPicker();
+        });
+        el.sourceUploadLocalBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            void openLocalTopicSourceUpload();
         });
         el.hiddenTopicKnowledgeBaseFileInput?.addEventListener('change', async () => {
             const kbId = getCurrentTopicKnowledgeBaseId() || await invokeFacade('ensureTopicSource', { silent: true });
             if (kbId) {
                 await invokeFacade('importKnowledgeBaseFilesForKb', kbId, el.hiddenTopicKnowledgeBaseFileInput.files);
+                closeShelfPicker();
             }
             el.hiddenTopicKnowledgeBaseFileInput.value = '';
         });

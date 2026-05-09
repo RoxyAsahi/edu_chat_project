@@ -402,3 +402,71 @@ test('reader title rename rejects empty names and escape cancels without saving'
     assert.deepEqual(renameCalls, []);
     assert.equal(el.readerDocumentTitle.textContent, 'chapter.png');
 });
+
+test('reader opens shelf document ids through the shared view API without refetching cached guides', async () => {
+    const { createReaderController } = await loadReaderModule();
+    const { window, document, el } = createReaderDom();
+    const store = createStore({
+        documentId: null,
+        documentName: '',
+        guideStatus: 'idle',
+        guideMarkdown: '',
+        view: null,
+    });
+    const calls = [];
+    const controller = createReaderController({
+        store,
+        el,
+        chatAPI: {
+            async getKnowledgeBaseDocumentViewData(documentId) {
+                calls.push(['view', documentId]);
+                return {
+                    success: true,
+                    document: {
+                        id: documentId,
+                        name: '书架资料.md',
+                        status: 'done',
+                        contentType: 'markdown',
+                        isIndexed: true,
+                        guideStatus: 'done',
+                        guideMarkdown: '# 已缓存指南',
+                    },
+                    view: {
+                        type: 'text',
+                        contentType: 'markdown',
+                        paragraphs: [{ index: 1, sectionTitle: null, text: '正文' }],
+                    },
+                };
+            },
+            async getKnowledgeBaseDocumentGuide(documentId) {
+                calls.push(['guide', documentId]);
+                return {
+                    success: true,
+                    documentId,
+                    guideStatus: 'done',
+                    guideMarkdown: '# 已缓存指南',
+                };
+            },
+            async generateKnowledgeBaseDocumentGuide(documentId) {
+                calls.push(['generate', documentId]);
+                return { success: true };
+            },
+        },
+        ui: createUiStub(),
+        windowObj: window,
+        documentObj: document,
+        renderMarkdownToSafeHtml: (value) => `<p>${value}</p>`,
+        setLeftSidebarMode: () => {},
+        setLeftReaderTab: () => {},
+    });
+
+    await controller.openReaderDocument('shelf-doc-1');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(calls, [
+        ['view', 'shelf-doc-1'],
+    ]);
+    assert.match(el.readerDocumentTitle.textContent, /书架资料\.md/);
+    assert.match(el.readerGuideContent.textContent, /已缓存指南/);
+});

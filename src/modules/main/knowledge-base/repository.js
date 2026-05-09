@@ -170,11 +170,11 @@ function createKnowledgeBaseRepository(deps = {}) {
         };
     }
 
-    async function touchKnowledgeBase(kbId) {
+    async function touchKnowledgeBase(kbId, timestamp = Date.now()) {
         const db = getDbImpl();
         await db.execute({
             sql: 'UPDATE knowledge_base SET updated_at = ? WHERE id = ?',
-            args: [Date.now(), kbId],
+            args: [timestamp, kbId],
         });
     }
 
@@ -186,12 +186,31 @@ function createKnowledgeBaseRepository(deps = {}) {
 
         const name = normalizeDocumentName(payload.name);
         const updatedAt = Date.now();
+        const fileHash = String(existing.fileHash || '').trim();
         const db = getDbImpl();
-        await db.execute({
-            sql: 'UPDATE kb_document SET name = ?, updated_at = ? WHERE id = ?',
-            args: [name, updatedAt, documentId],
-        });
-        await touchKnowledgeBase(existing.kbId);
+        if (fileHash) {
+            const linkedKnowledgeBases = await db.execute({
+                sql: 'SELECT DISTINCT kb_id FROM kb_document WHERE file_hash = ?',
+                args: [fileHash],
+            });
+            const touchedKbIds = [...new Set([
+                existing.kbId,
+                ...((linkedKnowledgeBases.rows || []).map((row) => row.kb_id || row.kbId).filter(Boolean)),
+            ])];
+            await db.execute({
+                sql: 'UPDATE kb_document SET name = ?, updated_at = ? WHERE file_hash = ?',
+                args: [name, updatedAt, fileHash],
+            });
+            for (const kbId of touchedKbIds) {
+                await touchKnowledgeBase(kbId, updatedAt);
+            }
+        } else {
+            await db.execute({
+                sql: 'UPDATE kb_document SET name = ?, updated_at = ? WHERE id = ?',
+                args: [name, updatedAt, documentId],
+            });
+            await touchKnowledgeBase(existing.kbId, updatedAt);
+        }
 
         return {
             ...existing,

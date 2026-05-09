@@ -58,6 +58,7 @@ function createDomElements() {
         <body>
             <div id="sourceFileTooltip"></div>
             <div id="sourceFileActionMenu"></div>
+            <button id="sourceUploadLocalBtn"></button>
             <div id="knowledgeBaseDebugResults"></div>
             <div id="knowledgeBaseList"></div>
             <div id="knowledgeBaseDocuments"></div>
@@ -95,6 +96,7 @@ function createDomElements() {
         el: {
             sourceFileTooltip: window.document.getElementById('sourceFileTooltip'),
             sourceFileActionMenu: window.document.getElementById('sourceFileActionMenu'),
+            sourceUploadLocalBtn: window.document.getElementById('sourceUploadLocalBtn'),
             knowledgeBaseDebugResults: window.document.getElementById('knowledgeBaseDebugResults'),
             knowledgeBaseList: window.document.getElementById('knowledgeBaseList'),
             knowledgeBaseDocuments: window.document.getElementById('knowledgeBaseDocuments'),
@@ -618,10 +620,21 @@ test('renameKnowledgeBaseDocument preserves extension and updates source state',
     const { window, document, el } = createDomElements();
     const originalDocument = {
         id: 'doc-1',
+        kbId: 'kb-topic',
         name: 'chapter.png',
         status: 'done',
         contentType: 'markdown',
         mimeType: 'image/png',
+        fileHash: 'hash-shared',
+    };
+    const linkedDocument = {
+        id: 'doc-linked',
+        kbId: 'kb-topic',
+        name: '旧副本.png',
+        status: 'done',
+        contentType: 'markdown',
+        mimeType: 'image/png',
+        fileHash: 'hash-shared',
     };
     const state = createBaseState({
         session: {
@@ -631,8 +644,8 @@ test('renameKnowledgeBaseDocument preserves extension and updates source state',
         },
         source: {
             knowledgeBases: [],
-            knowledgeBaseDocuments: [originalDocument],
-            topicKnowledgeBaseDocuments: [originalDocument],
+            knowledgeBaseDocuments: [originalDocument, linkedDocument],
+            topicKnowledgeBaseDocuments: [originalDocument, linkedDocument],
             knowledgeBaseDebugResult: null,
             selectedKnowledgeBaseId: 'kb-topic',
             activeSourceFileMenu: null,
@@ -657,7 +670,7 @@ test('renameKnowledgeBaseDocument preserves extension and updates source state',
                 apiCalls.push([documentId, payload]);
                 return {
                     success: true,
-                    item: { id: documentId, name: payload.name, renamedAt: 'now' },
+                    item: { id: documentId, kbId: 'kb-topic', name: payload.name, fileHash: 'hash-shared', renamedAt: 'now' },
                 };
             },
         },
@@ -685,12 +698,18 @@ test('renameKnowledgeBaseDocument preserves extension and updates source state',
     ]);
     assert.equal(state.source.knowledgeBaseDocuments[0].name, '新标题.png');
     assert.equal(state.source.topicKnowledgeBaseDocuments[0].name, '新标题.png');
+    assert.equal(state.source.knowledgeBaseDocuments[1].name, '新标题.png');
+    assert.equal(state.source.topicKnowledgeBaseDocuments[1].name, '新标题.png');
+    assert.equal(state.source.knowledgeBaseDocuments[1].id, 'doc-linked');
+    assert.equal(state.source.topicKnowledgeBaseDocuments[1].id, 'doc-linked');
     assert.equal(state.source.knowledgeBaseDocuments[0].renamedAt, 'now');
     assert.deepEqual(syncCalls, [
         {
             items: [
                 state.source.topicKnowledgeBaseDocuments[0],
+                state.source.topicKnowledgeBaseDocuments[1],
                 state.source.knowledgeBaseDocuments[0],
+                state.source.knowledgeBaseDocuments[1],
             ],
             options: { resetIfMissing: false },
         },
@@ -769,4 +788,56 @@ test('bindEvents routes UI actions through the controller facade methods', async
         'runKnowledgeBaseSearch',
         'handleTopicKnowledgeBaseChange:kb-2',
     ]);
+});
+
+test('upload source button opens the unified picker and local upload imports from it', async () => {
+    const { createSourceController } = await loadSourceModule();
+    const { window, document, el } = createDomElements();
+    const store = createStore(createBaseState({
+        session: {
+            currentSelectedItem: { id: 'agent-1', name: 'Agent' },
+            currentTopicId: 'topic-1',
+            topics: [{ id: 'topic-1', name: 'Topic', knowledgeBaseId: 'kb-1' }],
+        },
+    }));
+    const calls = [];
+    const controller = createSourceController({
+        store,
+        el,
+        chatAPI: {},
+        ui: createUiStub(),
+        windowObj: window,
+        documentObj: document,
+        openShelfPicker: () => {
+            calls.push('openShelfPicker');
+        },
+        closeShelfPicker: () => {
+            calls.push('closeShelfPicker');
+        },
+    });
+    let fileInputClicked = false;
+    el.hiddenTopicKnowledgeBaseFileInput.click = () => {
+        fileInputClicked = true;
+    };
+    controller.importKnowledgeBaseFilesForKb = async (kbId, files) => {
+        calls.push(`import:${kbId}:${files.length}`);
+    };
+
+    controller.bindEvents();
+
+    el.importTopicKnowledgeBaseFilesBtn.click();
+    assert.deepEqual(calls, ['openShelfPicker']);
+
+    el.sourceUploadLocalBtn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(fileInputClicked, true);
+
+    Object.defineProperty(el.hiddenTopicKnowledgeBaseFileInput, 'files', {
+        configurable: true,
+        value: [{ name: 'local.pdf' }],
+    });
+    el.hiddenTopicKnowledgeBaseFileInput.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(calls, ['openShelfPicker', 'import:kb-1:1', 'closeShelfPicker']);
 });

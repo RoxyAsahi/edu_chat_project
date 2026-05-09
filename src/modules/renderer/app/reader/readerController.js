@@ -108,6 +108,7 @@ function createReaderController(deps = {}) {
     const patchDocumentGuideStateInSource = deps.patchDocumentGuideStateInSource || (() => {});
     const patchDocumentNameInSource = deps.patchDocumentNameInSource || (() => {});
     const getLeftReaderActiveTab = deps.getLeftReaderActiveTab || (() => store.getState().layout.leftReaderActiveTab);
+    const listenForKnowledgeBaseRefs = deps.listenForKnowledgeBaseRefs !== false;
 
     const scheduleFrame = typeof windowObj.requestAnimationFrame === 'function'
         ? windowObj.requestAnimationFrame.bind(windowObj)
@@ -612,7 +613,9 @@ function createReaderController(deps = {}) {
         scheduleFrame(() => {
             scrollReaderToLocator(locator);
         });
-        void ensureReaderGuide(documentId);
+        if (!String(documentItem.guideMarkdown || '').trim()) {
+            void ensureReaderGuide(documentId);
+        }
     }
 
     async function openReaderFromRef(ref = {}) {
@@ -855,9 +858,11 @@ function createReaderController(deps = {}) {
                 syncReaderSelectionFromDom();
             });
         });
-        documentObj.addEventListener('unistudy-open-kb-ref', (event) => {
-            void openReaderFromRef(event.detail || {});
-        });
+        if (listenForKnowledgeBaseRefs) {
+            documentObj.addEventListener('unistudy-open-kb-ref', (event) => {
+                void openReaderFromRef(event.detail || {});
+            });
+        }
     }
 
     return {

@@ -104,12 +104,19 @@ function createSourceOperations(deps = {}) {
         if (!normalizedDocumentId) {
             return;
         }
+        const normalizedFileHash = String(patch?.fileHash || '').trim();
 
-        const applyPatch = (items = []) => items.map((item) => (
-            item.id === normalizedDocumentId
-                ? { ...item, ...patch }
-                : item
-        ));
+        const applyPatch = (items = []) => items.map((item) => {
+            const sameDocument = item.id === normalizedDocumentId;
+            const sameFile = normalizedFileHash && String(item?.fileHash || '').trim() === normalizedFileHash;
+            if (!sameDocument && !sameFile) {
+                return item;
+            }
+            const nextItem = { ...item, ...patch };
+            return sameDocument
+                ? nextItem
+                : { ...nextItem, id: item.id, kbId: item.kbId };
+        });
 
         state.knowledgeBaseDocuments = applyPatch(state.knowledgeBaseDocuments);
         state.topicKnowledgeBaseDocuments = applyPatch(state.topicKnowledgeBaseDocuments);

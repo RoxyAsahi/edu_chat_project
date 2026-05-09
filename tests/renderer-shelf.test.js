@@ -311,6 +311,60 @@ test('shelf document context menu can move a document to another group', async (
     assert.equal(state.shelf.selectedGroupId, 'shelf-2');
 });
 
+test('shelf document cards open the shelf reader only for readable completed documents', async () => {
+    const { createShelfController } = await loadShelfModule();
+    const dom = createDomElements();
+    const state = createState();
+    const store = createStore(state);
+    const openCalls = [];
+    const docs = [
+        { id: 'doc-readable', kbId: 'shelf-1', name: '教材.pdf', status: 'done', contentType: 'pdf-text', fileHash: 'hash-readable' },
+        { id: 'doc-processing', kbId: 'shelf-1', name: '处理中.pdf', status: 'processing', contentType: 'pdf-text', fileHash: 'hash-processing' },
+        { id: 'doc-unreadable', kbId: 'shelf-1', name: '素材.zip', status: 'done', mimeType: 'application/zip', fileHash: 'hash-zip' },
+    ];
+    const controller = createShelfController({
+        store,
+        el: dom.el,
+        chatAPI: {
+            async listKnowledgeBases() {
+                return { success: true, items: [{ id: 'shelf-1', name: '教材', kind: 'shelf', documentCount: docs.length, doneCount: 2 }] };
+            },
+            async listKnowledgeBaseDocuments() {
+                return { success: true, items: docs };
+            },
+        },
+        ui: createUiStub(),
+        windowObj: dom.window,
+        documentObj: dom.document,
+        openShelfReaderDocument: async (documentId) => {
+            openCalls.push(documentId);
+        },
+        isShelfReaderDocumentActive: (documentId) => documentId === 'doc-readable',
+    });
+
+    await controller.loadShelfGroups();
+
+    const cards = [...dom.el.sourceShelfDocuments.querySelectorAll('article.source-shelf-card')];
+    assert.equal(cards.length, 3);
+    assert.equal(cards[0].classList.contains('source-shelf-card--clickable'), true);
+    assert.equal(cards[0].classList.contains('source-shelf-card--active'), true);
+    assert.equal(cards[1].classList.contains('source-shelf-card--clickable'), false);
+    assert.equal(cards[2].classList.contains('source-shelf-card--clickable'), false);
+
+    cards[0].click();
+    cards[1].click();
+    cards[2].click();
+    assert.deepEqual(openCalls, ['doc-readable']);
+
+    cards[0].dispatchEvent(new dom.window.MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 80,
+        clientY: 90,
+    }));
+    assert.deepEqual(openCalls, ['doc-readable']);
+});
+
 test('shelf picker copies reusable documents into the current topic source', async () => {
     const { createShelfController } = await loadShelfModule();
     const dom = createDomElements();
