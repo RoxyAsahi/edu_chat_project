@@ -14,7 +14,9 @@ const EXPECTED_EXPORT_KEYS = [
     'updateKnowledgeBase',
     'deleteKnowledgeBase',
     'importKnowledgeBaseFiles',
+    'copyKnowledgeBaseDocuments',
     'listKnowledgeBaseDocuments',
+    'deleteKnowledgeBaseDocument',
     'renameKnowledgeBaseDocument',
     'retryKnowledgeBaseDocument',
     'retrieveKnowledgeBaseContext',
@@ -43,13 +45,13 @@ function loadKnowledgeBaseFacade() {
         },
     };
     const repository = {
-        async listKnowledgeBases() {
-            callLog.push(['repository.listKnowledgeBases']);
+        async listKnowledgeBases(options) {
+            callLog.push(['repository.listKnowledgeBases', options]);
             return [{ id: 'kb-1', name: 'KB 1' }];
         },
         async getKnowledgeBaseById(id) {
             callLog.push(['repository.getKnowledgeBaseById', id]);
-            return id === 'kb-1' ? { id, name: 'KB 1' } : null;
+            return id === 'kb-1' ? { id, name: 'KB 1', kind: 'source' } : null;
         },
         async createKnowledgeBase(payload) {
             callLog.push(['repository.createKnowledgeBase', payload]);
@@ -80,6 +82,14 @@ function loadKnowledgeBaseFacade() {
                 name: payload.name,
                 status: 'done',
             };
+        },
+        async cloneDocumentToKnowledgeBase(documentId, targetKbId) {
+            callLog.push(['repository.cloneDocumentToKnowledgeBase', documentId, targetKbId]);
+            return { id: `${documentId}-copy`, kbId: targetKbId, status: 'done' };
+        },
+        async deleteKnowledgeBaseDocumentData(documentId) {
+            callLog.push(['repository.deleteKnowledgeBaseDocumentData', documentId]);
+            return { id: documentId, storedPath: 'stored/deleted.txt' };
         },
         async listStoredPathsByKnowledgeBase(kbId) {
             callLog.push(['repository.listStoredPathsByKnowledgeBase', kbId]);
@@ -269,7 +279,7 @@ function loadKnowledgeBaseFacade() {
     }
 }
 
-test('knowledge-base facade exposes the stable 16-function public contract', () => {
+test('knowledge-base facade exposes the stable public contract', () => {
     const { facade } = loadKnowledgeBaseFacade();
 
     assert.deepEqual(Object.keys(facade).sort(), [...EXPECTED_EXPORT_KEYS].sort());
@@ -296,6 +306,8 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
     const guide = await facade.getKnowledgeBaseDocumentGuide('doc-1');
     const generatedGuide = await facade.generateKnowledgeBaseDocumentGuide('doc-1', { forceRefresh: false });
     const renamedDocument = await facade.renameKnowledgeBaseDocument('doc-1', { name: 'renamed.txt' });
+    const copiedDocuments = await facade.copyKnowledgeBaseDocuments('kb-1', ['doc-1']);
+    const deletedDocument = await facade.deleteKnowledgeBaseDocument('doc-delete');
     const retried = await facade.retryKnowledgeBaseDocument('doc-1');
     const deleted = await facade.deleteKnowledgeBase('kb-1');
     await facade.shutdownKnowledgeBase();
@@ -344,6 +356,13 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
         id: 'doc-1',
         name: 'renamed.txt',
         status: 'done',
+    });
+    assert.deepEqual(copiedDocuments, [
+        { id: 'doc-1-copy', kbId: 'kb-1', status: 'done' },
+    ]);
+    assert.deepEqual(deletedDocument, {
+        id: 'doc-delete',
+        storedPath: 'stored/deleted.txt',
     });
     assert.deepEqual(retried, {
         id: 'doc-1',

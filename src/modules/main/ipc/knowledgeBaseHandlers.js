@@ -60,8 +60,8 @@ function initialize(context = {}) {
 
     const { agentConfigManager } = context;
 
-    registerHandle(['list-knowledge-bases', 'kb:list'], withKnowledgeBaseReady(async () => (
-        ok({ items: await knowledgeBase.listKnowledgeBases() })
+    registerHandle(['list-knowledge-bases', 'kb:list'], withKnowledgeBaseReady(async (_event, options) => (
+        ok({ items: await knowledgeBase.listKnowledgeBases(options) })
     ), { items: [] }));
 
     registerHandle(['create-knowledge-base', 'kb:create'], withKnowledgeBaseReady(async (_event, payload) => (
@@ -81,6 +81,10 @@ function initialize(context = {}) {
         ok({ items: await knowledgeBase.importKnowledgeBaseFiles(kbId, files) })
     ), { items: [] }));
 
+    registerHandle(['copy-knowledge-base-documents', 'kb:copy-documents'], withKnowledgeBaseReady(async (_event, targetKbId, documentIds) => (
+        ok({ items: await knowledgeBase.copyKnowledgeBaseDocuments(targetKbId, documentIds) })
+    ), { items: [] }));
+
     registerHandle(['list-knowledge-base-documents', 'kb:list-documents'], withKnowledgeBaseReady(async (_event, kbId) => (
         ok({ items: await knowledgeBase.listKnowledgeBaseDocuments(kbId) })
     ), { items: [] }));
@@ -93,11 +97,18 @@ function initialize(context = {}) {
         ok({ item: await knowledgeBase.renameKnowledgeBaseDocument(documentId, payload) })
     ), { item: null }));
 
+    registerHandle(['delete-knowledge-base-document', 'kb:delete-document'], withKnowledgeBaseReady(async (_event, documentId) => (
+        ok({ item: await knowledgeBase.deleteKnowledgeBaseDocument(documentId) })
+    ), { item: null }));
+
     registerHandle(['set-topic-knowledge-base', 'kb:set-topic-binding'], withKnowledgeBaseReady(async (_event, agentId, topicId, kbId) => {
         if (kbId) {
             const kb = await knowledgeBase.getKnowledgeBaseById(kbId);
             if (!kb) {
                 throw new Error('Knowledge base not found.');
+            }
+            if (kb.kind && kb.kind !== 'source') {
+                throw new Error('Only Source groups can be bound to topics.');
             }
         }
 

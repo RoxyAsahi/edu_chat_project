@@ -270,6 +270,59 @@
   .manual-notes-library-grid {
     grid-template-columns: 1fr;
   }
+
+  .source-shelf-page {
+    padding: 0 16px 16px;
+  }
+
+  .source-shelf-page__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .source-shelf-page__metrics {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .source-shelf-page__metric {
+    flex: 1 1 92px;
+  }
+
+  .source-shelf-documents-panel__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .source-shelf-page__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .source-shelf-page__name-field {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .source-shelf-page__body {
+    grid-template-columns: 1fr;
+  }
+
+  .source-shelf-groups-panel {
+    max-height: 180px;
+  }
+
+  .source-shelf-documents-panel {
+    min-height: 420px;
+  }
+
+  .source-shelf-picker-modal {
+    padding: 12px;
+  }
+
+  .source-shelf-picker-group__grid,
+  .source-shelf-grid {
+    gap: 6px;
+  }
 }
 
 @media (max-width: 620px) {
@@ -1219,7 +1272,8 @@ body .titlebar__context-card.titlebar__tab--active,
 body .titlebar__tab--active,
 body.workspace-view-overview .titlebar__home-btn,
 body.workspace-view-subject #workspaceOpenSubjectBtn,
-body.workspace-view-manual-notes #manualNotesLibraryBtn {
+body.workspace-view-manual-notes #manualNotesLibraryBtn,
+body.workspace-view-source-shelf #sourceShelfBtn {
   border-color: #ffffff;
   box-shadow: none;
 }

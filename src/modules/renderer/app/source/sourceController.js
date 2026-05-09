@@ -26,6 +26,7 @@ function createSourceController(deps = {}) {
     const syncReaderFromDocuments = deps.syncReaderFromDocuments || (() => {});
     const getNativePathForFile = deps.getNativePathForFile || (async () => '');
     const loadTopics = deps.loadTopics || (async () => {});
+    const openShelfPicker = deps.openShelfPicker || (() => {});
     const getLeftSidebarMode = deps.getLeftSidebarMode || (() => 'source-list');
     const getSourceListScrollTop = deps.getSourceListScrollTop || (() => 0);
     const setSourceListScrollTop = deps.setSourceListScrollTop || (() => {});
@@ -276,6 +277,9 @@ function createSourceController(deps = {}) {
             if (kbId) {
                 el.hiddenTopicKnowledgeBaseFileInput?.click();
             }
+        });
+        el.addTopicSourceFromShelfBtn?.addEventListener('click', () => {
+            void openShelfPicker();
         });
         el.hiddenTopicKnowledgeBaseFileInput?.addEventListener('change', async () => {
             const kbId = getCurrentTopicKnowledgeBaseId() || await invokeFacade('ensureTopicSource', { silent: true });

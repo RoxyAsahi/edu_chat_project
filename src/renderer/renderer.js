@@ -16,6 +16,7 @@ import { createLogsController } from '../modules/renderer/app/logs/logsControlle
 import { createNotesController } from '../modules/renderer/app/notes/notesController.js';
 import { createReaderController } from '../modules/renderer/app/reader/readerController.js';
 import { createSettingsController } from '../modules/renderer/app/settings/settingsController.js';
+import { createShelfController } from '../modules/renderer/app/shelf/shelfController.js';
 import { createSourceController } from '../modules/renderer/app/source/sourceController.js';
 import { createTopicTitleController } from '../modules/renderer/app/topicTitles/topicTitleController.js';
 import { DEFAULT_AGENT_AVATAR, createWorkspaceController } from '../modules/renderer/app/workspace/workspaceController.js';
@@ -82,6 +83,7 @@ const renderMarkdownFragment = createMarkdownFragmentRenderer({
 let sourceController = null;
 let workspaceController = null;
 let readerController = null;
+let shelfController = null;
 let flashcardController = null;
 let notesController = null;
 let logsController = null;
@@ -255,6 +257,7 @@ sourceController = createSourceController({
     isReaderDocumentActive: (...args) => readerController?.isDocumentActive?.(...args),
     syncReaderFromDocuments: (...args) => readerController?.syncFromSourceDocuments?.(...args),
     getNativePathForFile: (...args) => composerController?.getNativePathForFile?.(...args),
+    openShelfPicker: (...args) => shelfController?.openShelfPicker?.(...args),
     loadTopics: (...args) => workspaceController?.loadTopics?.(...args),
     getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
     getCurrentTopicId: () => getSessionSlice().currentTopicId,
@@ -408,6 +411,23 @@ workspaceController = createWorkspaceController({
     syncMobileWorkspaceLayout,
     refreshWorkspaceLayout: scheduleLayoutRefresh,
 });
+shelfController = createShelfController({
+    store,
+    el,
+    chatAPI,
+    ui,
+    windowObj: window,
+    documentObj: document,
+    getNativePathForFile: (...args) => composerController?.getNativePathForFile?.(...args),
+    showSourceShelfPage: (...args) => workspaceController?.showSourceShelf?.(...args),
+    ensureTopicSource,
+    loadCurrentTopicKnowledgeBaseDocuments,
+    loadKnowledgeBases,
+    updateTopicSourceSelection,
+    getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
+    getCurrentTopicId: () => getSessionSlice().currentTopicId,
+    getCurrentTopic: (...args) => workspaceController?.getCurrentTopic?.(...args),
+});
 const {
     getCurrentTopic,
     getCurrentTopicDisplayName,
@@ -428,6 +448,9 @@ const {
     closeTopicActionMenu,
     bindEvents: bindWorkspaceEvents,
 } = workspaceController;
+const {
+    bindEvents: bindShelfEvents,
+} = shelfController;
 const {
     bindEvents: bindNotesEvents,
 } = notesController;
@@ -974,6 +997,7 @@ function bindFeatureEvents() {
     bindReaderEvents();
     bindSourceEvents();
     bindWorkspaceEvents();
+    bindShelfEvents();
     bindNotesEvents();
     bindLogsEvents();
     bindDiaryWallEvents();
@@ -1032,6 +1056,10 @@ function bindShellEvents() {
 
     el.manualNotesLibraryBtn?.addEventListener('click', () => {
         setManualNotesLibraryPanel('notes');
+    });
+
+    el.sourceShelfBtn?.addEventListener('click', () => {
+        void shelfController?.openShelfPage?.();
     });
 
     el.manualNotesLibraryNotesTabBtn?.addEventListener('click', () => {

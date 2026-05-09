@@ -144,7 +144,8 @@ body.workspace-view-overview .titlebar {
 
 body.workspace-view-overview .titlebar__home-btn,
 body.workspace-view-subject #workspaceOpenSubjectBtn,
-body.workspace-view-manual-notes #manualNotesLibraryBtn {
+body.workspace-view-manual-notes #manualNotesLibraryBtn,
+body.workspace-view-source-shelf #sourceShelfBtn {
   background: #ffffff;
   border-color: #ffffff;
   box-shadow: none;
@@ -514,7 +515,8 @@ button { border: none; background: transparent; outline: none; cursor: pointer; 
 .titlebar__tab--active,
 body.workspace-view-overview .titlebar__home-btn,
 body.workspace-view-subject #workspaceOpenSubjectBtn,
-body.workspace-view-manual-notes #manualNotesLibraryBtn {
+body.workspace-view-manual-notes #manualNotesLibraryBtn,
+body.workspace-view-source-shelf #sourceShelfBtn {
   border-color: #ffffff;
 }
 

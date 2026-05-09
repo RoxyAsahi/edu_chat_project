@@ -36,6 +36,7 @@ async function initializeDatabase(rootDir) {
         `CREATE TABLE IF NOT EXISTS knowledge_base (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'source',
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         )`,
@@ -76,6 +77,13 @@ async function initializeDatabase(rootDir) {
     for (const statement of statements) {
         await dbClient.execute(statement);
     }
+
+    await ensureColumn('knowledge_base', 'kind', "TEXT NOT NULL DEFAULT 'source'");
+    await dbClient.execute(`
+        UPDATE knowledge_base
+        SET kind = 'source'
+        WHERE kind IS NULL OR kind = ''
+    `);
 
     await ensureColumn('kb_document', 'attempt_count', 'INTEGER DEFAULT 0');
     await ensureColumn('kb_document', 'processing_started_at', 'INTEGER');

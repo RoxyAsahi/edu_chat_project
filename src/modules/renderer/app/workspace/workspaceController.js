@@ -805,23 +805,32 @@ function createWorkspaceController(deps = {}) {
         syncWorkspaceView();
     }
 
+    function showSourceShelf() {
+        state.workspaceViewMode = 'source-shelf';
+        syncWorkspaceView();
+    }
+
     function syncWorkspaceView() {
         const mode = state.workspaceViewMode || 'overview';
         const isOverview = mode === 'overview';
         const isSubject = mode === 'subject';
         const isManualNotes = mode === 'manual-notes';
+        const isSourceShelf = mode === 'source-shelf';
 
         el.workspaceOverviewPage?.classList.toggle('hidden', !isOverview);
         el.workspaceSubjectPage?.classList.toggle('hidden', !isSubject);
         el.manualNotesLibraryPage?.classList.toggle('hidden', !isManualNotes);
+        el.sourceShelfPage?.classList.toggle('hidden', !isSourceShelf);
         el.settingsModal?.classList.add('hidden');
         el.settingsModal?.classList.remove('settings-page--open');
         el.workspaceBackToOverviewBtn?.classList.toggle('titlebar__tab--active', isOverview);
         el.workspaceOpenSubjectBtn?.classList.toggle('titlebar__tab--active', isSubject);
         el.manualNotesLibraryBtn?.classList.toggle('titlebar__tab--active', isManualNotes);
+        el.sourceShelfBtn?.classList.toggle('titlebar__tab--active', isSourceShelf);
         documentObj.body?.classList?.toggle('workspace-view-overview', isOverview);
         documentObj.body?.classList?.toggle('workspace-view-subject', isSubject);
         documentObj.body?.classList?.toggle('workspace-view-manual-notes', isManualNotes);
+        documentObj.body?.classList?.toggle('workspace-view-source-shelf', isSourceShelf);
         documentObj.body?.classList?.remove('workspace-view-settings');
         documentObj.body?.classList?.remove('settings-page-open');
         if (!isManualNotes) {
@@ -2291,6 +2300,7 @@ function createWorkspaceController(deps = {}) {
         selectAgent,
         showSubjectWorkspace,
         showManualNotesLibrary,
+        showSourceShelf,
         syncWorkspaceView,
         exportCurrentTopic,
         createAgent,

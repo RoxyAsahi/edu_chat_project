@@ -8,6 +8,7 @@ const KNOWLEDGE_BASE_SCHEMA = [
     `CREATE TABLE IF NOT EXISTS knowledge_base (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'source',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
     )`,

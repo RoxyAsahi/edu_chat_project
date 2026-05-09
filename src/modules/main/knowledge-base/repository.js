@@ -4,8 +4,15 @@ const {
     toNumber,
 } = require('./helpers');
 
+const KNOWLEDGE_BASE_KINDS = new Set(['source', 'shelf']);
+
 function createKnowledgeBaseRepository(deps = {}) {
     const getDbImpl = deps.getDb || getDb;
+
+    function normalizeKnowledgeBaseKind(kind = 'source') {
+        const normalized = String(kind || 'source').trim().toLowerCase();
+        return KNOWLEDGE_BASE_KINDS.has(normalized) ? normalized : 'source';
+    }
 
     function normalizeDocumentName(name) {
         const normalized = String(name || '').trim();
@@ -16,6 +23,21 @@ function createKnowledgeBaseRepository(deps = {}) {
             throw new Error('Document name cannot contain path separators.');
         }
         return normalized;
+    }
+
+    function mapKnowledgeBaseRow(row) {
+        return {
+            id: row.id,
+            name: row.name,
+            kind: normalizeKnowledgeBaseKind(row.kind),
+            createdAt: toNumber(row.created_at, 0),
+            updatedAt: toNumber(row.updated_at, 0),
+            documentCount: toNumber(row.document_count, 0),
+            doneCount: toNumber(row.done_count, 0),
+            failedCount: toNumber(row.failed_count, 0),
+            pendingCount: toNumber(row.pending_count, 0),
+            processingCount: toNumber(row.processing_count, 0),
+        };
     }
 
     function mapDocumentRow(row) {
@@ -49,12 +71,16 @@ function createKnowledgeBaseRepository(deps = {}) {
         };
     }
 
-    async function listKnowledgeBases() {
+    async function listKnowledgeBases(options = {}) {
         const db = getDbImpl();
-        const result = await db.execute(`
+        const requestedKind = String(options?.kind || 'source').trim().toLowerCase();
+        const filterKind = requestedKind === 'all' ? null : normalizeKnowledgeBaseKind(requestedKind);
+        const result = await db.execute({
+            sql: `
             SELECT
                 kb.id,
                 kb.name,
+                kb.kind,
                 kb.created_at,
                 kb.updated_at,
                 COUNT(doc.id) AS document_count,
@@ -64,27 +90,20 @@ function createKnowledgeBaseRepository(deps = {}) {
                 SUM(CASE WHEN doc.status = 'processing' THEN 1 ELSE 0 END) AS processing_count
             FROM knowledge_base kb
             LEFT JOIN kb_document doc ON doc.kb_id = kb.id
-            GROUP BY kb.id
+            ${filterKind ? 'WHERE kb.kind = ?' : ''}
+            GROUP BY kb.id, kb.kind
             ORDER BY kb.updated_at DESC
-        `);
+        `,
+            args: filterKind ? [filterKind] : [],
+        });
 
-        return (result.rows || []).map((row) => ({
-            id: row.id,
-            name: row.name,
-            createdAt: toNumber(row.created_at, 0),
-            updatedAt: toNumber(row.updated_at, 0),
-            documentCount: toNumber(row.document_count, 0),
-            doneCount: toNumber(row.done_count, 0),
-            failedCount: toNumber(row.failed_count, 0),
-            pendingCount: toNumber(row.pending_count, 0),
-            processingCount: toNumber(row.processing_count, 0),
-        }));
+        return (result.rows || []).map(mapKnowledgeBaseRow);
     }
 
     async function getKnowledgeBaseById(kbId) {
         const db = getDbImpl();
         const result = await db.execute({
-            sql: 'SELECT id, name, created_at, updated_at FROM knowledge_base WHERE id = ? LIMIT 1',
+            sql: 'SELECT id, name, kind, created_at, updated_at FROM knowledge_base WHERE id = ? LIMIT 1',
             args: [kbId],
         });
 
@@ -96,6 +115,7 @@ function createKnowledgeBaseRepository(deps = {}) {
         return {
             id: row.id,
             name: row.name,
+            kind: normalizeKnowledgeBaseKind(row.kind),
             createdAt: toNumber(row.created_at, 0),
             updatedAt: toNumber(row.updated_at, 0),
         };
@@ -111,14 +131,15 @@ function createKnowledgeBaseRepository(deps = {}) {
         const kb = {
             id: makeId('kb'),
             name,
+            kind: normalizeKnowledgeBaseKind(payload.kind),
             createdAt: now,
             updatedAt: now,
         };
 
         const db = getDbImpl();
         await db.execute({
-            sql: 'INSERT INTO knowledge_base (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
-            args: [kb.id, kb.name, kb.createdAt, kb.updatedAt],
+            sql: 'INSERT INTO knowledge_base (id, name, kind, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+            args: [kb.id, kb.name, kb.kind, kb.createdAt, kb.updatedAt],
         });
 
         return kb;
@@ -244,6 +265,118 @@ function createKnowledgeBaseRepository(deps = {}) {
         return getDocumentById(documentId);
     }
 
+    async function listChunkRowsByDocument(documentId) {
+        const db = getDbImpl();
+        const result = await db.execute({
+            sql: `SELECT chunk_index, content, embedding, created_at, content_type, char_length, section_title, page_number, paragraph_index
+                FROM kb_chunk
+                WHERE document_id = ?
+                ORDER BY chunk_index ASC`,
+            args: [documentId],
+        });
+
+        return result.rows || [];
+    }
+
+    function buildCloneDocumentChunkStatement(row, targetKbId, targetDocumentId) {
+        return {
+            sql: `INSERT INTO kb_chunk
+                (id, kb_id, document_id, chunk_index, content, embedding, created_at, content_type, char_length, section_title, page_number, paragraph_index)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+                makeId('kbchunk'),
+                targetKbId,
+                targetDocumentId,
+                toNumber(row.chunk_index, 0),
+                row.content,
+                row.embedding,
+                toNumber(row.created_at, Date.now()),
+                row.content_type || null,
+                toNumber(row.char_length, String(row.content || '').length),
+                row.section_title || null,
+                row.page_number ?? null,
+                row.paragraph_index ?? null,
+            ],
+        };
+    }
+
+    async function cloneDocumentToKnowledgeBase(documentId, targetKbId) {
+        const sourceDocument = await getDocumentById(documentId);
+        if (!sourceDocument) {
+            throw new Error('Knowledge base document not found.');
+        }
+
+        if (sourceDocument.status !== 'done') {
+            throw new Error('Only indexed documents can be reused from the shelf.');
+        }
+
+        const targetKnowledgeBase = await getKnowledgeBaseById(targetKbId);
+        if (!targetKnowledgeBase) {
+            throw new Error('Knowledge base not found.');
+        }
+
+        const duplicateId = await findDocumentIdByHash(targetKbId, sourceDocument.fileHash);
+        if (duplicateId) {
+            return getDocumentById(duplicateId);
+        }
+
+        const now = Date.now();
+        const clonedDocumentId = makeId('kbdoc');
+        const db = getDbImpl();
+        await db.execute({
+            sql: `INSERT INTO kb_document
+                (id, kb_id, name, stored_path, mime_type, file_size, file_hash, status, error, chunk_count, created_at, updated_at, processed_at,
+                    extracted_text, extracted_content_type, attempt_count, processing_started_at, failed_at, completed_at, last_error, content_type,
+                    guide_status, guide_markdown, guide_generated_at, guide_error)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+                clonedDocumentId,
+                targetKbId,
+                sourceDocument.name,
+                sourceDocument.storedPath,
+                sourceDocument.mimeType || '',
+                toNumber(sourceDocument.fileSize, 0),
+                sourceDocument.fileHash,
+                sourceDocument.status,
+                sourceDocument.error || null,
+                toNumber(sourceDocument.chunkCount, 0),
+                now,
+                now,
+                sourceDocument.processedAt,
+                sourceDocument.extractedText || '',
+                sourceDocument.extractedContentType || null,
+                toNumber(sourceDocument.attemptCount, 0),
+                sourceDocument.processingStartedAt,
+                sourceDocument.failedAt,
+                sourceDocument.completedAt,
+                sourceDocument.lastError || null,
+                sourceDocument.contentType || null,
+                sourceDocument.guideStatus || 'idle',
+                sourceDocument.guideMarkdown || '',
+                sourceDocument.guideGeneratedAt,
+                sourceDocument.guideError || null,
+            ],
+        });
+
+        const chunkRows = await listChunkRowsByDocument(documentId);
+        const statements = chunkRows.map((row) => buildCloneDocumentChunkStatement(row, targetKbId, clonedDocumentId));
+        if (statements.length > 0) {
+            if (typeof db.batch === 'function') {
+                const batchSize = 250;
+                for (let start = 0; start < statements.length; start += batchSize) {
+                    await db.batch(statements.slice(start, start + batchSize), 'write');
+                }
+            } else {
+                for (const statement of statements) {
+                    await db.execute(statement);
+                }
+            }
+        }
+
+        await touchKnowledgeBase(targetKbId);
+        return getDocumentById(clonedDocumentId);
+    }
+
     async function updateDocumentState(documentId, patch = {}) {
         const document = await getDocumentById(documentId);
         if (!document) {
@@ -367,6 +500,22 @@ function createKnowledgeBaseRepository(deps = {}) {
         });
     }
 
+    async function deleteKnowledgeBaseDocumentData(documentId) {
+        const document = await getDocumentById(documentId);
+        if (!document) {
+            throw new Error('Knowledge base document not found.');
+        }
+
+        const db = getDbImpl();
+        await deleteDocumentChunks(documentId);
+        await db.execute({
+            sql: 'DELETE FROM kb_document WHERE id = ?',
+            args: [documentId],
+        });
+        await touchKnowledgeBase(document.kbId);
+        return document;
+    }
+
     function buildInsertDocumentChunkStatement(payload = {}) {
         return {
             sql: `INSERT INTO kb_chunk
@@ -383,8 +532,8 @@ function createKnowledgeBaseRepository(deps = {}) {
                 payload.contentType,
                 toNumber(payload.charLength, String(payload.content || '').length),
                 payload.sectionTitle || null,
-                payload.pageNumber,
-                payload.paragraphIndex,
+                payload.pageNumber ?? null,
+                payload.paragraphIndex ?? null,
             ],
         };
     }
@@ -500,11 +649,13 @@ function createKnowledgeBaseRepository(deps = {}) {
         getDocumentById,
         findDocumentIdByHash,
         createDocument,
+        cloneDocumentToKnowledgeBase,
         updateDocumentState,
         updateDocumentGuideState,
         updateDocumentDerivedContent,
         updateDocumentMimeType,
         deleteDocumentChunks,
+        deleteKnowledgeBaseDocumentData,
         insertDocumentChunk,
         insertDocumentChunks,
         listRecoverableDocuments,

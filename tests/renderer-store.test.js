@@ -22,6 +22,7 @@ test('createInitialAppState groups renderer state into the expected slices', asy
         'layout',
         'session',
         'source',
+        'shelf',
         'reader',
         'notes',
         'logs',
@@ -44,6 +45,7 @@ test('createInitialAppState groups renderer state into the expected slices', asy
     assert.equal(state.layout.sidePanelTab, 'notes');
     assert.equal(state.session.currentTopicId, null);
     assert.equal(state.source.selectedKnowledgeBaseId, null);
+    assert.equal(state.shelf.selectedGroupId, null);
     assert.equal(state.notes.notesScope, 'topic');
     assert.equal(state.logs.scope, 'topic');
     assert.equal(state.composer.activeRequestId, null);

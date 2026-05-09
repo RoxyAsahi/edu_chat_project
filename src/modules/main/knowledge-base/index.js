@@ -108,6 +108,57 @@ async function clearKnowledgeBaseBindings(kbId) {
     }
 }
 
+async function clearKnowledgeBaseDocumentSelections(documentId) {
+    const normalizedDocumentId = String(documentId || '').trim();
+    if (!normalizedDocumentId) {
+        return;
+    }
+
+    const { agentConfigManager, agentDir } = runtime.getState();
+    if (!agentConfigManager || !agentDir) {
+        return;
+    }
+
+    const dirEntries = await fs.readdir(agentDir, { withFileTypes: true }).catch(() => []);
+    for (const entry of dirEntries) {
+        if (!entry.isDirectory()) {
+            continue;
+        }
+
+        const agentId = entry.name;
+        const config = await agentConfigManager.readAgentConfig(agentId).catch(() => null);
+        if (!config || !Array.isArray(config.topics)) {
+            continue;
+        }
+
+        let changed = false;
+        const topics = config.topics.map((topic) => {
+            if (!Array.isArray(topic?.selectedKnowledgeBaseDocumentIds)) {
+                return topic;
+            }
+
+            const nextSelection = topic.selectedKnowledgeBaseDocumentIds
+                .filter((id) => String(id || '').trim() !== normalizedDocumentId);
+            if (nextSelection.length === topic.selectedKnowledgeBaseDocumentIds.length) {
+                return topic;
+            }
+
+            changed = true;
+            return {
+                ...topic,
+                selectedKnowledgeBaseDocumentIds: nextSelection,
+            };
+        });
+
+        if (changed) {
+            await agentConfigManager.updateAgentConfig(agentId, (current) => ({
+                ...current,
+                topics,
+            }));
+        }
+    }
+}
+
 async function deleteKnowledgeBase(kbId) {
     const existing = await repository.getKnowledgeBaseById(kbId);
     if (!existing) {
@@ -119,6 +170,42 @@ async function deleteKnowledgeBase(kbId) {
     await documentStore.removeUnreferencedStoredFiles(storedPaths);
     await clearKnowledgeBaseBindings(kbId);
     return { success: true };
+}
+
+async function deleteKnowledgeBaseDocument(documentId) {
+    const deletedDocument = await repository.deleteKnowledgeBaseDocumentData(documentId);
+    await documentStore.removeUnreferencedStoredFiles([deletedDocument.storedPath]);
+    await clearKnowledgeBaseDocumentSelections(documentId);
+    return deletedDocument;
+}
+
+async function copyKnowledgeBaseDocuments(targetKbId, documentIds = []) {
+    const targetKnowledgeBase = await repository.getKnowledgeBaseById(targetKbId);
+    if (!targetKnowledgeBase) {
+        throw new Error('Knowledge base not found.');
+    }
+
+    if (targetKnowledgeBase.kind !== 'source') {
+        throw new Error('Shelf documents can only be added to a Source.');
+    }
+
+    const normalizedDocumentIds = [...new Set(
+        (Array.isArray(documentIds) ? documentIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean),
+    )];
+    if (normalizedDocumentIds.length === 0) {
+        return [];
+    }
+
+    const copied = [];
+    for (const documentId of normalizedDocumentIds) {
+        const document = await repository.cloneDocumentToKnowledgeBase(documentId, targetKbId);
+        if (document) {
+            copied.push(document);
+        }
+    }
+    return copied;
 }
 
 async function getKnowledgeBaseDocumentViewData(documentId) {
@@ -152,7 +239,9 @@ module.exports = {
     updateKnowledgeBase: repository.updateKnowledgeBase,
     deleteKnowledgeBase,
     importKnowledgeBaseFiles: documentStore.importKnowledgeBaseFiles,
+    copyKnowledgeBaseDocuments,
     listKnowledgeBaseDocuments: repository.listKnowledgeBaseDocuments,
+    deleteKnowledgeBaseDocument,
     renameKnowledgeBaseDocument: repository.renameKnowledgeBaseDocument,
     retryKnowledgeBaseDocument: processingQueue.retryKnowledgeBaseDocument,
     retrieveKnowledgeBaseContext: retrievalService.retrieveKnowledgeBaseContext,

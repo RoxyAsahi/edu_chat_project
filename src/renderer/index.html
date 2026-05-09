@@ -71,6 +71,13 @@
               <strong>我的笔记</strong>
             </div>
           </button>
+          <button id="sourceShelfBtn" class="ghost-button titlebar__context-card titlebar__context-card--action titlebar__tab" type="button">
+            <span class="material-symbols-outlined titlebar__tab-icon" aria-hidden="true">shelves</span>
+            <div class="titlebar__tab-copy">
+              <span class="titlebar__context-label">来源</span>
+              <strong>资料书架</strong>
+            </div>
+          </button>
         </div>
       </div>
       <div class="titlebar__meta">
@@ -193,6 +200,70 @@
         </div>
       </section>
 
+      <section id="sourceShelfPage" class="source-shelf-page hidden" aria-labelledby="sourceShelfTitle">
+        <div class="source-shelf-page__inner">
+          <header class="source-shelf-page__header">
+            <div class="source-shelf-page__header-main">
+              <span class="material-symbols-outlined source-shelf-page__header-icon" aria-hidden="true">shelves</span>
+              <div>
+                <h1 id="sourceShelfTitle">资料书架</h1>
+                <p id="sourceShelfSubtitle" class="source-shelf-page__subtitle">提前收纳可复用资料，再添加到任意对话来源。</p>
+              </div>
+            </div>
+            <div class="source-shelf-page__metrics" aria-label="资料书架概览">
+              <div class="source-shelf-page__metric">
+                <strong id="sourceShelfGroupCount">0</strong>
+                <span>分组</span>
+              </div>
+              <div class="source-shelf-page__metric">
+                <strong id="sourceShelfDocumentCount">0</strong>
+                <span>资料</span>
+              </div>
+              <div class="source-shelf-page__metric">
+                <strong id="sourceShelfReusableCount">0</strong>
+                <span>可复用</span>
+              </div>
+            </div>
+          </header>
+          <div class="source-shelf-page__body">
+            <aside class="source-shelf-groups-panel" aria-label="资料分组">
+              <div class="source-shelf-panel__header">
+                <span>分组</span>
+                <small>按用途收纳</small>
+              </div>
+              <div id="sourceShelfGroups" class="source-shelf-groups"></div>
+            </aside>
+            <section class="source-shelf-documents-panel" aria-label="资料列表">
+              <div class="source-shelf-documents-panel__toolbar">
+                <label class="source-shelf-page__name-field">
+                  <span>分组名称</span>
+                  <input id="sourceShelfGroupNameInput" type="text" placeholder="例如：教材 / 试卷 / 论文" />
+                </label>
+                <div class="source-shelf-page__actions">
+                  <button id="createSourceShelfGroupBtn" class="accent-button source-shelf-page__action" type="button">
+                    <span class="material-symbols-outlined" aria-hidden="true">create_new_folder</span>
+                    <span>新建分组</span>
+                  </button>
+                  <button id="renameSourceShelfGroupBtn" class="ghost-button source-shelf-page__action" type="button">
+                    <span class="material-symbols-outlined" aria-hidden="true">drive_file_rename_outline</span>
+                    <span>重命名</span>
+                  </button>
+                  <button id="deleteSourceShelfGroupBtn" class="ghost-button ghost-button--danger source-shelf-page__action" type="button">
+                    <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                    <span>删除分组</span>
+                  </button>
+                  <button id="importSourceShelfFilesBtn" class="ghost-button source-shelf-page__action" type="button">
+                    <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
+                    <span>上传资料</span>
+                  </button>
+                </div>
+              </div>
+              <div id="sourceShelfDocuments" class="source-shelf-grid" aria-live="polite"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
       <main id="workspaceSubjectPage" class="layout hidden">
       <nav class="mobile-workspace-tabs" aria-label="窄态工作区导航">
         <button id="mobileWorkspaceSourceTabBtn" class="mobile-workspace-tab mobile-workspace-tab--active" type="button">来源</button>
@@ -239,9 +310,14 @@
             </div>
           </div>
 
-          <button id="importTopicKnowledgeBaseFilesBtn" class="ghost-button workspace-card__cta" type="button">
-            <span class="material-symbols-outlined">add</span> 添加来源
-          </button>
+          <div class="source-sidebar-card__actions">
+            <button id="importTopicKnowledgeBaseFilesBtn" class="ghost-button workspace-card__cta" type="button">
+              <span class="material-symbols-outlined">upload_file</span> 上传来源
+            </button>
+            <button id="addTopicSourceFromShelfBtn" class="ghost-button workspace-card__cta" type="button">
+              <span class="material-symbols-outlined">shelves</span> 资料书架
+            </button>
+          </div>
 
           <div class="hidden">
             <p id="sourcePanelBindingStatus" class="settings-caption">每个话题都会自动使用自己的 Source。</p>
@@ -1261,9 +1337,33 @@
   <div id="sourceFileTooltip" class="source-file-tooltip hidden" role="tooltip"></div>
   <div id="messageCitationPopover" class="message-citation-popover hidden" role="dialog" aria-hidden="true"></div>
   <div id="sourceFileActionMenu" class="source-file-action-menu hidden"></div>
+  <div id="sourceShelfFileActionMenu" class="source-file-action-menu hidden"></div>
   <div id="emoticonPanel" class="emoticon-panel"></div>
+  <div id="sourceShelfPickerModal" class="source-shelf-picker-modal hidden" aria-hidden="true">
+    <div id="sourceShelfPickerBackdrop" class="source-shelf-picker-modal__backdrop"></div>
+    <section class="source-shelf-picker-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="sourceShelfPickerTitle">
+      <header class="source-shelf-picker-modal__header">
+        <div>
+          <h2 id="sourceShelfPickerTitle">从资料书架选择</h2>
+          <p id="sourceShelfPickerSummary" class="settings-caption">选择已完成入库的资料，加入当前话题来源。</p>
+        </div>
+        <button id="sourceShelfPickerCloseBtn" class="ghost-button icon-btn" type="button" aria-label="关闭资料书架选择器">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </header>
+      <div id="sourceShelfPickerBody" class="source-shelf-picker-modal__body"></div>
+      <footer class="source-shelf-picker-modal__footer">
+        <button id="sourceShelfPickerCancelBtn" class="ghost-button" type="button">取消</button>
+        <button id="sourceShelfPickerConfirmBtn" class="accent-button" type="button">
+          <span class="material-symbols-outlined" aria-hidden="true">add_link</span>
+          <span>加入当前来源</span>
+        </button>
+      </footer>
+    </section>
+  </div>
   <input id="hiddenKnowledgeBaseFileInput" type="file" multiple hidden />
   <input id="hiddenTopicKnowledgeBaseFileInput" type="file" multiple hidden />
+  <input id="hiddenSourceShelfFileInput" type="file" multiple hidden />
 
   <script>
     (() => {
