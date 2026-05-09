@@ -11,7 +11,20 @@ test('knowledge base shelf kind, document clone, and document delete behavior', 
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-kb-shelf-'));
     t.after(async () => {
         await closeDatabase();
-        await fs.remove(tempRoot);
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+            try {
+                await fs.remove(tempRoot);
+                return;
+            } catch (error) {
+                if (error?.code === 'EBUSY' && attempt === 7) {
+                    return;
+                }
+                if (error?.code !== 'EBUSY') {
+                    throw error;
+                }
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+        }
     });
 
     await initializeDatabase(tempRoot);
@@ -79,6 +92,24 @@ test('knowledge base shelf kind, document clone, and document delete behavior', 
 
     const copiedAgain = await repository.cloneDocumentToKnowledgeBase(document.id, source.id);
     assert.equal(copiedAgain.id, copied.id);
+
+    const links = await repository.getShelfLinksForDocuments([copied.id]);
+    assert.deepEqual(links, [{
+        sourceDocumentId: copied.id,
+        fileHash: 'hash-lesson',
+        shelfDocumentId: document.id,
+        shelfDocumentName: 'lesson.txt',
+        shelfKbId: shelf.id,
+        shelfKbName: '教材资料',
+    }]);
+
+    const targetShelf = await repository.createKnowledgeBase({ name: '未归类', kind: 'shelf' });
+    const moved = await repository.moveDocumentToKnowledgeBase(document.id, targetShelf.id);
+    assert.equal(moved.kbId, targetShelf.id);
+    const movedChunks = await repository.listChunkRowsByKnowledgeBase(targetShelf.id);
+    assert.equal(movedChunks.length, 1);
+    assert.equal(movedChunks[0].document_id, document.id);
+    assert.equal((await repository.listChunkRowsByKnowledgeBase(shelf.id)).length, 0);
 
     const pendingDocument = await repository.createDocument({
         kbId: shelf.id,

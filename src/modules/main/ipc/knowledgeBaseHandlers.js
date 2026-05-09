@@ -85,6 +85,18 @@ function initialize(context = {}) {
         ok({ items: await knowledgeBase.copyKnowledgeBaseDocuments(targetKbId, documentIds) })
     ), { items: [] }));
 
+    registerHandle(['get-knowledge-base-shelf-links', 'kb:get-shelf-links'], withKnowledgeBaseReady(async (_event, documentIds) => (
+        ok({ items: await knowledgeBase.getKnowledgeBaseShelfLinks(documentIds) })
+    ), { items: [] }));
+
+    registerHandle(['add-knowledge-base-documents-to-shelf', 'kb:add-documents-to-shelf'], withKnowledgeBaseReady(async (_event, documentIds, options) => (
+        ok({ items: await knowledgeBase.addKnowledgeBaseDocumentsToShelf(documentIds, options) })
+    ), { items: [] }));
+
+    registerHandle(['move-knowledge-base-document-to-shelf-group', 'kb:move-document-to-shelf-group'], withKnowledgeBaseReady(async (_event, documentId, targetKbId) => (
+        ok({ item: await knowledgeBase.moveKnowledgeBaseDocumentToShelfGroup(documentId, targetKbId) })
+    ), { item: null }));
+
     registerHandle(['list-knowledge-base-documents', 'kb:list-documents'], withKnowledgeBaseReady(async (_event, kbId) => (
         ok({ items: await knowledgeBase.listKnowledgeBaseDocuments(kbId) })
     ), { items: [] }));
@@ -165,6 +177,14 @@ function initialize(context = {}) {
     ), {
         document: null,
         view: null,
+    }));
+
+    registerHandle(['get-knowledge-base-document-thumbnail', 'kb:get-document-thumbnail'], withKnowledgeBaseReady(async (_event, documentId) => (
+        ok(await knowledgeBase.getKnowledgeBaseDocumentThumbnail(documentId))
+    ), {
+        documentId: null,
+        thumbnailUrl: '',
+        kind: 'none',
     }));
 
     registerHandle(['get-knowledge-base-document-guide', 'kb:get-document-guide'], withKnowledgeBaseReady(async (_event, documentId) => (

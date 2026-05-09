@@ -75,6 +75,15 @@ async function createHarness(config, options = {}) {
         async copyKnowledgeBaseDocuments() {
             return [];
         },
+        async getKnowledgeBaseShelfLinks() {
+            return [];
+        },
+        async addKnowledgeBaseDocumentsToShelf() {
+            return [];
+        },
+        async moveKnowledgeBaseDocumentToShelfGroup(documentId, targetKbId) {
+            return { id: documentId, kbId: targetKbId };
+        },
         async listKnowledgeBaseDocuments() {
             return [];
         },
@@ -98,6 +107,9 @@ async function createHarness(config, options = {}) {
         },
         async getKnowledgeBaseDocumentViewData() {
             return { document: null, view: null };
+        },
+        async getKnowledgeBaseDocumentThumbnail(documentId) {
+            return { documentId, thumbnailUrl: '', kind: 'none' };
         },
         async getKnowledgeBaseDocumentGuide() {
             return { documentId: null, guideStatus: 'idle', guideMarkdown: '' };
@@ -242,7 +254,7 @@ test('rename knowledge base document handler delegates to knowledge base service
     });
 });
 
-test('shelf copy and delete document handlers delegate to knowledge base service', async (t) => {
+test('shelf link, copy, move, and delete document handlers delegate to knowledge base service', async (t) => {
     const calls = [];
     const harness = await createHarness(
         { topics: [{ id: 'topic-1', name: 'Topic 1', knowledgeBaseId: null }] },
@@ -251,6 +263,18 @@ test('shelf copy and delete document handlers delegate to knowledge base service
                 async copyKnowledgeBaseDocuments(targetKbId, documentIds) {
                     calls.push(['copy', targetKbId, documentIds]);
                     return documentIds.map((id) => ({ id: `${id}-copy`, kbId: targetKbId }));
+                },
+                async getKnowledgeBaseShelfLinks(documentIds) {
+                    calls.push(['links', documentIds]);
+                    return [{ sourceDocumentId: documentIds[0], shelfDocumentId: 'doc-shelf', shelfKbId: 'kb-shelf' }];
+                },
+                async addKnowledgeBaseDocumentsToShelf(documentIds, options) {
+                    calls.push(['add-to-shelf', documentIds, options]);
+                    return [{ sourceDocumentId: documentIds[0], shelfDocumentId: 'doc-shelf', shelfKbId: 'kb-shelf' }];
+                },
+                async moveKnowledgeBaseDocumentToShelfGroup(documentId, targetKbId) {
+                    calls.push(['move-shelf', documentId, targetKbId]);
+                    return { id: documentId, kbId: targetKbId };
                 },
                 async deleteKnowledgeBaseDocument(documentId) {
                     calls.push(['delete', documentId]);
@@ -262,17 +286,38 @@ test('shelf copy and delete document handlers delegate to knowledge base service
     t.after(harness.cleanup);
 
     const copyDocuments = harness.handlers.get('kb:copy-documents');
+    const getShelfLinks = harness.handlers.get('kb:get-shelf-links');
+    const addToShelf = harness.handlers.get('kb:add-documents-to-shelf');
+    const moveShelfDocument = harness.handlers.get('kb:move-document-to-shelf-group');
     const deleteDocument = harness.handlers.get('kb:delete-document');
     const copyResult = await copyDocuments(null, 'kb-valid', ['doc-1']);
+    const linksResult = await getShelfLinks(null, ['doc-1']);
+    const addResult = await addToShelf(null, ['doc-1'], { targetKbId: 'kb-shelf' });
+    const moveResult = await moveShelfDocument(null, 'doc-shelf', 'kb-next');
     const deleteResult = await deleteDocument(null, 'doc-1');
 
     assert.deepEqual(calls, [
         ['copy', 'kb-valid', ['doc-1']],
+        ['links', ['doc-1']],
+        ['add-to-shelf', ['doc-1'], { targetKbId: 'kb-shelf' }],
+        ['move-shelf', 'doc-shelf', 'kb-next'],
         ['delete', 'doc-1'],
     ]);
     assert.deepEqual(copyResult, {
         success: true,
         items: [{ id: 'doc-1-copy', kbId: 'kb-valid' }],
+    });
+    assert.deepEqual(linksResult, {
+        success: true,
+        items: [{ sourceDocumentId: 'doc-1', shelfDocumentId: 'doc-shelf', shelfKbId: 'kb-shelf' }],
+    });
+    assert.deepEqual(addResult, {
+        success: true,
+        items: [{ sourceDocumentId: 'doc-1', shelfDocumentId: 'doc-shelf', shelfKbId: 'kb-shelf' }],
+    });
+    assert.deepEqual(moveResult, {
+        success: true,
+        item: { id: 'doc-shelf', kbId: 'kb-next' },
     });
     assert.deepEqual(deleteResult, {
         success: true,

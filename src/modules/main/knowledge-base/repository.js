@@ -241,6 +241,94 @@ function createKnowledgeBaseRepository(deps = {}) {
         return result.rows[0]?.id || null;
     }
 
+    async function findShelfDocumentByHash(fileHash) {
+        const normalizedHash = String(fileHash || '').trim();
+        if (!normalizedHash) {
+            return null;
+        }
+
+        const db = getDbImpl();
+        const result = await db.execute({
+            sql: `SELECT
+                    doc.id,
+                    doc.kb_id,
+                    doc.name,
+                    doc.stored_path,
+                    doc.mime_type,
+                    doc.file_size,
+                    doc.file_hash,
+                    doc.status,
+                    doc.error,
+                    doc.chunk_count,
+                    doc.created_at,
+                    doc.updated_at,
+                    doc.processed_at,
+                    doc.attempt_count,
+                    doc.processing_started_at,
+                    doc.failed_at,
+                    doc.completed_at,
+                    doc.last_error,
+                    doc.content_type,
+                    doc.guide_status,
+                    doc.guide_markdown,
+                    doc.guide_generated_at,
+                    doc.guide_error,
+                    doc.extracted_text,
+                    doc.extracted_content_type,
+                    kb.name AS shelf_kb_name
+                FROM kb_document doc
+                JOIN knowledge_base kb ON kb.id = doc.kb_id
+                WHERE kb.kind = 'shelf' AND doc.file_hash = ?
+                ORDER BY doc.created_at ASC
+                LIMIT 1`,
+            args: [normalizedHash],
+        });
+
+        const row = result.rows[0];
+        if (!row) {
+            return null;
+        }
+
+        return {
+            document: mapDocumentRow(row),
+            shelfKbId: row.kb_id,
+            shelfKbName: row.shelf_kb_name || '',
+        };
+    }
+
+    async function getShelfLinksForDocuments(documentIds = []) {
+        const normalizedDocumentIds = [...new Set((Array.isArray(documentIds) ? documentIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean))];
+        if (normalizedDocumentIds.length === 0) {
+            return [];
+        }
+
+        const links = [];
+        for (const documentId of normalizedDocumentIds) {
+            const sourceDocument = await getDocumentById(documentId);
+            if (!sourceDocument?.fileHash) {
+                continue;
+            }
+
+            const shelfLink = await findShelfDocumentByHash(sourceDocument.fileHash);
+            if (!shelfLink?.document) {
+                continue;
+            }
+
+            links.push({
+                sourceDocumentId: sourceDocument.id,
+                fileHash: sourceDocument.fileHash,
+                shelfDocumentId: shelfLink.document.id,
+                shelfDocumentName: shelfLink.document.name,
+                shelfKbId: shelfLink.shelfKbId,
+                shelfKbName: shelfLink.shelfKbName,
+            });
+        }
+
+        return links;
+    }
+
     async function createDocument(payload = {}) {
         const now = Date.now();
         const documentId = makeId('kbdoc');
@@ -492,6 +580,42 @@ function createKnowledgeBaseRepository(deps = {}) {
         });
     }
 
+    async function moveDocumentToKnowledgeBase(documentId, targetKbId) {
+        const document = await getDocumentById(documentId);
+        if (!document) {
+            throw new Error('Knowledge base document not found.');
+        }
+
+        const targetKnowledgeBase = await getKnowledgeBaseById(targetKbId);
+        if (!targetKnowledgeBase) {
+            throw new Error('Knowledge base not found.');
+        }
+
+        if (document.kbId === targetKbId) {
+            return document;
+        }
+
+        const duplicateId = await findDocumentIdByHash(targetKbId, document.fileHash);
+        if (duplicateId && duplicateId !== document.id) {
+            throw new Error('A document with the same file already exists in the target group.');
+        }
+
+        const updatedAt = Date.now();
+        const db = getDbImpl();
+        await db.execute({
+            sql: 'UPDATE kb_document SET kb_id = ?, updated_at = ? WHERE id = ?',
+            args: [targetKbId, updatedAt, documentId],
+        });
+        await db.execute({
+            sql: 'UPDATE kb_chunk SET kb_id = ? WHERE document_id = ?',
+            args: [targetKbId, documentId],
+        });
+
+        await touchKnowledgeBase(document.kbId);
+        await touchKnowledgeBase(targetKbId);
+        return getDocumentById(documentId);
+    }
+
     async function deleteDocumentChunks(documentId) {
         const db = getDbImpl();
         await db.execute({
@@ -648,12 +772,15 @@ function createKnowledgeBaseRepository(deps = {}) {
         listKnowledgeBaseDocuments,
         getDocumentById,
         findDocumentIdByHash,
+        findShelfDocumentByHash,
+        getShelfLinksForDocuments,
         createDocument,
         cloneDocumentToKnowledgeBase,
         updateDocumentState,
         updateDocumentGuideState,
         updateDocumentDerivedContent,
         updateDocumentMimeType,
+        moveDocumentToKnowledgeBase,
         deleteDocumentChunks,
         deleteKnowledgeBaseDocumentData,
         insertDocumentChunk,

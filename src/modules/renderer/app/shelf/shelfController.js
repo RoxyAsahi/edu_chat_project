@@ -4,6 +4,7 @@ import {
     formatDocumentStatus,
     getKnowledgeBaseDocumentVisual,
 } from '../source/sourceModel.js';
+import { positionFloatingElement } from '../dom/positionFloatingElement.js';
 
 function createShelfController(deps = {}) {
     const store = deps.store;
@@ -24,6 +25,9 @@ function createShelfController(deps = {}) {
 
     let pollTimer = null;
     let pollInFlight = false;
+    let pendingShelfImportGroupId = null;
+    let lastShelfDocumentMenuOpenedAt = 0;
+    const thumbnailCache = new Map();
 
     function getShelfSlice() {
         return store.getState().shelf;
@@ -54,6 +58,10 @@ function createShelfController(deps = {}) {
             get: () => getShelfSlice().documents || [],
             set: (value) => patchShelf({ documents: Array.isArray(value) ? value : [] }),
         },
+        documentsByGroupId: {
+            get: () => getShelfSlice().documentsByGroupId || {},
+            set: (value) => patchShelf({ documentsByGroupId: value && typeof value === 'object' ? value : {} }),
+        },
         pickerOpen: {
             get: () => getShelfSlice().pickerOpen === true,
             set: (value) => patchShelf({ pickerOpen: value === true }),
@@ -69,6 +77,10 @@ function createShelfController(deps = {}) {
         pickerSelectedDocumentIds: {
             get: () => getShelfSlice().pickerSelectedDocumentIds || [],
             set: (value) => patchShelf({ pickerSelectedDocumentIds: normalizeIds(value) }),
+        },
+        activeShelfDocumentMenu: {
+            get: () => getShelfSlice().activeShelfDocumentMenu || null,
+            set: (value) => patchShelf({ activeShelfDocumentMenu: value || null }),
         },
     });
 
@@ -89,8 +101,84 @@ function createShelfController(deps = {}) {
         }
     }
 
+    function stripMarkdownForShelfPreview(value = '') {
+        return String(value || '')
+            .replace(/```[\s\S]*?```/g, ' ')
+            .replace(/`([^`]+)`/g, '$1')
+            .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+            .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+            .replace(/^#{1,6}\s+/gm, '')
+            .replace(/^[>\-*+\d.)\s]+/gm, '')
+            .replace(/[*_~#>|]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function getShelfDocumentPreview(documentItem = {}) {
+        if (documentItem.lastError) {
+            return documentItem.lastError;
+        }
+
+        const extracted = stripMarkdownForShelfPreview(documentItem.extractedText || '');
+        if (extracted) {
+            return extracted;
+        }
+
+        const guide = stripMarkdownForShelfPreview(documentItem.guideMarkdown || '');
+        if (guide) {
+            return guide;
+        }
+
+        if (documentItem.status === 'processing' || documentItem.status === 'pending') {
+            return '资料正在解析入库，完成后这里会显示可阅读的内容预览。';
+        }
+
+        if (documentItem.status === 'done') {
+            return '已完成入库，可加入任意话题来源并用于对话检索。';
+        }
+
+        return '等待资料内容完成解析。';
+    }
+
+    function shouldLoadShelfThumbnail(documentItem = {}) {
+        const name = String(documentItem.name || '').trim().toLowerCase();
+        const mimeType = String(documentItem.mimeType || '').trim().toLowerCase();
+        const contentType = String(documentItem.contentType || '').trim().toLowerCase();
+        return mimeType === 'application/pdf'
+            || mimeType.startsWith('image/')
+            || contentType === 'pdf-text'
+            || name.endsWith('.pdf')
+            || ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'].some((extension) => name.endsWith(extension));
+    }
+
     function getSelectedGroup() {
         return state.groups.find((group) => group.id === state.selectedGroupId) || null;
+    }
+
+    function getShelfDocumentsForGroup(groupId) {
+        const documents = state.documentsByGroupId[String(groupId || '')] || [];
+        return Array.isArray(documents) ? documents : [];
+    }
+
+    function getAllShelfDocuments() {
+        const groupedDocuments = Object.values(state.documentsByGroupId || {})
+            .flatMap((items) => (Array.isArray(items) ? items : []));
+        const documentsById = new Map();
+        [...groupedDocuments, ...(Array.isArray(state.documents) ? state.documents : [])].forEach((documentItem) => {
+            const documentId = String(documentItem?.id || '').trim();
+            if (documentId) {
+                documentsById.set(documentId, documentItem);
+            }
+        });
+        return [...documentsById.values()];
+    }
+
+    function findShelfDocumentInState(documentId) {
+        const normalizedDocumentId = String(documentId || '').trim();
+        if (!normalizedDocumentId) {
+            return null;
+        }
+        return getAllShelfDocuments().find((documentItem) => documentItem.id === normalizedDocumentId) || null;
     }
 
     function getPickerDocuments() {
@@ -115,7 +203,9 @@ function createShelfController(deps = {}) {
 
     function shouldPollShelfItems() {
         const pickerDocuments = getPickerDocuments();
-        return [...state.documents, ...pickerDocuments].some((item) => (
+        const shelfDocuments = Object.values(state.documentsByGroupId)
+            .flatMap((items) => (Array.isArray(items) ? items : []));
+        return [...state.documents, ...shelfDocuments, ...pickerDocuments].some((item) => (
             item.status === 'pending'
             || item.status === 'processing'
             || item.guideStatus === 'pending'
@@ -135,6 +225,8 @@ function createShelfController(deps = {}) {
                 try {
                     if (state.selectedGroupId) {
                         await loadShelfDocuments(state.selectedGroupId, { silent: true });
+                    } else if (state.groups.length > 0) {
+                        await loadAllShelfDocuments(state.groups, { silent: true });
                     }
                     if (state.pickerOpen) {
                         await loadPickerData({ silent: true });
@@ -236,8 +328,30 @@ function createShelfController(deps = {}) {
         }
 
         state.documents = Array.isArray(result.items) ? result.items : [];
+        state.documentsByGroupId = {
+            ...state.documentsByGroupId,
+            [groupId]: state.documents,
+        };
         renderShelfPage();
         return state.documents;
+    }
+
+    async function loadAllShelfDocuments(groups = state.groups, options = {}) {
+        const documentEntries = await Promise.all((Array.isArray(groups) ? groups : []).map(async (group) => {
+            const docsResult = await chatAPI.listKnowledgeBaseDocuments(group.id).catch((error) => ({
+                success: false,
+                error: error.message,
+                items: [],
+            }));
+            if (!docsResult?.success && options.silent !== true) {
+                ui.showToastNotification(`加载 ${group.name || '分组'} 资料失败：${docsResult?.error || '未知错误'}`, 'error');
+            }
+            return [group.id, docsResult?.success && Array.isArray(docsResult.items) ? docsResult.items : []];
+        }));
+        state.documentsByGroupId = Object.fromEntries(documentEntries);
+        state.documents = state.selectedGroupId ? getShelfDocumentsForGroup(state.selectedGroupId) : [];
+        renderShelfPage();
+        return state.documentsByGroupId;
     }
 
     async function loadShelfGroups(options = {}) {
@@ -259,15 +373,10 @@ function createShelfController(deps = {}) {
 
         state.groups = Array.isArray(result.items) ? result.items : [];
         if (!state.groups.some((group) => group.id === state.selectedGroupId)) {
-            state.selectedGroupId = state.groups[0]?.id || null;
+            state.selectedGroupId = null;
         }
         setGroupNameInput(getSelectedGroup()?.name || '');
-        if (state.selectedGroupId) {
-            await loadShelfDocuments(state.selectedGroupId, { silent: true });
-        } else {
-            state.documents = [];
-            renderShelfPage();
-        }
+        await loadAllShelfDocuments(state.groups, { silent: true });
         return true;
     }
 
@@ -304,7 +413,7 @@ function createShelfController(deps = {}) {
 
     async function createShelfGroup() {
         const typedName = String(el.sourceShelfGroupNameInput?.value || '').trim();
-        const currentGroupName = String(getSelectedGroup()?.name || '').trim();
+        const currentGroupName = String(getSelectedGroup()?.name || (!state.selectedGroupId ? '全部资料' : '')).trim();
         const shouldUseTypedName = Boolean(typedName && typedName !== currentGroupName);
         const name = await promptForGroupName({
             title: '新建资料分组',
@@ -387,8 +496,8 @@ function createShelfController(deps = {}) {
         ui.showToastNotification('已删除资料分组。', 'success');
     }
 
-    async function importShelfFiles(files) {
-        const selectedGroup = getSelectedGroup();
+    async function importShelfFiles(files, targetGroupId = state.selectedGroupId) {
+        const selectedGroup = state.groups.find((group) => group.id === targetGroupId) || getSelectedGroup();
         const fileEntries = Array.from(files || []);
         if (!selectedGroup) {
             ui.showToastNotification('请先新建或选择一个资料分组。', 'warning');
@@ -423,6 +532,16 @@ function createShelfController(deps = {}) {
         ui.showToastNotification(`已开始导入 ${payloads.length} 个资料文件。`, 'success');
     }
 
+    function requestShelfFileImport(groupId = state.selectedGroupId) {
+        const targetGroup = state.groups.find((group) => group.id === groupId) || null;
+        if (!targetGroup) {
+            ui.showToastNotification('请先新建或选择一个资料分组。', 'warning');
+            return;
+        }
+        pendingShelfImportGroupId = targetGroup.id;
+        el.hiddenSourceShelfFileInput?.click();
+    }
+
     async function renameShelfDocument(documentItem = {}) {
         const documentId = String(documentItem?.id || '').trim();
         if (!documentId) {
@@ -442,7 +561,7 @@ function createShelfController(deps = {}) {
             ui.showToastNotification(`重命名资料失败：${result?.error || '未知错误'}`, 'error');
             return;
         }
-        await loadShelfDocuments(state.selectedGroupId, { silent: true });
+        await loadShelfGroups({ silent: true });
         if (state.pickerOpen) {
             await loadPickerData({ silent: true });
         }
@@ -474,11 +593,214 @@ function createShelfController(deps = {}) {
             ui.showToastNotification(`删除资料失败：${result?.error || '未知错误'}`, 'error');
             return;
         }
-        await loadShelfDocuments(state.selectedGroupId, { silent: true });
+        await loadShelfGroups({ silent: true });
         if (state.pickerOpen) {
             await loadPickerData({ silent: true });
         }
         ui.showToastNotification('已删除资料。', 'success');
+    }
+
+    async function moveShelfDocumentToGroup(documentItem = {}, targetGroupId = '') {
+        const documentId = String(documentItem?.id || '').trim();
+        const normalizedTargetGroupId = String(targetGroupId || '').trim();
+        if (!documentId || !normalizedTargetGroupId || documentItem.kbId === normalizedTargetGroupId) {
+            closeShelfDocumentActionMenu();
+            return;
+        }
+
+        if (typeof chatAPI.moveKnowledgeBaseDocumentToShelfGroup !== 'function') {
+            ui.showToastNotification('当前版本暂不支持移动资料分组。', 'warning');
+            closeShelfDocumentActionMenu();
+            return;
+        }
+
+        const result = await chatAPI.moveKnowledgeBaseDocumentToShelfGroup(documentId, normalizedTargetGroupId).catch((error) => ({
+            success: false,
+            error: error.message,
+            item: null,
+        }));
+        if (!result?.success) {
+            ui.showToastNotification(`移动资料失败：${result?.error || '未知错误'}`, 'error');
+            return;
+        }
+
+        closeShelfDocumentActionMenu();
+        state.selectedGroupId = normalizedTargetGroupId;
+        await Promise.all([
+            loadShelfGroups({ silent: true }),
+            loadCurrentTopicKnowledgeBaseDocuments({ silent: true, reuseSelected: false }),
+            loadKnowledgeBases({ silent: true }),
+        ]);
+        ui.showToastNotification('已移动资料分组。', 'success');
+    }
+
+    function ensureShelfDocumentActionMenu() {
+        let menu = documentObj.getElementById?.('sourceShelfDocumentActionMenu');
+        if (menu && documentObj.body?.contains(menu)) {
+            return menu;
+        }
+
+        menu = documentObj.createElement('div');
+        menu.id = 'sourceShelfDocumentActionMenu';
+        menu.className = 'source-file-action-menu source-shelf-action-menu hidden';
+        menu.setAttribute('role', 'menu');
+        menu.setAttribute('aria-label', '资料操作');
+        documentObj.body?.appendChild(menu);
+        return menu;
+    }
+
+    function closeShelfDocumentActionMenu() {
+        state.activeShelfDocumentMenu = null;
+        const menu = documentObj.getElementById?.('sourceShelfDocumentActionMenu');
+        if (!menu) {
+            return;
+        }
+        menu.classList.add('hidden');
+        menu.innerHTML = '';
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        menu.style.visibility = '';
+    }
+
+    function restoreShelfDocumentActionMenuAfterRender() {
+        const activeMenu = state.activeShelfDocumentMenu;
+        if (!activeMenu?.documentId) {
+            return;
+        }
+
+        const documentItem = findShelfDocumentInState(activeMenu.documentId);
+        if (!documentItem) {
+            closeShelfDocumentActionMenu();
+            return;
+        }
+
+        state.activeShelfDocumentMenu = {
+            ...activeMenu,
+            documentItem,
+        };
+
+        if (activeMenu.mode === 'move') {
+            renderShelfDocumentMoveMenu(documentItem);
+        } else {
+            renderShelfDocumentActionMenu();
+        }
+    }
+
+    function renderShelfDocumentActionMenu() {
+        const menu = ensureShelfDocumentActionMenu();
+        const activeMenu = state.activeShelfDocumentMenu;
+        if (!activeMenu?.documentItem || !activeMenu?.anchorRect) {
+            closeShelfDocumentActionMenu();
+            return;
+        }
+
+        const actions = [
+            { key: 'rename', label: '重命名', icon: 'edit' },
+            { key: 'move', label: '移动到分组', icon: 'drive_file_move' },
+            { key: 'delete', label: '删除', icon: 'delete', danger: true },
+        ];
+
+        menu.innerHTML = actions.map((action) => `
+            <button
+                type="button"
+                class="source-file-action-menu__item ${action.danger ? 'source-file-action-menu__item--danger' : ''}"
+                data-shelf-document-action="${escapeHtml(action.key)}"
+                role="menuitem"
+            >
+                <span class="material-symbols-outlined">${escapeHtml(action.icon)}</span>
+                <span>${escapeHtml(action.label)}</span>
+            </button>
+        `).join('');
+
+        menu.classList.remove('hidden');
+        menu.style.visibility = 'hidden';
+        positionFloatingElement(menu, activeMenu.anchorRect, 'right', windowObj);
+        menu.style.visibility = 'visible';
+
+        menu.querySelectorAll('[data-shelf-document-action]').forEach((button) => {
+            button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const action = button.dataset.shelfDocumentAction;
+                const documentItem = activeMenu.documentItem;
+                if (action === 'move') {
+                    state.activeShelfDocumentMenu = {
+                        ...activeMenu,
+                        mode: 'move',
+                    };
+                    renderShelfDocumentMoveMenu(documentItem);
+                    return;
+                }
+                closeShelfDocumentActionMenu();
+                if (action === 'rename') {
+                    await renameShelfDocument(documentItem);
+                } else if (action === 'delete') {
+                    await deleteShelfDocument(documentItem);
+                }
+            });
+        });
+    }
+
+    function renderShelfDocumentMoveMenu(documentItem = {}) {
+        const menu = ensureShelfDocumentActionMenu();
+        const activeMenu = state.activeShelfDocumentMenu;
+        if (!activeMenu?.anchorRect) {
+            closeShelfDocumentActionMenu();
+            return;
+        }
+
+        const groups = Array.isArray(state.groups) ? state.groups : [];
+        menu.innerHTML = groups.length > 0
+            ? groups.map((group) => `
+                <button
+                    type="button"
+                    class="source-file-action-menu__item"
+                    data-shelf-document-move-group="${escapeHtml(group.id)}"
+                    ${group.id === documentItem.kbId ? 'disabled' : ''}
+                    role="menuitem"
+                >
+                    <span class="material-symbols-outlined">folder</span>
+                    <span>${escapeHtml(group.name || '未命名分组')}</span>
+                </button>
+            `).join('')
+            : `
+                <button type="button" class="source-file-action-menu__item" disabled role="menuitem">
+                    <span class="material-symbols-outlined">folder_off</span>
+                    <span>暂无分组</span>
+                </button>
+            `;
+
+        menu.classList.remove('hidden');
+        menu.style.visibility = 'hidden';
+        positionFloatingElement(menu, activeMenu.anchorRect, 'right', windowObj);
+        menu.style.visibility = 'visible';
+
+        menu.querySelectorAll('[data-shelf-document-move-group]').forEach((button) => {
+            button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                if (button.disabled) {
+                    return;
+                }
+                await moveShelfDocumentToGroup(documentItem, button.dataset.shelfDocumentMoveGroup);
+            });
+        });
+    }
+
+    function openShelfDocumentActionMenu(event, documentItem) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.activeShelfDocumentMenu = {
+            documentId: documentItem.id,
+            documentItem,
+            anchorRect: {
+                left: event.clientX,
+                right: event.clientX,
+                top: event.clientY,
+                bottom: event.clientY,
+            },
+            mode: 'actions',
+        };
+        lastShelfDocumentMenuOpenedAt = Date.now();
+        renderShelfDocumentActionMenu();
     }
 
     function renderShelfGroupButton(group) {
@@ -489,13 +811,30 @@ function createShelfController(deps = {}) {
             <span class="source-shelf-group-card__icon material-symbols-outlined" aria-hidden="true">folder</span>
             <span class="source-shelf-group-card__body">
                 <strong>${escapeHtml(group.name)}</strong>
-                <span>${group.documentCount || 0} 份资料 · ${group.doneCount || 0} 可复用</span>
             </span>
         `;
         button.addEventListener('click', async () => {
             state.selectedGroupId = group.id;
             setGroupNameInput(group.name || '');
             await loadShelfDocuments(group.id, { silent: true });
+        });
+        return button;
+    }
+
+    function renderShelfAllGroupsButton() {
+        const button = documentObj.createElement('button');
+        button.type = 'button';
+        button.className = `source-shelf-group-card source-shelf-group-card--all${!state.selectedGroupId ? ' source-shelf-group-card--active' : ''}`;
+        button.innerHTML = `
+            <span class="source-shelf-group-card__icon material-symbols-outlined" aria-hidden="true">shelves</span>
+            <span class="source-shelf-group-card__body">
+                <strong>全部资料</strong>
+            </span>
+        `;
+        button.addEventListener('click', () => {
+            state.selectedGroupId = null;
+            setGroupNameInput('全部资料');
+            renderShelfPage();
         });
         return button;
     }
@@ -521,44 +860,141 @@ function createShelfController(deps = {}) {
 
     function renderShelfDocumentCard(documentItem) {
         const visual = getKnowledgeBaseDocumentVisual(documentItem);
+        const preview = getShelfDocumentPreview(documentItem);
         const card = documentObj.createElement('article');
-        card.className = 'source-shelf-card';
+        card.className = `source-shelf-card source-shelf-card--${visual.tone}`;
         card.classList.toggle('source-shelf-card--processing', visual.spinning === true);
+        card.classList.toggle('source-shelf-card--failed', Boolean(documentItem.lastError));
         card.innerHTML = `
             <header class="source-shelf-card__header">
-                <span class="source-shelf-card__icon source-shelf-card__icon--${escapeHtml(visual.tone)} material-symbols-outlined ${visual.spinning ? 'source-shelf-card__icon--spinning' : ''}" aria-hidden="true">${escapeHtml(visual.icon)}</span>
                 <div class="source-shelf-card__title">
                     <strong>${escapeHtml(documentItem.name)}</strong>
-                    <span>${escapeHtml(formatDocumentStatus(documentItem))}</span>
-                </div>
-                <div class="source-shelf-card__actions">
-                    <button type="button" class="ghost-button icon-btn" data-shelf-doc-action="rename" aria-label="重命名资料">
-                        <span class="material-symbols-outlined">edit</span>
-                    </button>
-                    <button type="button" class="ghost-button icon-btn" data-shelf-doc-action="delete" aria-label="删除资料">
-                        <span class="material-symbols-outlined">delete</span>
-                    </button>
                 </div>
             </header>
-            <div class="source-shelf-card__meta">
-                <span>${escapeHtml(formatRelativeTime(documentItem.updatedAt || documentItem.createdAt))}</span>
-                <span>${Math.max(0, Math.round((documentItem.fileSize || 0) / 1024))} KB</span>
+            <div class="source-shelf-card__cover">
+                <div class="source-shelf-card__thumbnail hidden" data-shelf-thumbnail>
+                    <img alt="" loading="lazy" />
+                </div>
+                <div class="source-shelf-card__cover-topline">
+                    <span class="source-shelf-card__icon source-shelf-card__icon--${escapeHtml(visual.tone)} material-symbols-outlined ${visual.spinning ? 'source-shelf-card__icon--spinning' : ''}" aria-hidden="true">${escapeHtml(visual.icon)}</span>
+                    <span class="source-shelf-card__status">${escapeHtml(formatDocumentStatus(documentItem))}</span>
+                </div>
+                <p class="source-shelf-card__preview">${escapeHtml(preview)}</p>
             </div>
-            ${documentItem.lastError ? `<p class="source-shelf-card__error">${escapeHtml(documentItem.lastError)}</p>` : ''}
         `;
-        card.querySelector('[data-shelf-doc-action="rename"]')?.addEventListener('click', (event) => {
-            event.stopPropagation();
-            void renameShelfDocument(documentItem);
+        card.addEventListener('contextmenu', (event) => {
+            openShelfDocumentActionMenu(event, documentItem);
         });
-        card.querySelector('[data-shelf-doc-action="delete"]')?.addEventListener('click', (event) => {
-            event.stopPropagation();
-            void deleteShelfDocument(documentItem);
-        });
+        if (documentItem.thumbnailUrl) {
+            applyShelfThumbnail(card, {
+                thumbnailUrl: documentItem.thumbnailUrl,
+                kind: documentItem.thumbnailKind || visual.tone,
+            });
+        }
+        queueShelfThumbnailLoad(documentItem, card);
         return card;
+    }
+
+    function applyShelfThumbnail(card, payload = {}) {
+        const thumbnailUrl = String(payload?.thumbnailUrl || '').trim();
+        const thumbnail = card?.querySelector?.('[data-shelf-thumbnail]');
+        const image = thumbnail?.querySelector?.('img');
+        if (!thumbnailUrl || !thumbnail || !image) {
+            return;
+        }
+
+        image.onload = () => {
+            thumbnail.classList.remove('hidden');
+            card.classList.add('source-shelf-card--has-thumbnail');
+        };
+        image.onerror = () => {
+            thumbnail.classList.add('hidden');
+            card.classList.remove('source-shelf-card--has-thumbnail');
+        };
+        image.src = thumbnailUrl;
+        thumbnail.classList.remove('hidden');
+        card.classList.add('source-shelf-card--has-thumbnail');
+    }
+
+    function queueShelfThumbnailLoad(documentItem, card) {
+        const documentId = String(documentItem?.id || '').trim();
+        if (!documentId || !shouldLoadShelfThumbnail(documentItem) || typeof chatAPI.getKnowledgeBaseDocumentThumbnail !== 'function') {
+            return;
+        }
+
+        const cached = thumbnailCache.get(documentId);
+        if (cached?.result) {
+            applyShelfThumbnail(card, cached.result);
+            return;
+        }
+        if (cached?.promise) {
+            cached.promise.then((result) => {
+                if (result && documentObj.body?.contains(card)) {
+                    applyShelfThumbnail(card, result);
+                }
+            });
+            return;
+        }
+
+        const promise = chatAPI.getKnowledgeBaseDocumentThumbnail(documentId)
+            .then((result) => {
+                if (!result?.success || !result.thumbnailUrl) {
+                    thumbnailCache.delete(documentId);
+                    return null;
+                }
+                thumbnailCache.set(documentId, { result });
+                if (documentObj.body?.contains(card)) {
+                    applyShelfThumbnail(card, result);
+                }
+                return result;
+            })
+            .catch(() => {
+                thumbnailCache.delete(documentId);
+                return null;
+            });
+        thumbnailCache.set(documentId, { promise });
+    }
+
+    function renderShelfUploadCard(group) {
+        const button = documentObj.createElement('button');
+        button.type = 'button';
+        button.className = 'source-shelf-card source-shelf-upload-card';
+        button.setAttribute('aria-label', `上传资料到${group?.name || '这个分组'}`);
+        button.innerHTML = `
+            <span class="source-shelf-upload-card__icon material-symbols-outlined" aria-hidden="true">add</span>
+            <span class="source-shelf-upload-card__title">上传资料</span>
+            <span class="source-shelf-upload-card__hint">${escapeHtml(group?.name || '当前分组')}</span>
+        `;
+        button.addEventListener('click', () => {
+            requestShelfFileImport(group?.id);
+        });
+        return button;
+    }
+
+    function renderShelfGroupSection(group) {
+        const documents = getShelfDocumentsForGroup(group.id);
+        const section = documentObj.createElement('section');
+        section.className = 'source-shelf-section';
+        section.dataset.shelfGroupSection = group.id;
+        section.innerHTML = `
+            <header class="source-shelf-section__header">
+                <strong>${escapeHtml(group.name || '未命名分组')}</strong>
+                <span>${documents.length} 份资料</span>
+            </header>
+        `;
+        const grid = documentObj.createElement('div');
+        grid.className = `source-shelf-section__grid${documents.length <= 1 ? ' source-shelf-section__grid--single-row' : ''}`;
+        documents.forEach((documentItem) => {
+            grid.appendChild(renderShelfDocumentCard(documentItem));
+        });
+        grid.appendChild(renderShelfUploadCard(group));
+        section.appendChild(grid);
+        return section;
     }
 
     function renderShelfPage() {
         const selectedGroup = getSelectedGroup();
+        const isAllShelfView = !selectedGroup;
         const groupCount = state.groups.length;
         const totalDocs = state.groups.reduce((sum, group) => sum + Number(group.documentCount || 0), 0);
         const reusableDocs = state.groups.reduce((sum, group) => sum + Number(group.doneCount || 0), 0);
@@ -578,7 +1014,7 @@ function createShelfController(deps = {}) {
         }
 
         if (el.sourceShelfGroupNameInput && documentObj.activeElement !== el.sourceShelfGroupNameInput) {
-            el.sourceShelfGroupNameInput.value = selectedGroup?.name || '';
+            el.sourceShelfGroupNameInput.value = selectedGroup?.name || (state.groups.length > 0 ? '全部资料' : '');
         }
         if (el.renameSourceShelfGroupBtn) {
             el.renameSourceShelfGroupBtn.disabled = !selectedGroup;
@@ -595,6 +1031,7 @@ function createShelfController(deps = {}) {
             if (state.groups.length === 0) {
                 el.sourceShelfGroups.innerHTML = '<div class="source-shelf-groups-empty"><strong>暂无分组</strong><span>新建后即可上传资料。</span></div>';
             } else {
+                el.sourceShelfGroups.appendChild(renderShelfAllGroupsButton());
                 state.groups.forEach((group) => {
                     el.sourceShelfGroups.appendChild(renderShelfGroupButton(group));
                 });
@@ -603,7 +1040,8 @@ function createShelfController(deps = {}) {
 
         if (el.sourceShelfDocuments) {
             el.sourceShelfDocuments.innerHTML = '';
-            if (!selectedGroup) {
+            el.sourceShelfDocuments.classList.toggle('source-shelf-grid--shelf-view', isAllShelfView);
+            if (state.groups.length === 0) {
                 el.sourceShelfDocuments.classList.add('source-shelf-grid--empty');
                 el.sourceShelfDocuments.appendChild(renderShelfEmptyState({
                     icon: 'create_new_folder',
@@ -614,23 +1052,22 @@ function createShelfController(deps = {}) {
                         void createShelfGroup();
                     },
                 }));
+            } else if (isAllShelfView) {
+                el.sourceShelfDocuments.classList.remove('source-shelf-grid--empty');
+                state.groups.forEach((group) => {
+                    el.sourceShelfDocuments.appendChild(renderShelfGroupSection(group));
+                });
             } else if (state.documents.length === 0) {
-                el.sourceShelfDocuments.classList.add('source-shelf-grid--empty');
-                el.sourceShelfDocuments.appendChild(renderShelfEmptyState({
-                    icon: 'upload_file',
-                    title: '这个分组还没有资料',
-                    detail: '支持 PDF、DOCX、Markdown、文本和图片。',
-                    actionLabel: '上传资料',
-                    onAction: () => {
-                        el.hiddenSourceShelfFileInput?.click();
-                    },
-                }));
+                el.sourceShelfDocuments.classList.remove('source-shelf-grid--empty');
+                el.sourceShelfDocuments.appendChild(renderShelfUploadCard(selectedGroup));
             } else {
                 el.sourceShelfDocuments.classList.remove('source-shelf-grid--empty');
                 state.documents.forEach((documentItem) => {
                     el.sourceShelfDocuments.appendChild(renderShelfDocumentCard(documentItem));
                 });
+                el.sourceShelfDocuments.appendChild(renderShelfUploadCard(selectedGroup));
             }
+            restoreShelfDocumentActionMenuAfterRender();
         }
         syncPolling();
     }
@@ -805,9 +1242,19 @@ function createShelfController(deps = {}) {
         closeShelfPicker();
     }
 
-    async function openShelfPage() {
+    async function openShelfPage(options = {}) {
+        const targetGroupId = String(options?.selectedGroupId || options?.groupId || '').trim();
+        if (targetGroupId) {
+            state.selectedGroupId = targetGroupId;
+        }
         showSourceShelfPage();
         await loadShelfGroups({ silent: true });
+        if (targetGroupId && state.groups.some((group) => group.id === targetGroupId)) {
+            state.selectedGroupId = targetGroupId;
+            state.documents = getShelfDocumentsForGroup(targetGroupId);
+            setGroupNameInput(getSelectedGroup()?.name || '');
+            renderShelfPage();
+        }
     }
 
     async function openShelfPicker() {
@@ -845,14 +1292,12 @@ function createShelfController(deps = {}) {
             void deleteShelfGroup();
         });
         el.importSourceShelfFilesBtn?.addEventListener('click', () => {
-            if (!getSelectedGroup()) {
-                ui.showToastNotification('请先新建或选择一个资料分组。', 'warning');
-                return;
-            }
-            el.hiddenSourceShelfFileInput?.click();
+            requestShelfFileImport(state.selectedGroupId);
         });
         el.hiddenSourceShelfFileInput?.addEventListener('change', async () => {
-            await importShelfFiles(el.hiddenSourceShelfFileInput.files);
+            const targetGroupId = pendingShelfImportGroupId || state.selectedGroupId;
+            pendingShelfImportGroupId = null;
+            await importShelfFiles(el.hiddenSourceShelfFileInput.files, targetGroupId);
             el.hiddenSourceShelfFileInput.value = '';
         });
         el.sourceShelfGroupNameInput?.addEventListener('keydown', (event) => {
@@ -868,9 +1313,23 @@ function createShelfController(deps = {}) {
             void confirmPickerSelection();
         });
         documentObj.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeShelfDocumentActionMenu();
+            }
             if (event.key === 'Escape' && state.pickerOpen) {
                 closeShelfPicker();
             }
+        });
+        documentObj.addEventListener('click', (event) => {
+            if (Date.now() - lastShelfDocumentMenuOpenedAt < 250) {
+                return;
+            }
+            const target = event.target;
+            const menu = documentObj.getElementById?.('sourceShelfDocumentActionMenu');
+            if (menu && target instanceof Element && menu.contains(target)) {
+                return;
+            }
+            closeShelfDocumentActionMenu();
         });
     }
 

@@ -149,6 +149,7 @@ function createBaseState(overrides = {}) {
             knowledgeBases: [],
             knowledgeBaseDocuments: [],
             topicKnowledgeBaseDocuments: [],
+            sourceShelfLinksByDocumentId: {},
             knowledgeBaseDebugResult: null,
             selectedKnowledgeBaseId: null,
             activeSourceFileMenu: null,
@@ -178,6 +179,7 @@ function createStore(initialState) {
         knowledgeBases: ['source', 'knowledgeBases'],
         knowledgeBaseDocuments: ['source', 'knowledgeBaseDocuments'],
         topicKnowledgeBaseDocuments: ['source', 'topicKnowledgeBaseDocuments'],
+        sourceShelfLinksByDocumentId: ['source', 'sourceShelfLinksByDocumentId'],
         knowledgeBaseDebugResult: ['source', 'knowledgeBaseDebugResult'],
         selectedKnowledgeBaseId: ['source', 'selectedKnowledgeBaseId'],
         activeSourceFileMenu: ['source', 'activeSourceFileMenu'],
@@ -513,6 +515,102 @@ test('topic source file menu includes rename action', async () => {
     const renameAction = el.sourceFileActionMenu.querySelector('[data-source-file-action="rename"]');
     assert.ok(renameAction);
     assert.match(renameAction.textContent, /重命名/);
+});
+
+test('topic source menu can add documents to the shelf and open the linked shelf group', async () => {
+    const { createSourceController } = await loadSourceModule();
+    const { window, document, el } = createDomElements();
+    const sourceDocument = {
+        id: 'doc-1',
+        name: 'chapter.pdf',
+        status: 'done',
+        contentType: 'pdf-text',
+        mimeType: 'application/pdf',
+    };
+    const state = createBaseState({
+        session: {
+            currentSelectedItem: { id: 'agent-1', name: '数学' },
+            currentTopicId: 'topic-1',
+            topics: [{ id: 'topic-1', name: '函数', knowledgeBaseId: 'kb-topic' }],
+        },
+        source: {
+            knowledgeBases: [],
+            knowledgeBaseDocuments: [sourceDocument],
+            topicKnowledgeBaseDocuments: [sourceDocument],
+            sourceShelfLinksByDocumentId: {},
+            knowledgeBaseDebugResult: null,
+            selectedKnowledgeBaseId: 'kb-topic',
+            activeSourceFileMenu: null,
+        },
+    });
+    const store = createStore(state);
+    const calls = [];
+    let linked = false;
+    const controller = createSourceController({
+        store,
+        el,
+        chatAPI: {
+            async getKnowledgeBaseShelfLinks(documentIds) {
+                calls.push(['links', documentIds]);
+                return {
+                    success: true,
+                    items: linked
+                        ? [{
+                            sourceDocumentId: 'doc-1',
+                            fileHash: 'hash-1',
+                            shelfDocumentId: 'doc-shelf',
+                            shelfDocumentName: 'chapter.pdf',
+                            shelfKbId: 'kb-uncategorized',
+                            shelfKbName: '未归类',
+                        }]
+                        : [],
+                };
+            },
+            async addKnowledgeBaseDocumentsToShelf(documentIds) {
+                calls.push(['add', documentIds]);
+                linked = true;
+                return {
+                    success: true,
+                    items: [{
+                        sourceDocumentId: 'doc-1',
+                        shelfDocumentId: 'doc-shelf',
+                        shelfKbId: 'kb-uncategorized',
+                        shelfKbName: '未归类',
+                    }],
+                };
+            },
+        },
+        ui: createUiStub(),
+        windowObj: window,
+        documentObj: document,
+        openShelfPage: async (options) => {
+            calls.push(['openShelfPage', options]);
+        },
+    });
+
+    await controller.loadCurrentTopicKnowledgeBaseDocuments();
+    assert.equal(el.topicKnowledgeBaseFiles.querySelector('[data-source-shelf-status]'), null);
+
+    el.topicKnowledgeBaseFiles.querySelector('[data-doc-menu-button]').click();
+    let shelfAction = el.sourceFileActionMenu.querySelector('[data-source-file-action="addToShelf"]');
+    assert.ok(shelfAction);
+    assert.match(shelfAction.textContent, /未入书架/);
+    shelfAction.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(calls.filter((call) => call[0] === 'add'), [['add', ['doc-1']]]);
+    assert.equal(state.source.sourceShelfLinksByDocumentId['doc-1'].shelfKbName, '未归类');
+
+    el.topicKnowledgeBaseFiles.querySelector('[data-doc-menu-button]').click();
+    shelfAction = el.sourceFileActionMenu.querySelector('[data-source-file-action="openShelfGroup"]');
+    assert.ok(shelfAction);
+    assert.match(shelfAction.textContent, /已入书架/);
+    assert.match(shelfAction.textContent, /未归类/);
+    shelfAction.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(calls.at(-1), ['openShelfPage', { selectedGroupId: 'kb-uncategorized' }]);
 });
 
 test('renameKnowledgeBaseDocument preserves extension and updates source state', async () => {

@@ -27,6 +27,7 @@ function createSourceController(deps = {}) {
     const getNativePathForFile = deps.getNativePathForFile || (async () => '');
     const loadTopics = deps.loadTopics || (async () => {});
     const openShelfPicker = deps.openShelfPicker || (() => {});
+    const openShelfPage = deps.openShelfPage || (() => {});
     const getLeftSidebarMode = deps.getLeftSidebarMode || (() => 'source-list');
     const getSourceListScrollTop = deps.getSourceListScrollTop || (() => 0);
     const setSourceListScrollTop = deps.setSourceListScrollTop || (() => {});
@@ -73,6 +74,10 @@ function createSourceController(deps = {}) {
         topicKnowledgeBaseDocuments: {
             get: () => getSourceSlice().topicKnowledgeBaseDocuments,
             set: (value) => patchSource({ topicKnowledgeBaseDocuments: value }),
+        },
+        sourceShelfLinksByDocumentId: {
+            get: () => getSourceSlice().sourceShelfLinksByDocumentId || {},
+            set: (value) => patchSource({ sourceShelfLinksByDocumentId: value && typeof value === 'object' ? value : {} }),
         },
         knowledgeBaseDebugResult: {
             get: () => getSourceSlice().knowledgeBaseDebugResult,
@@ -193,6 +198,7 @@ function createSourceController(deps = {}) {
         getCurrentTopicKnowledgeBaseId,
         updateTopicKnowledgeBaseBinding,
         updateTopicSourceSelection,
+        openShelfPage,
         getFacade,
     });
 
@@ -325,6 +331,7 @@ function createSourceController(deps = {}) {
         hideSourceFileTooltip: dom.hideSourceFileTooltip,
         importKnowledgeBaseFilesForKb: operations.importKnowledgeBaseFilesForKb,
         importKnowledgeBaseFilesFromInput: operations.importKnowledgeBaseFilesFromInput,
+        addTopicSourceDocumentToShelf: operations.addTopicSourceDocumentToShelf,
         loadCurrentTopicKnowledgeBaseDocuments: operations.loadCurrentTopicKnowledgeBaseDocuments,
         loadKnowledgeBaseDocuments: operations.loadKnowledgeBaseDocuments,
         loadKnowledgeBases: operations.loadKnowledgeBases,
@@ -333,6 +340,7 @@ function createSourceController(deps = {}) {
         refreshKnowledgeBaseSummaries: operations.refreshKnowledgeBaseSummaries,
         renameKnowledgeBase: operations.renameKnowledgeBase,
         renameKnowledgeBaseDocument: operations.renameKnowledgeBaseDocument,
+        openShelfGroupFromSource: operations.openShelfGroupFromSource,
         renderKnowledgeBaseDebugResults: dom.renderKnowledgeBaseDebugResults,
         renderKnowledgeBaseManager: dom.renderKnowledgeBaseManager,
         renderTopicKnowledgeBaseFiles: dom.renderTopicKnowledgeBaseFiles,

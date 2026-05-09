@@ -107,6 +107,7 @@ function createState(overrides = {}) {
             groups: [],
             selectedGroupId: null,
             documents: [],
+            documentsByGroupId: {},
             pickerOpen: false,
             pickerGroups: [],
             pickerDocumentsByGroupId: {},
@@ -157,18 +158,29 @@ test('shelf controller renders groups and bento document states', async () => {
     const store = createStore(state);
     const ui = createUiStub();
     const docs = [
-        { id: 'doc-done', name: '教材.pdf', status: 'done', chunkCount: 3, fileSize: 2048, updatedAt: 100, mimeType: 'application/pdf' },
+        { id: 'doc-done', name: '教材.pdf', status: 'done', chunkCount: 3, fileSize: 2048, updatedAt: 100, mimeType: 'application/pdf', extractedText: '# 第一章\n函数的概念、定义域和值域。' },
+        { id: 'doc-pdf-by-name', name: '历史资料.pdf', status: 'done', chunkCount: 2, fileSize: 1024, updatedAt: 150, mimeType: '', thumbnailUrl: 'file:///preview/history.png', thumbnailKind: 'pdf' },
         { id: 'doc-processing', name: '试卷.docx', status: 'processing', chunkCount: 0, fileSize: 1024, updatedAt: 200 },
         { id: 'doc-failed', name: '坏文件.txt', status: 'failed', chunkCount: 0, fileSize: 512, updatedAt: 300, lastError: '解析失败' },
     ];
+    const thumbnailCalls = [];
+    const deleteCalls = [];
     const chatAPI = {
         async listKnowledgeBases(options) {
             assert.deepEqual(options, { kind: 'shelf' });
-            return { success: true, items: [{ id: 'shelf-1', name: '教材', kind: 'shelf', documentCount: 3, doneCount: 1 }] };
+            return { success: true, items: [{ id: 'shelf-1', name: '教材', kind: 'shelf', documentCount: 4, doneCount: 2 }] };
         },
         async listKnowledgeBaseDocuments(kbId) {
             assert.equal(kbId, 'shelf-1');
             return { success: true, items: docs };
+        },
+        async getKnowledgeBaseDocumentThumbnail(documentId) {
+            thumbnailCalls.push(documentId);
+            return { success: false, thumbnailUrl: '', kind: 'none' };
+        },
+        async deleteKnowledgeBaseDocument(documentId) {
+            deleteCalls.push(documentId);
+            return { success: true };
         },
     };
 
@@ -183,12 +195,120 @@ test('shelf controller renders groups and bento document states', async () => {
     await controller.loadShelfGroups();
 
     assert.match(dom.el.sourceShelfGroups.textContent, /教材/);
+    assert.match(dom.el.sourceShelfGroups.textContent, /全部资料/);
     assert.match(dom.el.sourceShelfDocuments.textContent, /教材\.pdf/);
+    assert.match(dom.el.sourceShelfDocuments.textContent, /函数的概念、定义域和值域/);
+    assert.equal(dom.el.sourceShelfDocuments.querySelector('.source-shelf-card__preview')?.textContent.includes('#'), false);
     assert.match(dom.el.sourceShelfDocuments.textContent, /试卷\.docx/);
     assert.match(dom.el.sourceShelfDocuments.textContent, /坏文件\.txt/);
     assert.match(dom.el.sourceShelfDocuments.textContent, /解析失败/);
+    assert.equal(dom.el.sourceShelfDocuments.querySelectorAll('.source-shelf-section').length, 1);
+    assert.equal(dom.el.sourceShelfDocuments.querySelectorAll('.source-shelf-upload-card').length, 1);
+    assert.equal(dom.el.sourceShelfDocuments.querySelectorAll('.source-shelf-card--has-thumbnail').length, 1);
+    assert.match(dom.el.sourceShelfDocuments.querySelector('.source-shelf-upload-card')?.textContent || '', /上传资料/);
+    assert.equal(dom.el.sourceShelfDocuments.classList.contains('source-shelf-grid--shelf-view'), true);
+    assert.equal(dom.el.renameSourceShelfGroupBtn.disabled, true);
+    assert.equal(dom.el.importSourceShelfFilesBtn.disabled, true);
+
+    dom.el.sourceShelfGroups.querySelectorAll('.source-shelf-group-card')[1].click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     assert.equal(dom.el.renameSourceShelfGroupBtn.disabled, false);
     assert.equal(dom.el.importSourceShelfFilesBtn.disabled, false);
+    assert.equal(dom.el.sourceShelfDocuments.querySelectorAll('.source-shelf-upload-card').length, 1);
+    assert.equal(thumbnailCalls.includes('doc-pdf-by-name'), true);
+    assert.equal(dom.el.sourceShelfDocuments.querySelector('[data-shelf-doc-action]'), null);
+
+    const firstCard = dom.el.sourceShelfDocuments.querySelector('article.source-shelf-card');
+    firstCard.dispatchEvent(new dom.window.MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 80,
+        clientY: 90,
+    }));
+    const menu = dom.document.getElementById('sourceShelfDocumentActionMenu');
+    assert.ok(menu);
+    assert.equal(menu.classList.contains('hidden'), false);
+    assert.match(menu.textContent, /重命名/);
+    assert.match(menu.textContent, /删除/);
+
+    await controller.loadShelfGroups();
+    const restoredMenu = dom.document.getElementById('sourceShelfDocumentActionMenu');
+    assert.equal(restoredMenu.classList.contains('hidden'), false);
+    assert.match(restoredMenu.textContent, /重命名/);
+    assert.match(restoredMenu.textContent, /删除/);
+
+    restoredMenu.querySelector('[data-shelf-document-action="delete"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(deleteCalls, ['doc-done']);
+});
+
+test('shelf document context menu can move a document to another group', async () => {
+    const { createShelfController } = await loadShelfModule();
+    const dom = createDomElements();
+    const state = createState();
+    const store = createStore(state);
+    const moveCalls = [];
+    let docsByGroup = {
+        'shelf-1': [{ id: 'doc-1', kbId: 'shelf-1', name: '教材.pdf', status: 'done', fileHash: 'hash-1', contentType: 'pdf-text' }],
+        'shelf-2': [],
+    };
+    const controller = createShelfController({
+        store,
+        el: dom.el,
+        chatAPI: {
+            async listKnowledgeBases() {
+                return {
+                    success: true,
+                    items: [
+                        { id: 'shelf-1', name: '教材', kind: 'shelf', documentCount: docsByGroup['shelf-1'].length, doneCount: docsByGroup['shelf-1'].length },
+                        { id: 'shelf-2', name: '未归类', kind: 'shelf', documentCount: docsByGroup['shelf-2'].length, doneCount: docsByGroup['shelf-2'].length },
+                    ],
+                };
+            },
+            async listKnowledgeBaseDocuments(kbId) {
+                return { success: true, items: docsByGroup[kbId] || [] };
+            },
+            async moveKnowledgeBaseDocumentToShelfGroup(documentId, targetGroupId) {
+                moveCalls.push([documentId, targetGroupId]);
+                docsByGroup = {
+                    'shelf-1': [],
+                    'shelf-2': [{ id: documentId, kbId: targetGroupId, name: '教材.pdf', status: 'done', fileHash: 'hash-1', contentType: 'pdf-text' }],
+                };
+                return { success: true, item: docsByGroup['shelf-2'][0] };
+            },
+        },
+        ui: createUiStub(),
+        windowObj: dom.window,
+        documentObj: dom.document,
+        loadCurrentTopicKnowledgeBaseDocuments: async () => [],
+        loadKnowledgeBases: async () => {},
+    });
+
+    await controller.loadShelfGroups();
+    const card = dom.el.sourceShelfDocuments.querySelector('article.source-shelf-card');
+    card.dispatchEvent(new dom.window.MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 80,
+        clientY: 90,
+    }));
+
+    const menu = dom.document.getElementById('sourceShelfDocumentActionMenu');
+    menu.querySelector('[data-shelf-document-action="move"]').click();
+
+    await controller.loadShelfGroups();
+    const restoredMoveMenu = dom.document.getElementById('sourceShelfDocumentActionMenu');
+    assert.equal(restoredMoveMenu.classList.contains('hidden'), false);
+    assert.ok(restoredMoveMenu.querySelector('[data-shelf-document-move-group="shelf-2"]'));
+
+    restoredMoveMenu.querySelector('[data-shelf-document-move-group="shelf-2"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(moveCalls, [['doc-1', 'shelf-2']]);
+    assert.equal(state.shelf.selectedGroupId, 'shelf-2');
 });
 
 test('shelf picker copies reusable documents into the current topic source', async () => {

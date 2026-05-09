@@ -15,6 +15,9 @@ const EXPECTED_EXPORT_KEYS = [
     'deleteKnowledgeBase',
     'importKnowledgeBaseFiles',
     'copyKnowledgeBaseDocuments',
+    'getKnowledgeBaseShelfLinks',
+    'addKnowledgeBaseDocumentsToShelf',
+    'moveKnowledgeBaseDocumentToShelfGroup',
     'listKnowledgeBaseDocuments',
     'deleteKnowledgeBaseDocument',
     'renameKnowledgeBaseDocument',
@@ -24,6 +27,7 @@ const EXPECTED_EXPORT_KEYS = [
     'getKnowledgeBaseRetrievalDebug',
     'getKnowledgeBaseDocumentGuide',
     'generateKnowledgeBaseDocumentGuide',
+    'getKnowledgeBaseDocumentThumbnail',
     'getKnowledgeBaseDocumentViewData',
 ];
 
@@ -47,11 +51,20 @@ function loadKnowledgeBaseFacade() {
     const repository = {
         async listKnowledgeBases(options) {
             callLog.push(['repository.listKnowledgeBases', options]);
+            if (options?.kind === 'shelf') {
+                return [];
+            }
             return [{ id: 'kb-1', name: 'KB 1' }];
         },
         async getKnowledgeBaseById(id) {
             callLog.push(['repository.getKnowledgeBaseById', id]);
-            return id === 'kb-1' ? { id, name: 'KB 1', kind: 'source' } : null;
+            if (id === 'kb-1') {
+                return { id, name: 'KB 1', kind: 'source' };
+            }
+            if (id === 'kb-shelf') {
+                return { id, name: 'Shelf', kind: 'shelf' };
+            }
+            return null;
         },
         async createKnowledgeBase(payload) {
             callLog.push(['repository.createKnowledgeBase', payload]);
@@ -70,10 +83,35 @@ function loadKnowledgeBaseFacade() {
             return {
                 id: documentId,
                 name: documentId === 'doc-image' ? 'diagram.png' : 'fixture.txt',
-                status: 'done',
+                status: documentId === 'doc-pending' ? 'processing' : 'done',
+                kbId: documentId === 'doc-shelf' ? 'kb-shelf' : 'kb-1',
+                fileHash: documentId === 'doc-existing-link' ? 'hash-existing' : 'hash-new',
                 fileName: 'fixture.txt',
                 storedPath: documentId === 'doc-image' ? path.join('C:/fixtures', 'diagram.png') : path.join('C:/fixtures', 'fixture.txt'),
             };
+        },
+        async getShelfLinksForDocuments(documentIds) {
+            callLog.push(['repository.getShelfLinksForDocuments', documentIds]);
+            return documentIds.includes('doc-existing-link')
+                ? [{
+                    sourceDocumentId: 'doc-existing-link',
+                    fileHash: 'hash-existing',
+                    shelfDocumentId: 'doc-shelf-existing',
+                    shelfDocumentName: 'fixture.txt',
+                    shelfKbId: 'kb-shelf',
+                    shelfKbName: 'Shelf',
+                }]
+                : [];
+        },
+        async findShelfDocumentByHash(fileHash) {
+            callLog.push(['repository.findShelfDocumentByHash', fileHash]);
+            return fileHash === 'hash-existing'
+                ? {
+                    document: { id: 'doc-shelf-existing', name: 'fixture.txt', kbId: 'kb-shelf', fileHash },
+                    shelfKbId: 'kb-shelf',
+                    shelfKbName: 'Shelf',
+                }
+                : null;
         },
         async renameKnowledgeBaseDocument(documentId, payload) {
             callLog.push(['repository.renameKnowledgeBaseDocument', documentId, payload]);
@@ -97,6 +135,10 @@ function loadKnowledgeBaseFacade() {
         },
         async deleteKnowledgeBaseData(kbId) {
             callLog.push(['repository.deleteKnowledgeBaseData', kbId]);
+        },
+        async moveDocumentToKnowledgeBase(documentId, targetKbId) {
+            callLog.push(['repository.moveDocumentToKnowledgeBase', documentId, targetKbId]);
+            return { id: documentId, kbId: targetKbId };
         },
     };
     const processingQueue = {
@@ -262,6 +304,24 @@ function loadKnowledgeBaseFacade() {
                     },
                 };
             }
+            if (request === './thumbnailService') {
+                return {
+                    createKnowledgeBaseThumbnailService() {
+                        return {
+                            async getExistingKnowledgeBaseDocumentThumbnail(document) {
+                                callLog.push(['thumbnailService.getExistingKnowledgeBaseDocumentThumbnail', document.id]);
+                                return document.id === 'doc-1'
+                                    ? { documentId: document.id, thumbnailUrl: `file:///preview/${document.id}.png`, kind: 'pdf' }
+                                    : { documentId: document.id, thumbnailUrl: '', kind: 'none' };
+                            },
+                            async getKnowledgeBaseDocumentThumbnail(documentId) {
+                                callLog.push(['thumbnailService.getKnowledgeBaseDocumentThumbnail', documentId]);
+                                return { documentId, thumbnailUrl: `file:///preview/${documentId}.png`, kind: 'pdf' };
+                            },
+                        };
+                    },
+                };
+            }
             if (request === './readerProjection') {
                 return readerProjection;
             }
@@ -299,14 +359,23 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
     ]);
 
     const retrieval = await facade.retrieveKnowledgeBaseContext({ query: 'What is NEWTON-101?' });
+    const listedDocuments = await facade.listKnowledgeBaseDocuments('kb-1');
     const search = await facade.searchKnowledgeBase({ query: 'NEWTON-101' });
     const debug = await facade.getKnowledgeBaseRetrievalDebug({ query: 'debug me' });
     const view = await facade.getKnowledgeBaseDocumentViewData('doc-1');
     const imageView = await facade.getKnowledgeBaseDocumentViewData('doc-image');
+    const thumbnail = await facade.getKnowledgeBaseDocumentThumbnail('doc-1');
     const guide = await facade.getKnowledgeBaseDocumentGuide('doc-1');
     const generatedGuide = await facade.generateKnowledgeBaseDocumentGuide('doc-1', { forceRefresh: false });
     const renamedDocument = await facade.renameKnowledgeBaseDocument('doc-1', { name: 'renamed.txt' });
     const copiedDocuments = await facade.copyKnowledgeBaseDocuments('kb-1', ['doc-1']);
+    const shelfLinks = await facade.getKnowledgeBaseShelfLinks(['doc-existing-link']);
+    const shelfAdded = await facade.addKnowledgeBaseDocumentsToShelf(['doc-1']);
+    await assert.rejects(
+        () => facade.addKnowledgeBaseDocumentsToShelf(['doc-pending']),
+        /Only indexed documents/,
+    );
+    const movedShelfDocument = await facade.moveKnowledgeBaseDocumentToShelfGroup('doc-shelf', 'kb-shelf');
     const deletedDocument = await facade.deleteKnowledgeBaseDocument('doc-delete');
     const retried = await facade.retryKnowledgeBaseDocument('doc-1');
     const deleted = await facade.deleteKnowledgeBase('kb-1');
@@ -317,6 +386,12 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
         contextText: 'ctx',
         itemCount: 1,
     });
+    assert.deepEqual(listedDocuments, [{
+        id: 'doc-1',
+        kbId: 'kb-1',
+        thumbnailUrl: 'file:///preview/doc-1.png',
+        thumbnailKind: 'pdf',
+    }]);
     assert.deepEqual(search, {
         items: [{ documentId: 'doc-1' }],
         itemCount: 1,
@@ -332,6 +407,8 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
             id: 'doc-1',
             name: 'fixture.txt',
             status: 'done',
+            kbId: 'kb-1',
+            fileHash: 'hash-new',
             fileName: 'fixture.txt',
             storedPath: path.join('C:/fixtures', 'fixture.txt'),
             isIndexed: true,
@@ -342,6 +419,11 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
     });
     assert.equal(imageView.document.name, 'diagram.png');
     assert.equal(imageView.view.imagePreviewUrl.startsWith('file:'), true);
+    assert.deepEqual(thumbnail, {
+        documentId: 'doc-1',
+        thumbnailUrl: 'file:///preview/doc-1.png',
+        kind: 'pdf',
+    });
     assert.deepEqual(guide, {
         documentId: 'doc-1',
         guideStatus: 'done',
@@ -360,6 +442,26 @@ test('knowledge-base facade keeps lifecycle order and delegates core calls to in
     assert.deepEqual(copiedDocuments, [
         { id: 'doc-1-copy', kbId: 'kb-1', status: 'done' },
     ]);
+    assert.deepEqual(shelfLinks, [{
+        sourceDocumentId: 'doc-existing-link',
+        fileHash: 'hash-existing',
+        shelfDocumentId: 'doc-shelf-existing',
+        shelfDocumentName: 'fixture.txt',
+        shelfKbId: 'kb-shelf',
+        shelfKbName: 'Shelf',
+    }]);
+    assert.deepEqual(shelfAdded, [{
+        sourceDocumentId: 'doc-1',
+        fileHash: 'hash-new',
+        shelfDocumentId: 'doc-1-copy',
+        shelfDocumentName: '',
+        shelfKbId: 'kb-created',
+        shelfKbName: '未归类',
+    }]);
+    assert.deepEqual(movedShelfDocument, {
+        id: 'doc-shelf',
+        kbId: 'kb-shelf',
+    });
     assert.deepEqual(deletedDocument, {
         id: 'doc-delete',
         storedPath: 'stored/deleted.txt',

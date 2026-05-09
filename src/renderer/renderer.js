@@ -258,6 +258,7 @@ sourceController = createSourceController({
     syncReaderFromDocuments: (...args) => readerController?.syncFromSourceDocuments?.(...args),
     getNativePathForFile: (...args) => composerController?.getNativePathForFile?.(...args),
     openShelfPicker: (...args) => shelfController?.openShelfPicker?.(...args),
+    openShelfPage: (...args) => shelfController?.openShelfPage?.(...args),
     loadTopics: (...args) => workspaceController?.loadTopics?.(...args),
     getCurrentSelectedItem: () => getSessionSlice().currentSelectedItem,
     getCurrentTopicId: () => getSessionSlice().currentTopicId,

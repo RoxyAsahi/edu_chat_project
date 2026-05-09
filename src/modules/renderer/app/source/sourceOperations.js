@@ -18,6 +18,7 @@ function createSourceOperations(deps = {}) {
     const getCurrentTopicKnowledgeBaseId = deps.getCurrentTopicKnowledgeBaseId || (() => null);
     const updateTopicKnowledgeBaseBinding = deps.updateTopicKnowledgeBaseBinding || (() => {});
     const updateTopicSourceSelection = deps.updateTopicSourceSelection || (() => {});
+    const openShelfPage = deps.openShelfPage || (() => {});
     const getFacade = deps.getFacade || (() => ({}));
 
     function normalizeDocumentIds(documentIds = []) {
@@ -35,6 +36,51 @@ function createSourceOperations(deps = {}) {
 
     function getAllTopicDocumentIds() {
         return normalizeDocumentIds(state.topicKnowledgeBaseDocuments.map((item) => item.id));
+    }
+
+    function normalizeShelfLinkMap(items = []) {
+        const links = {};
+        (Array.isArray(items) ? items : []).forEach((item) => {
+            const sourceDocumentId = String(item?.sourceDocumentId || '').trim();
+            if (!sourceDocumentId || !item?.shelfDocumentId || !item?.shelfKbId) {
+                return;
+            }
+            links[sourceDocumentId] = {
+                sourceDocumentId,
+                fileHash: item.fileHash || '',
+                shelfDocumentId: item.shelfDocumentId,
+                shelfDocumentName: item.shelfDocumentName || '',
+                shelfKbId: item.shelfKbId,
+                shelfKbName: item.shelfKbName || '',
+            };
+        });
+        return links;
+    }
+
+    async function refreshTopicSourceShelfLinks(documents = state.topicKnowledgeBaseDocuments, options = {}) {
+        const documentIds = normalizeDocumentIds((Array.isArray(documents) ? documents : []).map((item) => item?.id));
+        if (documentIds.length === 0 || typeof chatAPI.getKnowledgeBaseShelfLinks !== 'function') {
+            state.sourceShelfLinksByDocumentId = {};
+            return {};
+        }
+
+        const result = await chatAPI.getKnowledgeBaseShelfLinks(documentIds).catch((error) => ({
+            success: false,
+            error: error.message,
+            items: [],
+        }));
+
+        if (!result?.success) {
+            state.sourceShelfLinksByDocumentId = {};
+            if (options.silent !== true) {
+                ui.showToastNotification(`加载资料书架状态失败：${result?.error || '未知错误'}`, 'error');
+            }
+            return {};
+        }
+
+        const links = normalizeShelfLinkMap(result.items);
+        state.sourceShelfLinksByDocumentId = links;
+        return links;
     }
 
     function splitDocumentNameForRename(name = '') {
@@ -165,6 +211,7 @@ function createSourceOperations(deps = {}) {
         if (!kbId) {
             state[target] = [];
             if (isTopicTarget) {
+                state.sourceShelfLinksByDocumentId = {};
                 syncReaderFromDocuments([], { resetIfMissing: true });
             }
             if (isTopicTarget) {
@@ -184,6 +231,7 @@ function createSourceOperations(deps = {}) {
         if (!result?.success) {
             state[target] = [];
             if (isTopicTarget) {
+                state.sourceShelfLinksByDocumentId = {};
                 syncReaderFromDocuments([], { resetIfMissing: true });
             }
             if (options.silent !== true) {
@@ -198,6 +246,9 @@ function createSourceOperations(deps = {}) {
         }
 
         state[target] = Array.isArray(result.items) ? result.items : [];
+        if (isTopicTarget) {
+            await refreshTopicSourceShelfLinks(state[target], { silent: true });
+        }
         syncReaderFromDocuments(state[target], { resetIfMissing: isTopicTarget });
 
         if (isTopicTarget) {
@@ -212,6 +263,7 @@ function createSourceOperations(deps = {}) {
         const kbId = getCurrentTopicKnowledgeBaseId();
         if (!kbId) {
             state.topicKnowledgeBaseDocuments = [];
+            state.sourceShelfLinksByDocumentId = {};
             getFacade().renderTopicKnowledgeBaseFiles();
             return [];
         }
@@ -222,6 +274,7 @@ function createSourceOperations(deps = {}) {
             reuseSelected: options.reuseSelected,
         })) {
             state.topicKnowledgeBaseDocuments = [...state.knowledgeBaseDocuments];
+            await refreshTopicSourceShelfLinks(state.topicKnowledgeBaseDocuments, { silent: true });
             syncReaderFromDocuments(state.topicKnowledgeBaseDocuments, { resetIfMissing: true });
             getFacade().renderTopicKnowledgeBaseFiles();
             return state.topicKnowledgeBaseDocuments;
@@ -256,6 +309,7 @@ function createSourceOperations(deps = {}) {
         if (selectedKbId && selectedKbId === topicKbId) {
             const documents = await loadKnowledgeBaseDocuments(selectedKbId, { silent: true });
             state.topicKnowledgeBaseDocuments = Array.isArray(documents) ? [...documents] : [];
+            await refreshTopicSourceShelfLinks(state.topicKnowledgeBaseDocuments, { silent: true });
             getFacade().renderTopicKnowledgeBaseFiles();
         } else {
             await Promise.all([
@@ -399,6 +453,46 @@ function createSourceOperations(deps = {}) {
         if (options.toastSuccess !== false) {
             ui.showToastNotification(`已开始导入 ${payloads.length} 个资料文件。`, 'success');
         }
+    }
+
+    async function addTopicSourceDocumentToShelf(documentItem = {}) {
+        const documentId = String(documentItem?.id || '').trim();
+        if (!documentId) {
+            return;
+        }
+        if (documentItem.status !== 'done') {
+            ui.showToastNotification('资料完成解析后才能加入资料书架。', 'warning');
+            return;
+        }
+        if (typeof chatAPI.addKnowledgeBaseDocumentsToShelf !== 'function') {
+            ui.showToastNotification('当前版本暂不支持加入资料书架。', 'warning');
+            return;
+        }
+
+        const result = await chatAPI.addKnowledgeBaseDocumentsToShelf([documentId]).catch((error) => ({
+            success: false,
+            error: error.message,
+            items: [],
+        }));
+        if (!result?.success) {
+            ui.showToastNotification(`加入资料书架失败：${result?.error || '未知错误'}`, 'error');
+            return;
+        }
+
+        await refreshTopicSourceShelfLinks(state.topicKnowledgeBaseDocuments, { silent: true });
+        getFacade().renderTopicKnowledgeBaseFiles();
+        const link = state.sourceShelfLinksByDocumentId[documentId];
+        ui.showToastNotification(`已加入资料书架${link?.shelfKbName ? `：${link.shelfKbName}` : ''}。`, 'success');
+    }
+
+    async function openShelfGroupFromSource(documentItem = {}) {
+        const documentId = String(documentItem?.id || '').trim();
+        const link = state.sourceShelfLinksByDocumentId[documentId];
+        if (!link?.shelfKbId) {
+            await addTopicSourceDocumentToShelf(documentItem);
+            return;
+        }
+        await openShelfPage({ selectedGroupId: link.shelfKbId });
     }
 
     async function createKnowledgeBase() {
@@ -617,6 +711,7 @@ function createSourceOperations(deps = {}) {
         handleTopicKnowledgeBaseChange,
         importKnowledgeBaseFilesForKb,
         importKnowledgeBaseFilesFromInput,
+        addTopicSourceDocumentToShelf,
         loadCurrentTopicKnowledgeBaseDocuments,
         loadKnowledgeBaseDocuments,
         loadKnowledgeBases,
@@ -625,6 +720,7 @@ function createSourceOperations(deps = {}) {
         refreshKnowledgeBaseSummaries,
         renameKnowledgeBase,
         renameKnowledgeBaseDocument,
+        openShelfGroupFromSource,
         runKnowledgeBaseDebug,
         runKnowledgeBaseSearch,
         setAllTopicSourceDocumentsSelected,

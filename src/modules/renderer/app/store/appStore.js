@@ -195,6 +195,7 @@ function createInitialAppState() {
             knowledgeBases: [],
             knowledgeBaseDocuments: [],
             topicKnowledgeBaseDocuments: [],
+            sourceShelfLinksByDocumentId: {},
             knowledgeBaseDebugResult: null,
             selectedKnowledgeBaseId: null,
             activeSourceFileMenu: null,

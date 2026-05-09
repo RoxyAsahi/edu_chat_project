@@ -98,7 +98,13 @@ function createSourceDom(deps = {}) {
             return;
         }
 
-        const actions = getSourceFileActions(activeMenu.documentItem);
+        const baseActions = getSourceFileActions(activeMenu.documentItem);
+        const shelfAction = getShelfMenuAction(activeMenu.documentItem);
+        const actions = [
+            ...baseActions.filter((action) => action.key === 'open'),
+            shelfAction,
+            ...baseActions.filter((action) => action.key !== 'open'),
+        ];
         el.sourceFileActionMenu.innerHTML = actions.map((action) => `
             <button
                 type="button"
@@ -126,6 +132,14 @@ function createSourceDom(deps = {}) {
 
                 if (action === 'open') {
                     await openReaderDocument(activeMenu.documentItem.id);
+                } else if (action === 'addToShelf') {
+                    closeSourceFileActionMenu();
+                    await getFacade().addTopicSourceDocumentToShelf(activeMenu.documentItem);
+                    return;
+                } else if (action === 'openShelfGroup') {
+                    closeSourceFileActionMenu();
+                    await getFacade().openShelfGroupFromSource(activeMenu.documentItem);
+                    return;
                 } else if (action === 'rename') {
                     closeSourceFileActionMenu();
                     await getFacade().renameKnowledgeBaseDocument(activeMenu.documentItem);
@@ -171,6 +185,37 @@ function createSourceDom(deps = {}) {
     function isTopicDocumentSelected(documentItem) {
         const selectedSet = getSelectedTopicDocumentIdSet();
         return selectedSet === null || selectedSet.has(documentItem?.id);
+    }
+
+    function getShelfLinkForDocument(documentItem = {}) {
+        const links = state.sourceShelfLinksByDocumentId || {};
+        return links[String(documentItem.id || '').trim()] || null;
+    }
+
+    function getShelfMenuAction(documentItem = {}) {
+        const link = getShelfLinkForDocument(documentItem);
+        if (link) {
+            return {
+                key: 'openShelfGroup',
+                label: link.shelfKbName ? `已入书架 · ${link.shelfKbName}` : '已入书架',
+                icon: 'shelves',
+                disabled: false,
+            };
+        }
+        if (documentItem.status !== 'done') {
+            return {
+                key: 'addToShelf',
+                label: '待解析 · 暂不能加入',
+                icon: 'hourglass_top',
+                disabled: true,
+            };
+        }
+        return {
+            key: 'addToShelf',
+            label: '未入书架 · 加入',
+            icon: 'add',
+            disabled: false,
+        };
     }
 
     function renderSourceCheckbox({ checked = true, indeterminate = false, label = '选择来源', documentId = '' } = {}) {

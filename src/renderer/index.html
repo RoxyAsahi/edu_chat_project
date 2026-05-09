@@ -230,6 +230,9 @@
               <div class="source-shelf-panel__header">
                 <span>分组</span>
                 <small>按用途收纳</small>
+                <button id="createSourceShelfGroupBtn" class="ghost-button source-shelf-panel__add" type="button" aria-label="新建分组">
+                  <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                </button>
               </div>
               <div id="sourceShelfGroups" class="source-shelf-groups"></div>
             </aside>
@@ -240,10 +243,6 @@
                   <input id="sourceShelfGroupNameInput" type="text" placeholder="例如：教材 / 试卷 / 论文" />
                 </label>
                 <div class="source-shelf-page__actions">
-                  <button id="createSourceShelfGroupBtn" class="accent-button source-shelf-page__action" type="button">
-                    <span class="material-symbols-outlined" aria-hidden="true">create_new_folder</span>
-                    <span>新建分组</span>
-                  </button>
                   <button id="renameSourceShelfGroupBtn" class="ghost-button source-shelf-page__action" type="button">
                     <span class="material-symbols-outlined" aria-hidden="true">drive_file_rename_outline</span>
                     <span>重命名</span>

@@ -294,6 +294,8 @@
   }
 
   .source-shelf-page__actions {
+    position: static;
+    transform: none;
     width: 100%;
     justify-content: flex-start;
   }
@@ -301,6 +303,7 @@
   .source-shelf-page__name-field {
     flex: 1 1 100%;
     min-width: 0;
+    padding-right: 0;
   }
 
   .source-shelf-page__body {
@@ -321,7 +324,24 @@
 
   .source-shelf-picker-group__grid,
   .source-shelf-grid {
-    gap: 6px;
+    gap: 12px;
+  }
+
+  .source-shelf-grid {
+    grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+    grid-auto-rows: 210px;
+    padding: 14px;
+  }
+
+  .source-shelf-grid--shelf-view {
+    padding: 14px;
+    gap: 22px;
+  }
+
+  .source-shelf-section__grid {
+    grid-auto-columns: minmax(156px, 1fr);
+    grid-template-rows: minmax(0, 210px);
+    gap: 12px;
   }
 }
 
