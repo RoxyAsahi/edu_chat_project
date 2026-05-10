@@ -90,6 +90,11 @@ function parseMessageRow(row) {
     }
 }
 
+async function getTableColumnSet(client, tableName) {
+    const result = await client.execute(`PRAGMA table_info(${tableName})`);
+    return new Set((result.rows || []).map((row) => String(row.name)));
+}
+
 function createChatHistoryStore(options = {}) {
     const dataRoot = options.dataRoot;
     const dbDir = options.dbDir || path.join(dataRoot || '', 'ChatHistory');
@@ -147,6 +152,20 @@ function createChatHistoryStore(options = {}) {
 
             for (const statement of statements) {
                 await client.execute(statement);
+            }
+
+            const topicStateColumns = await getTableColumnSet(client, 'chat_topic_state');
+            if (!topicStateColumns.has('initialized_at')) {
+                await client.execute('ALTER TABLE chat_topic_state ADD COLUMN initialized_at INTEGER');
+                if (topicStateColumns.has('migrated_at')) {
+                    await client.execute('UPDATE chat_topic_state SET initialized_at = COALESCE(initialized_at, migrated_at)');
+                }
+            }
+            if (!topicStateColumns.has('message_count')) {
+                await client.execute('ALTER TABLE chat_topic_state ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0');
+            }
+            if (!topicStateColumns.has('updated_at')) {
+                await client.execute('ALTER TABLE chat_topic_state ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0');
             }
 
             initialized = true;
@@ -407,10 +426,10 @@ function createChatHistoryStore(options = {}) {
         ensureTopicState,
         findTopicIdsByContent,
         getDbPath: () => dbPath,
+        getTopicState,
         getHistory,
         getHistoryPage,
         getMessageById,
-        getTopicState,
         getUnreadSummary,
         initialize,
         replaceHistory,

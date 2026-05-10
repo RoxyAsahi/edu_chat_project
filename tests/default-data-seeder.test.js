@@ -161,3 +161,148 @@ test('default data seeder uses stat-based source checks for packaged asar paths'
     assert.equal(result.copiedFiles, 1);
     assert.ok(await originalPathExists(path.join(dataRoot, 'Agents', 'seed_agent', 'config.json')));
 });
+
+test('default data seeder repairs seeded shelf knowledge base kind in existing DBs', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-default-seed-shelf-kind-test-'));
+    const dataRoot = path.join(tempRoot, 'data');
+    const seedRoot = path.join(tempRoot, 'seed');
+    const { createClient } = require('@libsql/client');
+
+    t.after(async () => {
+        await fs.remove(tempRoot).catch(() => {});
+    });
+
+    const kbId = 'kb_seed_shelf';
+    const docId = 'doc_seed_shelf';
+    const fileName = 'seed-shelf.pdf';
+    const seedKbDbPath = path.join(seedRoot, 'KnowledgeBase', 'knowledge-base.db');
+    await fs.ensureDir(path.dirname(seedKbDbPath));
+    const seedKbDb = createClient({ url: `file:${seedKbDbPath}` });
+    await seedKbDb.execute('CREATE TABLE knowledge_base (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT "source", created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
+    await seedKbDb.execute(`CREATE TABLE kb_document (
+        id TEXT PRIMARY KEY, kb_id TEXT NOT NULL, name TEXT NOT NULL, stored_path TEXT NOT NULL, mime_type TEXT,
+        file_size INTEGER DEFAULT 0, file_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', error TEXT,
+        chunk_count INTEGER DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, processed_at INTEGER,
+        extracted_text TEXT, extracted_content_type TEXT
+    )`);
+    await seedKbDb.execute(`CREATE TABLE kb_chunk (
+        id TEXT PRIMARY KEY, kb_id TEXT NOT NULL, document_id TEXT NOT NULL, chunk_index INTEGER NOT NULL,
+        content TEXT NOT NULL, embedding TEXT NOT NULL, created_at INTEGER NOT NULL
+    )`);
+    await seedKbDb.execute({
+        sql: 'INSERT INTO knowledge_base (id, name, kind, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        args: [kbId, 'Seed Shelf', 'shelf', 1, 2],
+    });
+    await seedKbDb.execute({
+        sql: `INSERT INTO kb_document
+            (id, kb_id, name, stored_path, mime_type, file_size, file_hash, status, chunk_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [docId, kbId, fileName, `KnowledgeBase/files/${fileName}`, 'application/pdf', 10, 'seed-shelf-hash', 'done', 0, 3, 4],
+    });
+    await seedKbDb.close?.();
+    await fs.outputFile(path.join(seedRoot, 'KnowledgeBase', 'files', fileName), 'pdf bytes');
+
+    const targetKbDbPath = path.join(dataRoot, 'KnowledgeBase', 'knowledge-base.db');
+    await fs.ensureDir(path.dirname(targetKbDbPath));
+    const targetKbDb = createClient({ url: `file:${targetKbDbPath}` });
+    await targetKbDb.execute('CREATE TABLE knowledge_base (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT "source", created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
+    await targetKbDb.execute(`CREATE TABLE kb_document (
+        id TEXT PRIMARY KEY, kb_id TEXT NOT NULL, name TEXT NOT NULL, stored_path TEXT NOT NULL, mime_type TEXT,
+        file_size INTEGER DEFAULT 0, file_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', error TEXT,
+        chunk_count INTEGER DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, processed_at INTEGER
+    )`);
+    await targetKbDb.execute(`CREATE TABLE kb_chunk (
+        id TEXT PRIMARY KEY, kb_id TEXT NOT NULL, document_id TEXT NOT NULL, chunk_index INTEGER NOT NULL,
+        content TEXT NOT NULL, embedding TEXT NOT NULL, created_at INTEGER NOT NULL
+    )`);
+    await targetKbDb.execute({
+        sql: 'INSERT INTO knowledge_base (id, name, kind, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        args: [kbId, 'Seed Shelf', 'source', 1, 2],
+    });
+    await targetKbDb.close?.();
+
+    const result = await seedDefaultDataRoot({ dataRoot, seedRoot });
+    assert.equal(result.knowledgeBaseImports.knowledgeBases, 0);
+    assert.equal(result.knowledgeBaseImports.documents, 1);
+
+    const repairedDb = createClient({ url: `file:${targetKbDbPath}` });
+    const kbs = await repairedDb.execute({
+        sql: 'SELECT kind FROM knowledge_base WHERE id = ?',
+        args: [kbId],
+    });
+    const docs = await repairedDb.execute({
+        sql: 'SELECT stored_path FROM kb_document WHERE id = ?',
+        args: [docId],
+    });
+    assert.equal(kbs.rows[0].kind, 'shelf');
+    assert.equal(docs.rows[0].stored_path, path.join(dataRoot, 'KnowledgeBase', 'files', fileName));
+    await repairedDb.close?.();
+});
+
+test('default data seeder imports existing seed history files once without overwriting DB history', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-default-seed-existing-history-test-'));
+    const dataRoot = path.join(tempRoot, 'data');
+    const seedRoot = path.join(tempRoot, 'seed');
+    const agentId = 'seed_agent';
+    const topicId = 'default';
+    t.after(async () => {
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            try {
+                await fs.remove(tempRoot);
+                return;
+            } catch (error) {
+                if (error.code !== 'EBUSY' || attempt === 9) {
+                    if (error.code === 'EBUSY') {
+                        return;
+                    }
+                    throw error;
+                }
+            }
+        }
+    });
+
+    await fs.outputJson(path.join(seedRoot, 'Agents', agentId, 'config.json'), {
+        name: 'Seed Agent',
+        topics: [{ id: topicId, name: 'Seed Topic' }],
+    }, { spaces: 2 });
+    await fs.outputJson(path.join(seedRoot, 'UserData', agentId, 'topics', topicId, 'history.json'), [{
+        id: 'seed-user-1',
+        role: 'user',
+        content: 'seed hello',
+    }], { spaces: 2 });
+
+    await fs.copy(path.join(seedRoot, 'Agents'), path.join(dataRoot, 'Agents'));
+    await fs.copy(path.join(seedRoot, 'UserData'), path.join(dataRoot, 'UserData'));
+
+    const { createChatHistoryStore } = require('../src/modules/main/chat-history/store');
+    const emptyStateStore = createChatHistoryStore({ dataRoot });
+    assert.deepEqual(await emptyStateStore.getHistory(agentId, topicId), []);
+    await emptyStateStore.close();
+
+    const firstResult = await seedDefaultDataRoot({ dataRoot, seedRoot });
+    assert.equal(firstResult.chatHistoryImports, 1);
+    assert.equal(await fs.pathExists(path.join(dataRoot, 'UserData', agentId, 'topics', topicId, 'history.json')), false);
+
+    const chatHistoryStore = createChatHistoryStore({ dataRoot });
+    assert.deepEqual(await chatHistoryStore.getHistory(agentId, topicId), [{
+        id: 'seed-user-1',
+        role: 'user',
+        content: 'seed hello',
+    }]);
+
+    await chatHistoryStore.replaceHistory(agentId, topicId, [
+        { id: 'seed-user-1', role: 'user', content: 'seed hello' },
+        { id: 'user-added-1', role: 'assistant', content: 'user-added reply' },
+    ]);
+    await chatHistoryStore.close();
+
+    const secondResult = await seedDefaultDataRoot({ dataRoot, seedRoot });
+    assert.equal(secondResult.chatHistoryImports, 0);
+
+    const reopenedStore = createChatHistoryStore({ dataRoot });
+    const historyAfterSecondSeed = await reopenedStore.getHistory(agentId, topicId);
+    assert.equal(historyAfterSecondSeed.length, 2);
+    assert.equal(historyAfterSecondSeed[1].content, 'user-added reply');
+    await reopenedStore.close();
+});

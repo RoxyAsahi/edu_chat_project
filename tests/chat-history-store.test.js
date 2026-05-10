@@ -3,6 +3,7 @@ const assert = require('assert/strict');
 const fs = require('fs-extra');
 const os = require('os');
 const path = require('path');
+const { createClient } = require('@libsql/client');
 
 const { createChatHistoryStore } = require('../src/modules/main/chat-history/store');
 
@@ -39,6 +40,45 @@ test('chat history store initializes empty topics without reading JSON history f
 
     const state = await store.getTopicState('agent-1', 'topic-1');
     assert.equal(Number(state.message_count), 0);
+});
+
+test('chat history store repairs topic state schema created before initialized_at', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-chat-history-schema-repair-'));
+    const dbDir = path.join(tempRoot, 'ChatHistory');
+    const dbPath = path.join(dbDir, 'chat-history.db');
+    await fs.ensureDir(dbDir);
+
+    const db = createClient({ url: `file:${dbPath}` });
+    await db.execute(`CREATE TABLE chat_topic_state (
+        agent_id TEXT NOT NULL,
+        topic_id TEXT NOT NULL,
+        migrated_at INTEGER,
+        message_count INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (agent_id, topic_id)
+    )`);
+    await db.execute({
+        sql: `INSERT INTO chat_topic_state (agent_id, topic_id, migrated_at, message_count, updated_at)
+            VALUES (?, ?, ?, ?, ?)`,
+        args: ['agent-1', 'topic-1', 12345, 0, 12345],
+    });
+    if (typeof db.close === 'function') {
+        await db.close();
+    }
+
+    const store = createChatHistoryStore({ dataRoot: tempRoot });
+    t.after(async () => {
+        await store.close();
+        await removeTempRootBestEffort(tempRoot);
+    });
+
+    const state = await store.getTopicState('agent-1', 'topic-1');
+    assert.equal(Number(state.initialized_at), 12345);
+
+    await store.replaceHistory('agent-1', 'topic-1', [
+        { id: 'm1', role: 'user', content: 'schema repaired' },
+    ]);
+    assert.equal((await store.getHistory('agent-1', 'topic-1')).length, 1);
 });
 
 test('chat history store replaces full histories and returns stable pages', async (t) => {
