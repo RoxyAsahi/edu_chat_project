@@ -901,19 +901,22 @@ function createNotesDom(deps = {}) {
         if (el.manualNotesLibrarySubjectToggle) {
             el.manualNotesLibrarySubjectToggle.setAttribute('aria-expanded', String(!tabsCollapsed));
         }
+        el.manualNotesAnalysisReportsBtn?.classList.toggle(
+            'manual-notes-library-page__analysis-report--active',
+            isAnalysisFilter
+        );
         if (el.manualNotesLibrarySubjectTabs) {
             const isDiaryPanel = state.manualNotesLibraryActivePanel === 'diary';
             let tabs;
             if (isDiaryPanel) {
                 const diaryTabs = getDiaryWallTabs();
                 if (diaryTabs.length > 0 && diaryTabs[0].id === 'all') {
-                    diaryTabs[0] = { ...diaryTabs[0], label: '筛选' };
+                    diaryTabs[0] = { ...diaryTabs[0], label: '全部' };
                 }
                 tabs = diaryTabs.filter(Boolean);
             } else {
                 tabs = [
-                    { id: 'all', label: '筛选' },
-                    { id: 'analysis', label: '深度分析' },
+                    { id: 'all', label: '全部' },
                     ...subjectFilters,
                 ].filter(Boolean);
             }

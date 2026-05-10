@@ -2392,6 +2392,13 @@ function createNotesController(deps = {}) {
                 }
             }
         });
+        el.manualNotesAnalysisReportsBtn?.addEventListener('click', () => {
+            if (state.manualNotesLibraryActivePanel !== 'notes') {
+                state.manualNotesLibraryActivePanel = 'notes';
+                syncWorkspaceView();
+            }
+            setManualNotesLibraryFilter('analysis');
+        });
         el.manualNotesLibrarySubjectToggle?.addEventListener('click', () => {
             state.manualNotesLibraryTabsCollapsed = !state.manualNotesLibraryTabsCollapsed;
             notesDomApi.renderManualNotesLibrary();

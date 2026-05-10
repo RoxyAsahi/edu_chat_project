@@ -42,6 +42,40 @@ function escapeSelectorValue(value) {
     return String(value).replace(/["\\]/g, '\\$&');
 }
 
+function positionFloatingElement(element, rect, preferred = 'right', windowObj = null) {
+    if (!element || !rect) {
+        return;
+    }
+
+    const viewportPadding = 12;
+    const gap = 10;
+    const { innerWidth = 1024, innerHeight = 768 } = windowObj || {};
+    const elementWidth = element.offsetWidth || 0;
+    const elementHeight = element.offsetHeight || 0;
+
+    let left = preferred === 'left'
+        ? rect.left - elementWidth - gap
+        : rect.right + gap;
+    let top = rect.top;
+
+    if (preferred === 'right' && left + elementWidth > innerWidth - viewportPadding) {
+        left = Math.max(viewportPadding, rect.left - elementWidth - gap);
+        top = Math.max(viewportPadding, rect.top - 4);
+    } else if (preferred === 'left' && left < viewportPadding) {
+        left = Math.min(innerWidth - elementWidth - viewportPadding, rect.right + gap);
+    }
+
+    if (top + elementHeight > innerHeight - viewportPadding) {
+        top = Math.max(viewportPadding, rect.bottom - elementHeight);
+    }
+
+    top = Math.max(viewportPadding, Math.min(top, innerHeight - elementHeight - viewportPadding));
+    left = Math.max(viewportPadding, Math.min(left, innerWidth - elementWidth - viewportPadding));
+
+    element.style.left = `${Math.round(left)}px`;
+    element.style.top = `${Math.round(top)}px`;
+}
+
 function stripLeadingDiaryHeadings(value) {
     const lines = String(value || '').split(/\r?\n/);
     let skipping = true;
@@ -241,6 +275,7 @@ function createDiaryWallController(deps = {}) {
     const chatAPI = deps.chatAPI;
     const ui = deps.ui;
     const documentObj = deps.documentObj || document;
+    const windowObj = deps.windowObj || documentObj.defaultView || (typeof window !== 'undefined' ? window : null);
     const renderMarkdownFragment = deps.renderMarkdownFragment || ((value) => escapeHtml(value));
     const getCurrentSelectedItem = deps.getCurrentSelectedItem || (() => ({ id: '', name: '' }));
     const getCurrentTopicId = deps.getCurrentTopicId || (() => '');
@@ -263,6 +298,7 @@ function createDiaryWallController(deps = {}) {
         manageMode: false,
         selectedCardKeys: new Set(),
         editingEntry: null,
+        activeCardMenu: null,
         noteModalOpen: false,
         lastLoadedAt: 0,
         loadingPromise: null,
@@ -284,6 +320,142 @@ function createDiaryWallController(deps = {}) {
         state.editingEntry = null;
         el.diaryWallNoteModal?.classList.add('hidden');
         el.diaryWallNoteModal?.setAttribute('aria-hidden', 'true');
+    }
+
+    function ensureDiaryWallActionMenu() {
+        if (el.diaryWallActionMenu) {
+            return el.diaryWallActionMenu;
+        }
+
+        const existing = documentObj.getElementById('diaryWallActionMenu');
+        if (existing) {
+            el.diaryWallActionMenu = existing;
+            return existing;
+        }
+
+        const menu = documentObj.createElement('div');
+        menu.id = 'diaryWallActionMenu';
+        menu.className = 'topic-action-menu hidden diary-wall-action-menu';
+        menu.setAttribute('role', 'menu');
+        documentObj.body.appendChild(menu);
+        el.diaryWallActionMenu = menu;
+        return menu;
+    }
+
+    function closeDiaryWallActionMenu() {
+        state.activeCardMenu = null;
+        const menu = el.diaryWallActionMenu || documentObj.getElementById('diaryWallActionMenu');
+        if (!menu) {
+            return;
+        }
+
+        menu.classList.add('hidden');
+        menu.innerHTML = '';
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        menu.style.visibility = '';
+    }
+
+    async function openCardFromMenu(card) {
+        if (!card) {
+            return;
+        }
+
+        state.selectedCardKey = buildCardSelectionKey(card);
+        state.detailExpanded = false;
+        renderCards();
+        await loadDetail();
+        if (state.detail) {
+            openNoteModal();
+        }
+    }
+
+    function toggleManageMode() {
+        state.manageMode = !state.manageMode;
+        state.selectedCardKeys.clear();
+        renderSummary();
+        renderCards();
+        renderDetail();
+    }
+
+    function renderDiaryWallActionMenu() {
+        const activeMenu = state.activeCardMenu;
+        const menu = ensureDiaryWallActionMenu();
+        if (!activeMenu?.card || !activeMenu?.anchorRect) {
+            closeDiaryWallActionMenu();
+            return;
+        }
+
+        const actions = [
+            { key: 'open', label: '打开日记', icon: 'open_in_new' },
+            { key: 'manage', label: state.manageMode ? '返回浏览' : '管理日记', icon: state.manageMode ? 'visibility' : 'edit' },
+            { key: 'refresh', label: '刷新日记墙', icon: 'refresh' },
+            { key: 'delete', label: '删除日记', icon: 'delete', danger: true },
+        ];
+
+        menu.innerHTML = actions.map((action) => `
+            <button
+                type="button"
+                class="topic-action-menu__item ${action.danger ? 'topic-action-menu__item--danger' : ''}"
+                data-diary-wall-card-action="${escapeHtml(action.key)}"
+                role="menuitem"
+            >
+                <span class="material-symbols-outlined">${escapeHtml(action.icon)}</span>
+                <span>${escapeHtml(action.label)}</span>
+            </button>
+        `).join('');
+
+        menu.classList.remove('hidden');
+        menu.style.visibility = 'hidden';
+        positionFloatingElement(
+            menu,
+            activeMenu.anchorRect,
+            activeMenu.placement || 'right',
+            windowObj,
+        );
+        menu.style.visibility = 'visible';
+
+        menu.querySelectorAll('[data-diary-wall-card-action]').forEach((button) => {
+            button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const action = button.getAttribute('data-diary-wall-card-action');
+                const card = activeMenu.card;
+                closeDiaryWallActionMenu();
+
+                if (action === 'open') {
+                    await openCardFromMenu(card);
+                } else if (action === 'manage') {
+                    toggleManageMode();
+                } else if (action === 'refresh') {
+                    await refresh();
+                } else if (action === 'delete') {
+                    await deleteCard(card);
+                }
+            });
+        });
+    }
+
+    function openDiaryWallActionMenu(event, card, anchorElement) {
+        if (!card) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        state.activeCardMenu = {
+            card,
+            anchorElement,
+            anchorRect: {
+                left: event.clientX,
+                right: event.clientX,
+                top: event.clientY,
+                bottom: event.clientY,
+                width: 0,
+                height: 0,
+            },
+            placement: 'right',
+        };
+        renderDiaryWallActionMenu();
     }
 
     function getAgentTabs(cards = state.cards) {
@@ -472,10 +644,9 @@ function createDiaryWallController(deps = {}) {
                 ${sortedCards.map((card) => {
                     const cardKey = buildCardSelectionKey(card);
                     const preview = buildPlainPreview(card.previewMarkdown || card.contentMarkdown || '', 180);
-                    const entryLabel = Number(card.entryCount || 0) > 0 ? `${Number(card.entryCount || 0)} 条记录` : '日记卡';
                     const notebookLabel = card.notebookName || (Array.isArray(card.agentNames) ? card.agentNames[0] : '') || '';
-                    const tagMarkup = Array.isArray(card.tags) && card.tags.length > 0
-                        ? `<div class="diary-wall-card__tags">${card.tags.slice(0, 4).map((tag) => `<span class="diary-wall-chip">#${escapeHtml(tag)}</span>`).join('')}</div>`
+                    const cardMetaMarkup = notebookLabel
+                        ? `<div class="diary-wall-card__meta"><span>${escapeHtml(notebookLabel)}</span></div>`
                         : '';
                     if (state.manageMode) {
                         const isSelected = state.selectedCardKeys.has(cardKey);
@@ -501,12 +672,7 @@ function createDiaryWallController(deps = {}) {
                         </div>
                       </div>
                       <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
-                      ${tagMarkup}
-                      <div class="diary-wall-card__meta">
-                        ${notebookLabel ? `<span>${escapeHtml(notebookLabel)}</span>` : ''}
-                        <span>${escapeHtml(card.dateKey || '未记录日期')}</span>
-                        <span>${escapeHtml(entryLabel)}</span>
-                      </div>
+                      ${cardMetaMarkup}
                     </article>
                 `;
                     }
@@ -519,12 +685,7 @@ function createDiaryWallController(deps = {}) {
                         </div>
                       </div>
                       <p class="diary-wall-card__summary">${escapeHtml(preview || '这张日记还没有摘要内容。')}</p>
-                      ${tagMarkup}
-                      <div class="diary-wall-card__meta">
-                        ${notebookLabel ? `<span>${escapeHtml(notebookLabel)}</span>` : ''}
-                        <span>${escapeHtml(card.dateKey || '未记录日期')}</span>
-                        <span>${escapeHtml(entryLabel)}</span>
-                      </div>
+                      ${cardMetaMarkup}
                     </button>
                 `;
                 }).join('')}
@@ -1072,11 +1233,7 @@ function createDiaryWallController(deps = {}) {
             void refresh();
         });
         el.diaryWallEditBtn?.addEventListener('click', () => {
-            state.manageMode = !state.manageMode;
-            state.selectedCardKeys.clear();
-            renderSummary();
-            renderCards();
-            renderDetail();
+            toggleManageMode();
         });
 
         [el.diaryWallSearchInput, el.diaryWallNotebookInput, el.diaryWallTagInput, el.diaryWallDateInput].forEach((node) => {
@@ -1085,6 +1242,7 @@ function createDiaryWallController(deps = {}) {
             });
         });
         el.diaryWallCards?.addEventListener('click', (event) => {
+            closeDiaryWallActionMenu();
             const actionTarget = event.target instanceof Element ? event.target : null;
             const deleteSelectedButton = actionTarget?.closest('[data-diary-wall-delete-selected]');
             if (deleteSelectedButton) {
@@ -1146,6 +1304,18 @@ function createDiaryWallController(deps = {}) {
                 }
             });
         });
+        el.diaryWallCards?.addEventListener('contextmenu', (event) => {
+            const target = event.target instanceof Element ? event.target.closest('[data-diary-wall-card]') : null;
+            if (!target) {
+                return;
+            }
+
+            openDiaryWallActionMenu(
+                event,
+                getCardByKey(target.getAttribute('data-diary-wall-card') || ''),
+                target,
+            );
+        });
         el.diaryWallNoteCloseBtn?.addEventListener('click', closeNoteModal);
         el.diaryWallNoteModalBackdrop?.addEventListener('click', closeNoteModal);
         el.diaryWallNoteContent?.addEventListener('submit', (event) => {
@@ -1172,6 +1342,10 @@ function createDiaryWallController(deps = {}) {
             }
         });
         documentObj.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && state.activeCardMenu) {
+                closeDiaryWallActionMenu();
+                return;
+            }
             if (event.key === 'Escape' && state.noteModalOpen) {
                 closeNoteModal();
                 return;
@@ -1179,6 +1353,17 @@ function createDiaryWallController(deps = {}) {
             if (event.key === 'Escape' && state.open && !isEmbeddedPanel()) {
                 close();
             }
+        });
+        documentObj.addEventListener('click', (event) => {
+            if (!state.activeCardMenu) {
+                return;
+            }
+
+            const target = event.target;
+            if (target instanceof Element && target.closest('#diaryWallActionMenu')) {
+                return;
+            }
+            closeDiaryWallActionMenu();
         });
     }
 

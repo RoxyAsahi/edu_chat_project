@@ -3,8 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 if "%~1"=="" (
-  for /f %%I in ('powershell -NoProfile -Command "(Get-Date).ToString('yyyyMMdd_HHmmss')"') do set "UNISTUDY_RUN_ID=%%I"
-  set "UNISTUDY_DATA_ROOT=%cd%\.tmp\runtime-data\fresh-%UNISTUDY_RUN_ID%"
+  for /f %%I in ('powershell -NoProfile -Command "(Get-Date).ToString('yyyyMMdd_HHmmss_fff')"') do set "UNISTUDY_DATA_ROOT=%cd%\.tmp\runtime-data\fresh-%%I"
 ) else (
   set "UNISTUDY_DATA_ROOT=%~f1"
 )

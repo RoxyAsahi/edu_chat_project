@@ -266,6 +266,7 @@ function createNotesDom() {
             <div id="manualNotesLibrarySubjectTabsWrapper">
                 <div id="manualNotesLibrarySubjectTabs"></div>
             </div>
+            <button id="manualNotesAnalysisReportsBtn"></button>
             <div id="manualNotesLibraryGrid"></div>
             <input id="noteTitleInput" />
             <textarea id="noteContentInput"></textarea>
@@ -368,6 +369,7 @@ function createNotesDom() {
             manualNotesLibrarySubjectToggle: window.document.getElementById('manualNotesLibrarySubjectToggle'),
             manualNotesLibrarySubjectTabsWrapper: window.document.getElementById('manualNotesLibrarySubjectTabsWrapper'),
             manualNotesLibrarySubjectTabs: window.document.getElementById('manualNotesLibrarySubjectTabs'),
+            manualNotesAnalysisReportsBtn: window.document.getElementById('manualNotesAnalysisReportsBtn'),
             manualNotesLibraryGrid: window.document.getElementById('manualNotesLibraryGrid'),
             noteTitleInput: window.document.getElementById('noteTitleInput'),
             noteContentInput: window.document.getElementById('noteContentInput'),
@@ -1055,7 +1057,7 @@ test('manual notes library keeps rich previews mounted during lightweight contro
     assert.equal(mountCalls.length, 2);
     assert.equal(mountCalls.every((call) => call.forceRemount), true);
 
-    el.manualNotesLibrarySubjectToggle.click();
+    controller.renderManualNotesLibrary();
 
     assert.equal(mountCalls.length, 2);
     assert.strictEqual(el.manualNotesLibraryGrid.querySelector('.manual-note-card'), firstCard);
@@ -1066,7 +1068,7 @@ test('manual notes library keeps rich previews mounted during lightweight contro
     assert.equal(mountCalls.length, 4);
 });
 
-test('manual notes library exposes a deep analysis tab that only renders analysis notes', async () => {
+test('manual notes library exposes deep analysis reports separately from subject filters', async () => {
     const { createNotesController } = await loadNotesControllerModule();
 
     const { controller, el, store } = createNotesControllerHarness(createNotesController, {
@@ -1094,15 +1096,17 @@ test('manual notes library exposes a deep analysis tab that only renders analysi
     controller.renderManualNotesLibrary();
 
     const subjectTabsText = el.manualNotesLibrarySubjectTabs.textContent;
-    assert.match(subjectTabsText, /深度分析/);
+    assert.match(subjectTabsText, /全部/);
+    assert.doesNotMatch(subjectTabsText, /深度分析/);
     assert.match(subjectTabsText, /数学/);
     assert.doesNotMatch(subjectTabsText, /物理/);
     assert.match(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析内容/);
 
-    el.manualNotesLibrarySubjectTabs.querySelector('[data-subject-filter="analysis"]').click();
+    el.manualNotesAnalysisReportsBtn.click();
 
     assert.equal(store.getState().notes.manualNotesLibraryFilter, 'analysis');
+    assert.equal(el.manualNotesAnalysisReportsBtn.classList.contains('manual-notes-library-page__analysis-report--active'), true);
     assert.match(el.manualNotesLibraryGrid.textContent, /分析内容/);
     assert.match(el.manualNotesLibraryGrid.textContent, /物理/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /普通内容 A/);

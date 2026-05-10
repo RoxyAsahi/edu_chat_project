@@ -259,12 +259,28 @@
   }
 
   .manual-notes-library-page__inner {
-    gap: 16px;
-    padding-top: 16px;
+    gap: 0;
+    padding-top: 0;
   }
 
-  .manual-notes-library-page__header {
-    align-items: flex-start;
+  .manual-notes-library-page__body {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-notes-library-page__filters-card {
+    max-height: 220px;
+  }
+
+  .manual-notes-library-page__content-card {
+    min-height: 420px;
+  }
+
+  .manual-notes-library-page__filter-stack {
+    padding: 12px 14px 14px;
+  }
+
+  .manual-notes-library-page__subject-tabs {
+    max-height: 120px;
   }
 
   .manual-notes-library-grid {

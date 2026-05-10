@@ -260,7 +260,9 @@ test('diaryWallController opens a dedicated wall, renders cards/details, and fil
     assert.ok(documentObj.querySelector('.diary-wall-card__header-main'));
     assert.ok(documentObj.querySelector('.diary-wall-card__meta'));
     assert.match(documentObj.getElementById('diaryWallCards').textContent, /学习日记/);
-    assert.match(documentObj.getElementById('diaryWallCards').textContent, /2 条记录/);
+    assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /2 条记录/);
+    assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /2026-04-14/);
+    assert.doesNotMatch(documentObj.getElementById('diaryWallCards').textContent, /错因复盘/);
     assert.equal(documentObj.getElementById('diaryWallEditBtn') instanceof dom.window.HTMLButtonElement, true);
     assert.match(documentObj.getElementById('diaryWallDetail').textContent, /选择一张日记卡/);
     assert.equal(listPayloads[0].scope, 'global');
@@ -402,7 +404,20 @@ test('diaryWallController manager mode can delete cards and save entry edits', a
     controller.open();
     await new Promise((resolve) => setTimeout(resolve, 30));
 
-    documentObj.getElementById('diaryWallEditBtn').click();
+    const cardMenuTarget = documentObj.querySelector('[data-diary-wall-card]');
+    cardMenuTarget.dispatchEvent(new dom.window.MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 120,
+        clientY: 120,
+    }));
+    const diaryMenu = documentObj.getElementById('diaryWallActionMenu');
+    assert.ok(diaryMenu);
+    assert.match(diaryMenu.textContent, /管理日记/);
+    assert.match(diaryMenu.textContent, /刷新日记墙/);
+    assert.match(diaryMenu.textContent, /删除日记/);
+
+    diaryMenu.querySelector('[data-diary-wall-card-action="manage"]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 30));
 
     assert.match(documentObj.getElementById('diaryWallCards').textContent, /日记管理/);

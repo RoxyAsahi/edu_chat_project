@@ -508,6 +508,7 @@ async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
         'Agents',
         'UserData',
         path.join('KnowledgeBase', 'files'),
+        'Notes',
         'StudyLogs',
         'StudyDiary',
     ];

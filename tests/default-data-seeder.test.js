@@ -99,6 +99,14 @@ test('default data seeder copies missing agents and rewrites seeded attachment f
         dateKey: '2026-04-30',
         contentMarkdown: 'seed diary',
     }, { spaces: 2 });
+    await fs.outputJson(path.join(seedRoot, 'Notes', agentId, topicId, 'notes.json'), [{
+        id: 'note_seed',
+        title: 'Seed Note',
+        contentMarkdown: 'seed note',
+        kind: 'manual-note',
+        agentId,
+        topicId,
+    }], { spaces: 2 });
 
     const result = await seedDefaultDataRoot({ dataRoot, seedRoot });
 
@@ -109,6 +117,7 @@ test('default data seeder copies missing agents and rewrites seeded attachment f
     assert.ok(await fs.pathExists(path.join(dataRoot, 'Agents', agentId, 'config.json')));
     assert.ok(await fs.pathExists(path.join(dataRoot, 'UserData', 'attachments', attachmentFileName)));
     assert.ok(await fs.pathExists(path.join(dataRoot, 'KnowledgeBase', 'files', 'seed-source.png')));
+    assert.ok(await fs.pathExists(path.join(dataRoot, 'Notes', agentId, topicId, 'notes.json')));
     assert.ok(await fs.pathExists(path.join(dataRoot, 'StudyLogs', agentId, topicId, 'entries.json')));
     assert.ok(await fs.pathExists(path.join(dataRoot, 'StudyDiary', 'seed_notebook', '2026-04-30.json')));
 

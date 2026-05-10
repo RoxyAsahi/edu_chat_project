@@ -6138,8 +6138,7 @@ body.diary-wall-open {
 }
 
 .manual-notes-library-page .diary-wall-panel .diary-wall-canvas__toolbar {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  display: none;
 }
 
 .manual-notes-library-page .diary-wall-panel .diary-wall-canvas__toolbar-meta {
@@ -6159,6 +6158,31 @@ body.diary-wall-open {
   padding: 10px;
   border-radius: 22px;
   gap: 7px;
+}
+
+.manual-notes-library-page .diary-wall-panel .diary-wall-card::before {
+  background:
+    linear-gradient(90deg, rgba(120, 142, 166, 0.075) 1px, transparent 1px) 18px 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 22px,
+      rgba(92, 113, 138, 0.07) 23px,
+      transparent 24px
+    ),
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.68), transparent 28%),
+    radial-gradient(circle at 78% 78%, rgba(214, 225, 240, 0.28), transparent 34%);
+  opacity: 0.68;
+}
+
+.manual-notes-library-page .diary-wall-panel .diary-wall-card::after {
+  right: 7px;
+  bottom: 7px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  font-size: 22px;
+  opacity: 0.22;
 }
 
 .manual-notes-library-page .diary-wall-panel .diary-wall-card__header,
@@ -6533,6 +6557,8 @@ body.diary-wall-open {
 }
 
 .diary-wall-card {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -6542,30 +6568,92 @@ body.diary-wall-open {
   min-height: 204px;
   padding: 18px;
   border-radius: 26px;
-  border: 1px solid #dde3ea;
-  background: #ffffff;
+  border: 1px solid color-mix(in srgb, #d7dfeb 86%, #ffffff 14%);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 255, 0.94)),
+    #ffffff;
   color: var(--ink);
   text-align: left;
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 10px 26px rgba(31, 43, 68, 0.045);
   overflow: hidden;
-  transition: background-color 0.18s ease, border-color 0.18s ease;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   cursor: pointer;
+}
+
+.diary-wall-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(120, 142, 166, 0.08) 1px, transparent 1px) 24px 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 28px,
+      rgba(92, 113, 138, 0.075) 29px,
+      transparent 30px
+    ),
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.72), transparent 26%),
+    radial-gradient(circle at 76% 74%, rgba(214, 225, 240, 0.32), transparent 34%);
+  opacity: 0.78;
+}
+
+.diary-wall-card::after {
+  content: "edit_note";
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  z-index: -1;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.58);
+  color: color-mix(in srgb, var(--accent) 46%, var(--muted) 54%);
+  font-family: 'Material Symbols Outlined';
+  font-size: 30px;
+  font-weight: normal;
+  line-height: 1;
+  font-feature-settings: "liga";
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  opacity: 0.28;
+  transform: rotate(-18deg);
+  pointer-events: none;
+}
+
+.diary-wall-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .diary-wall-card:hover,
 .diary-wall-card:focus-visible {
   transform: none;
-  background: #fbfcfd;
-  border-color: #cfd6de;
-  box-shadow: none;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 1), rgba(246, 250, 255, 0.98)),
+    #ffffff;
+  border-color: color-mix(in srgb, var(--accent) 18%, #cfd6de 82%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 14px 30px rgba(31, 43, 68, 0.065);
   outline: none;
 }
 
 .diary-wall-card--active {
-  background: #f6f8fb;
-  border-color: #c5ccd5;
+  background:
+    linear-gradient(145deg, rgba(249, 252, 255, 1), rgba(240, 246, 255, 0.98)),
+    #f6f8fb;
+  border-color: color-mix(in srgb, var(--accent) 28%, #c5ccd5 72%);
   color: #202124;
-  box-shadow: none;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent),
+    0 14px 32px rgba(31, 43, 68, 0.07);
 }
 
 .diary-wall-card__header {
@@ -6889,6 +6977,27 @@ body.dark-theme .diary-wall-manager-toolbar,
 body.dark-theme .diary-wall-card,
 body.dark-theme .diary-wall-entry__tool pre {
   background: rgba(30, 30, 32, 0.94);
+}
+
+body.dark-theme .diary-wall-card::before {
+  background:
+    linear-gradient(90deg, rgba(168, 199, 250, 0.08) 1px, transparent 1px) 24px 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 28px,
+      rgba(168, 199, 250, 0.055) 29px,
+      transparent 30px
+    ),
+    radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.055), transparent 28%),
+    radial-gradient(circle at 76% 76%, rgba(168, 199, 250, 0.075), transparent 34%);
+  opacity: 0.72;
+}
+
+body.dark-theme .diary-wall-card::after {
+  background: rgba(255, 255, 255, 0.06);
+  color: color-mix(in srgb, var(--accent) 72%, var(--muted) 28%);
+  opacity: 0.24;
 }
 
 body.dark-theme .diary-wall-field,
