@@ -1,5 +1,184 @@
 [
   {
+    "id": "note_1778413151413_y53ymo",
+    "agentId": "_____-____1778401447794",
+    "topicId": "topic_1778409166243",
+    "title": "一般过去时核心速记",
+    "contentMarkdown": "# 一般过去时核心速记\n\n\n\n## 卡片 1\n- 正面：用途\n- 背面：描述 过去发生的动作 及 过去的状态/习惯\n\n## 卡片 2\n- 正面：规则变化\n- 背面：一般加 ed ；e结尾加 d ；辅音+y变y为i加 ed ；重读闭音节双写尾字母加 ed\n\n## 卡片 3\n- 正面：e结尾\n- 背面：加 d ，如 celebrate → celebrated\n\n## 卡片 4\n- 正面：辅音+y\n- 背面：变 y为i 加 ed ，如 study → studied\n\n## 卡片 5\n- 正面：闭音节\n- 背面：双写 尾字母加 ed ，如 stop → stopped\n\n## 卡片 6\n- 正面：be过去式\n- 背面：was （I/he/she/it）/ were （you/we/they）\n\n## 卡片 7\n- 正面：否定式\n- 背面：主语 + didn't + 动词 原形\n\n## 卡片 8\n- 正面：疑问式\n- 背面：Did + 主语 + 动词 原形 ？\n\n## 卡片 9\n- 正面：didn't后\n- 背面：必须接动词 原形 ，如 didn't eat （❌ didn't ate）\n\n## 卡片 10\n- 正面：be与did\n- 背面：不可混用！ 有be用be （wasn't/weren't）， 无be请did\n\n## 卡片 11\n- 正面：时间词\n- 背面：yesterday , last week , ...ago , just now , in+过去年份\n\n## 卡片 12\n- 正面：不规则例\n- 背面：eat → ate ；learn → learned/learnt",
+    "sourceMessageIds": [
+      "user_1778409174332_vnn6ft",
+      "assistant_1778409174340_up94z2"
+    ],
+    "sourceDocumentRefs": [],
+    "kind": "flashcards",
+    "flashcardDeck": {
+      "title": "一般过去时核心速记",
+      "cards": [
+        {
+          "id": "card-1",
+          "front": "用途",
+          "back": "描述**过去发生的动作**及**过去的状态/习惯**",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-2",
+          "front": "规则变化",
+          "back": "一般加 **-ed**；e结尾加 **-d**；辅音+y变y为i加 **-ed**；重读闭音节双写尾字母加 **-ed**",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-3",
+          "front": "e结尾",
+          "back": "加 **-d**，如 celebrate → celebrated",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-4",
+          "front": "辅音+y",
+          "back": "变 **y为i** 加 **-ed**，如 study → studied",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-5",
+          "front": "闭音节",
+          "back": "**双写**尾字母加 **-ed**，如 stop → stopped",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-6",
+          "front": "be过去式",
+          "back": "**was**（I/he/she/it）/ **were**（you/we/they）",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-7",
+          "front": "否定式",
+          "back": "主语 + **didn't** + 动词**原形**",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-8",
+          "front": "疑问式",
+          "back": "**Did** + 主语 + 动词**原形**？",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-9",
+          "front": "didn't后",
+          "back": "必须接动词**原形**，如 didn't *eat*（❌ didn't ate）",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-10",
+          "front": "be与did",
+          "back": "不可混用！**有be用be**（wasn't/weren't），**无be请did**",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-11",
+          "front": "时间词",
+          "back": "**yesterday**, **last week**, **...ago**, **just now**, **in+过去年份**",
+          "sourceDocumentRefs": []
+        },
+        {
+          "id": "card-12",
+          "front": "不规则例",
+          "back": "eat → **ate**；learn → **learned/learnt**",
+          "sourceDocumentRefs": []
+        }
+      ]
+    },
+    "flashcardProgress": {
+      "currentIndex": 0,
+      "flipped": false,
+      "knownCount": 0,
+      "unknownCount": 0,
+      "cardStates": [
+        {
+          "cardId": "card-1",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-2",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-3",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-4",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-5",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-6",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-7",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-8",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-9",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-10",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-11",
+          "result": null,
+          "updatedAt": 0
+        },
+        {
+          "cardId": "card-12",
+          "result": null,
+          "updatedAt": 0
+        }
+      ]
+    },
+    "renderSnapshot": null,
+    "createdAt": 1778413151413,
+    "updatedAt": 1778413151413
+  },
+  {
+    "id": "note_1778413107611_qvaicu",
+    "agentId": "_____-____1778401447794",
+    "topicId": "topic_1778409166243",
+    "title": "一般过去时综合练习",
+    "contentMarkdown": "# 一般过去时综合练习\n\n## 1. My brother _______ English very hard last term.\nA. studyed\nB. studied\nC. studys\nD. studying\n正确答案：B\n解析：study 以辅音字母加 y 结尾，变过去式时需将 y 改为 i 再加 -ed，即 studied。\n\n## 2. We _______ zongzi together yesterday. It was delicious.\nA. eated\nB. eat\nC. ate\nD. eating\n正确答案：C\n解析：eat 是不规则动词，其过去式为 ate，不能在词尾直接加 -ed。\n\n## 3. She didn't _______ TV with her parents last night.\nA. watched\nB. watches\nC. watch\nD. watching\n正确答案：C\n解析：一般过去时的否定句结构为 didn't 加动词原形，因此此处应使用 watch。\n\n## 4. My grandparents _______ very happy to see us last Spring Festival.\nA. was\nB. were\nC. are\nD. be\n正确答案：B\n解析：主语 My grandparents 为复数，且时间状语 last Spring Festival 表示过去，因此 be 动词应用 were。\n\n## 5. _______ your father _______ to make mooncakes last year?\nA. Did; learned\nB. Did; learn\nC. Do; learned\nD. Does; learn\n正确答案：B\n解析：一般过去时的一般疑问句结构为 Did 加主语加动词原形。助动词 Did 已体现过去时态，后面动词需用原形 learn。\n\n## 6. I _______ my old classmates just now.\nA. meet\nB. met\nC. meets\nD. meeting\n正确答案：B\n解析：just now（刚才）是一般过去时的典型标志词，meet 的过去式为 met。\n\n## 7. Tom _______ at home yesterday afternoon because he _______ ill.\nA. was; didn't be\nB. was; was\nC. did be; was\nD. was; didn't was\n正确答案：B\n解析：be 动词的过去式为 was/were，不需要借助助动词 did。两个空都应使用 be 动词的过去式，即 was。\n\n## 8. — How _______ your last Dragon Boat Festival?\n— It was great! We _______ dragon boat races and _______ zongzi.\nA. was; watched; ate\nB. did; watched; ate\nC. was; watch; eat\nD. is; watched; ate\n正确答案：A\n解析：根据答句 It was great 可知问句应用 was；后两空描述过去发生的动作，应用动词过去式 watched 和 ate。",
+    "sourceMessageIds": [
+      "user_1778409174332_vnn6ft",
+      "assistant_1778409174340_up94z2"
+    ],
+    "sourceDocumentRefs": [],
+    "kind": "quiz",
+    "flashcardDeck": null,
+    "flashcardProgress": null,
+    "renderSnapshot": null,
+    "createdAt": 1778413107610,
+    "updatedAt": 1778413107610
+  },
+  {
     "id": "note_1778409393184_k0rsxm",
     "agentId": "_____-____1778401447794",
     "topicId": "topic_1778409166243",

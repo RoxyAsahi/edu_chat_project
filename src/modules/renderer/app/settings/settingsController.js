@@ -38,8 +38,8 @@ const SETTINGS_MODAL_META = Object.freeze({
         subtitle: '查看提示词片段和最终 system prompt 的实际注入结果。',
     },
     updates: {
-        title: '软件更新',
-        subtitle: '检查、下载并安装 UniStudy 新版本。',
+        title: '关于项目',
+        subtitle: '了解 UniStudy 的作品定位、开发信息与参赛用途。',
     },
     global: {
         title: '模型服务',
@@ -4201,7 +4201,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             windowObj.__unistudySubjectSettingsCloseHandler = handleSubjectSettingsCloseAction;
         }
         bindAppUpdateEvents();
-        void refreshAppUpdateInfo();
         el.currentAgentSettingsBtn?.addEventListener('click', () => {
             openSubjectSettingsPanel(el.currentAgentSettingsBtn);
         });

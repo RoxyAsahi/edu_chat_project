@@ -549,6 +549,9 @@ function createWorkspaceController(deps = {}) {
         case 'open-notes':
             showManualNotesLibrary();
             break;
+        case 'open-source-shelf':
+            showSourceShelf();
+            break;
         case 'open-diary':
             openDiaryWall();
             break;

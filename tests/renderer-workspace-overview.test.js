@@ -68,6 +68,9 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
     assert.match(result.gridMarkup, /学习状态/);
     assert.match(result.gridMarkup, /最近学习/);
     assert.match(result.gridMarkup, /查看更多/);
+    assert.match(result.gridMarkup, /home-recent-learning__subject/);
+    assert.match(result.gridMarkup, /<span class="home-recent-learning__subject">数学<\/span>/);
+    assert.doesNotMatch(result.gridMarkup, /home-recent-learning__copy[\s\S]*?<small>/);
     assert.match(result.gridMarkup, /学习空间/);
     assert.match(result.gridMarkup, /把每个学科当作一个长期学习空间/);
     assert.match(result.gridMarkup, /home-subjects/);

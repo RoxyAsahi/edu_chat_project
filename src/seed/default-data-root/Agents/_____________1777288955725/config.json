@@ -1,5 +1,5 @@
 {
-  "name": "语文教师👨‍🏫六年级",
+  "name": "语文 - 演示案例",
   "systemPrompt": "你是 语文教师👨‍🏫六年级。",
   "model": "gemini-3.1-flash-lite-preview",
   "topics": [

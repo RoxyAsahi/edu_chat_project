@@ -1083,8 +1083,8 @@
                   <span>高级与调试</span>
                 </button>
                 <button id="settingsNavUpdatesBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="updates">
-                  <span class="material-symbols-outlined">system_update_alt</span>
-                  <span>软件更新</span>
+                  <span class="material-symbols-outlined">info</span>
+                  <span>关于项目</span>
                 </button>
               </div>
             </div>
@@ -1249,19 +1249,133 @@
             </section>
 
             <section id="settingsModalSectionUpdates" class="settings-modal__section hidden" data-settings-section="updates">
-              <section class="settings-list-card settings-list-card--untitled app-update-card">
-                <div class="settings-list">
-                  <div class="settings-row">
-                    <div class="settings-row__main"><strong>当前版本</strong><span>当前正在运行的 UniStudy 版本。</span></div>
-                    <span id="appUpdateCurrentVersion" class="app-update-value settings-row__control">--</span>
+              <section class="settings-list-card settings-list-card--flat about-project-card" aria-labelledby="aboutProjectTitle">
+                <div class="about-project-hero">
+                  <div class="about-project-hero__brand" aria-label="UniStudy">
+                    <div class="about-project-hero__mark" aria-hidden="true">
+                      <img src="../assets/logo.png" alt="" />
+                    </div>
+                    <img class="about-project-hero__wordmark" src="../assets/UniStudy.png" alt="UniStudy" />
                   </div>
-                  <div class="settings-row">
-                    <div class="settings-row__main"><strong>更新状态</strong><span id="appUpdateStatus">正在读取更新状态...</span></div>
-                    <span id="appUpdateBadge" class="app-update-badge settings-row__control">检查中</span>
+                  <div class="about-project-hero__copy">
+                    <span class="about-project-kicker">UniStudy</span>
+                    <h3 id="aboutProjectTitle">个人 AI 学习空间</h3>
+                    <p>UniStudy 面向多学科学习场景，将资料导入、主题对话、笔记沉淀、复习训练和学习记录连接成一个连续流程，让 AI 真正参与学习过程。</p>
                   </div>
-                  <div class="settings-row app-update-action-row">
-                    <div class="settings-row__main"><strong>操作</strong><span id="appUpdateActionHint">NSIS 安装版会从配置的更新源获取新版。</span></div>
-                    <div class="app-update-actions settings-row__control">
+                </div>
+
+                <div class="about-project-grid" aria-label="项目概览">
+                  <div class="about-project-panel about-project-panel--wide">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">flag</span>
+                      <strong>项目用途</strong>
+                    </div>
+                    <p>用于日常学习、专题整理、考前复习和资料管理，也作为参加第五届上海市青少年人工智能与编程实践活动的作品，展示 AI 在真实学习场景中的辅助价值。</p>
+                  </div>
+                  <div class="about-project-panel">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">person</span>
+                      <strong>开发者</strong>
+                    </div>
+                    <p>杨晨晢独立开发。</p>
+                  </div>
+                  <div class="about-project-panel">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">terminal</span>
+                      <strong>开发协作</strong>
+                    </div>
+                    <p>开发过程中借助 Codex 与 Claude Code 进行实现、调试和整理。</p>
+                  </div>
+                </div>
+
+                <div class="about-project-grid" aria-label="项目细节">
+                  <div class="about-project-panel">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+                      <strong>核心能力</strong>
+                    </div>
+                    <p>资料书架、话题来源、聊天收藏、Notes、选择题、闪卡、学习日志和可渲染的 HTML 回答气泡。</p>
+                  </div>
+                  <div class="about-project-panel">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">psychology</span>
+                      <strong>具体模型</strong>
+                    </div>
+                    <p>GPT-5.5、Claude Sonnet 4.6、gemini-3.1-pro、kimi k2.6。</p>
+                  </div>
+                  <div class="about-project-panel about-project-panel--wide">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">hub</span>
+                      <strong>作品定位</strong>
+                    </div>
+                    <p>不是单次问答工具，而是把看资料、提问题、记重点、做练习、再复习串起来的桌面端学习工作台。</p>
+                  </div>
+                </div>
+
+                <div class="about-project-grid" aria-label="参考与致谢">
+                  <div class="about-project-panel about-project-panel--wide about-project-reference-panel">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">favorite</span>
+                      <strong>参考与致谢</strong>
+                    </div>
+                    <p>开发前期参考和调研了一些成熟的 AI 学习类产品与 AI 前端项目，并在此基础上结合学习场景重新设计与扩展。</p>
+                    <div class="about-project-reference-list" aria-label="参考列表">
+                      <div class="about-project-reference-item">
+                        <span class="material-symbols-outlined" aria-hidden="true">article</span>
+                        <div><strong>Google NotebookLM</strong><p>参考其围绕资料阅读、重点整理和主题学习展开的产品方向。</p></div>
+                      </div>
+                      <div class="about-project-reference-item">
+                        <span class="material-symbols-outlined" aria-hidden="true">history_edu</span>
+                        <div><strong>OpenClaw</strong><p>参考其长期记忆思路，启发学习痕迹与持续记忆的设计。</p></div>
+                      </div>
+                      <div class="about-project-reference-item">
+                        <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+                        <div><strong>Cherry Studio</strong><p>参考其多模型配置与桌面端 AI 工具的组织方式。</p></div>
+                      </div>
+                      <div class="about-project-reference-item">
+                        <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+                        <div><strong>Open WebUI</strong><p>参考其会话、模型和工具入口的前端信息组织。</p></div>
+                      </div>
+                      <div class="about-project-reference-item">
+                        <span class="material-symbols-outlined" aria-hidden="true">chat</span>
+                        <div><strong>Chatbox</strong><p>参考其轻量聊天客户端体验与对话管理方式。</p></div>
+                      </div>
+                      <div class="about-project-reference-item">
+                        <span class="material-symbols-outlined" aria-hidden="true">hub</span>
+                        <div><strong>RikkaHub</strong><p>参考其聚合式模型使用体验与移动端信息密度处理。</p></div>
+                      </div>
+                      <div class="about-project-reference-item about-project-reference-item--wide">
+                        <span class="material-symbols-outlined" aria-hidden="true">code_blocks</span>
+                        <div><strong>HTML Artifact 输出形态</strong><p>受到 AI 直接生成 HTML 界面片段这一思路启发，将回答扩展为可以嵌入聊天流的可视化学习界面。</p></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="about-project-grid" aria-label="版本与更新">
+                  <div class="about-project-panel">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">tag</span>
+                      <strong>当前版本</strong>
+                    </div>
+                    <p>当前正在运行的 UniStudy 版本。</p>
+                    <span id="appUpdateCurrentVersion" class="app-update-value about-project-version-value">--</span>
+                  </div>
+                  <div class="about-project-panel">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">system_update_alt</span>
+                      <strong>更新状态</strong>
+                    </div>
+                    <p id="appUpdateStatus">正在读取更新状态...</p>
+                    <span id="appUpdateBadge" class="app-update-badge about-project-update-badge">检查中</span>
+                  </div>
+                  <div class="about-project-panel about-project-panel--wide app-update-action-row">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">download</span>
+                      <strong>更新操作</strong>
+                    </div>
+                    <p id="appUpdateActionHint">NSIS 安装版会从配置的更新源获取新版。</p>
+                    <div class="app-update-actions about-project-update-actions">
                       <button id="appUpdateCheckBtn" class="ghost-button icon-text-btn settings-row__button" type="button">
                         <span class="material-symbols-outlined">refresh</span> 检查
                       </button>
@@ -1273,14 +1387,22 @@
                       </button>
                     </div>
                   </div>
-                  <div id="appUpdateProgressRow" class="settings-row settings-row--editor app-update-progress-row hidden">
-                    <div class="settings-row__main"><strong>下载进度</strong><span id="appUpdateProgressText">0%</span></div>
+                  <div id="appUpdateProgressRow" class="about-project-panel about-project-panel--wide app-update-progress-row hidden">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">progress_activity</span>
+                      <strong>下载进度</strong>
+                    </div>
+                    <p id="appUpdateProgressText">0%</p>
                     <div class="app-update-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                       <div id="appUpdateProgressBar" class="app-update-progress__bar"></div>
                     </div>
                   </div>
-                  <div id="appUpdateReleaseRow" class="settings-row settings-row--editor app-update-release-row hidden">
-                    <div class="settings-row__main"><strong>新版本</strong><span id="appUpdateReleaseTitle">--</span></div>
+                  <div id="appUpdateReleaseRow" class="about-project-panel about-project-panel--wide app-update-release-row hidden">
+                    <div class="about-project-panel__title">
+                      <span class="material-symbols-outlined" aria-hidden="true">new_releases</span>
+                      <strong>新版本</strong>
+                    </div>
+                    <p id="appUpdateReleaseTitle">--</p>
                     <div id="appUpdateReleaseNotes" class="app-update-release-notes"></div>
                   </div>
                 </div>

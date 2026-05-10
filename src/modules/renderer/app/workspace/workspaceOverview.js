@@ -9,36 +9,6 @@ function escapeHtml(text) {
         .replace(/'/g, '&#39;');
 }
 
-function formatRelativeTimeShort(value) {
-    const timestamp = Number(value || 0);
-    if (!Number.isFinite(timestamp) || timestamp <= 0) {
-        return '';
-    }
-
-    const diff = Math.max(0, Date.now() - timestamp);
-    const minute = 60 * 1000;
-    const hour = 60 * minute;
-    const day = 24 * hour;
-
-    if (diff < minute) {
-        return '刚刚';
-    }
-    if (diff < hour) {
-        return `${Math.max(1, Math.floor(diff / minute))} 分钟前`;
-    }
-    if (diff < day) {
-        return `${Math.max(1, Math.floor(diff / hour))} 小时前`;
-    }
-    if (diff < 7 * day) {
-        return `${Math.max(1, Math.floor(diff / day))} 天前`;
-    }
-
-    return new Date(timestamp).toLocaleDateString('zh-CN', {
-        month: 'numeric',
-        day: 'numeric',
-    });
-}
-
 function stripMarkdownForPreview(value, maxChars = 120) {
     let source = String(value || '')
         // 移除 DailyNote 特殊标记和工具块
@@ -124,14 +94,13 @@ function buildRecentLearningItems({ agents = [], statsByAgent = {}, selectedAgen
             const topicCount = Math.max(0, Number(stats.topicCount || 0));
             const timestamp = Number(stats.lastTopicCreatedAt || 0);
             const isCurrent = agent.id === selectedAgentId;
+            const subjectName = agent.name || agent.id || '未命名学科';
             const title = stats.lastTopicName || `${agent.name || agent.id || '学科'} 新对话`;
-            const relativeTime = formatRelativeTimeShort(timestamp);
-            const fallbackMeta = topicCount > 0 ? `${topicCount} 个话题` : '准备开始';
 
             return {
                 agentId: agent.id,
                 title,
-                meta: `${agent.name || agent.id || '未命名学科'} · ${relativeTime || fallbackMeta}`,
+                subjectName,
                 rank: (isCurrent ? 2_000_000_000 : 0) + (timestamp || (topicCount * 1000)) - index,
             };
         })
@@ -142,7 +111,7 @@ function buildRecentLearningItems({ agents = [], statsByAgent = {}, selectedAgen
         return [
             {
                 title: '创建第一个学科',
-                meta: '开始一段新的学习对话',
+                subjectName: '',
                 action: 'create-subject',
             },
         ];
@@ -438,7 +407,7 @@ function buildSubjectOverviewMarkup({
     const heroTitle = '个人 AI 学习中心';
 
     const workflowCards = [
-        { title: '放入资料', desc: 'PDF、DOCX、图片和文本会归入当前话题的 Source。', icon: 'upload_file', action: 'open-subject', step: '01' },
+        { title: '放入资料', desc: '将课本、讲义和知识清单放入资料书架。', icon: 'upload_file', action: 'open-source-shelf', step: '01' },
         { title: '提问理解', desc: '围绕资料追问概念、推导、例题和作业思路。', icon: 'forum', action: 'open-subject', step: '02' },
         { title: '整理笔记', desc: '把关键结论、错因和可复用模板沉淀下来。', icon: 'edit_note', action: 'open-notes', step: '03' },
         { title: '复盘巩固', desc: '用学习日志和闪卡检查今天真正掌握了什么。', icon: 'task_alt', action: 'open-diary', step: '04' },
@@ -461,8 +430,8 @@ function buildSubjectOverviewMarkup({
             <span class="home-recent-learning__icon material-symbols-outlined" aria-hidden="true">${escapeHtml(item.icon || 'auto_stories')}</span>
             <span class="home-recent-learning__copy">
                 <strong>${escapeHtml(item.title)}</strong>
-                <small>${escapeHtml(item.meta)}</small>
             </span>
+            ${item.subjectName ? `<span class="home-recent-learning__subject">${escapeHtml(item.subjectName)}</span>` : ''}
         </button>
     `).join('');
 

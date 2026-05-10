@@ -3102,12 +3102,12 @@
 .home-recent-learning__item {
   width: 100%;
   min-height: 46px;
-  padding: 0;
+  padding: 0 8px 0 0;
   border: 0;
   border-radius: 12px;
   background: transparent;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   text-align: left;
@@ -3147,26 +3147,35 @@
 
 .home-recent-learning__copy {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: block;
 }
 
 .home-recent-learning__copy strong {
+  display: block;
   color: #1f2b44;
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 400;
   line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.home-recent-learning__copy small {
-  color: #8b98ad;
+.home-recent-learning__subject {
+  max-width: 116px;
+  min-height: 24px;
+  display: inline-flex;
+  justify-self: end;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eef3fb;
+  color: #65728a;
   font-size: 12px;
-  font-weight: 500;
-  line-height: 1.2;
+  font-weight: 400;
+  line-height: 1;
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3653,7 +3662,7 @@ body:not(.light-theme) .home-diary__empty p {
 
   .home-recent-learning__item {
     min-height: 40px;
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: 32px minmax(0, 1fr) auto;
     gap: 8px;
   }
 
@@ -3665,10 +3674,13 @@ body:not(.light-theme) .home-diary__empty p {
   }
 
   .home-recent-learning__copy strong {
-    font-size: 13px;
+    font-size: 15px;
   }
 
-  .home-recent-learning__copy small {
+  .home-recent-learning__subject {
+    max-width: 92px;
+    min-height: 22px;
+    padding: 0 8px;
     font-size: 11px;
   }
 
@@ -3887,10 +3899,13 @@ body:not(.light-theme) .home-diary__empty p {
   }
 
   .home-recent-learning__copy strong {
-    font-size: 12px;
+    font-size: 15px;
   }
 
-  .home-recent-learning__copy small {
+  .home-recent-learning__subject {
+    max-width: 76px;
+    min-height: 20px;
+    padding: 0 7px;
     font-size: 10px;
   }
 
