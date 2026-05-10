@@ -7,6 +7,7 @@ const fs = require('fs-extra');
 const { parseKnowledgeBaseDocument } = require('../src/modules/main/knowledge-base/parserAdapter');
 const { createDocumentProcessor } = require('../src/modules/main/knowledge-base/documentProcessor');
 const { createDocumentStore } = require('../src/modules/main/knowledge-base/documentStore');
+const { createProcessingQueue } = require('../src/modules/main/knowledge-base/processingQueue');
 const { createKnowledgeBaseRepository } = require('../src/modules/main/knowledge-base/repository');
 
 test('parseKnowledgeBaseDocument reuses cached extracted markdown for image documents', async () => {
@@ -208,6 +209,64 @@ test('documentProcessor writes chunk records in bulk when the repository support
     assert.equal(bulkInsert[1].length, 2);
     assert.deepEqual(bulkInsert[1].map((record) => record.chunkIndex), [0, 1]);
     assert.equal(document.status, 'done');
+});
+
+test('processingQueue starts source guide generation after successful document processing', async () => {
+    const queued = ['doc-done', 'doc-failed'];
+    const calls = [];
+    const documents = {
+        'doc-done': { id: 'doc-done', status: 'done' },
+        'doc-failed': { id: 'doc-failed', status: 'failed' },
+    };
+
+    const queue = createProcessingQueue({
+        runtime: {
+            enqueueDocument(documentId) {
+                queued.push(documentId);
+            },
+            shiftQueuedDocument() {
+                return queued.shift() || null;
+            },
+            hasQueuedDocuments() {
+                return queued.length > 0;
+            },
+            shouldDrainQueue() {
+                return true;
+            },
+            isShuttingDown() {
+                return false;
+            },
+            setProcessing(value) {
+                calls.push(['setProcessing', value]);
+            },
+        },
+        repository: {
+            async getDocumentById(documentId) {
+                calls.push(['getDocumentById', documentId]);
+                return documents[documentId] || null;
+            },
+        },
+        processor: {
+            async processDocument(documentId) {
+                calls.push(['processDocument', documentId]);
+            },
+        },
+        async onDocumentProcessed(document) {
+            calls.push(['generateGuide', document.id]);
+        },
+    });
+
+    await queue.drainQueue();
+
+    assert.deepEqual(calls, [
+        ['setProcessing', true],
+        ['processDocument', 'doc-done'],
+        ['getDocumentById', 'doc-done'],
+        ['generateGuide', 'doc-done'],
+        ['processDocument', 'doc-failed'],
+        ['getDocumentById', 'doc-failed'],
+        ['setProcessing', false],
+    ]);
 });
 
 test('documentStore requeues failed duplicate imports instead of keeping stale failed records', async (t) => {

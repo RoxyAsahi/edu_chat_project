@@ -37,6 +37,10 @@ const SETTINGS_MODAL_META = Object.freeze({
         title: '高级与调试',
         subtitle: '查看提示词片段和最终 system prompt 的实际注入结果。',
     },
+    updates: {
+        title: '软件更新',
+        subtitle: '检查、下载并安装 UniStudy 新版本。',
+    },
     global: {
         title: '模型服务',
         subtitle: '管理全局连接、检索模型和来源服务参数。',
@@ -1302,6 +1306,15 @@ function createSettingsController(deps = {}) {
         popup: null,
     };
     let modelServiceDialogHost = null;
+    let appUpdateEventsBound = false;
+    const appUpdateState = {
+        info: null,
+        status: 'idle',
+        checking: false,
+        downloading: false,
+        progress: null,
+        error: '',
+    };
 
     function getSettingsSlice() {
         return store.getState().settings;
@@ -1325,6 +1338,377 @@ function createSettingsController(deps = {}) {
                 ...(typeof patch === 'function' ? patch(current.settings, rootState) : patch),
             },
         }));
+    }
+
+    function getUpdateUnsupportedMessage(info = {}) {
+        if (info.unsupportedReason === 'development') {
+            return '开发环境不连接更新源，打包为 NSIS 安装版后启用。';
+        }
+        if (info.unsupportedReason === 'portable') {
+            return 'Portable 便携版不支持自动替换，请下载新版安装包。';
+        }
+        return '当前环境不支持自动更新。';
+    }
+
+    function normalizeAppUpdatePayload(payload = {}) {
+        if (!payload || typeof payload !== 'object') {
+            return {};
+        }
+        const { success: _success, ...data } = payload;
+        return data;
+    }
+
+    function getAppUpdateVersionLabel(version) {
+        const normalized = String(version || '').trim();
+        return normalized ? `v${normalized}` : '--';
+    }
+
+    function formatAppUpdateReleaseNotes(releaseNotes) {
+        if (Array.isArray(releaseNotes)) {
+            return releaseNotes
+                .map((item) => {
+                    if (typeof item === 'string') {
+                        return item;
+                    }
+                    if (item && typeof item === 'object') {
+                        return item.note || item.notes || item.body || '';
+                    }
+                    return '';
+                })
+                .filter(Boolean)
+                .join('\n');
+        }
+
+        if (releaseNotes && typeof releaseNotes === 'object') {
+            return releaseNotes.note || releaseNotes.notes || releaseNotes.body || '';
+        }
+
+        return String(releaseNotes || '');
+    }
+
+    function inferAppUpdateStatus(info = appUpdateState.info || {}) {
+        if (appUpdateState.error) {
+            return 'error';
+        }
+        if (appUpdateState.status && appUpdateState.status !== 'idle') {
+            return appUpdateState.status;
+        }
+        if (info.downloadedUpdateInfo?.version) {
+            return 'downloaded';
+        }
+        if (info.updateInfo?.version) {
+            return 'available';
+        }
+        if (info.updateSupported === false) {
+            return 'unsupported';
+        }
+        return 'ready';
+    }
+
+    function getAppUpdateAvailableInfo() {
+        const info = appUpdateState.info || {};
+        const status = inferAppUpdateStatus(info);
+        if (status === 'downloaded' && info.downloadedUpdateInfo) {
+            return info.downloadedUpdateInfo;
+        }
+        if (status === 'available' && info.updateInfo) {
+            return info.updateInfo;
+        }
+        return null;
+    }
+
+    function setAppUpdateBadge(label, tone) {
+        if (!el.appUpdateBadge) {
+            return;
+        }
+        el.appUpdateBadge.textContent = label;
+        el.appUpdateBadge.dataset.tone = tone || 'neutral';
+    }
+
+    function renderAppUpdatePanel() {
+        const info = appUpdateState.info || {};
+        const status = inferAppUpdateStatus(info);
+        const updateSupported = info.updateSupported !== false;
+        const availableInfo = getAppUpdateAvailableInfo();
+        const progress = appUpdateState.progress || {};
+        const progressPercent = Math.max(0, Math.min(100, Number(progress.percent) || 0));
+        let statusText = '可检查更新。';
+        let actionHint = 'NSIS 安装版会从配置的更新源获取新版。';
+        let badgeText = '就绪';
+        let badgeTone = 'neutral';
+
+        if (!appUpdateState.info) {
+            statusText = '正在读取更新状态...';
+            actionHint = '稍候即可检查更新。';
+            badgeText = '读取中';
+        } else if (!updateSupported) {
+            statusText = getUpdateUnsupportedMessage(info);
+            actionHint = info.unsupportedReason === 'portable'
+                ? '请通过更新源页面下载新版安装包。'
+                : '正式打包后会自动读取 app-update.yml。';
+            badgeText = '不可用';
+            badgeTone = 'muted';
+        } else if (status === 'checking') {
+            statusText = '正在检查更新...';
+            actionHint = '正在连接更新源。';
+            badgeText = '检查中';
+            badgeTone = 'info';
+        } else if (status === 'available' && availableInfo?.version) {
+            statusText = `发现 ${getAppUpdateVersionLabel(availableInfo.version)}。`;
+            actionHint = '可以下载新版安装包。';
+            badgeText = '有更新';
+            badgeTone = 'warning';
+        } else if (status === 'downloading') {
+            statusText = `正在下载更新 ${Math.round(progressPercent)}%。`;
+            actionHint = '下载完成后即可重启安装。';
+            badgeText = '下载中';
+            badgeTone = 'info';
+        } else if (status === 'downloaded') {
+            statusText = '新版已下载，重启后完成安装。';
+            actionHint = '安装会关闭当前应用并启动新版安装流程。';
+            badgeText = '已下载';
+            badgeTone = 'success';
+        } else if (status === 'error') {
+            statusText = appUpdateState.error || info.lastError?.message || '更新检查失败。';
+            actionHint = '请确认更新源地址、HTTPS 和 latest.yml 可访问。';
+            badgeText = '失败';
+            badgeTone = 'danger';
+        } else if (status === 'not-available' || status === 'checked') {
+            statusText = '当前已是最新版本。';
+            actionHint = '之后发布新版本时可再次检查。';
+            badgeText = '最新';
+            badgeTone = 'success';
+        }
+
+        if (el.appUpdateCurrentVersion) {
+            el.appUpdateCurrentVersion.textContent = getAppUpdateVersionLabel(info.version);
+        }
+        if (el.appUpdateStatus) {
+            el.appUpdateStatus.textContent = statusText;
+        }
+        if (el.appUpdateActionHint) {
+            el.appUpdateActionHint.textContent = actionHint;
+        }
+        setAppUpdateBadge(badgeText, badgeTone);
+
+        const busy = status === 'checking' || status === 'downloading';
+        if (el.appUpdateCheckBtn) {
+            el.appUpdateCheckBtn.disabled = !updateSupported || busy;
+        }
+        if (el.appUpdateDownloadBtn) {
+            const canDownload = updateSupported && status === 'available' && Boolean(availableInfo?.version);
+            el.appUpdateDownloadBtn.classList.toggle('hidden', !canDownload && status !== 'downloading');
+            el.appUpdateDownloadBtn.disabled = !canDownload || status === 'downloading';
+        }
+        if (el.appUpdateInstallBtn) {
+            const canInstall = updateSupported && status === 'downloaded';
+            el.appUpdateInstallBtn.classList.toggle('hidden', !canInstall);
+            el.appUpdateInstallBtn.disabled = !canInstall;
+        }
+
+        const showProgress = status === 'downloading' || status === 'downloaded' || progressPercent > 0;
+        el.appUpdateProgressRow?.classList.toggle('hidden', !showProgress);
+        if (el.appUpdateProgressText) {
+            el.appUpdateProgressText.textContent = `${Math.round(status === 'downloaded' ? 100 : progressPercent)}%`;
+        }
+        if (el.appUpdateProgressBar) {
+            el.appUpdateProgressBar.style.width = `${status === 'downloaded' ? 100 : progressPercent}%`;
+        }
+        const progressRoot = el.appUpdateProgressRow?.querySelector?.('.app-update-progress');
+        progressRoot?.setAttribute('aria-valuenow', String(Math.round(status === 'downloaded' ? 100 : progressPercent)));
+
+        const releaseNotes = formatAppUpdateReleaseNotes(availableInfo?.releaseNotes).trim();
+        const showRelease = Boolean(availableInfo?.version);
+        el.appUpdateReleaseRow?.classList.toggle('hidden', !showRelease);
+        if (el.appUpdateReleaseTitle) {
+            const dateLabel = availableInfo?.releaseDate
+                ? ` · ${new Date(availableInfo.releaseDate).toLocaleString('zh-CN')}`
+                : '';
+            el.appUpdateReleaseTitle.textContent = `${getAppUpdateVersionLabel(availableInfo?.version)}${dateLabel}`;
+        }
+        if (el.appUpdateReleaseNotes) {
+            const safeNotes = escapeHtml(releaseNotes || '暂无更新说明。').replace(/\n/g, '<br>');
+            el.appUpdateReleaseNotes.innerHTML = safeNotes;
+        }
+    }
+
+    function applyAppUpdatePayload(payload = {}) {
+        const data = normalizeAppUpdatePayload(payload);
+        const nextStatus = data.status || appUpdateState.status;
+        const terminalStatus = ['available', 'not-available', 'checked', 'downloaded', 'unsupported', 'error'].includes(nextStatus);
+
+        appUpdateState.info = {
+            ...(appUpdateState.info || {}),
+            ...data,
+        };
+        appUpdateState.status = nextStatus || inferAppUpdateStatus(appUpdateState.info);
+        appUpdateState.checking = nextStatus === 'checking' || Boolean(data.checking && !terminalStatus);
+        appUpdateState.downloading = nextStatus === 'downloading' || Boolean(data.downloading && !terminalStatus);
+        if (data.progress) {
+            appUpdateState.progress = data.progress;
+        } else if (nextStatus === 'downloaded') {
+            appUpdateState.progress = { percent: 100 };
+        } else if (nextStatus === 'checking' || nextStatus === 'available' || nextStatus === 'not-available') {
+            appUpdateState.progress = null;
+        }
+        if (data.error || data.updateError?.message) {
+            appUpdateState.error = data.error || data.updateError.message;
+            appUpdateState.status = 'error';
+        } else if (nextStatus !== 'error') {
+            appUpdateState.error = '';
+        }
+
+        renderAppUpdatePanel();
+    }
+
+    async function refreshAppUpdateInfo() {
+        if (typeof chatAPI?.getAppUpdateInfo !== 'function') {
+            appUpdateState.info = {
+                version: '',
+                updateSupported: false,
+                unsupportedReason: 'unavailable',
+            };
+            appUpdateState.status = 'unsupported';
+            renderAppUpdatePanel();
+            return appUpdateState.info;
+        }
+
+        try {
+            const result = await chatAPI.getAppUpdateInfo();
+            if (result?.success === false) {
+                throw new Error(result.error || '读取更新状态失败。');
+            }
+            const data = normalizeAppUpdatePayload(result);
+            appUpdateState.info = {
+                ...(appUpdateState.info || {}),
+                ...data,
+            };
+            if (appUpdateState.status === 'idle') {
+                appUpdateState.status = inferAppUpdateStatus(appUpdateState.info);
+            }
+            renderAppUpdatePanel();
+            return data;
+        } catch (error) {
+            appUpdateState.error = error?.message || '读取更新状态失败。';
+            appUpdateState.status = 'error';
+            renderAppUpdatePanel();
+            return null;
+        }
+    }
+
+    async function checkForAppUpdates() {
+        if (typeof chatAPI?.checkForUpdates !== 'function') {
+            ui?.showToastNotification?.('当前构建未暴露更新接口。', 'warning');
+            return;
+        }
+
+        appUpdateState.status = 'checking';
+        appUpdateState.checking = true;
+        appUpdateState.error = '';
+        appUpdateState.progress = null;
+        renderAppUpdatePanel();
+
+        try {
+            const result = await chatAPI.checkForUpdates();
+            if (result?.success === false) {
+                throw new Error(result.error || '检查更新失败。');
+            }
+            applyAppUpdatePayload(result);
+            const status = result?.status || appUpdateState.status;
+            if (status === 'unsupported') {
+                ui?.showToastNotification?.(getUpdateUnsupportedMessage(result), 'warning');
+            } else if (status === 'available') {
+                ui?.showToastNotification?.('发现新版本，可以下载。', 'success');
+            } else if (status === 'checked' || status === 'not-available') {
+                ui?.showToastNotification?.('当前已是最新版本。', 'success');
+            }
+        } catch (error) {
+            applyAppUpdatePayload({
+                status: 'error',
+                error: error?.message || '检查更新失败。',
+            });
+            ui?.showToastNotification?.(`检查更新失败：${appUpdateState.error}`, 'error');
+        }
+    }
+
+    async function downloadAppUpdate() {
+        if (typeof chatAPI?.downloadUpdate !== 'function') {
+            ui?.showToastNotification?.('当前构建未暴露下载接口。', 'warning');
+            return;
+        }
+
+        appUpdateState.status = 'downloading';
+        appUpdateState.downloading = true;
+        appUpdateState.error = '';
+        appUpdateState.progress = { percent: 0 };
+        renderAppUpdatePanel();
+
+        try {
+            const result = await chatAPI.downloadUpdate();
+            if (result?.success === false) {
+                throw new Error(result.error || '下载更新失败。');
+            }
+            applyAppUpdatePayload({
+                ...result,
+                status: result?.status || 'downloaded',
+            });
+            ui?.showToastNotification?.('新版已下载，可以重启安装。', 'success');
+        } catch (error) {
+            applyAppUpdatePayload({
+                status: 'error',
+                error: error?.message || '下载更新失败。',
+            });
+            ui?.showToastNotification?.(`下载更新失败：${appUpdateState.error}`, 'error');
+        }
+    }
+
+    async function installAppUpdate() {
+        if (typeof chatAPI?.quitAndInstallUpdate !== 'function') {
+            ui?.showToastNotification?.('当前构建未暴露安装接口。', 'warning');
+            return;
+        }
+
+        const confirmed = windowObj.confirm?.('新版本已下载。现在重启并安装吗？') ?? true;
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const result = await chatAPI.quitAndInstallUpdate();
+            if (result?.success === false) {
+                throw new Error(result.error || '启动安装失败。');
+            }
+            applyAppUpdatePayload({
+                ...result,
+                status: result?.status || 'installing',
+            });
+        } catch (error) {
+            applyAppUpdatePayload({
+                status: 'error',
+                error: error?.message || '启动安装失败。',
+            });
+            ui?.showToastNotification?.(`启动安装失败：${appUpdateState.error}`, 'error');
+        }
+    }
+
+    function bindAppUpdateEvents() {
+        if (appUpdateEventsBound) {
+            return;
+        }
+
+        const bindSubscription = (name, handler) => {
+            if (typeof chatAPI?.[name] === 'function') {
+                chatAPI[name](handler);
+            }
+        };
+
+        bindSubscription('onUpdateChecking', (payload) => applyAppUpdatePayload({ ...payload, status: 'checking' }));
+        bindSubscription('onUpdateAvailable', (payload) => applyAppUpdatePayload({ ...payload, status: 'available' }));
+        bindSubscription('onUpdateNotAvailable', (payload) => applyAppUpdatePayload({ ...payload, status: 'not-available' }));
+        bindSubscription('onUpdateDownloadProgress', (payload) => applyAppUpdatePayload({ ...payload, status: 'downloading' }));
+        bindSubscription('onUpdateDownloaded', (payload) => applyAppUpdatePayload({ ...payload, status: 'downloaded' }));
+        bindSubscription('onUpdateError', (payload) => applyAppUpdatePayload({ ...payload, status: 'error' }));
+        appUpdateEventsBound = true;
     }
 
     function getNormalizedModelService() {
@@ -3522,6 +3906,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             ['ai-memory', el.settingsModalSectionAiMemory],
             ['assist', el.settingsModalSectionAssist],
             ['prompt-advanced', el.settingsModalSectionPromptAdvanced],
+            ['updates', el.settingsModalSectionUpdates],
             ['knowledge-base', el.settingsModalSectionKnowledgeBase],
         ];
         sections.forEach(([name, node]) => {
@@ -3542,6 +3927,9 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         contentHero?.classList.toggle('settings-modal__content-hero--hidden', nextSection === 'services');
         if (['services', 'default-model', 'profile', 'prompts', 'emoticons', 'ai-memory', 'prompt-advanced'].includes(nextSection)) {
             void refreshFinalSystemPromptPreview();
+        }
+        if (nextSection === 'updates') {
+            void refreshAppUpdateInfo();
         }
     }
 
@@ -3869,6 +4257,8 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (windowObj) {
             windowObj.__unistudySubjectSettingsCloseHandler = handleSubjectSettingsCloseAction;
         }
+        bindAppUpdateEvents();
+        void refreshAppUpdateInfo();
         el.currentAgentSettingsBtn?.addEventListener('click', () => {
             openSubjectSettingsPanel(el.currentAgentSettingsBtn);
         });
@@ -3923,6 +4313,15 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         });
         el.saveGlobalSettingsBtn?.addEventListener('click', () => {
             void saveGlobalSettings();
+        });
+        el.appUpdateCheckBtn?.addEventListener('click', () => {
+            void checkForAppUpdates();
+        });
+        el.appUpdateDownloadBtn?.addEventListener('click', () => {
+            void downloadAppUpdate();
+        });
+        el.appUpdateInstallBtn?.addEventListener('click', () => {
+            void installAppUpdate();
         });
         el.saveAgentSettingsBtn?.addEventListener('click', () => {
             void saveAgentSettings();

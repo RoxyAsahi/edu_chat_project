@@ -636,6 +636,38 @@ test('buildNotesSelectionSummary matches topic and agent scope wording', async (
     );
 });
 
+test('buildMessageNoteContent strips reasoning blocks before saving notes', async () => {
+    const { buildMessageNoteContent, stripReasoningBlocksFromNoteContent } = await loadNotesUtilsModule();
+
+    const content = [
+        '[--- 模型思考过程: "草稿" ---]',
+        '这里不应该进入笔记。',
+        '[--- 模型思考过程结束 ---]',
+        '',
+        '## 正式回答',
+        '这个结论应该保留。',
+        '',
+        '<think>这段也不应该进入笔记。</think>',
+        '最后一句也保留。',
+    ].join('\n');
+
+    const noteBase = buildMessageNoteContent({
+        role: 'assistant',
+        content,
+        attachments: [{ name: '讲义.pdf' }],
+    });
+
+    assert.doesNotMatch(noteBase.contentMarkdown, /模型思考过程/);
+    assert.doesNotMatch(noteBase.contentMarkdown, /不应该进入笔记/);
+    assert.match(noteBase.contentMarkdown, /正式回答/);
+    assert.match(noteBase.contentMarkdown, /这个结论应该保留/);
+    assert.match(noteBase.contentMarkdown, /## 附件/);
+    assert.equal(
+        stripReasoningBlocksFromNoteContent('<thinking>hidden</thinking>\nvisible'),
+        'visible'
+    );
+});
+
 test('removeDeletedNoteReferencesFromHistory clears favorite state only when the last ref is removed', async () => {
     const { removeDeletedNoteReferencesFromHistory } = await loadNotesUtilsModule();
 

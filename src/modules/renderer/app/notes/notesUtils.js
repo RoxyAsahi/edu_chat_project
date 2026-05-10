@@ -9,6 +9,8 @@ import {
 const NOTE_RENDER_SNAPSHOT_SCHEMA_VERSION = 1;
 const NOTE_RENDER_SNAPSHOT_RENDERER = 'unistudy-message-renderer';
 const SNAPSHOT_ALLOWED_ROLES = new Set(['assistant', 'user', 'system']);
+const THOUGHT_CHAIN_REGEX = /\[--- 模型思考过程(?::\s*"([^"]*)")?\s*---\][\s\S]*?\[--- 模型思考过程结束 ---\]/gs;
+const CONVENTIONAL_THOUGHT_REGEX = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi;
 
 function normalizeHistory(history) {
     return Array.isArray(history)
@@ -213,6 +215,17 @@ function buildNoteSaveRequest({
     };
 }
 
+function stripReasoningBlocksFromNoteContent(content) {
+    if (typeof content !== 'string' || !content.trim()) {
+        return content;
+    }
+    return content
+        .replace(THOUGHT_CHAIN_REGEX, '')
+        .replace(CONVENTIONAL_THOUGHT_REGEX, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
 function deriveDeletedNoteState({
     selectedNoteIds = [],
     activeNoteId = null,
@@ -235,13 +248,14 @@ function buildMessageNoteContent(message = {}) {
     const textContent = typeof message.content === 'string'
         ? message.content
         : (message.content?.text || JSON.stringify(message.content || '', null, 2));
+    const cleanTextContent = stripReasoningBlocksFromNoteContent(textContent);
     const attachmentSection = Array.isArray(message.attachments) && message.attachments.length > 0
         ? `\n\n## 附件\n\n${message.attachments.map((item) => `- ${item.name}`).join('\n')}`
         : '';
 
     return {
         title: titleMap[message.role] || '聊天摘录',
-        contentMarkdown: `${textContent}${attachmentSection}`.trim(),
+        contentMarkdown: `${cleanTextContent}${attachmentSection}`.trim(),
     };
 }
 
@@ -260,4 +274,5 @@ export {
     normalizeNote,
     normalizeRenderSnapshot,
     removeDeletedNoteReferencesFromHistory,
+    stripReasoningBlocksFromNoteContent,
 };

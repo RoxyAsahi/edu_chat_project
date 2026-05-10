@@ -10,12 +10,13 @@
     "dist": "node scripts/package-electron.js dist",
     "pack:win": "electron-builder --win dir",
     "dist:win": "electron-builder --win nsis portable",
+    "dist:win:update": "electron-builder --win nsis --publish never",
     "pack:mac": "electron-builder --mac dir",
     "dist:mac": "electron-builder --mac",
     "pack:linux": "electron-builder --linux dir",
     "dist:linux": "electron-builder --linux",
     "test": "npm run test:main && npm run test:renderer && npm run test:e2e:controlled",
-    "test:main": "node --test tests/agent-handlers.test.js tests/bootstrap-settings.test.js tests/chat-client.test.js tests/chat-config.test.js tests/chat-history-ipc.test.js tests/chat-history-store.test.js tests/chat-orchestrator.test.js tests/chat-prompt-resolution.test.js tests/chat-window-getter.test.js tests/data-root-resolver.test.js tests/default-data-seeder.test.js tests/electron-binary-path.test.js tests/emoticon-handlers.test.js tests/file-dialog-handlers.test.js tests/kb-guide.test.js tests/kb-image-import.test.js tests/kb-reader-view.test.js tests/kb-retrieval.test.js tests/knowledge-base-facade.test.js tests/knowledge-base-handlers.test.js tests/knowledge-base-shelf.test.js tests/model-service.test.js tests/model-usage-tracker.test.js tests/notes-handlers.test.js tests/preload-contract.test.js tests/preload-paths.test.js tests/prompt-variable-resolver.test.js tests/runtime-data-roots.test.js tests/settings-handlers.test.js tests/settings-manager.test.js tests/study-memory.test.js tests/theme-handlers.test.js tests/topic-title-main.test.js tests/upstream-capabilities.test.js",
+    "test:main": "node --test tests/agent-handlers.test.js tests/app-updater-service.test.js tests/bootstrap-settings.test.js tests/chat-client.test.js tests/chat-config.test.js tests/chat-history-ipc.test.js tests/chat-history-store.test.js tests/chat-orchestrator.test.js tests/chat-prompt-resolution.test.js tests/chat-window-getter.test.js tests/data-root-resolver.test.js tests/default-data-seeder.test.js tests/electron-binary-path.test.js tests/emoticon-handlers.test.js tests/file-dialog-handlers.test.js tests/kb-guide.test.js tests/kb-image-import.test.js tests/kb-reader-view.test.js tests/kb-retrieval.test.js tests/knowledge-base-facade.test.js tests/knowledge-base-handlers.test.js tests/knowledge-base-shelf.test.js tests/model-service.test.js tests/model-usage-tracker.test.js tests/notes-handlers.test.js tests/preload-contract.test.js tests/preload-paths.test.js tests/prompt-variable-resolver.test.js tests/runtime-data-roots.test.js tests/settings-handlers.test.js tests/settings-manager.test.js tests/study-memory.test.js tests/theme-handlers.test.js tests/topic-title-main.test.js tests/upstream-capabilities.test.js",
     "test:renderer": "npm run test:renderer:logic && npm run test:renderer:dom",
     "test:renderer:logic": "node --test tests/renderer-*.test.js",
     "test:renderer:dom": "vitest run --environment jsdom tests/renderer/safe-html.test.js",
@@ -50,6 +51,7 @@
   "dependencies": {
     "@libsql/client": "^0.15.15",
     "chokidar": "^4.0.3",
+    "electron-updater": "^6.8.3",
     "fs-extra": "^11.3.2",
     "mammoth": "^1.9.1",
     "pdf-parse": "^1.1.1",
@@ -61,6 +63,13 @@
     "productName": "UniStudy",
     "icon": "icon.png",
     "afterPack": "scripts/after-pack-win.js",
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://your-domain.example/unistudy/win"
+      }
+    ],
+    "detectUpdateChannel": false,
     "directories": {
       "buildResources": "build-resources",
       "output": "dist"

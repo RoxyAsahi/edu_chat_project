@@ -121,6 +121,7 @@ const { resolveDataRootPaths } = require('../modules/main/utils/dataRootResolver
 const { shouldSeedDefaultDataRoot } = require('../modules/main/utils/bootstrapSettings');
 const { seedDefaultDataRoot } = require('../modules/main/utils/defaultDataSeeder');
 const { PRELOAD_ROLES, resolveProjectPreload } = require('../modules/main/services/preloadPaths');
+const appUpdater = require('../modules/main/services/appUpdater');
 
 const SRC_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(SRC_ROOT, '..');
@@ -188,6 +189,7 @@ const INTERNAL_SAVE_WINDOW_MS = 2000;
 let windowHandlersRegistered = false;
 let watcherHandlersRegistered = false;
 let exportHandlerRegistered = false;
+let updaterHandlersRegistered = false;
 let coreServicesInitialized = false;
 let coreIpcRegistered = false;
 let domainIpcRegistered = false;
@@ -451,6 +453,28 @@ function registerExportHandler() {
     exportHandlerRegistered = true;
 }
 
+function registerUpdaterHandlers() {
+    if (updaterHandlersRegistered) {
+        return;
+    }
+
+    const invokeUpdater = async (action, task) => {
+        try {
+            return ok(await task());
+        } catch (error) {
+            console.error(`[UniStudyUpdater] ${action} failed:`, error);
+            return fail(error);
+        }
+    };
+
+    ipcMain.handle('app:get-update-info', () => ok(appUpdater.getInfo()));
+    ipcMain.handle('app:check-for-updates', () => invokeUpdater('check for updates', appUpdater.checkForUpdates));
+    ipcMain.handle('app:download-update', () => invokeUpdater('download update', appUpdater.downloadUpdate));
+    ipcMain.handle('app:quit-and-install', () => invokeUpdater('quit and install', appUpdater.quitAndInstall));
+
+    updaterHandlersRegistered = true;
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1540,
@@ -560,6 +584,8 @@ function registerCoreIpc() {
     registerWindowHandlers();
     registerWatcherHandlers();
     registerExportHandler();
+    appUpdater.initialize({ app, getMainWindow });
+    registerUpdaterHandlers();
 
     coreIpcRegistered = true;
 }

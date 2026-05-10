@@ -48,7 +48,7 @@
           <img class="brand-mark" src="../assets/brand-logo.png" alt="UniStudy logo" />
           <div>
             <div class="titlebar__title">UniStudy</div>
-            <div class="titlebar__subtitle">个人 AI 学习终端</div>
+            <div class="titlebar__subtitle">个人 AI 学习空间</div>
           </div>
         </div>
         <button id="workspaceBackToOverviewBtn" class="ghost-button icon-text-btn titlebar__home-btn titlebar__tab" type="button">
@@ -1085,6 +1085,10 @@
                   <span class="material-symbols-outlined">science</span>
                   <span>高级与调试</span>
                 </button>
+                <button id="settingsNavUpdatesBtn" class="settings-modal__nav-button" type="button" data-settings-section-button="updates">
+                  <span class="material-symbols-outlined">system_update_alt</span>
+                  <span>软件更新</span>
+                </button>
               </div>
             </div>
           </nav>
@@ -1243,6 +1247,45 @@
                 <div class="settings-list">
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>当前提示词片段</strong><span>查看哪些片段会被加入最终 system prompt。</span></div><button id="refreshFinalSystemPromptPreviewBtn" class="ghost-button icon-text-btn settings-row__button" type="button"><span class="material-symbols-outlined">preview</span> 刷新</button><div id="promptSegmentPreview" class="settings-token-grid" aria-label="当前提示词片段总览"></div></div>
                   <div class="settings-row settings-row--editor"><div class="settings-row__main"><strong>最终完整 system prompt</strong><span>当前选中学科实际发送给上游的完整 system prompt。</span></div><textarea id="finalSystemPromptPreview" class="settings-textarea--preview" rows="10" readonly aria-readonly="true" placeholder="这里会显示完整 system prompt。"></textarea><div id="finalSystemPromptPreviewMeta" class="settings-preview-meta"></div></div>
+                </div>
+              </section>
+            </section>
+
+            <section id="settingsModalSectionUpdates" class="settings-modal__section hidden" data-settings-section="updates">
+              <section class="settings-list-card settings-list-card--untitled app-update-card">
+                <div class="settings-list">
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>当前版本</strong><span>当前正在运行的 UniStudy 版本。</span></div>
+                    <span id="appUpdateCurrentVersion" class="app-update-value settings-row__control">--</span>
+                  </div>
+                  <div class="settings-row">
+                    <div class="settings-row__main"><strong>更新状态</strong><span id="appUpdateStatus">正在读取更新状态...</span></div>
+                    <span id="appUpdateBadge" class="app-update-badge settings-row__control">检查中</span>
+                  </div>
+                  <div class="settings-row app-update-action-row">
+                    <div class="settings-row__main"><strong>操作</strong><span id="appUpdateActionHint">NSIS 安装版会从配置的更新源获取新版。</span></div>
+                    <div class="app-update-actions settings-row__control">
+                      <button id="appUpdateCheckBtn" class="ghost-button icon-text-btn settings-row__button" type="button">
+                        <span class="material-symbols-outlined">refresh</span> 检查
+                      </button>
+                      <button id="appUpdateDownloadBtn" class="accent-button icon-text-btn settings-row__button hidden" type="button">
+                        <span class="material-symbols-outlined">download</span> 下载
+                      </button>
+                      <button id="appUpdateInstallBtn" class="accent-button icon-text-btn settings-row__button hidden" type="button">
+                        <span class="material-symbols-outlined">restart_alt</span> 安装
+                      </button>
+                    </div>
+                  </div>
+                  <div id="appUpdateProgressRow" class="settings-row settings-row--editor app-update-progress-row hidden">
+                    <div class="settings-row__main"><strong>下载进度</strong><span id="appUpdateProgressText">0%</span></div>
+                    <div class="app-update-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                      <div id="appUpdateProgressBar" class="app-update-progress__bar"></div>
+                    </div>
+                  </div>
+                  <div id="appUpdateReleaseRow" class="settings-row settings-row--editor app-update-release-row hidden">
+                    <div class="settings-row__main"><strong>新版本</strong><span id="appUpdateReleaseTitle">--</span></div>
+                    <div id="appUpdateReleaseNotes" class="app-update-release-notes"></div>
+                  </div>
                 </div>
               </section>
             </section>

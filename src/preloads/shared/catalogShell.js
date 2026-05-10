@@ -42,6 +42,16 @@ function createShellCatalog(ops) {
         setTheme: command((theme) => ops.send('theme:set', theme)),
         setThemeMode: command((themeMode) => ops.send('theme:set-mode', themeMode)),
         getPlatform: query(() => ops.invoke('window:get-platform')),
+        getAppUpdateInfo: query(() => ops.invoke('app:get-update-info')),
+        checkForUpdates: query(() => ops.invoke('app:check-for-updates')),
+        downloadUpdate: query(() => ops.invoke('app:download-update')),
+        quitAndInstallUpdate: query(() => ops.invoke('app:quit-and-install')),
+        onUpdateChecking: subscription(ops.subscribe('app:update-checking', (_event, data) => data)),
+        onUpdateAvailable: subscription(ops.subscribe('app:update-available', (_event, data) => data)),
+        onUpdateNotAvailable: subscription(ops.subscribe('app:update-not-available', (_event, data) => data)),
+        onUpdateDownloadProgress: subscription(ops.subscribe('app:update-download-progress', (_event, data) => data)),
+        onUpdateDownloaded: subscription(ops.subscribe('app:update-downloaded', (_event, data) => data)),
+        onUpdateError: subscription(ops.subscribe('app:update-error', (_event, data) => data)),
     };
 }
 

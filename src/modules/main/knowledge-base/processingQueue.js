@@ -2,6 +2,20 @@ function createProcessingQueue(deps = {}) {
     const runtime = deps.runtime;
     const repository = deps.repository;
     const processor = deps.processor;
+    const onDocumentProcessed = deps.onDocumentProcessed || null;
+
+    async function maybeRunPostProcessing(documentId) {
+        if (typeof onDocumentProcessed !== 'function') {
+            return;
+        }
+
+        const document = await repository.getDocumentById(documentId).catch(() => null);
+        if (document?.status !== 'done') {
+            return;
+        }
+
+        await onDocumentProcessed(document).catch(() => {});
+    }
 
     function enqueueDocument(documentId) {
         runtime.enqueueDocument(documentId);
@@ -22,6 +36,7 @@ function createProcessingQueue(deps = {}) {
                     continue;
                 }
                 await processor.processDocument(documentId);
+                await maybeRunPostProcessing(documentId);
             }
         } finally {
             runtime.setProcessing(false);

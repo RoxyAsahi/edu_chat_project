@@ -296,6 +296,17 @@ function prependNativeReasoningBubble(rawHtml, message) {
     return nativeReasoningHtml ? `${nativeReasoningHtml}${rawHtml}` : rawHtml;
 }
 
+function stripReasoningBlocksFromText(text) {
+    if (typeof text !== 'string' || !text.trim()) {
+        return text;
+    }
+    return text
+        .replace(THOUGHT_CHAIN_REGEX, '')
+        .replace(CONVENTIONAL_THOUGHT_REGEX, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
 /**
  * Generates a unique ID for scoping CSS.
  * @returns {string} A unique ID string (e.g., 'unistudy-bubble-1a2b3c4d').
@@ -1484,7 +1495,21 @@ function derivePlainTextFromHtml(html) {
         .trim();
 }
 
-function normalizeMessageRenderSnapshot(snapshot) {
+function stripReasoningNodesFromSnapshotHtml(html) {
+    const source = String(html || '');
+    if (!source.trim() || typeof document === 'undefined' || !document.createElement) {
+        return source;
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = source;
+    template.content
+        .querySelectorAll('.reasoning-bubble, .unistudy-stream-reasoning-root')
+        .forEach((node) => node.remove());
+    return template.innerHTML;
+}
+
+function normalizeMessageRenderSnapshot(snapshot, options = {}) {
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
         return null;
     }
@@ -1495,13 +1520,16 @@ function normalizeMessageRenderSnapshot(snapshot) {
         return null;
     }
 
-    const contentHtml = sanitizeSnapshotHtml(snapshot.contentHtml);
+    const sanitizedHtml = sanitizeSnapshotHtml(snapshot.contentHtml);
+    const contentHtml = options.stripReasoning === false
+        ? sanitizedHtml
+        : stripReasoningNodesFromSnapshotHtml(sanitizedHtml);
     if (!contentHtml.trim()) {
         return null;
     }
 
     const styleText = sanitizeSnapshotStyleText(snapshot.styleText || '');
-    const plainText = String(snapshot.plainText || derivePlainTextFromHtml(contentHtml))
+    const plainText = String(derivePlainTextFromHtml(contentHtml) || snapshot.plainText || '')
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, 50000);
@@ -1544,6 +1572,7 @@ function createMessageRenderSnapshot(message = {}, options = {}) {
         return null;
     }
 
+    const includeReasoning = options.includeReasoning === true;
     const role = normalizeSnapshotRole(options.role || message.role || 'assistant');
     const scopeId = String(options.scopeId || generateUniqueId()).trim() || generateUniqueId();
     const settings = options.settings || mainRendererReferences.globalSettingsRef.get();
@@ -1553,6 +1582,9 @@ function createMessageRenderSnapshot(message = {}, options = {}) {
     const sourceMessageId = String(options.sourceMessageId || message.id || '').trim();
     let textToRender = getMessageTextContent(message);
     let styleText = '';
+    if (!includeReasoning) {
+        textToRender = stripReasoningBlocksFromText(textToRender);
+    }
 
     if (role === 'user') {
         textToRender = prepareUserMessageText(textToRender);
@@ -1574,9 +1606,19 @@ function createMessageRenderSnapshot(message = {}, options = {}) {
         textToRender = applyFrontendRegexRules(textToRender, agentConfigForRegex.stripRegexes, role, depth);
     }
 
+    const snapshotMessage = includeReasoning
+        ? { ...message, role, id: message.id || sourceMessageId || scopeId }
+        : {
+            ...message,
+            role,
+            id: message.id || sourceMessageId || scopeId,
+            reasoning_content: '',
+            reasoning: '',
+            reasoning_elapsed: '',
+        };
     const contentHtml = sanitizeSnapshotHtml(renderMessageContentHtml({
         textToRender,
-        message: { ...message, role, id: message.id || sourceMessageId || scopeId },
+        message: snapshotMessage,
         role,
         settings,
         depth,
@@ -1595,6 +1637,8 @@ function createMessageRenderSnapshot(message = {}, options = {}) {
         scopeId,
         plainText: derivePlainTextFromHtml(contentHtml) || textToRender.replace(/\s+/g, ' ').trim(),
         capturedAt: options.capturedAt || Date.now(),
+    }, {
+        stripReasoning: !includeReasoning,
     });
 }
 

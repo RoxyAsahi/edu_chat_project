@@ -3092,6 +3092,121 @@ body.dark-theme .manual-notes-library-empty__image {
   text-align: right;
 }
 
+.app-update-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-1);
+  white-space: nowrap;
+}
+
+.app-update-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 0.5px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.app-update-badge[data-tone='success'] {
+  border-color: rgba(22, 163, 74, 0.24);
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+}
+
+.app-update-badge[data-tone='warning'] {
+  border-color: rgba(217, 119, 6, 0.26);
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.app-update-badge[data-tone='info'] {
+  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.app-update-badge[data-tone='danger'] {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+.app-update-badge[data-tone='muted'] {
+  color: var(--color-text-3);
+}
+
+.app-update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-update-actions .settings-row__button {
+  min-width: 82px;
+}
+
+.app-update-progress {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-background-soft);
+}
+
+.app-update-progress__bar {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease;
+}
+
+.app-update-release-notes {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-height: 180px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 0.5px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+body.dark-theme .app-update-badge[data-tone='success'] {
+  color: #86efac;
+}
+
+body.dark-theme .app-update-badge[data-tone='warning'] {
+  color: #fbbf24;
+}
+
+body.dark-theme .app-update-badge[data-tone='info'] {
+  color: #93c5fd;
+}
+
+body.dark-theme .app-update-badge[data-tone='danger'] {
+  color: #fca5a5;
+}
+
+body.dark-theme .app-update-release-notes,
+body.dark-theme .app-update-progress {
+  background: rgba(255,255,255,0.06);
+}
+
 .settings-list-card .settings-row__emoji {
   width: 72px;
   min-width: 72px;
@@ -3268,6 +3383,11 @@ body.dark-theme .settings-list-card textarea:focus {
 
   .settings-row__number {
     text-align: left;
+  }
+
+  .app-update-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 

@@ -26,6 +26,16 @@ const SHELL_KEYS = [
     'setTheme',
     'setThemeMode',
     'getPlatform',
+    'getAppUpdateInfo',
+    'checkForUpdates',
+    'downloadUpdate',
+    'quitAndInstallUpdate',
+    'onUpdateChecking',
+    'onUpdateAvailable',
+    'onUpdateNotAvailable',
+    'onUpdateDownloadProgress',
+    'onUpdateDownloaded',
+    'onUpdateError',
 ];
 
 const SESSION_KEYS = [

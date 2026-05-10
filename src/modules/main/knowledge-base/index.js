@@ -34,10 +34,17 @@ const processor = createDocumentProcessor({
     KB_UNSUPPORTED_OCR_ERROR,
     isImageMimeType,
 });
+let guideService = null;
 const processingQueue = createProcessingQueue({
     runtime,
     repository,
     processor,
+    onDocumentProcessed: async (document) => {
+        if (!guideService || !document?.id) {
+            return;
+        }
+        await guideService.generateKnowledgeBaseDocumentGuide(document.id, { forceRefresh: false });
+    },
 });
 const documentStore = createDocumentStore({
     runtime,
@@ -53,7 +60,7 @@ const retrievalService = createRetrievalService({
     resolveRerankConfig,
     cosineSimilarity,
 });
-const guideService = createGuideService({
+guideService = createGuideService({
     runtime,
     repository,
     parseKnowledgeBaseDocument,

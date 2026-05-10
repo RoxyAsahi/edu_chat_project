@@ -606,6 +606,78 @@ test('messageRenderer captures and remounts note render snapshots with fresh sco
     );
 });
 
+test('messageRenderer omits reasoning content from note render snapshots by default', async (t) => {
+    const { history, messageRenderer } = await createHarness(t);
+    const message = {
+        id: 'assistant-note-snapshot-reasoning',
+        role: 'assistant',
+        name: 'Tutor',
+        reasoning_content: '这里是原生思维链，不应该出现在笔记预览。',
+        reasoning_elapsed: '12.3 秒',
+        content: [
+            '[--- 模型思考过程: "草稿" ---]',
+            '这里是明文思维链，也不应该出现在笔记预览。',
+            '[--- 模型思考过程结束 ---]',
+            '',
+            '<think>这段 think 内容也应该被过滤。</think>',
+            '',
+            '## 正式回答',
+            '这里才是要收藏进笔记的内容。',
+        ].join('\n'),
+        timestamp: Date.UTC(2026, 3, 26, 8, 8),
+    };
+    history.push(message);
+
+    const snapshot = messageRenderer.createMessageRenderSnapshot(message);
+
+    assert.ok(snapshot);
+    assert.doesNotMatch(snapshot.contentHtml, /reasoning-bubble/);
+    assert.doesNotMatch(snapshot.contentHtml, /已深度思考/);
+    assert.doesNotMatch(snapshot.contentHtml, /思维链/);
+    assert.doesNotMatch(snapshot.plainText, /思维链/);
+    assert.match(snapshot.contentHtml, /正式回答/);
+    assert.match(snapshot.plainText, /要收藏进笔记/);
+
+    const snapshotWithReasoning = messageRenderer.createMessageRenderSnapshot(message, { includeReasoning: true });
+    assert.match(snapshotWithReasoning.contentHtml, /reasoning-bubble/);
+});
+
+test('messageRenderer strips reasoning bubbles from saved note snapshots when remounting', async (t) => {
+    const { chatMessages, messageRenderer } = await createHarness(t);
+    const target = chatMessages.ownerDocument.createElement('div');
+    chatMessages.ownerDocument.body.appendChild(target);
+
+    const mounted = messageRenderer.mountRichNotePreview(target, {
+        id: 'legacy-note-with-reasoning',
+        contentMarkdown: '## 正式回答\n\n保留正文。',
+        renderSnapshot: {
+            schemaVersion: 1,
+            renderer: 'unistudy-message-renderer',
+            sourceMessageId: 'legacy-msg',
+            role: 'assistant',
+            contentHtml: [
+                '<div class="reasoning-bubble collapsible">',
+                '<div class="unistudy-thought-chain-header">已深度思考</div>',
+                '<div class="unistudy-thought-chain-body">旧的思维链</div>',
+                '</div>',
+                '<h2>正式回答</h2>',
+                '<p>保留正文。</p>',
+            ].join(''),
+            styleText: '',
+            scopeId: 'legacy-scope',
+            plainText: '已深度思考 旧的思维链 正式回答 保留正文。',
+            capturedAt: 10,
+        },
+    });
+
+    assert.ok(mounted?.snapshot);
+    assert.equal(target.querySelector('.reasoning-bubble'), null);
+    assert.doesNotMatch(target.textContent, /已深度思考|思维链/);
+    assert.match(target.textContent, /正式回答/);
+    assert.match(mounted.snapshot.plainText, /正式回答/);
+    assert.doesNotMatch(mounted.snapshot.plainText, /思维链/);
+});
+
 test('messageRenderer cleans live preview resources before updateMessageContent replaces DOM', async (t) => {
     const { chatMessages, history, messageRenderer } = await createHarness(t);
     const message = {

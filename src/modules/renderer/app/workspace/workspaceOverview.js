@@ -85,7 +85,7 @@ function buildDiaryCardsMarkup({ diaryCards = [] } = {}) {
             <div class="home-diary__empty">
                 <span class="home-diary__empty-icon" aria-hidden="true">✒️</span>
                 <strong>还没有学习日记</strong>
-                <p>和 AI 助手对话学习时，系统会自动把学习结晶整理成日记。开始一段对话，这里就会展示你的学习足迹。</p>
+                <p>和 AI 助手对话学习时，系统会主动把关键收获整理成记忆日记。开始一段对话，这里就会展示你的学习足迹。</p>
             </div>
         `;
     }
@@ -504,7 +504,7 @@ function buildSubjectOverviewMarkup({
     const diarySection = `
         <section class="home-diary">
             <div class="home-section-header">
-                <h3>学习结晶</h3>
+                <h3>AI主动记忆</h3>
                 <button type="button" class="ghost-button" data-home-action="open-diary">
                     查看全部
                     <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
