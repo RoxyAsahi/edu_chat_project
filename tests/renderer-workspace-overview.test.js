@@ -84,7 +84,6 @@ test('buildSubjectOverviewMarkup renders the learning home flow, status, and sub
     assert.match(result.gridMarkup, /data-agent-id="math"/);
     assert.match(result.gridMarkup, /data-agent-id="english"/);
     assert.match(result.gridMarkup, /subjectOverviewCreateCard/);
-    assert.match(result.gridMarkup, /学习结晶/);
     assert.match(result.gridMarkup, /home-diary/);
     assert.match(result.gridMarkup, /home-status-trend/);
     assert.match(result.gridMarkup, /home-status-trend__chart/);

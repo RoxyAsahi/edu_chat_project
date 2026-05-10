@@ -9,8 +9,6 @@ import {
     resolveComposerSendAction,
 } from './composerUtils.js';
 
-const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
-
 function escapeHtml(text) {
     return String(text || '')
         .replace(/&/g, '&amp;')
@@ -96,16 +94,7 @@ function extractReasoningContentFromResponseMessage(message = {}) {
 }
 
 function normalizeAgentModelOverride(rawModel, globalDefaultModel = '') {
-    const normalizedModel = String(rawModel || '').trim();
-    const normalizedGlobalDefaultModel = String(globalDefaultModel || '').trim();
-    if (
-        normalizedModel === LEGACY_AGENT_MODEL
-        && normalizedGlobalDefaultModel
-        && normalizedGlobalDefaultModel !== LEGACY_AGENT_MODEL
-    ) {
-        return '';
-    }
-    return normalizedModel;
+    return String(rawModel || '').trim();
 }
 
 function getReasoningContentForRequest(message = {}) {
@@ -114,19 +103,7 @@ function getReasoningContentForRequest(message = {}) {
         : undefined;
 }
 
-function formatLegacyTokenSuggestions(unresolvedTokens = [], suggestionMap = {}) {
-    return (Array.isArray(unresolvedTokens) ? unresolvedTokens : []).map((token) => (
-        suggestionMap?.[token]
-            ? `${token} -> ${suggestionMap[token]}`
-            : token
-    ));
-}
-
 const PLACEHOLDER_TOPIC_BASE_NAME = '新对话';
-const LEGACY_PLACEHOLDER_TOPIC_NAMES = new Set([
-    '主要对话',
-    'Main Conversation',
-]);
 
 const CHAT_MODEL_MODE_META = Object.freeze({
     fast: {
@@ -155,10 +132,6 @@ function isPlaceholderTopicName(name = '') {
     const normalized = normalizeTopicName(name);
     if (!normalized) {
         return false;
-    }
-
-    if (LEGACY_PLACEHOLDER_TOPIC_NAMES.has(normalized)) {
-        return true;
     }
 
     return new RegExp(`^${PLACEHOLDER_TOPIC_BASE_NAME}(?:\\s+\\d+)?$`).test(normalized);
@@ -819,10 +792,7 @@ function createComposerController(deps = {}) {
             : [];
         if (unresolvedTokens.length > 0) {
             ui.showToastNotification(
-                `提示词变量未解析：${formatLegacyTokenSuggestions(
-                    unresolvedTokens,
-                    payload?.promptVariableResolution?.legacyTokenSuggestions || {}
-                ).join(', ')}`,
+                `提示词变量未解析：${unresolvedTokens.join(', ')}`,
                 'warning',
                 5000
             );

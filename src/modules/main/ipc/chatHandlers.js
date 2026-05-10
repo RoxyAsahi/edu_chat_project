@@ -14,7 +14,7 @@ const {
     THINKING_CHAT_REASONING_EFFORTS,
 } = require('../utils/settingsSchema');
 const {
-    TASK_KEY_BY_LEGACY_SETTINGS_KEY,
+    TASK_KEY_BY_SETTINGS_KEY,
     MODEL_SERVICE_DEFAULT_KEYS,
     normalizeModelService,
     resolveDefaultModelRef,
@@ -30,7 +30,6 @@ const {
 const {
     extractResponseContent,
     resolveDailyNoteGuideInstruction,
-    rewriteLegacyStudyLogPromptText,
 } = require('../study/toolProtocol');
 const { createChatHistoryStore } = require('../chat-history/store');
 
@@ -49,7 +48,6 @@ let ipcHandlersRegistered = false;
 let studyServices = null;
 let chatHistoryStore = null;
 const DEFAULT_CHAT_MODEL = 'gemini-3.1-flash-lite-preview';
-const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
 const FOLLOW_UP_HISTORY_LIMIT = 6;
 const FOLLOW_UP_RESULT_LIMIT = 5;
 const FOLLOW_UP_MESSAGE_CHAR_LIMIT = 900;
@@ -84,19 +82,8 @@ const TOOL_PROTOCOL_SIGNAL_PATTERNS = [
     /{{\s*DailyNoteGuide\s*}}/i,
     /——\s*日记\s*\(DailyNote\)\s*——/i,
     /<<<\[TOOL_REQUEST\]>>>/i,
-    /<<<DailyNoteStart>>>/i,
-    /\b(?:DailyNote|StudyLog)\.(?:create|update|write)\b/i,
+    /\bDailyNote\.(?:create|update)\b/i,
 ];
-
-function buildLegacyHistoryFilePath(userDataDir, agentId, topicId) {
-    return path.join(userDataDir, agentId, 'topics', topicId, 'history.json');
-}
-
-async function ensureLegacyHistoryDirectory(userDataDir, agentId, topicId) {
-    const historyFilePath = buildLegacyHistoryFilePath(userDataDir, agentId, topicId);
-    await fs.ensureDir(path.dirname(historyFilePath));
-    return historyFilePath;
-}
 
 function decodeFollowUpEntities(text = '') {
     return String(text || '')
@@ -503,19 +490,6 @@ function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions
     return nextMessages;
 }
 
-function normalizeLegacyStudyLogPromptMessages(messages = []) {
-    return (Array.isArray(messages) ? messages : []).map((message) => {
-        if (!message || message.role !== 'system' || typeof message.content !== 'string') {
-            return message;
-        }
-
-        return {
-            ...message,
-            content: rewriteLegacyStudyLogPromptText(message.content),
-        };
-    });
-}
-
 function messageContentHasToolProtocolSignals(content) {
     if (typeof content === 'string') {
         return TOOL_PROTOCOL_SIGNAL_PATTERNS.some((pattern) => pattern.test(content));
@@ -761,15 +735,11 @@ function buildTopicTitlePrompt(template = '', messages = []) {
         : DEFAULT_TOPIC_TITLE_PROMPT_TEMPLATE;
     let prompt = replaceMessagesEndVariables(promptTemplate, messages);
 
-    if (!chatHistory) {
-        return prompt.replace(/{{CHAT_HISTORY}}/g, '');
-    }
-
-    if (prompt.includes('{{CHAT_HISTORY}}')) {
-        return prompt.replace(/{{CHAT_HISTORY}}/g, chatHistory);
-    }
-
     if (prompt !== promptTemplate) {
+        return prompt.trim();
+    }
+
+    if (!chatHistory) {
         return prompt.trim();
     }
 
@@ -1277,7 +1247,7 @@ async function requestFollowUpsOnce({
 
 function resolvePreferredTaskKey(preferredSettingsKeys = []) {
     for (const settingsKey of Array.isArray(preferredSettingsKeys) ? preferredSettingsKeys : []) {
-        const taskKey = TASK_KEY_BY_LEGACY_SETTINGS_KEY[settingsKey];
+        const taskKey = TASK_KEY_BY_SETTINGS_KEY[settingsKey];
         if (taskKey) {
             return taskKey;
         }
@@ -1286,16 +1256,7 @@ function resolvePreferredTaskKey(preferredSettingsKeys = []) {
 }
 
 function normalizeAgentModelOverride(rawModel, globalDefaultModel = '') {
-    const normalizedModel = String(rawModel || '').trim();
-    const normalizedGlobalDefaultModel = String(globalDefaultModel || '').trim();
-    if (
-        normalizedModel === LEGACY_AGENT_MODEL
-        && normalizedGlobalDefaultModel
-        && normalizedGlobalDefaultModel !== LEGACY_AGENT_MODEL
-    ) {
-        return '';
-    }
-    return normalizedModel;
+    return String(rawModel || '').trim();
 }
 
 async function resolveTaskModel({
@@ -1387,14 +1348,10 @@ function initialize(mainWindow, context) {
         dataRoot: DATA_ROOT || path.dirname(USER_DATA_DIR || ''),
     });
 
-    const getLegacyHistoryPath = (agentId, topicId) => buildLegacyHistoryFilePath(USER_DATA_DIR, agentId, topicId);
-    const ensureTopicHistoryDir = (agentId, topicId) => ensureLegacyHistoryDirectory(USER_DATA_DIR, agentId, topicId);
     const readChatHistory = async (agentId, topicId) => {
-        const legacyHistoryPath = await ensureTopicHistoryDir(agentId, topicId);
-        return chatHistoryStore.getHistory(agentId, topicId, { legacyHistoryPath });
+        return chatHistoryStore.getHistory(agentId, topicId);
     };
     const saveChatHistory = async (agentId, topicId, history) => {
-        await ensureTopicHistoryDir(agentId, topicId);
         return chatHistoryStore.replaceHistory(agentId, topicId, Array.isArray(history) ? history : []);
     };
 
@@ -1454,9 +1411,7 @@ function initialize(mainWindow, context) {
             }
 
             const topicIds = itemConfig.topics.map((topic) => topic.id).filter(Boolean);
-            const matchedTopicIds = await chatHistoryStore.findTopicIdsByContent(itemId, topicIds, searchTerm, {
-                legacyHistoryPathForTopic: (topicId) => getLegacyHistoryPath(itemId, topicId),
-            });
+            const matchedTopicIds = await chatHistoryStore.findTopicIdsByContent(itemId, topicIds, searchTerm);
 
             return { success: true, matchedTopicIds };
         } catch (error) {
@@ -1505,8 +1460,7 @@ function initialize(mainWindow, context) {
     ipcMain.handle('get-chat-history-page', async (event, agentId, topicId, pageOptions = {}) => {
         if (!topicId) return { success: false, error: `Missing topicId for agent ${agentId}.`, messages: [] };
         try {
-            const legacyHistoryPath = await ensureTopicHistoryDir(agentId, topicId);
-            return await chatHistoryStore.getHistoryPage(agentId, topicId, pageOptions, { legacyHistoryPath });
+            return await chatHistoryStore.getHistoryPage(agentId, topicId, pageOptions);
         } catch (error) {
             console.error(`Failed to load chat history page for agent ${agentId}, topic ${topicId}:`, error);
             return { success: false, error: error.message, messages: [] };
@@ -1601,7 +1555,6 @@ function initialize(mainWindow, context) {
                 }));
                 const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
 
-                await ensureTopicHistoryDir(agentId, newTopicId);
                 await chatHistoryStore.replaceHistory(agentId, newTopicId, []);
 
                 return { success: true, topicId: newTopicId, topicName: newTopic.name, topics: updatedConfig.topics };
@@ -1641,7 +1594,6 @@ function initialize(mainWindow, context) {
 
                 // Recreate the default topic history state when the last topic is deleted.
                 if (remainingTopics.length === 1 && remainingTopics[0].id === 'default') {
-                    await ensureTopicHistoryDir(agentId, 'default');
                     await chatHistoryStore.replaceHistory(agentId, 'default', []);
                 }
 
@@ -1871,8 +1823,7 @@ function initialize(mainWindow, context) {
                 return { success: false, error: 'Unsupported item type.' };
             }
 
-            const legacyHistoryPath = await ensureTopicHistoryDir(itemId, topicId);
-            const message = await chatHistoryStore.getMessageById(itemId, topicId, messageId, { legacyHistoryPath });
+            const message = await chatHistoryStore.getMessageById(itemId, topicId, messageId);
             if (message) {
                 return { success: true, content: message.content };
             }
@@ -1937,7 +1888,6 @@ function initialize(mainWindow, context) {
             unresolvedTokens: [],
             substitutions: {},
             variableSources: {},
-            legacyTokenSuggestions: {},
         };
         let promptResolutionOptions = {
             settings,
@@ -1967,7 +1917,6 @@ function initialize(mainWindow, context) {
                 );
             }
 
-            processedMessages = normalizeLegacyStudyLogPromptMessages(processedMessages);
             processedMessages = applyEmoticonPrompt(processedMessages, settings, promptResolutionOptions);
             const executionMode = resolveChatExecutionMode({
                 requestExecutionMode,
@@ -2009,7 +1958,6 @@ function initialize(mainWindow, context) {
                 unresolvedTokens: resolution.unresolvedTokens,
                 substitutions: resolution.substitutions,
                 variableSources: resolution.variableSources,
-                legacyTokenSuggestions: resolution.legacyTokenSuggestions || {},
             };
 
             if (resolution.unresolvedTokens.length > 0) {
@@ -2300,8 +2248,7 @@ function initialize(mainWindow, context) {
                                     continue;
                                 }
                                 try {
-                                    const historyPath = getLegacyHistoryPath(agentId, topic.id);
-                                    const summary = await chatHistoryStore.getUnreadSummary(agentId, topic.id, { legacyHistoryPath: historyPath });
+                                    const summary = await chatHistoryStore.getUnreadSummary(agentId, topic.id);
                                     const topicCount = summary.shouldActivateCount
                                         ? 1
                                         : (topic.unread === true ? -1 : 0);

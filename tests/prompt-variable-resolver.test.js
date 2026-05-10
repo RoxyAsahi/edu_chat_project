@@ -29,17 +29,6 @@ test('resolvePromptVariables keeps unresolved tokens visible and reports them', 
     assert.deepEqual(result.unresolvedTokens, ['MissingAlias']);
 });
 
-test('resolvePromptVariables reports replacement hints for legacy prompt tokens', () => {
-    const result = resolvePromptVariables('Hello {{VarDivRender}} and {{VarUser}}');
-
-    assert.equal(result.resolvedPrompt, 'Hello {{VarDivRender}} and {{VarUser}}');
-    assert.deepEqual(result.unresolvedTokens, ['VarDivRender', 'VarUser']);
-    assert.deepEqual(result.legacyTokenSuggestions, {
-        VarDivRender: 'RenderingGuide',
-        VarUser: 'UserName',
-    });
-});
-
 test('resolvePromptVariables resolves RenderingGuide locally', () => {
     const result = resolvePromptVariables('Output formatting requirement: {{RenderingGuide}}');
 

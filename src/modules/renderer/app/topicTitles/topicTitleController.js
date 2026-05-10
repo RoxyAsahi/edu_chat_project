@@ -2,10 +2,6 @@ import { normalizeHistory } from '../composer/composerUtils.js';
 
 const TOPIC_TITLE_HISTORY_LOAD_DELAY_MS = 1250;
 const PLACEHOLDER_TOPIC_BASE_NAME = '新对话';
-const LEGACY_PLACEHOLDER_TOPIC_NAMES = new Set([
-    '主要对话',
-    'Main Conversation',
-]);
 
 function normalizeTopicTitle(name = '') {
     return String(name || '')
@@ -17,10 +13,6 @@ function isPlaceholderTopicName(name = '') {
     const normalized = normalizeTopicTitle(name);
     if (!normalized) {
         return false;
-    }
-
-    if (LEGACY_PLACEHOLDER_TOPIC_NAMES.has(normalized)) {
-        return true;
     }
 
     return new RegExp(`^${PLACEHOLDER_TOPIC_BASE_NAME}(?:\\s+\\d+)?$`).test(normalized);

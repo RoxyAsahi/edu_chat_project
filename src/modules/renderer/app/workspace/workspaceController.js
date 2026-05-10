@@ -14,10 +14,6 @@ function escapeHtml(text) {
 
 const PLACEHOLDER_TOPIC_ICON = '💬';
 const PLACEHOLDER_TOPIC_BASE_NAME = '新对话';
-const LEGACY_PLACEHOLDER_TOPIC_NAMES = new Set([
-    '主要对话',
-    'Main Conversation',
-]);
 
 function normalizeTopicName(name = '') {
     return String(name || '')
@@ -29,10 +25,6 @@ function isPlaceholderTopicName(name = '') {
     const normalized = normalizeTopicName(name);
     if (!normalized) {
         return false;
-    }
-
-    if (LEGACY_PLACEHOLDER_TOPIC_NAMES.has(normalized)) {
-        return true;
     }
 
     return new RegExp(`^${PLACEHOLDER_TOPIC_BASE_NAME}(?:\\s+\\d+)?$`).test(normalized);

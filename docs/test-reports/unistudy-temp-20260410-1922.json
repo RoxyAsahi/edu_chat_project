@@ -1,12 +1,12 @@
 {
-  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "repoRoot": "C:\\UniStudy\\UniStudyLite",
   "mode": "temp",
   "dataRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-s43qMH",
   "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-WaEsDc",
-  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-temp-20260410-1922.json",
+  "reportPath": "C:\\UniStudy\\UniStudyLite\\docs\\test-reports\\unistudy-temp-20260410-1922.json",
   "targetAgentId": null,
   "settings": {
-    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "chatEndpoint": "http://chat.uniquest.us.kg/v1/chat/completions",
     "kbBaseUrl": "http://154.36.184.44:3000",
     "guideModel": "gemini-3.1-flash-lite-preview",
     "defaultModel": "gemini-3.1-flash-lite-preview",
@@ -15,7 +15,7 @@
     "kbRerankModel": "BAAI/bge-reranker-v2-m3"
   },
   "configurationDiagnostics": {
-    "hasVcpApiKey": true,
+    "hasChatApiKey": true,
     "hasKbApiKey": true
   },
   "rendererErrors": [],
@@ -25,7 +25,7 @@
       "label": "临时单文件 Smoke",
       "topicName": "临时单文件测试-20260410-1922",
       "passed": false,
-      "error": "Error: 打开阅读区超时：unistudy-20260410-1922-newton-source.txt\n    at openSourceDocumentInReader (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:559:11)\n    at async runScenario (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:743:13)\n    at async run (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:896:32)"
+      "error": "Error: 打开阅读区超时：unistudy-20260410-1922-newton-source.txt\n    at openSourceDocumentInReader (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:559:11)\n    at async runScenario (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:743:13)\n    at async run (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:896:32)"
     }
   ],
   "errors": [

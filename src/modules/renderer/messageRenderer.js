@@ -2823,7 +2823,6 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
         if (typeof message.content === 'string') {
             textToRender = message.content;
         } else if (message.content && typeof message.content.text === 'string') {
-            // This case handles legacy structured content such as { text: "..." }.
             textToRender = message.content.text;
         } else if (message.content === null || message.content === undefined) {
             textToRender = ""; // Handle null or undefined content gracefully
@@ -3356,7 +3355,7 @@ function prepareUserMessageText(text) {
  * Renders chat history with a bounded DOM window for long conversations.
  * Full history stays in currentChatHistory; only the visible tail is mounted.
  * @param {Array<Message>} history The chat history to render.
- * @param {Object|boolean} options Rendering options or legacy truthy flag.
+ * @param {Object} options Rendering options.
  * @param {number} options.windowSize Number of latest messages to mount first.
  * @param {number} options.prependBatchSize Number of older messages to prepend per load.
  * @param {boolean} options.autoLoadOnScroll Whether top scroll loads older messages.
@@ -3380,7 +3379,7 @@ async function renderHistory(history, options = {}) {
 
     // For short histories, use the full rendering path directly.
     if (history.length <= windowSize) {
-        return renderHistoryLegacy(history, renderSessionId);
+        return renderFullHistory(history, renderSessionId);
     }
 
     console.debug(`[MessageRenderer] Windowed render start: total=${history.length}, windowSize=${windowSize}, prependBatchSize=${prependBatchSize}`);
@@ -3477,10 +3476,10 @@ async function renderMessageBatch(messages, scrollToBottom = false, renderSessio
 }
 
 /**
- * Legacy history rendering path for smaller histories.
+ * Full history rendering path for smaller histories.
  * @param {Array<Message>} history Chat history.
  */
-async function renderHistoryLegacy(history, renderSessionId = getActiveRenderSessionId()) {
+async function renderFullHistory(history, renderSessionId = getActiveRenderSessionId()) {
     if (!isRenderSessionActive(renderSessionId)) return;
 
     const fragment = document.createDocumentFragment();
@@ -3549,7 +3548,7 @@ export {
     setUserAvatarColor,
     renderMessage,
     renderHistory,
-    renderHistoryLegacy,
+    renderFullHistory,
     renderMessageBatch,
     startStreamingMessage,
     appendStreamChunk,

@@ -255,7 +255,7 @@ function createLogsController(deps = {}) {
                   `${entry.requestedToolName || entry.toolRequest?.toolName || 'DailyNote'}.${entry.requestedCommand || entry.toolRequest?.command || 'create'}`,
                   entry.subjectSignature || entry.subjectRaw || '未记录主题',
                   `召回 ${Number(entry.recallCount || 0)} 次`,
-                  entry.status === 'imported' ? '旧迁移数据' : `状态 ${entry.status || 'unknown'}`,
+                  `状态 ${entry.status || 'unknown'}`,
               ].join(' · '))}</div>
               <div class="logs-card__tagline">${(entry.tags || []).slice(0, 4).map((tag) => `<button type="button" class="logs-tag" data-log-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`).join('')}</div>
             </div>
@@ -339,7 +339,7 @@ function createLogsController(deps = {}) {
                 <span>主题：${escapeHtml(entry.subjectSignature || entry.subjectRaw || '未记录')}</span>
                 <span>文件：${escapeHtml(entry.filePath || '未记录')}</span>
                 <span>来源：${escapeHtml(entry.modelSnapshot || entry.agentNameSnapshot || entry.agentId || '未记录')}</span>
-                <span>来源状态：${entry.status === 'imported' ? '历史导入' : '当前 UniStudy 写入'}</span>
+                <span>来源状态：${escapeHtml(entry.status || 'unknown')}</span>
                 <span>Topic Tag：${escapeHtml(entry.topicTag || '无')}</span>
                 <span>Agent Tag：${escapeHtml(entry.agentTag || '无')}</span>
               </div>

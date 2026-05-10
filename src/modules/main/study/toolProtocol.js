@@ -1,14 +1,11 @@
 const TOOL_REQUEST_START = '<<<[TOOL_REQUEST]>>>';
 const TOOL_REQUEST_END = '<<<[END_TOOL_REQUEST]>>>';
 const TOOL_PAYLOAD_MARKER = '<!-- TOOL_PAYLOAD -->';
-const LEGACY_DAILY_NOTE_REGEX = /<<<DailyNoteStart>>>([\s\S]*?)<<<DailyNoteEnd>>>/g;
 const THINK_BLOCK_REGEX = /<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/gi;
 const TOOL_BLOCK_REGEX = /<<<\[TOOL_REQUEST\]>>>([\s\S]*?)<<<\[END_TOOL_REQUEST\]>>>/g;
 
 const TOOL_NAME_ALIASES = Object.freeze({
     DailyNote: 'DailyNote',
-    DailyNoteWrite: 'DailyNote',
-    StudyLog: 'DailyNote',
 });
 
 const TOOL_COMMAND_ALIASES = Object.freeze({
@@ -104,11 +101,6 @@ function normalizeToolCommand(command = '', requestedToolName = '') {
         return TOOL_COMMAND_ALIASES[normalized] || normalized;
     }
 
-    const normalizedToolName = sanitizeText(requestedToolName);
-    if (normalizedToolName === 'DailyNoteWrite' || normalizedToolName === 'StudyLog') {
-        return 'create';
-    }
-
     return 'create';
 }
 
@@ -197,11 +189,6 @@ function parseDelimitedBlock(blockContent = '') {
         toolName,
         requestedCommand: command || '',
         command: normalizedCommand,
-        compatibilityMode: requestedToolName === 'StudyLog'
-            ? 'study-log-write'
-            : requestedToolName === 'DailyNoteWrite'
-                ? 'daily-note-write'
-                : '',
         args: normalizedArgs,
         rawArgs,
         rawBlock: blockContent,
@@ -221,45 +208,6 @@ function parseToolRequests(content = '') {
         }
     }
 
-    LEGACY_DAILY_NOTE_REGEX.lastIndex = 0;
-    while ((match = LEGACY_DAILY_NOTE_REGEX.exec(cleanContent)) !== null) {
-        const block = sanitizeText(match[1]);
-        if (!block) {
-            continue;
-        }
-
-        const subject = block.match(/^\s*Subject:\s*(.+?)$/mi)?.[1]?.trim()
-            || '';
-        const dateString = block.match(/^\s*Date:\s*(.+?)$/mi)?.[1]?.trim() || '';
-        const fileName = block.match(/^\s*FileName:\s*(.+?)$/mi)?.[1]?.trim() || '';
-        const tagLine = block.match(/^\s*Tag:\s*(.+?)$/mi)?.[1]?.trim() || '';
-        const contentMatch = block.match(/^\s*Content:\s*([\s\S]*?)$/mi);
-        const contentText = contentMatch ? sanitizeText(contentMatch[1]) : '';
-
-        if (!contentText) {
-            continue;
-        }
-
-        toolRequests.push({
-            protocol: 'legacy-daily-note',
-            requestedToolName: 'DailyNote',
-            toolName: 'DailyNote',
-            requestedCommand: 'create',
-            command: 'create',
-            compatibilityMode: 'legacy-daily-note',
-            args: {
-                subject,
-                Date: dateString,
-                Content: contentText,
-                Tag: tagLine,
-                fileName,
-                archery: '',
-            },
-            rawArgs: {},
-            rawBlock: block,
-        });
-    }
-
     return toolRequests;
 }
 
@@ -267,18 +215,8 @@ function stripToolArtifacts(content = '') {
     return String(content || '')
         .replace(THINK_BLOCK_REGEX, '')
         .replace(TOOL_BLOCK_REGEX, '')
-        .replace(LEGACY_DAILY_NOTE_REGEX, '')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
-}
-
-function rewriteLegacyStudyLogPromptText(content = '') {
-    return String(content || '')
-        .replace(
-            /默认使用\s*StudyLog\.write\s*[；;]?\s*兼容\s*DailyNote\.create\s*\/\s*DailyNote\.update\s*文本块/gi,
-            '默认使用 DailyNote.create / DailyNote.update 文本块'
-        )
-        .replace(/\bStudyLog\.write\b/g, 'DailyNote.create');
 }
 
 function buildToolPayloadMessage(results = []) {
@@ -347,7 +285,6 @@ function buildDailyNoteGuideInstruction(customGuide = '', options = {}) {
 
 module.exports = {
     DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION,
-    LEGACY_DAILY_NOTE_REGEX,
     THINK_BLOCK_REGEX,
     TOOL_BLOCK_REGEX,
     TOOL_PAYLOAD_MARKER,
@@ -362,7 +299,6 @@ module.exports = {
     parseToolRequests,
     resolvePreferredDailyNoteSubject,
     resolveDailyNoteGuideInstruction,
-    rewriteLegacyStudyLogPromptText,
     stripToolArtifacts,
     toArray,
 };

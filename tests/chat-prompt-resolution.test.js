@@ -172,54 +172,6 @@ test('send-chat-request preserves assistant reasoning_content during preprocessi
     assert.equal(assistantMessage.reasoning_content, '这是上一轮的思考过程。');
 });
 
-test('send-chat-request returns replacement hints for legacy prompt tokens', async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-legacy-token-resolution-'));
-    t.after(() => fs.remove(tempRoot));
-
-    let capturedRequest = null;
-    const chatClientStub = {
-        initialize() {},
-        async send(request) {
-            capturedRequest = request;
-            return { ok: true };
-        },
-    };
-
-    const { chatHandlers, handlers } = loadChatHandlers(chatClientStub);
-    chatHandlers.initialize(null, {
-        AGENT_DIR: path.join(tempRoot, 'agents'),
-        USER_DATA_DIR: path.join(tempRoot, 'user-data'),
-        DATA_ROOT: path.join(tempRoot, 'app-data'),
-        fileWatcher: null,
-        settingsManager: {
-            async readSettings() {
-                return {
-                    enableThoughtChainInjection: false,
-                };
-            },
-        },
-        agentConfigManager: null,
-    });
-
-    const sendChatRequest = handlers.get('send-chat-request');
-    const result = await sendChatRequest({ sender: {} }, {
-        requestId: 'req_legacy_token',
-        endpoint: 'http://example.com/v1/chat/completions',
-        apiKey: 'demo-key',
-        messages: [{ role: 'system', content: 'Legacy {{VarDivRender}}' }],
-        modelConfig: { stream: false },
-        context: {},
-    });
-
-    assert.equal(result.ok, true);
-    assert.ok(capturedRequest);
-    assert.equal(capturedRequest.messages[0].content.includes('{{VarDivRender}}'), true);
-    assert.deepEqual(result.promptVariableResolution.unresolvedTokens, ['VarDivRender']);
-    assert.deepEqual(result.promptVariableResolution.legacyTokenSuggestions, {
-        VarDivRender: 'RenderingGuide',
-    });
-});
-
 test('send-chat-request injects bundled emoticon prompt text before calling the upstream client', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-emoticon-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
@@ -488,7 +440,7 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
     await fs.writeJson(path.join(agentDir, agentId, 'config.json'), {
         id: agentId,
         name: 'Study Agent',
-        systemPrompt: '请按需使用 {{DailyNoteGuide}}\n默认使用 StudyLog.write；兼容 DailyNote.create / DailyNote.update 文本块。',
+        systemPrompt: '请按需使用 {{DailyNoteGuide}}\n默认使用 DailyNote.create / DailyNote.update 文本块。',
         topics: [{ id: topicId, name: '高数复习' }],
     }, { spaces: 2 });
 
@@ -582,10 +534,6 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
 
     assert.ok(capturedRequest);
     assert.equal(sendCount, 2);
-    assert.equal(
-        capturedRequest.messages.some((message) => typeof message.content === 'string' && message.content.includes('StudyLog.write')),
-        false
-    );
     assert.equal(Array.isArray(result.toolEvents), true);
     assert.equal(result.toolEvents.length, 1);
     assert.equal(result.toolEvents[0].success, true);

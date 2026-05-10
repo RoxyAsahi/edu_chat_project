@@ -1,12 +1,12 @@
 {
-  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "repoRoot": "C:\\UniStudy\\UniStudyLite",
   "mode": "real-data",
-  "dataRoot": "C:\\VCP\\Eric\\VCPChatLite\\AppData",
+  "dataRoot": "C:\\UniStudy\\UniStudyLite\\AppData",
   "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-AvmPuA",
-  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-real-data-20260410-0555.json",
+  "reportPath": "C:\\UniStudy\\UniStudyLite\\docs\\test-reports\\unistudy-real-data-20260410-0555.json",
   "targetAgentId": "Lite_Real_Test_Nova_1775682726542",
   "settings": {
-    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "chatEndpoint": "http://chat.uniquest.us.kg/v1/chat/completions",
     "kbBaseUrl": "http://154.36.184.44:3000",
     "kbEmbeddingModel": "BAAI/bge-m3",
     "kbRerankModel": "BAAI/bge-reranker-v2-m3"
@@ -19,7 +19,7 @@
       "agentId": "Lite_Real_Test_Nova_1775682726542",
       "topicId": "topic_1775771714191",
       "topicName": "真实单文件测试-20260410-0555",
-      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771714191\\history.json",
+      "historyFilePath": "C:\\UniStudy\\UniStudyLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771714191\\history.json",
       "uploadedFiles": [
         "unistudy-20260410-0555-newton-source.txt"
       ],
@@ -78,7 +78,7 @@
       "agentId": "Lite_Real_Test_Nova_1775682726542",
       "topicId": "topic_1775771748507",
       "topicName": "真实多文件测试-20260410-0555",
-      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771748507\\history.json",
+      "historyFilePath": "C:\\UniStudy\\UniStudyLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771748507\\history.json",
       "uploadedFiles": [
         "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
         "unistudy-20260410-0555-ohm-law.txt",
@@ -156,7 +156,7 @@
             "unistudy-20260410-0555-ohm-law.txt",
             "unistudy-20260410-0555-pythagorean.md"
           ],
-          "answerPreview": "📂 系统组件：[VCP-Visual-Synesthesia] (视觉通感协议)\n\n\n⚡ 资料检索结果：OHM-204\n\n    \n\n核心知识点： 欧",
+          "answerPreview": "📂 系统组件：[UniStudy-Visual-Synesthesia] (视觉通感协议)\n\n\n⚡ 资料检索结果：OHM-204\n\n    \n\n核心知识点： 欧",
           "kbRefCount": 2,
           "keywordOk": false,
           "documentOk": true,
@@ -184,7 +184,7 @@
       "agentId": "Lite_Real_Test_Nova_1775682726542",
       "topicId": "topic_1775771791944",
       "topicName": "真实压力测试-20260410-0555",
-      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771791944\\history.json",
+      "historyFilePath": "C:\\UniStudy\\UniStudyLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775771791944\\history.json",
       "uploadedFiles": [
         "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
         "unistudy-20260410-0555-newton-source.txt",

@@ -44,8 +44,8 @@ node scripts/electron-unistudy-smoke.js
 如果当前 smoke / 联调环境也需要显式覆盖聊天服务，可以再补：
 
 ```powershell
-$env:VCP_SERVER_URL="http://your-chat-endpoint/v1/chat/completions"
-$env:VCP_API_KEY="your-chat-key"
+$env:CHAT_ENDPOINT="http://your-chat-endpoint/v1/chat/completions"
+$env:CHAT_API_KEY="your-chat-key"
 ```
 
 ## 脚本环境变量
@@ -65,10 +65,10 @@ $env:VCP_API_KEY="your-chat-key"
   - 可选，默认输出到 `docs/test-reports`
 - `KB_BASE_URL` / `KB_API_KEY`
   - Source 检索服务配置
-- `VCP_SERVER_URL` / `VCP_API_KEY`
+- `CHAT_ENDPOINT` / `CHAT_API_KEY`
   - 当前 smoke / 联调脚本使用的对话服务配置，不作为 UniStudy 应用级正式命名
 
-其中，`VCP_SERVER_URL`、`VCP_API_KEY` 只应在脚本、smoke、联调说明中保留，不能提升为通用产品或应用正式运行时契约。
+其中，`CHAT_ENDPOINT`、`CHAT_API_KEY` 只应在脚本、smoke、联调说明中保留，不能提升为通用产品或应用正式运行时契约。
 
 ## 真实模式会做什么
 

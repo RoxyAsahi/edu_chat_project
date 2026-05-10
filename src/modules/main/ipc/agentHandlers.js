@@ -15,39 +15,10 @@ let cachedAgents = null; // Memory cache for full agent list
 let cachedMetadata = null; // Memory cache for lightweight metadata list
 let initialized = false;
 
-const DEPRECATED_AGENT_CONFIG_FIELDS = [
-    'cardCss',
-    'chatCss',
-    'customCss',
-    'promptAliases',
-    'toolSignature',
-    'vcpAliases',
-    'temperature',
-    'contextTokenLimit',
-    'maxOutputTokens',
-    'thinkingBudget',
-    'top_p',
-    'top_k',
-    'enableThinkingRequest',
-    'includeUsageInStream',
-];
-
 function invalidateCaches() {
     console.log('[agentHandlers] Invalidating agent caches.');
     cachedAgents = null;
     cachedMetadata = null;
-}
-
-function stripDeprecatedAgentConfigFields(config) {
-    if (!config || typeof config !== 'object') {
-        return config;
-    }
-
-    const sanitizedConfig = { ...config };
-    for (const field of DEPRECATED_AGENT_CONFIG_FIELDS) {
-        delete sanitizedConfig[field];
-    }
-    return sanitizedConfig;
 }
 
 async function loadAgents(settingsManager) {
@@ -89,7 +60,6 @@ async function loadAgents(settingsManager) {
                     }
                 }
 
-                config = stripDeprecatedAgentConfigFields(config);
                 agentData.name = config.name || folderName;
                 agentData.config = config;
                 agentData.topics = (config.topics && Array.isArray(config.topics) && config.topics.length > 0)
@@ -204,8 +174,6 @@ async function getAgentConfigById(agentId) {
                 // Keep stripRegexes from config.json as a fallback
             }
         }
-
-        config = stripDeprecatedAgentConfigFields(config);
 
         const avatarPathPng = path.join(agentDir, 'avatar.png');
         const avatarPathJpg = path.join(agentDir, 'avatar.jpg');
@@ -334,13 +302,13 @@ function initialize(context) {
             }
 
             // CRITICAL: Always remove stripRegexes from the object to be saved to config.json
-            const configToSave = stripDeprecatedAgentConfigFields({ ...config });
+            const configToSave = { ...config };
             delete configToSave.stripRegexes;
 
             if (agentConfigManager) {
                 // 使用AgentConfigManager进行安全的配置更新
                 const result = await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
-                    ...stripDeprecatedAgentConfigFields(existingConfig),
+                    ...existingConfig,
                     ...configToSave
                 }));
                 invalidateCaches();
@@ -361,8 +329,8 @@ function initialize(context) {
         try {
             if (agentConfigManager) {
                 const result = await agentConfigManager.updateAgentConfig(agentId, existingConfig => ({
-                    ...stripDeprecatedAgentConfigFields(existingConfig),
-                    ...stripDeprecatedAgentConfigFields(updates)
+                    ...existingConfig,
+                    ...updates
                 }));
                 invalidateCaches();
                 return { success: true, message: `Agent ${agentId} 配置已更新。` };
@@ -481,7 +449,7 @@ function initialize(context) {
 
             let configToSave;
             if (initialConfig) {
-                configToSave = stripDeprecatedAgentConfigFields({ ...initialConfig, name: agentName });
+                configToSave = { ...initialConfig, name: agentName };
             } else {
                 configToSave = {
                     name: agentName,

@@ -2423,7 +2423,6 @@
   margin-left: 2px;
 }
 
-/* legacy dashboard wrapper (no longer used but keep for safety) */
 .overview-dashboard {
   display: none;
 }

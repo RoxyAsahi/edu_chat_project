@@ -260,6 +260,7 @@ async function bootstrapIndependentDataRoot() {
             copiedFiles: 0,
             skippedFiles: 0,
             hydratedHistories: 0,
+            chatHistoryImports: 0,
             knowledgeBaseImports: { knowledgeBases: 0, documents: 0, chunks: 0 },
             seedRootMissing: false,
         };

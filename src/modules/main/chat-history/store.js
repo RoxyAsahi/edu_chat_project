@@ -134,7 +134,7 @@ function createChatHistoryStore(options = {}) {
                 `CREATE TABLE IF NOT EXISTS chat_topic_state (
                     agent_id TEXT NOT NULL,
                     topic_id TEXT NOT NULL,
-                    migrated_at INTEGER,
+                    initialized_at INTEGER,
                     message_count INTEGER NOT NULL DEFAULT 0,
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (agent_id, topic_id)
@@ -181,7 +181,7 @@ function createChatHistoryStore(options = {}) {
     async function getTopicState(agentId, topicId) {
         const db = await getClient();
         const result = await db.execute({
-            sql: `SELECT agent_id, topic_id, migrated_at, message_count, updated_at
+            sql: `SELECT agent_id, topic_id, initialized_at, message_count, updated_at
                 FROM chat_topic_state
                 WHERE agent_id = ? AND topic_id = ?
                 LIMIT 1`,
@@ -199,23 +199,23 @@ function createChatHistoryStore(options = {}) {
         return toFiniteInteger(result.rows?.[0]?.count, 0);
     }
 
-    async function markTopicState(agentId, topicId, messageCount, migratedAt = Date.now()) {
+    async function markTopicState(agentId, topicId, messageCount, initializedAt = Date.now()) {
         const now = Date.now();
         await executeWriteBatch([{
-            sql: `INSERT INTO chat_topic_state (agent_id, topic_id, migrated_at, message_count, updated_at)
+            sql: `INSERT INTO chat_topic_state (agent_id, topic_id, initialized_at, message_count, updated_at)
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(agent_id, topic_id) DO UPDATE SET
-                    migrated_at = excluded.migrated_at,
+                    initialized_at = excluded.initialized_at,
                     message_count = excluded.message_count,
                     updated_at = excluded.updated_at`,
-            args: [agentId, topicId, migratedAt, messageCount, now],
+            args: [agentId, topicId, initializedAt, messageCount, now],
         }]);
     }
 
     async function replaceHistory(agentId, topicId, history = [], optionsForReplace = {}) {
         const messages = Array.isArray(history) ? history : [];
         const now = Date.now();
-        const migratedAt = optionsForReplace.migratedAt || now;
+        const initializedAt = optionsForReplace.initializedAt || now;
         const statements = [{
             sql: 'DELETE FROM chat_message WHERE agent_id = ? AND topic_id = ?',
             args: [agentId, topicId],
@@ -243,68 +243,32 @@ function createChatHistoryStore(options = {}) {
         }
 
         statements.push({
-            sql: `INSERT INTO chat_topic_state (agent_id, topic_id, migrated_at, message_count, updated_at)
+            sql: `INSERT INTO chat_topic_state (agent_id, topic_id, initialized_at, message_count, updated_at)
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(agent_id, topic_id) DO UPDATE SET
-                    migrated_at = excluded.migrated_at,
+                    initialized_at = excluded.initialized_at,
                     message_count = excluded.message_count,
                     updated_at = excluded.updated_at`,
-            args: [agentId, topicId, migratedAt, messages.length, now],
+            args: [agentId, topicId, initializedAt, messages.length, now],
         });
 
         await executeWriteBatch(statements);
         return { success: true, messageCount: messages.length };
     }
 
-    async function readLegacyHistory(legacyHistoryPath) {
-        if (!legacyHistoryPath || !await fsImpl.pathExists(legacyHistoryPath)) {
-            return { exists: false, history: [] };
-        }
-
-        try {
-            const history = await fsImpl.readJson(legacyHistoryPath);
-            return {
-                exists: true,
-                history: Array.isArray(history) ? history : [],
-                invalidShape: !Array.isArray(history),
-            };
-        } catch (error) {
-            return {
-                exists: true,
-                history: [],
-                error,
-            };
-        }
-    }
-
-    async function ensureMigrated(agentId, topicId, legacyHistoryPath = '') {
+    async function ensureTopicState(agentId, topicId) {
         const state = await getTopicState(agentId, topicId);
         if (state) {
-            return { migrated: false, state };
+            return state;
         }
 
         const existingMessageCount = await countTopicMessages(agentId, topicId);
-        if (existingMessageCount > 0) {
-            await markTopicState(agentId, topicId, existingMessageCount);
-            return { migrated: false, state: await getTopicState(agentId, topicId) };
-        }
-
-        const legacy = await readLegacyHistory(legacyHistoryPath);
-        if (legacy.error) {
-            console.warn(`[ChatHistoryStore] Failed to migrate legacy history: ${legacyHistoryPath}`, legacy.error);
-            return { migrated: false, error: legacy.error };
-        }
-
-        await replaceHistory(agentId, topicId, legacy.history, { migratedAt: Date.now() });
-        return {
-            migrated: legacy.exists && legacy.history.length > 0,
-            state: await getTopicState(agentId, topicId),
-            invalidShape: legacy.invalidShape === true,
-        };
+        await markTopicState(agentId, topicId, existingMessageCount);
+        return getTopicState(agentId, topicId);
     }
 
-    async function getHistory(agentId, topicId, optionsForGet = {}) {
-        await ensureMigrated(agentId, topicId, optionsForGet.legacyHistoryPath);
+    async function getHistory(agentId, topicId) {
+        await ensureTopicState(agentId, topicId);
         const db = await getClient();
         const result = await db.execute({
             sql: `SELECT message_json
@@ -317,8 +281,8 @@ function createChatHistoryStore(options = {}) {
         return (result.rows || []).map(parseMessageRow).filter((message) => message !== null);
     }
 
-    async function getHistoryPage(agentId, topicId, pageOptions = {}, migrationOptions = {}) {
-        await ensureMigrated(agentId, topicId, migrationOptions.legacyHistoryPath);
+    async function getHistoryPage(agentId, topicId, pageOptions = {}) {
+        await ensureTopicState(agentId, topicId);
         const limit = Math.max(1, Math.min(200, toFiniteInteger(pageOptions.limit, 50)));
         const before = Number(pageOptions.before);
         const hasBefore = Number.isFinite(before);
@@ -347,8 +311,8 @@ function createChatHistoryStore(options = {}) {
         };
     }
 
-    async function getMessageById(agentId, topicId, messageId, optionsForGet = {}) {
-        await ensureMigrated(agentId, topicId, optionsForGet.legacyHistoryPath);
+    async function getMessageById(agentId, topicId, messageId) {
+        await ensureTopicState(agentId, topicId);
         const db = await getClient();
         const result = await db.execute({
             sql: `SELECT message_json
@@ -371,11 +335,8 @@ function createChatHistoryStore(options = {}) {
             return [];
         }
 
-        const legacyPathForTopic = typeof optionsForSearch.legacyHistoryPathForTopic === 'function'
-            ? optionsForSearch.legacyHistoryPathForTopic
-            : () => '';
         for (const topicId of normalizedTopicIds) {
-            await ensureMigrated(agentId, topicId, legacyPathForTopic(topicId));
+            await ensureTopicState(agentId, topicId);
         }
 
         const placeholders = normalizedTopicIds.map(() => '?').join(', ');
@@ -396,8 +357,8 @@ function createChatHistoryStore(options = {}) {
         return normalizedTopicIds.filter((topicId) => matched.has(topicId));
     }
 
-    async function getUnreadSummary(agentId, topicId, optionsForGet = {}) {
-        await ensureMigrated(agentId, topicId, optionsForGet.legacyHistoryPath);
+    async function getUnreadSummary(agentId, topicId) {
+        await ensureTopicState(agentId, topicId);
         const db = await getClient();
         const result = await db.execute({
             sql: `SELECT
@@ -443,7 +404,7 @@ function createChatHistoryStore(options = {}) {
     return {
         close,
         deleteTopic,
-        ensureMigrated,
+        ensureTopicState,
         findTopicIdsByContent,
         getDbPath: () => dbPath,
         getHistory,

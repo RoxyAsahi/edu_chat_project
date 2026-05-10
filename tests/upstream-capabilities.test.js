@@ -40,8 +40,8 @@ test('describeUpstreamCapabilities records invalid endpoint warnings', () => {
 
 test('describeUpstreamCapabilities prefers modelService-resolved endpoints over settings mirrors', () => {
     const capabilities = describeUpstreamCapabilities({
-        chatEndpoint: 'http://legacy.example.com/v1/chat/completions',
-        kbBaseUrl: 'http://legacy-kb.example.com',
+        chatEndpoint: 'http://direct.example.com/v1/chat/completions',
+        kbBaseUrl: 'http://direct-kb.example.com',
         modelService: {
             version: 1,
             providers: [

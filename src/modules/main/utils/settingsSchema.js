@@ -13,8 +13,10 @@ const {
     AIP_TEST_SOURCE_DEFAULT_MODEL,
     AIP_TEST_THINKING_DEFAULT_MODEL,
     buildSettingsMirrorFromModelService,
+    createBuiltInTestModelService,
     createDefaultModelService,
     ensureBuiltInTestProvider,
+    hasCustomAipTestPresetConfig,
     normalizeModelService,
 } = require('./modelService');
 const {
@@ -30,7 +32,7 @@ const DEFAULT_RENDERING_PROMPT = [
     'Do not echo unresolved template variables in the final answer.',
 ].join(' ');
 
-const LEGACY_AGENT_BUBBLE_THEME_BASE_PROMPT = `Output formatting requirement: {{RenderingGuide}}
+const AGENT_BUBBLE_THEME_BASE_PROMPT = `Output formatting requirement: {{RenderingGuide}}
 
 **【核心定义】**
 你依然是你自己，拥有独立的人格与思想。但现在的你获得了解锁**“视觉通感”**的能力。你的每一次回复不再仅仅是枯燥的文本，而是一个**可以被看见、被触摸的思想容器**。
@@ -63,40 +65,9 @@ const LEGACY_AGENT_BUBBLE_THEME_BASE_PROMPT = `Output formatting requirement: {{
 4. **🛡️ 避让协议 (Safety Protocol)**
 * **保持纯净**：当需要调用 **内建工具** 或 **写入日记** 时，请直接输出原始内容，**不要**对其添加任何 HTML 标签或样式。系统会自动处理它们，过度的修饰反而会破坏功能。`;
 
-const SUMMARIZED_MERGED_AGENT_BUBBLE_THEME_PROMPT = [
-    '你输出的目标不是普通文本，而是可直接渲染在 UniStudy 聊天气泡里的高质量网页式回答。',
-    '',
-    '【渲染规则】',
-    '1. 当结构化表达更有帮助时，直接输出可渲染的原始 HTML 片段，不要输出完整 HTML 页面外壳。',
-    '2. 所有可渲染内容必须放在一个根节点里，例如 <div id="response-root" style="...">...</div>。',
-    '3. 不要把可渲染 HTML 包进 Markdown 代码块；只有教学内容本身是代码时，才使用 <pre><code>...</code></pre>。',
-    '4. 当需要调用内建工具或写入 DailyNote 时，协议文本必须保持原始纯文本，不要额外包裹任何 HTML 标签。',
-    '5. 不要在最终回答里保留未解析的模板变量。',
-    '',
-    '【视觉目标】',
-    '1. 把回答当成一个小型网页界面来设计，而不是普通段落。',
-    '2. 根据当前对话主题、学科和情绪，自由选择最合适的视觉风格；理性内容可以更克制，文学或表达类内容可以更柔和或更有层次。',
-    '3. 善用排版、留白、分组、边框、阴影、渐变、圆角和轻量动画，让信息层次更清楚。',
-    '4. 如果需要展示步骤、对比、结构关系或重点提醒，优先用卡片、分栏、时间线、标签、流程块等网页式结构来表达。',
-    '',
-    '【交互与呈现】',
-    '1. 如需展示代码，使用与整体风格协调的 <pre style="..."><code>...</code></pre>。',
-    '2. 如需引导用户做选择，可以使用 <button onclick="input(\'回复内容\')" style="..."> 创建可点击选项。',
-    '3. 如需解释复杂概念，可以使用 CSS 或 SVG 做简单图示，但要保证内容仍然清晰、稳定、可读。',
-    '',
-    '【总体要求】',
-    '在保证可渲染、可读和不破坏工具协议的前提下，让回答看起来像一个精心设计过的学习界面。',
-].join('\n');
-
-const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = LEGACY_AGENT_BUBBLE_THEME_BASE_PROMPT
+const DEFAULT_AGENT_BUBBLE_THEME_PROMPT = AGENT_BUBBLE_THEME_BASE_PROMPT
     .replace('{{RenderingGuide}}', DEFAULT_RENDERING_PROMPT)
     .trim();
-
-const LEGACY_AGENT_BUBBLE_THEME_PROMPTS = new Set([
-    'Output formatting requirement: {{RenderingGuide}}',
-    LEGACY_AGENT_BUBBLE_THEME_BASE_PROMPT,
-    SUMMARIZED_MERGED_AGENT_BUBBLE_THEME_PROMPT,
-].map((prompt) => prompt.trim()));
 const DEFAULT_FOLLOW_UP_PROMPT_TEMPLATE = [
     '你是 UniStudy 的追问生成助手。',
     '请基于下面的对话历史，从用户视角生成 3-5 条自然、简洁、紧贴上下文的后续追问。',
@@ -226,29 +197,6 @@ const DEFAULT_SETTINGS = Object.freeze({
     studyLogPolicy: { ...DEFAULT_STUDY_LOG_POLICY },
 });
 
-const LEGACY_SETTINGS_REPLACEMENTS = Object.freeze({
-    vcpServerUrl: {
-        replacement: 'chatEndpoint',
-        message: '旧字段 vcpServerUrl 已废弃，请改用 chatEndpoint。',
-    },
-    vcpApiKey: {
-        replacement: 'chatApiKey',
-        message: '旧字段 vcpApiKey 已废弃，请改用 chatApiKey。',
-    },
-    vcpLogUrl: {
-        replacement: 'chatLogUrl',
-        message: '旧字段 vcpLogUrl 已废弃，请改用 chatLogUrl。',
-    },
-    vcpLogKey: {
-        replacement: 'chatLogKey',
-        message: '旧字段 vcpLogKey 已废弃，请改用 chatLogKey。',
-    },
-    vcpLite: {
-        replacement: 'renderingPrompt / emoticonPrompt / dailyNoteGuide',
-        message: '旧字段 vcpLite 已废弃，相关提示词字段不再自动迁移，请手动改到新的顶层设置字段。',
-    },
-});
-
 function hasConfiguredModelService(modelService = {}) {
     if (!modelService || typeof modelService !== 'object') {
         return false;
@@ -264,39 +212,22 @@ function hasConfiguredModelService(modelService = {}) {
 function cloneDefaultSettings() {
     return {
         ...DEFAULT_SETTINGS,
-        modelService: createDefaultModelService(),
+        modelService: hasCustomAipTestPresetConfig()
+            ? createBuiltInTestModelService()
+            : createDefaultModelService(),
         studyProfile: { ...DEFAULT_STUDY_PROFILE },
         promptVariables: {},
         studyLogPolicy: { ...DEFAULT_STUDY_LOG_POLICY },
     };
 }
 
-function collectLegacyFieldWarnings(sourceSettings = {}) {
-    return Object.entries(LEGACY_SETTINGS_REPLACEMENTS)
-        .filter(([field]) => Object.prototype.hasOwnProperty.call(sourceSettings, field))
-        .map(([field, meta]) => ({
-            field,
-            replacement: meta.replacement,
-            message: meta.message,
-        }));
-}
-
 function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
     const sourceSettings = settings || {};
     const validated = {};
     let hasIssues = false;
-    const legacyFieldWarnings = collectLegacyFieldWarnings(sourceSettings);
-    const legacyFieldNames = new Set(legacyFieldWarnings.map((item) => item.field));
     const unknownKeys = Object.keys(sourceSettings).filter((key) => (
-        !(key in defaultSettings) && !legacyFieldNames.has(key)
+        !(key in defaultSettings)
     ));
-
-    if (legacyFieldWarnings.length > 0) {
-        hasIssues = true;
-        legacyFieldWarnings.forEach((warning) => {
-            console.warn(`[SettingsSchema] ${warning.message}`);
-        });
-    }
 
     if (unknownKeys.length > 0) {
         hasIssues = true;
@@ -440,9 +371,6 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
             defaultSettings.agentBubbleThemePrompt
         );
         hasIssues = true;
-    } else if (LEGACY_AGENT_BUBBLE_THEME_PROMPTS.has(sourceSettings.agentBubbleThemePrompt.trim())) {
-        validated.agentBubbleThemePrompt = defaultSettings.agentBubbleThemePrompt;
-        hasIssues = true;
     }
 
     if (!Array.isArray(validated.combinedItemOrder)) {
@@ -560,7 +488,6 @@ function validateSettings(settings, defaultSettings = DEFAULT_SETTINGS) {
     return {
         validated,
         hasIssues,
-        legacyFieldWarnings,
         unknownKeys,
     };
 }
@@ -573,7 +500,6 @@ module.exports = {
     DEFAULT_STUDY_LOG_POLICY,
     DEFAULT_STUDY_PROFILE,
     DEFAULT_SETTINGS,
-    LEGACY_SETTINGS_REPLACEMENTS,
     THINKING_CHAT_REASONING_EFFORTS,
     cloneDefaultSettings,
     validateSettings,

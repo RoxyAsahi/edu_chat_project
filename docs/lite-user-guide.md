@@ -1,7 +1,7 @@
 # UniStudy 使用说明
 
 更新时间: 2026-04-13
-适用仓库: `C:\VCP\Eric\edu_chat_project`
+适用仓库: 当前仓库根目录
 
 ## 产品定位
 UniStudy 是面向个人学习场景持续演进的 AI 学习终端。

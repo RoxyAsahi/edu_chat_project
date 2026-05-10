@@ -1,7 +1,36 @@
 const test = require('node:test');
 const assert = require('assert/strict');
+const path = require('path');
 
 const modelService = require('../src/modules/main/utils/modelService');
+const MODEL_SERVICE_PATH = path.resolve(__dirname, '../src/modules/main/utils/modelService.js');
+
+function loadModelServiceWithEnv(overrides = {}) {
+    const previousValues = {};
+    Object.keys(overrides).forEach((key) => {
+        previousValues[key] = process.env[key];
+        if (overrides[key] === undefined) {
+            delete process.env[key];
+        } else {
+            process.env[key] = overrides[key];
+        }
+    });
+
+    delete require.cache[MODEL_SERVICE_PATH];
+    const loaded = require(MODEL_SERVICE_PATH);
+
+    Object.entries(previousValues).forEach(([key, value]) => {
+        if (value === undefined) {
+            delete process.env[key];
+        } else {
+            process.env[key] = value;
+        }
+    });
+    delete require.cache[MODEL_SERVICE_PATH];
+    require(MODEL_SERVICE_PATH);
+
+    return loaded;
+}
 
 test('modelService exports the neutral helper names for settings conversion and mirror building', () => {
     assert.equal(typeof modelService.buildModelServiceFromSettings, 'function');
@@ -57,10 +86,82 @@ test('detectRemoteModelCapabilities recognizes OpenAI-compatible thinking model 
     assert.equal(modelService.detectRemoteModelCapabilities('deepseek-ai/DeepSeek-V4-Flash').reasoning, true);
 });
 
-test('buildModelServiceFromSettings recognizes the built-in AI&P test preset from the hardcoded channel', () => {
+test('modelService allows the packaged AI&P test key to be overridden by environment variable', () => {
+    const loaded = loadModelServiceWithEnv({
+        UNISTUDY_AIP_TEST_API_KEY: 'env-provided-key',
+    });
+
+    assert.equal(loaded.AIP_TEST_API_KEY, 'env-provided-key');
+    assert.deepEqual(loaded.createBuiltInTestProvider().apiKeys, ['env-provided-key']);
+});
+
+test('modelService can load the AI&P test preset from a JSON environment config', () => {
+    const loaded = loadModelServiceWithEnv({
+        UNISTUDY_AIP_TEST_PRESET_CONFIG: JSON.stringify({
+            name: 'Contest Review Proxy',
+            apiBaseUrl: 'https://proxy.example.com/openai',
+            apiKey: 'json-config-key',
+            models: [
+                {
+                    id: 'review-chat',
+                    name: 'Review Chat',
+                    group: 'chat',
+                    capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
+                },
+                {
+                    id: 'review-embedding',
+                    name: 'Review Embedding',
+                    group: 'embedding',
+                    capabilities: { chat: false, embedding: true, rerank: false, vision: false, reasoning: false },
+                },
+                {
+                    id: 'review-rerank',
+                    name: 'Review Rerank',
+                    group: 'rerank',
+                    capabilities: { chat: false, embedding: false, rerank: true, vision: false, reasoning: false },
+                },
+            ],
+            defaults: {
+                chat: 'review-chat',
+                thinkingChat: 'review-chat',
+                chatFallback: 'review-chat',
+                followUp: 'review-chat',
+                studyTool: 'review-chat',
+                topicTitle: 'review-chat',
+                sourceGuide: 'review-chat',
+                imageTranscription: 'review-chat',
+                embedding: 'review-embedding',
+                rerank: 'review-rerank',
+            },
+        }),
+    });
+
+    assert.equal(loaded.hasCustomAipTestPresetConfig(), true);
+    assert.equal(loaded.AIP_TEST_PROVIDER_NAME, 'Contest Review Proxy');
+    assert.equal(loaded.AIP_TEST_API_BASE_URL, 'https://proxy.example.com/openai');
+    assert.equal(loaded.AIP_TEST_CHAT_ENDPOINT, 'https://proxy.example.com/openai/v1/chat/completions');
+    assert.equal(loaded.AIP_TEST_API_KEY, 'json-config-key');
+    assert.equal(loaded.AIP_TEST_DEFAULT_MODEL, 'review-chat');
+    assert.equal(loaded.AIP_TEST_EMBEDDING_DEFAULT_MODEL, 'review-embedding');
+
+    const service = loaded.createBuiltInTestModelService();
+    assert.equal(service.providers.length, 1);
+    assert.equal(service.providers[0].name, 'Contest Review Proxy');
+    assert.deepEqual(service.providers[0].models.map((model) => model.id), [
+        'review-chat',
+        'review-embedding',
+        'review-rerank',
+    ]);
+    assert.deepEqual(service.defaults.embedding, {
+        providerId: 'aip-test-provider',
+        modelId: 'review-embedding',
+    });
+});
+
+test('buildModelServiceFromSettings recognizes the built-in AI&P test preset from the configured endpoint', () => {
     const service = modelService.buildModelServiceFromSettings({
         chatEndpoint: modelService.AIP_TEST_CHAT_ENDPOINT,
-        chatApiKey: modelService.AIP_TEST_API_KEY,
+        chatApiKey: 'configured-key',
         defaultModel: modelService.AIP_TEST_DEFAULT_MODEL,
     });
 
@@ -68,6 +169,7 @@ test('buildModelServiceFromSettings recognizes the built-in AI&P test preset fro
     assert.equal(service.providers[0].presetId, modelService.AIP_TEST_PROVIDER_PRESET_ID);
     assert.equal(service.providers[0].name, modelService.AIP_TEST_PROVIDER_NAME);
     assert.equal(service.providers[0].apiBaseUrl, modelService.AIP_TEST_API_BASE_URL);
+    assert.deepEqual(service.providers[0].apiKeys, ['configured-key']);
     assert.equal(service.defaults.chat?.modelId, modelService.AIP_TEST_DEFAULT_MODEL);
 });
 

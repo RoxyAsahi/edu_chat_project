@@ -1,7 +1,7 @@
 # UniStudy Windows EXE 打包与内部试发布说明
 
 更新时间: 2026-05-10  
-适用仓库: `C:\VCP\Eric\edu_chat_project`
+适用仓库: 当前仓库根目录
 
 ## 当前目标
 
@@ -97,14 +97,14 @@
 
 打包后的 `exe` 仍然是 Electron 客户端壳，首次使用前需要在设置页配置以下内容:
 
-- `vcpServerUrl`
-- `vcpApiKey`
+- `chatEndpoint`
+- `chatApiKey`
 - `kbBaseUrl`
 - `kbApiKey`
 
 说明:
 
-- 如果未配置 `vcpServerUrl` / `vcpApiKey`，聊天能力无法正常请求模型服务
+- 如果未配置 `chatEndpoint` / `chatApiKey`，聊天能力无法正常请求模型服务
 - 如果未配置 `kbBaseUrl` / `kbApiKey`，Source 检索与向量相关能力将不可用或退化
 
 ## 数据目录策略

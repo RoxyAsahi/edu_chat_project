@@ -101,14 +101,6 @@ test('logsController degrades quietly when UniStudy is unavailable', async (t) =
             logsDetailView: documentObj.getElementById('logsDetailView'),
         },
         chatAPI: {
-            async getVcpLiteMaintenanceSummary() {
-                return {
-                    success: false,
-                    available: false,
-                    unavailable: true,
-                    error: 'Missing dependency @dqbd/tiktoken',
-                };
-            },
             async listStudyLogDays() {
                 return {
                     success: true,
@@ -200,17 +192,6 @@ test('logsController renders overview, entry details, tag filters, and diary sho
             logsDetailView: documentObj.getElementById('logsDetailView'),
         },
         chatAPI: {
-            async getVcpLiteMaintenanceSummary() {
-                return {
-                    success: true,
-                    summary: {
-                        entryCount: 1,
-                        dayCount: 1,
-                        recallCount: 2,
-                        latestEntryPreview: '刚复盘了二次函数顶点式。',
-                    },
-                };
-            },
             async listStudyLogDays() {
                 return {
                     success: true,

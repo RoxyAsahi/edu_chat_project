@@ -31,7 +31,7 @@ test('parseQuizSetFromResponse accepts strict JSON quiz payloads', async () => {
     assert.equal(quizSet.items[0].correctOptionId, 'option_a');
 });
 
-test('parseQuizSetFromMarkdown parses legacy markdown quiz format', async () => {
+test('parseQuizSetFromMarkdown parses markdown quiz summaries', async () => {
     const { parseQuizSetFromMarkdown } = await loadQuizUtilsModule();
 
     const quizSet = parseQuizSetFromMarkdown([

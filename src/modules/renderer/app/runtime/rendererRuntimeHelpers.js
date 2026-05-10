@@ -64,7 +64,7 @@ function normalizeTopic(topic = {}) {
     };
 }
 
-function extractPromptTextFromLegacyConfig(config = {}) {
+function extractPromptTextFromConfig(config = {}) {
     if (typeof config.originalSystemPrompt === 'string' && config.originalSystemPrompt.trim()) {
         return config.originalSystemPrompt;
     }
@@ -73,37 +73,12 @@ function extractPromptTextFromLegacyConfig(config = {}) {
         return config.systemPrompt;
     }
 
-    if (config.promptMode === 'modular') {
-        const advancedPrompt = config.advancedSystemPrompt;
-        if (typeof advancedPrompt === 'string' && advancedPrompt.trim()) {
-            return advancedPrompt;
-        }
-        if (advancedPrompt && typeof advancedPrompt === 'object' && Array.isArray(advancedPrompt.blocks)) {
-            return advancedPrompt.blocks
-                .filter((block) => block && block.disabled !== true)
-                .map((block) => {
-                    if (block.type === 'newline') {
-                        return '\n';
-                    }
-                    if (Array.isArray(block.variants) && block.variants.length > 0) {
-                        return block.variants[block.selectedVariant || 0] || block.content || '';
-                    }
-                    return block.content || '';
-                })
-                .join('');
-        }
-    }
-
-    if (config.promptMode === 'preset' && typeof config.presetSystemPrompt === 'string') {
-        return config.presetSystemPrompt;
-    }
-
     return '';
 }
 
 export {
     createMarkdownFragmentRenderer,
     createMarkedInitializer,
-    extractPromptTextFromLegacyConfig,
+    extractPromptTextFromConfig,
     normalizeTopic,
 };

@@ -593,14 +593,12 @@ function createNotesDom(deps = {}) {
     function buildManualNoteMetaHtml(normalized, options = {}) {
         const topicLabel = escapeHtml(getTopicDisplayLabel(normalized.topicId));
         const agentLabel = escapeHtml(getManualLibraryAgentLabel(normalized.agentId));
-        const updatedLabel = escapeHtml(formatRelativeTime(normalized.updatedAt) || '');
         const isSelected = options.isSelected === true;
         const isAnalysisFilter = options.isAnalysisFilter === true;
 
         return [
             isAnalysisFilter ? `<span>${agentLabel}</span>` : '',
             `<span>${topicLabel}</span>`,
-            `<span>${updatedLabel}</span>`,
             isSelected ? '<span class="manual-note-card__selection">已选用于生成</span>' : '',
         ].filter(Boolean).join('');
     }

@@ -1,12 +1,12 @@
 {
-  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "repoRoot": "C:\\UniStudy\\UniStudyLite",
   "mode": "real-data",
-  "dataRoot": "C:\\VCP\\Eric\\VCPChatLite\\AppData",
+  "dataRoot": "C:\\UniStudy\\UniStudyLite\\AppData",
   "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-bfq3Oz",
-  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-real-data-20260410-0602.json",
+  "reportPath": "C:\\UniStudy\\UniStudyLite\\docs\\test-reports\\unistudy-real-data-20260410-0602.json",
   "targetAgentId": "Lite_Real_Test_Nova_1775682726542",
   "settings": {
-    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "chatEndpoint": "http://chat.uniquest.us.kg/v1/chat/completions",
     "kbBaseUrl": "http://154.36.184.44:3000",
     "kbEmbeddingModel": "BAAI/bge-m3",
     "kbRerankModel": "BAAI/bge-reranker-v2-m3"
@@ -19,7 +19,7 @@
       "agentId": "Lite_Real_Test_Nova_1775682726542",
       "topicId": "topic_1775772137458",
       "topicName": "真实单文件测试-20260410-0602",
-      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772137458\\history.json",
+      "historyFilePath": "C:\\UniStudy\\UniStudyLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772137458\\history.json",
       "uploadedFiles": [
         "unistudy-20260410-0602-newton-source.txt"
       ],
@@ -80,7 +80,7 @@
       "agentId": "Lite_Real_Test_Nova_1775682726542",
       "topicId": "topic_1775772167656",
       "topicName": "真实多文件测试-20260410-0602",
-      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772167656\\history.json",
+      "historyFilePath": "C:\\UniStudy\\UniStudyLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772167656\\history.json",
       "uploadedFiles": [
         "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
         "unistudy-20260410-0602-ohm-law.txt",
@@ -203,7 +203,7 @@
       "agentId": "Lite_Real_Test_Nova_1775682726542",
       "topicId": "topic_1775772221264",
       "topicName": "真实压力测试-20260410-0602",
-      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772221264\\history.json",
+      "historyFilePath": "C:\\UniStudy\\UniStudyLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775772221264\\history.json",
       "uploadedFiles": [
         "第五届上海市青少年人工智能与编程实践活动项目手册.pdf",
         "unistudy-20260410-0602-newton-source.txt",

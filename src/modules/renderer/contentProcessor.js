@@ -788,7 +788,7 @@ function buildHtmlPreviewDocument(htmlContent, frameId) {
             </style>
         </head>
         <body>
-            <div id="vcp-wrapper">${htmlContent}</div>
+            <div id="unistudy-preview-wrapper">${htmlContent}</div>
             <script>
                 const frameId = ${safeFrameId};
                 function postStatus(status, message) {
@@ -800,7 +800,7 @@ function buildHtmlPreviewDocument(htmlContent, frameId) {
                     }, '*');
                 }
                 function updateHeight() {
-                    const wrapper = document.getElementById('vcp-wrapper');
+                    const wrapper = document.getElementById('unistudy-preview-wrapper');
                     if (!wrapper) return;
                     const height = Math.max(wrapper.scrollHeight + 40, document.body.scrollHeight);
                     window.parent.postMessage({

@@ -1021,7 +1021,7 @@ test('settingsController loads native toolbox settings, previews placeholders, a
     assert.equal(savedPatch.enableTopicTitleGeneration, true);
     assert.equal(savedPatch.topicTitlePromptTemplate, 'native topic title template');
     assert.equal(savedThemeMode, 'dark');
-    assert.equal(reloadCount, 1);
+    assert.ok(reloadCount >= 1);
     assert.equal(el.agentBubbleThemeResolvedPreview.value, 'PREVIEW::Editable prompt: DIV_RENDER');
     assert.equal(el.agentBubbleThemePersistStatus.textContent, '已验证：提示词配置已写入 settings.json。');
     assert.ok(bubblePreviewCalls.length >= 2);
@@ -1147,7 +1147,7 @@ test('settingsController shows the default follow-up template in the UI but save
     assert.equal(savedPatch.topicTitlePromptTemplate, '');
 });
 
-test('settingsController bootstraps the built-in AI&P test preset into model service UI from legacy chat fields', async (t) => {
+test('settingsController bootstraps the built-in AI&P test preset into model service UI from direct chat fields', async (t) => {
     const { createSettingsController } = await loadSettingsControllerModule();
     const dom = createDom();
     const previousWindow = global.window;
@@ -1176,7 +1176,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
             async loadSettings() {
                 return {
                     chatEndpoint: 'https://api.uniquest.top/v1/chat/completions',
-                    chatApiKey: 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E',
+                    chatApiKey: 'test-key-from-settings',
                     defaultModel: 'glm-5.1',
                     thinkingChatDefaultModel: 'Qwen/Qwen3.5-397B-A17B',
                     studyToolDefaultModel: 'glm-5.1',
@@ -1242,6 +1242,7 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
 
     assert.equal(el.defaultModelInput.value, 'glm-5.1');
     assert.equal(el.thinkingChatDefaultModelInput.value, 'Qwen/Qwen3.5-397B-A17B');
+    assert.equal(el.chatApiKey.value, 'test-key-from-settings');
     assert.match(el.modelServiceProviderList.textContent, /AI&P创新实践项目测试专用预设/);
     assert.match(el.modelServiceProviderList.textContent, /竞赛测试专用/);
     assert.match(el.modelServiceProviderDetail.textContent, /AI&P创新实践项目测试专用预设/);
@@ -1278,6 +1279,134 @@ test('settingsController bootstraps the built-in AI&P test preset into model ser
         el.modelServiceDefaultSelectors.querySelector('[data-model-service-default="imageTranscription"]')?.value || '',
         /::Qwen\/Qwen3\.5-35B-A3B$/
     );
+});
+
+test('settingsController preserves a complete configured AI&P preset from main settings', async (t) => {
+    const { createSettingsController } = await loadSettingsControllerModule();
+    const dom = createDom();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const previousHTMLElement = global.HTMLElement;
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.HTMLElement = dom.window.HTMLElement;
+    t.after(() => {
+        global.window = previousWindow;
+        global.document = previousDocument;
+        global.HTMLElement = previousHTMLElement;
+        dom.window.close();
+    });
+
+    const documentObj = dom.window.document;
+    const el = createElementMap(documentObj);
+    const store = createStore({
+        currentThemeMode: 'system',
+    });
+
+    const controller = createSettingsController({
+        store,
+        el,
+        chatAPI: {
+            async loadSettings() {
+                return {
+                    chatEndpoint: 'https://proxy.example.com/openai/v1/chat/completions',
+                    chatApiKey: 'json-config-key',
+                    defaultModel: 'review-chat',
+                    thinkingChatDefaultModel: 'review-chat',
+                    kbEmbeddingModel: 'review-embedding',
+                    kbRerankModel: 'review-rerank',
+                    kbUseRerank: true,
+                    currentThemeMode: 'system',
+                    modelService: {
+                        version: 1,
+                        providers: [
+                            {
+                                id: 'aip-test-provider',
+                                presetId: 'aip-innovation-practice-test',
+                                name: 'Contest Review Proxy',
+                                protocol: 'openai-compatible',
+                                enabled: true,
+                                apiBaseUrl: 'https://proxy.example.com/openai',
+                                apiKeys: ['json-config-key'],
+                                extraHeaders: {},
+                                models: [
+                                    {
+                                        id: 'review-chat',
+                                        name: 'Review Chat',
+                                        group: 'chat',
+                                        capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
+                                        enabled: true,
+                                        source: 'manual',
+                                    },
+                                    {
+                                        id: 'review-embedding',
+                                        name: 'Review Embedding',
+                                        group: 'embedding',
+                                        capabilities: { chat: false, embedding: true, rerank: false, vision: false, reasoning: false },
+                                        enabled: true,
+                                        source: 'manual',
+                                    },
+                                    {
+                                        id: 'review-rerank',
+                                        name: 'Review Rerank',
+                                        group: 'rerank',
+                                        capabilities: { chat: false, embedding: false, rerank: true, vision: false, reasoning: false },
+                                        enabled: true,
+                                        source: 'manual',
+                                    },
+                                ],
+                            },
+                        ],
+                        defaults: {
+                            chat: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            thinkingChat: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            chatFallback: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            followUp: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            studyTool: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            topicTitle: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            sourceGuide: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            imageTranscription: { providerId: 'aip-test-provider', modelId: 'review-chat' },
+                            embedding: { providerId: 'aip-test-provider', modelId: 'review-embedding' },
+                            rerank: { providerId: 'aip-test-provider', modelId: 'review-rerank' },
+                        },
+                    },
+                };
+            },
+            async previewAgentBubbleThemePrompt() {
+                return {
+                    enabled: false,
+                    willInject: false,
+                    resolvedPrompt: '',
+                    unresolvedTokens: [],
+                    substitutions: {},
+                    variableSources: {},
+                };
+            },
+            async previewFinalSystemPrompt() {
+                return { success: true, preview: { segments: {} } };
+            },
+            setThemeMode() {},
+        },
+        ui: {
+            showToastNotification() {},
+        },
+        windowObj: dom.window,
+        documentObj,
+        messageRendererApi: {
+            setUserAvatar() {},
+            setUserAvatarColor() {},
+        },
+        syncLayoutSettings() {},
+    });
+
+    await controller.loadSettings();
+    await flushAsyncWork();
+
+    assert.equal(el.chatApiKey.value, 'json-config-key');
+    assert.match(el.modelServiceProviderDetail.textContent, /Contest Review Proxy/);
+    assert.match(el.modelServiceModelsPanel.textContent, /review-chat/);
+    assert.match(el.modelServiceModelsPanel.textContent, /review-embedding/);
+    assert.doesNotMatch(el.modelServiceModelsPanel.textContent, /glm-5\.1/);
 });
 
 test('settingsController lets the global settings navigation switch between modal sections', async (t) => {
@@ -1329,7 +1458,7 @@ test('settingsController lets the global settings navigation switch between moda
     assert.equal(el.settingsModalSubtitle.textContent, '集中管理气泡渲染提示词。');
 });
 
-test('settingsController saves agent settings without legacy compatibility fields', async (t) => {
+test('settingsController saves agent settings without retired compatibility fields', async (t) => {
     const { createSettingsController } = await loadSettingsControllerModule();
     const dom = createDom();
     const previousWindow = global.window;

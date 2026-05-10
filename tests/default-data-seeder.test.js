@@ -104,6 +104,7 @@ test('default data seeder copies missing agents and rewrites seeded attachment f
 
     assert.equal(result.seedRootMissing, false);
     assert.equal(result.hydratedHistories, 1);
+    assert.equal(result.chatHistoryImports, 1);
     assert.deepEqual(result.knowledgeBaseImports, { knowledgeBases: 1, documents: 1, chunks: 1 });
     assert.ok(await fs.pathExists(path.join(dataRoot, 'Agents', agentId, 'config.json')));
     assert.ok(await fs.pathExists(path.join(dataRoot, 'UserData', 'attachments', attachmentFileName)));
@@ -111,10 +112,15 @@ test('default data seeder copies missing agents and rewrites seeded attachment f
     assert.ok(await fs.pathExists(path.join(dataRoot, 'StudyLogs', agentId, topicId, 'entries.json')));
     assert.ok(await fs.pathExists(path.join(dataRoot, 'StudyDiary', 'seed_notebook', '2026-04-30.json')));
 
-    const history = await fs.readJson(path.join(dataRoot, 'UserData', agentId, 'topics', topicId, 'history.json'));
     const expectedUrl = pathToFileURL(path.join(dataRoot, 'UserData', 'attachments', attachmentFileName)).href;
-    assert.equal(history[0].attachments[0].internalPath, expectedUrl);
-    assert.equal(history[0].attachments[0].src, expectedUrl);
+    assert.equal(await fs.pathExists(path.join(dataRoot, 'UserData', agentId, 'topics', topicId, 'history.json')), false);
+
+    const { createChatHistoryStore } = require('../src/modules/main/chat-history/store');
+    const chatHistoryStore = createChatHistoryStore({ dataRoot });
+    const storedHistory = await chatHistoryStore.getHistory(agentId, topicId);
+    assert.equal(storedHistory[0].attachments[0].internalPath, expectedUrl);
+    assert.equal(storedHistory[0].attachments[0].src, expectedUrl);
+    await chatHistoryStore.close();
 
     const targetKbDb = createClient({ url: `file:${path.join(dataRoot, 'KnowledgeBase', 'knowledge-base.db')}` });
     const docs = await targetKbDb.execute({

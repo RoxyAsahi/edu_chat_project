@@ -268,7 +268,7 @@
   }
 
   .manual-notes-library-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(164px, 188px));
   }
 
   .source-shelf-page {

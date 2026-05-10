@@ -10,19 +10,6 @@ const DEFAULT_DIV_RENDER_INSTRUCTION = [
     'Do not echo unresolved template variables in the final answer.',
 ].join(' ');
 
-const LEGACY_PROMPT_TOKEN_REPLACEMENTS = Object.freeze({
-    VarUser: 'UserName',
-    VarCity: 'City',
-    VarTimeNow: 'CurrentDateTime',
-    VarDailyNoteGuide: 'DailyNoteGuide',
-    StudyLogTool: 'DailyNoteGuide',
-    DailyNoteTool: 'DailyNoteGuide',
-    VarDivRender: 'RenderingGuide',
-    VarRendering: 'RenderingGuide',
-    VarEmoticonPrompt: 'EmoticonGuide',
-    VarEmojiPrompt: 'EmoticonGuide',
-});
-
 function isPlainObject(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -165,19 +152,6 @@ function addDerivedAliasVariables(variableMap, candidates = []) {
     }
 }
 
-function buildLegacyTokenSuggestions(tokens = []) {
-    const suggestions = {};
-
-    for (const token of Array.isArray(tokens) ? tokens : []) {
-        const replacement = LEGACY_PROMPT_TOKEN_REPLACEMENTS[token];
-        if (replacement) {
-            suggestions[token] = replacement;
-        }
-    }
-
-    return suggestions;
-}
-
 function buildPromptVariableMap(options = {}) {
     const {
         settings = {},
@@ -296,7 +270,6 @@ function resolvePromptVariables(prompt, options = {}) {
             unresolvedTokens: [],
             substitutions: {},
             variableSources: {},
-            legacyTokenSuggestions: {},
         };
     }
 
@@ -326,7 +299,6 @@ function resolvePromptVariables(prompt, options = {}) {
         unresolvedTokens: unresolvedTokenList,
         substitutions,
         variableSources,
-        legacyTokenSuggestions: buildLegacyTokenSuggestions(unresolvedTokenList),
     };
 }
 
@@ -334,7 +306,6 @@ function resolvePromptMessageSet(messages, options = {}) {
     const unresolvedTokens = new Set();
     const substitutions = {};
     const variableSources = {};
-    const legacyTokenSuggestions = {};
 
     const resolvedMessages = Array.isArray(messages)
         ? messages.map((message) => {
@@ -347,7 +318,6 @@ function resolvePromptMessageSet(messages, options = {}) {
                 result.unresolvedTokens.forEach((token) => unresolvedTokens.add(token));
                 Object.assign(substitutions, result.substitutions);
                 Object.assign(variableSources, result.variableSources);
-                Object.assign(legacyTokenSuggestions, result.legacyTokenSuggestions);
                 return {
                     ...message,
                     content: result.resolvedPrompt,
@@ -366,7 +336,6 @@ function resolvePromptMessageSet(messages, options = {}) {
                         result.unresolvedTokens.forEach((token) => unresolvedTokens.add(token));
                         Object.assign(substitutions, result.substitutions);
                         Object.assign(variableSources, result.variableSources);
-                        Object.assign(legacyTokenSuggestions, result.legacyTokenSuggestions);
                         return {
                             ...part,
                             text: result.resolvedPrompt,
@@ -384,15 +353,12 @@ function resolvePromptMessageSet(messages, options = {}) {
         unresolvedTokens: [...unresolvedTokens],
         substitutions,
         variableSources,
-        legacyTokenSuggestions,
     };
 }
 
 module.exports = {
     DEFAULT_DIV_RENDER_INSTRUCTION,
-    LEGACY_PROMPT_TOKEN_REPLACEMENTS,
     buildPromptVariableMap,
-    buildLegacyTokenSuggestions,
     resolvePromptVariables,
     resolvePromptMessageSet,
 };

@@ -1,12 +1,12 @@
 {
-  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "repoRoot": "C:\\UniStudy\\UniStudyLite",
   "mode": "real-data",
-  "dataRoot": "C:\\VCP\\Eric\\VCPChatLite\\AppData",
+  "dataRoot": "C:\\UniStudy\\UniStudyLite\\AppData",
   "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-ui7Hs1",
-  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-real-data-20260410-1924.json",
+  "reportPath": "C:\\UniStudy\\UniStudyLite\\docs\\test-reports\\unistudy-real-data-20260410-1924.json",
   "targetAgentId": "Lite_Real_Test_Nova_1775682726542",
   "settings": {
-    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "chatEndpoint": "http://chat.uniquest.us.kg/v1/chat/completions",
     "kbBaseUrl": "http://154.36.184.44:3000",
     "guideModel": "gemini-3.1-flash-lite-preview",
     "defaultModel": "gemini-3.1-flash-lite-preview",
@@ -15,7 +15,7 @@
     "kbRerankModel": "BAAI/bge-reranker-v2-m3"
   },
   "configurationDiagnostics": {
-    "hasVcpApiKey": true,
+    "hasChatApiKey": true,
     "hasKbApiKey": true
   },
   "rendererErrors": [],
@@ -26,7 +26,7 @@
       "agentId": "Lite_Real_Test_Nova_1775682726542",
       "topicId": "topic_1775820286957",
       "topicName": "真实单文件测试-20260410-1924",
-      "historyFilePath": "C:\\VCP\\Eric\\VCPChatLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775820286957\\history.json",
+      "historyFilePath": "C:\\UniStudy\\UniStudyLite\\AppData\\UserData\\Lite_Real_Test_Nova_1775682726542\\topics\\topic_1775820286957\\history.json",
       "uploadedFiles": [
         "unistudy-20260410-1924-newton-source.txt"
       ],
@@ -108,14 +108,14 @@
       "label": "真实多文件测试",
       "topicName": "真实多文件测试-20260410-1924",
       "passed": false,
-      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-ohm-law.txt' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n\n    at openSourceDocumentInReader (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:541:15)\n    at runScenario (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:744:19)\n    at async run (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:897:32)"
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-ohm-law.txt' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n\n    at openSourceDocumentInReader (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:541:15)\n    at runScenario (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:744:19)\n    at async run (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:897:32)"
     },
     {
       "id": "real-pressure",
       "label": "真实中等压力测试",
       "topicName": "真实压力测试-20260410-1924",
       "passed": false,
-      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-pythagorean.md' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n\n    at openSourceDocumentInReader (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:541:15)\n    at runScenario (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:744:19)\n    at async run (C:\\VCP\\Eric\\VCPChatLite\\scripts\\electron-unistudy-smoke.js:897:32)"
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#topicKnowledgeBaseFiles .kb-document-row').filter({ hasText: 'unistudy-20260410-1924-pythagorean.md' }).first() to be visible\u001b[22m\n\u001b[2m    63 × locator resolved to hidden <div class=\"kb-document-row kb-document-row--clickable\">…</div>\u001b[22m\n\n    at openSourceDocumentInReader (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:541:15)\n    at runScenario (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:744:19)\n    at async run (C:\\UniStudy\\UniStudyLite\\scripts\\electron-unistudy-smoke.js:897:32)"
     }
   ],
   "errors": [

@@ -1,12 +1,12 @@
 {
-  "repoRoot": "C:\\VCP\\Eric\\VCPChatLite",
+  "repoRoot": "C:\\UniStudy\\UniStudyLite",
   "mode": "temp",
   "dataRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-electron-smoke-OlDJPK",
   "fixtureRoot": "C:\\Users\\CHENXI\\AppData\\Local\\Temp\\unistudy-fixtures-EYLBNe",
-  "reportPath": "C:\\VCP\\Eric\\VCPChatLite\\docs\\test-reports\\unistudy-temp-20260411-0011.json",
+  "reportPath": "C:\\UniStudy\\UniStudyLite\\docs\\test-reports\\unistudy-temp-20260411-0011.json",
   "targetAgentId": null,
   "settings": {
-    "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
+    "chatEndpoint": "http://chat.uniquest.us.kg/v1/chat/completions",
     "kbBaseUrl": "http://154.36.184.44:3000",
     "guideModel": "gemini-3.1-flash-lite-preview",
     "defaultModel": "gemini-3.1-flash-lite-preview",
@@ -15,7 +15,7 @@
     "kbRerankModel": "BAAI/bge-reranker-v2-m3"
   },
   "configurationDiagnostics": {
-    "hasVcpApiKey": true,
+    "hasChatApiKey": true,
     "hasKbApiKey": true
   },
   "rendererErrors": [],

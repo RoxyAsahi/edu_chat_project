@@ -500,6 +500,28 @@ body.dark-theme ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
   -webkit-font-smoothing: antialiased;
 }
 
+.material-symbols-outlined:has(> .unistudy-lucide-icon) {
+  font-family: inherit;
+  font-feature-settings: normal;
+  font-variation-settings: normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.125em;
+}
+
+.unistudy-lucide-icon {
+  width: 1em;
+  height: 1em;
+  display: block;
+  flex: 0 0 auto;
+  color: inherit;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 /* Base button resets */
 button { border: none; background: transparent; outline: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 

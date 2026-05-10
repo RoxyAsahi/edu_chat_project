@@ -17,10 +17,6 @@ function getTopicNotesFile(agentId, topicId) {
     return path.join(notesRootDir, agentId, topicId, 'notes.json');
 }
 
-function getLegacyNotesRoot(appDataRoot) {
-    return path.join(appDataRoot, 'Notemodules');
-}
-
 function getNotesRoot(appDataRoot) {
     return path.join(appDataRoot, 'Notes');
 }
@@ -43,11 +39,6 @@ function buildNoteAttachmentMarkdown(note = {}) {
     return contentMarkdown
         ? `# ${title}\n\n${contentMarkdown}\n`
         : `# ${title}\n`;
-}
-
-function buildLegacySearchPathLabel(fullPath, rootDir) {
-    const relative = path.relative(rootDir, fullPath).replace(/\\/g, '/');
-    return relative || path.basename(fullPath);
 }
 
 function buildTopicNotePathLabel(agentId, topicId) {
@@ -218,59 +209,6 @@ async function writeTopicNotes(agentId, topicId, notes) {
     await fs.writeJson(notesFile, notes, { spaces: 2 });
 }
 
-async function searchLegacyNotes(appDataRoot, queryText) {
-    const lowerCaseQuery = String(queryText || '').trim().toLowerCase();
-    if (!lowerCaseQuery) {
-        return [];
-    }
-
-    const rootDir = getLegacyNotesRoot(appDataRoot);
-    const results = [];
-
-    async function searchInDirectory(directory) {
-        let entries = [];
-        try {
-            entries = await fs.readdir(directory, { withFileTypes: true });
-        } catch (error) {
-            if (error?.code !== 'ENOENT') {
-                console.error(`[UniStudyNotes] Failed to read notes directory ${directory}:`, error);
-            }
-            return;
-        }
-
-        for (const entry of entries) {
-            const fullPath = path.join(directory, entry.name);
-            if (entry.isDirectory()) {
-                await searchInDirectory(fullPath);
-                continue;
-            }
-
-            if (!entry.isFile()) {
-                continue;
-            }
-
-            const lowerName = entry.name.toLowerCase();
-            if (!lowerName.endsWith('.md') && !lowerName.endsWith('.txt')) {
-                continue;
-            }
-
-            if (!lowerName.includes(lowerCaseQuery)) {
-                continue;
-            }
-
-            results.push({
-                name: entry.name,
-                path: fullPath,
-                pathLabel: buildLegacySearchPathLabel(fullPath, rootDir),
-                sourceType: 'legacy-note-file',
-            });
-        }
-    }
-
-    await searchInDirectory(rootDir);
-    return results;
-}
-
 async function searchStructuredNotes(appDataRoot, queryText) {
     const lowerCaseQuery = String(queryText || '').trim().toLowerCase();
     if (!lowerCaseQuery) {
@@ -352,11 +290,7 @@ async function searchStructuredNotes(appDataRoot, queryText) {
 }
 
 async function searchNotesIndex(appDataRoot, queryText) {
-    const [structuredNotes, legacyNotes] = await Promise.all([
-        searchStructuredNotes(appDataRoot, queryText),
-        searchLegacyNotes(appDataRoot, queryText),
-    ]);
-    return [...structuredNotes, ...legacyNotes].slice(0, 30);
+    return (await searchStructuredNotes(appDataRoot, queryText)).slice(0, 30);
 }
 
 async function exportNoteToTempAttachment(appDataRoot, payload = {}) {

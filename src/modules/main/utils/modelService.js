@@ -35,16 +35,17 @@ const MODEL_SERVICE_DEFAULT_REQUIRED_CAPABILITIES = Object.freeze({
 });
 
 const AIP_TEST_PROVIDER_PRESET_ID = 'aip-innovation-practice-test';
-const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
-const AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
-const AIP_TEST_CHAT_ENDPOINT = `${AIP_TEST_API_BASE_URL}/v1/chat/completions`;
-const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
-const AIP_TEST_DEFAULT_MODEL = 'glm-5.1';
-const AIP_TEST_THINKING_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
-const AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL = 'Pro/moonshotai/Kimi-K2.6';
-const AIP_TEST_AUXILIARY_DEFAULT_MODEL = 'Qwen/Qwen3.5-122B-A10B';
-const AIP_TEST_SOURCE_DEFAULT_MODEL = 'Qwen/Qwen3.5-35B-A3B';
-const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
+const DEFAULT_AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
+const DEFAULT_AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
+const DEFAULT_AIP_TEST_CHAT_ENDPOINT = `${DEFAULT_AIP_TEST_API_BASE_URL}/v1/chat/completions`;
+const PACKAGED_AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
+const AIP_TEST_PRESET_CONFIG = parseAipTestPresetConfig();
+const DEFAULT_AIP_TEST_DEFAULT_MODEL = 'glm-5.1';
+const DEFAULT_AIP_TEST_THINKING_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
+const DEFAULT_AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL = 'Pro/moonshotai/Kimi-K2.6';
+const DEFAULT_AIP_TEST_AUXILIARY_DEFAULT_MODEL = 'Qwen/Qwen3.5-122B-A10B';
+const DEFAULT_AIP_TEST_SOURCE_DEFAULT_MODEL = 'Qwen/Qwen3.5-35B-A3B';
+const DEFAULT_AIP_TEST_BUILT_IN_MODELS = Object.freeze([
     {
         id: 'Qwen/Qwen3.6-35B-A3B',
         name: 'Qwen/Qwen3.6-35B-A3B',
@@ -112,6 +113,69 @@ const AIP_TEST_BUILT_IN_MODELS = Object.freeze([
         capabilities: { chat: true, embedding: false, rerank: false, vision: true, reasoning: true },
     },
 ]);
+const CONFIGURED_AIP_TEST_API_KEYS = normalizeConfiguredApiKeys(AIP_TEST_PRESET_CONFIG);
+const AIP_TEST_PROVIDER_NAME = normalizeText(AIP_TEST_PRESET_CONFIG?.name, DEFAULT_AIP_TEST_PROVIDER_NAME);
+const AIP_TEST_API_BASE_URL = normalizeApiBaseUrl(
+    AIP_TEST_PRESET_CONFIG?.apiBaseUrl
+        || AIP_TEST_PRESET_CONFIG?.baseUrl
+        || AIP_TEST_PRESET_CONFIG?.endpoint
+        || AIP_TEST_PRESET_CONFIG?.chatEndpoint
+        || DEFAULT_AIP_TEST_API_BASE_URL
+);
+const AIP_TEST_CHAT_ENDPOINT = normalizeText(AIP_TEST_PRESET_CONFIG?.chatEndpoint)
+    || normalizeText(AIP_TEST_PRESET_CONFIG?.endpoint)
+    || buildChatEndpoint(AIP_TEST_API_BASE_URL)
+    || DEFAULT_AIP_TEST_CHAT_ENDPOINT;
+const AIP_TEST_API_KEY = readEnvText(
+    'UNISTUDY_AIP_TEST_API_KEY',
+    CONFIGURED_AIP_TEST_API_KEYS[0] || PACKAGED_AIP_TEST_API_KEY
+);
+const AIP_TEST_DEFAULT_MODEL = resolveConfiguredDefaultModel(
+    AIP_TEST_PRESET_CONFIG,
+    'chat',
+    ['defaultModel', 'chatModel'],
+    DEFAULT_AIP_TEST_DEFAULT_MODEL
+);
+const AIP_TEST_THINKING_DEFAULT_MODEL = resolveConfiguredDefaultModel(
+    AIP_TEST_PRESET_CONFIG,
+    'thinkingChat',
+    ['thinkingChatDefaultModel', 'thinkingModel'],
+    DEFAULT_AIP_TEST_THINKING_DEFAULT_MODEL
+);
+const AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL = resolveConfiguredDefaultModel(
+    AIP_TEST_PRESET_CONFIG,
+    'chatFallback',
+    ['chatFallbackDefaultModel', 'fallbackModel'],
+    DEFAULT_AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL
+);
+const AIP_TEST_AUXILIARY_DEFAULT_MODEL = resolveConfiguredDefaultModel(
+    AIP_TEST_PRESET_CONFIG,
+    'followUp',
+    ['auxiliaryDefaultModel', 'followUpDefaultModel', 'topicTitleDefaultModel'],
+    DEFAULT_AIP_TEST_AUXILIARY_DEFAULT_MODEL
+);
+const AIP_TEST_SOURCE_DEFAULT_MODEL = resolveConfiguredDefaultModel(
+    AIP_TEST_PRESET_CONFIG,
+    'sourceGuide',
+    ['sourceDefaultModel', 'guideModel', 'imageTranscriptionModel'],
+    DEFAULT_AIP_TEST_SOURCE_DEFAULT_MODEL
+);
+const AIP_TEST_EMBEDDING_DEFAULT_MODEL = resolveConfiguredDefaultModel(
+    AIP_TEST_PRESET_CONFIG,
+    'embedding',
+    ['embeddingModel', 'kbEmbeddingModel'],
+    'Qwen/Qwen3-VL-Embedding-8B'
+);
+const AIP_TEST_RERANK_DEFAULT_MODEL = resolveConfiguredDefaultModel(
+    AIP_TEST_PRESET_CONFIG,
+    'rerank',
+    ['rerankModel', 'kbRerankModel'],
+    'Qwen/Qwen3-VL-Reranker-8B'
+);
+const AIP_TEST_BUILT_IN_MODELS = Object.freeze(createConfiguredBuiltInModels(
+    AIP_TEST_PRESET_CONFIG,
+    DEFAULT_AIP_TEST_BUILT_IN_MODELS
+));
 
 const PROVIDER_PRESETS = Object.freeze([
     {
@@ -183,7 +247,76 @@ const DEFAULT_MODEL_SERVICE = Object.freeze({
     },
 });
 
-const TASK_KEY_BY_LEGACY_SETTINGS_KEY = Object.freeze({
+function readEnvText(name, fallback = '') {
+    const value = typeof process !== 'undefined'
+        && process.env
+        && typeof process.env[name] === 'string'
+        ? process.env[name].trim()
+        : '';
+    return value || fallback;
+}
+
+function parseAipTestPresetConfig(env = process.env) {
+    const rawValue = typeof env?.UNISTUDY_AIP_TEST_PRESET_CONFIG === 'string'
+        ? env.UNISTUDY_AIP_TEST_PRESET_CONFIG.trim()
+        : '';
+    if (!rawValue) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(rawValue);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return parsed;
+        }
+        console.warn('[ModelService] UNISTUDY_AIP_TEST_PRESET_CONFIG must be a JSON object.');
+    } catch (error) {
+        console.warn('[ModelService] Failed to parse UNISTUDY_AIP_TEST_PRESET_CONFIG:', error.message);
+    }
+    return null;
+}
+
+function normalizeConfiguredApiKeys(config = null) {
+    if (!config || typeof config !== 'object') {
+        return [];
+    }
+    return normalizeApiKeys(config.apiKeys || config.apiKey);
+}
+
+function resolveConfiguredDefaultModel(config = null, taskKey = '', aliases = [], fallback = '') {
+    const defaults = config && typeof config.defaults === 'object' && !Array.isArray(config.defaults)
+        ? config.defaults
+        : {};
+    const fromDefaults = defaults?.[taskKey];
+    if (typeof fromDefaults === 'string' && fromDefaults.trim()) {
+        return fromDefaults.trim();
+    }
+    if (fromDefaults && typeof fromDefaults === 'object' && typeof fromDefaults.modelId === 'string') {
+        return fromDefaults.modelId.trim() || fallback;
+    }
+
+    for (const alias of aliases) {
+        if (typeof config?.[alias] === 'string' && config[alias].trim()) {
+            return config[alias].trim();
+        }
+    }
+    return fallback;
+}
+
+function createConfiguredBuiltInModels(config = null, fallbackModels = DEFAULT_AIP_TEST_BUILT_IN_MODELS) {
+    const configuredModels = Array.isArray(config?.models) && config.models.length > 0
+        ? config.models
+        : fallbackModels;
+    return configuredModels
+        .map((model) => normalizeModelConfig(model))
+        .filter((model) => model.id);
+}
+
+function hasCustomAipTestPresetConfig() {
+    return Boolean(AIP_TEST_PRESET_CONFIG);
+}
+
+const TASK_KEY_BY_SETTINGS_KEY = Object.freeze({
     defaultModel: 'chat',
     thinkingChatDefaultModel: 'thinkingChat',
     followUpDefaultModel: 'followUp',
@@ -381,7 +514,6 @@ function normalizeApiKeys(value) {
 function resolveBuiltInProviderPresetMeta({ apiBaseUrl = '', apiKeys = [] } = {}) {
     if (
         normalizeApiBaseUrl(apiBaseUrl) === normalizeApiBaseUrl(AIP_TEST_API_BASE_URL)
-        && normalizeApiKeys(apiKeys).includes(AIP_TEST_API_KEY)
     ) {
         return PROVIDER_PRESETS.find((preset) => preset.presetId === AIP_TEST_PROVIDER_PRESET_ID) || null;
     }
@@ -655,9 +787,18 @@ function createBuiltInTestProviderDefaults(provider = {}) {
         topicTitle: refFor(AIP_TEST_AUXILIARY_DEFAULT_MODEL),
         sourceGuide: refFor(AIP_TEST_SOURCE_DEFAULT_MODEL),
         imageTranscription: refFor(AIP_TEST_SOURCE_DEFAULT_MODEL),
-        embedding: refFor('Qwen/Qwen3-VL-Embedding-8B'),
-        rerank: refFor('Qwen/Qwen3-VL-Reranker-8B'),
+        embedding: refFor(AIP_TEST_EMBEDDING_DEFAULT_MODEL),
+        rerank: refFor(AIP_TEST_RERANK_DEFAULT_MODEL),
     };
+}
+
+function createBuiltInTestModelService() {
+    const provider = createBuiltInTestProvider();
+    return normalizeModelService({
+        version: MODEL_SERVICE_VERSION,
+        providers: [provider],
+        defaults: createBuiltInTestProviderDefaults(provider),
+    });
 }
 
 function mergeDefaultsPreservingConfigured(fallbackDefaults = {}, configuredDefaults = {}) {
@@ -677,7 +818,6 @@ function ensureBuiltInTestProvider(service = DEFAULT_MODEL_SERVICE) {
         provider.presetId === AIP_TEST_PROVIDER_PRESET_ID
         || (
             normalizeApiBaseUrl(provider.apiBaseUrl) === normalizeApiBaseUrl(AIP_TEST_API_BASE_URL)
-            && normalizeApiKeys(provider.apiKeys).includes(AIP_TEST_API_KEY)
         )
     ));
 
@@ -729,7 +869,7 @@ function ensureBuiltInTestProvider(service = DEFAULT_MODEL_SERVICE) {
     });
 }
 
-function collectLegacyModels(settings = {}, fieldEntries = [], defaults = {}) {
+function collectDirectSettingsModels(settings = {}, fieldEntries = [], defaults = {}) {
     return fieldEntries
         .map(([value, group, capabilities, source = 'manual']) => {
             const modelId = normalizeText(value);
@@ -749,7 +889,7 @@ function collectLegacyModels(settings = {}, fieldEntries = [], defaults = {}) {
         .filter(Boolean);
 }
 
-function createMigratedProvider({
+function createSettingsProvider({
     id,
     name,
     apiBaseUrl,
@@ -794,7 +934,7 @@ function buildModelServiceFromSettings(settings = {}) {
     const chatApiKeys = normalizeApiKeys(settings?.chatApiKey);
     const kbApiKeys = normalizeApiKeys(settings?.kbApiKey || settings?.chatApiKey);
 
-    const chatModels = collectLegacyModels(settings, [
+    const chatModels = collectDirectSettingsModels(settings, [
         [settings?.defaultModel, 'chat', { chat: true }],
         [settings?.thinkingChatDefaultModel, 'chat', { chat: true }],
         [settings?.followUpDefaultModel, 'chat', { chat: true }],
@@ -804,7 +944,7 @@ function buildModelServiceFromSettings(settings = {}) {
         [settings?.guideModel, 'chat', { chat: true }],
         [settings?.imageTranscriptionModel, 'chat', { chat: true, vision: true }],
     ]);
-    const kbModels = collectLegacyModels(settings, [
+    const kbModels = collectDirectSettingsModels(settings, [
         [settings?.kbEmbeddingModel, 'embedding', { chat: false, embedding: true, rerank: false, vision: false, reasoning: false }],
         [settings?.kbRerankModel, 'rerank', { chat: false, embedding: false, rerank: true, vision: false, reasoning: false }],
     ]);
@@ -822,7 +962,7 @@ function buildModelServiceFromSettings(settings = {}) {
 
     let primaryProvider = null;
     if (hasChatProvider) {
-        primaryProvider = createMigratedProvider({
+        primaryProvider = createSettingsProvider({
             id: 'custom-provider',
             name: 'Custom Provider',
             apiBaseUrl: chatBaseUrl,
@@ -834,7 +974,7 @@ function buildModelServiceFromSettings(settings = {}) {
 
     let kbProvider = primaryProvider;
     if (kbNeedsDedicatedProvider) {
-        kbProvider = createMigratedProvider({
+        kbProvider = createSettingsProvider({
             id: 'knowledge-base-provider',
             name: 'Knowledge Base Provider',
             apiBaseUrl: kbBaseUrl,
@@ -850,7 +990,7 @@ function buildModelServiceFromSettings(settings = {}) {
         providers[0] = primaryProvider;
         kbProvider = primaryProvider;
     } else if (!primaryProvider && kbModels.length > 0) {
-        kbProvider = createMigratedProvider({
+        kbProvider = createSettingsProvider({
             id: 'custom-provider',
             name: 'Custom Provider',
             apiBaseUrl: kbBaseUrl,
@@ -1067,7 +1207,7 @@ function buildResolvedExecution(result = null, purpose = 'chat') {
     };
 }
 
-function buildLegacyChatEndpoint(endpointOrBaseUrl) {
+function buildChatEndpointFromInput(endpointOrBaseUrl) {
     const rawValue = normalizeText(endpointOrBaseUrl);
     if (!rawValue) {
         return '';
@@ -1145,7 +1285,7 @@ function resolveExecutionConfig(settings = {}, options = {}) {
 
     if (purpose === 'embedding') {
         return {
-            source: 'legacy',
+            source: 'directSettings',
             purpose,
             provider: null,
             model: normalizeText(settings?.kbEmbeddingModel)
@@ -1160,7 +1300,7 @@ function resolveExecutionConfig(settings = {}, options = {}) {
 
     if (purpose === 'rerank') {
         return {
-            source: 'legacy',
+            source: 'directSettings',
             purpose,
             provider: null,
             model: normalizeText(settings?.kbRerankModel)
@@ -1173,19 +1313,19 @@ function resolveExecutionConfig(settings = {}, options = {}) {
         };
     }
 
-    const legacyModel = requestedModel
+    const fallbackModelId = requestedModel
         || (purpose === 'thinkingChat' ? normalizeText(settings?.thinkingChatDefaultModel) : '')
         || (purpose === 'sourceGuide' ? normalizeText(settings?.guideModel) : '')
         || (purpose === 'imageTranscription' ? normalizeText(settings?.imageTranscriptionModel) : '')
         || normalizeText(settings?.defaultModel)
         || normalizeText(options.fallbackModel);
     return {
-        source: 'legacy',
+        source: 'directSettings',
         purpose,
         provider: null,
-        model: legacyModel ? { id: legacyModel, name: legacyModel } : null,
+        model: fallbackModelId ? { id: fallbackModelId, name: fallbackModelId } : null,
         ref: null,
-        endpoint: normalizeText(options.fallbackEndpoint) || buildLegacyChatEndpoint(settings?.chatEndpoint),
+        endpoint: normalizeText(options.fallbackEndpoint) || buildChatEndpointFromInput(settings?.chatEndpoint),
         apiKey: normalizeText(options.fallbackApiKey || settings?.chatApiKey),
         extraHeaders: {},
     };
@@ -1199,7 +1339,7 @@ function resolveChatFallbackExecution(settings = {}, options = {}) {
     return buildResolvedExecution(resolved, 'chat');
 }
 
-function getLegacyFallbackModel(service = DEFAULT_MODEL_SERVICE, taskKey = 'chat') {
+function getDefaultModelId(service = DEFAULT_MODEL_SERVICE, taskKey = 'chat') {
     const resolved = resolveDefaultModelRef(service, taskKey);
     return resolved?.model?.id || '';
 }
@@ -1210,15 +1350,15 @@ function buildSettingsMirrorFromModelService(modelService = DEFAULT_MODEL_SERVIC
     const embeddingExecution = resolveExecutionConfig({ modelService: normalizedModelService }, { purpose: 'embedding' });
     const rerankExecution = resolveExecutionConfig({ modelService: normalizedModelService }, { purpose: 'rerank' });
 
-    const chatModel = getLegacyFallbackModel(normalizedModelService, 'chat');
-    const thinkingChatModel = getLegacyFallbackModel(normalizedModelService, 'thinkingChat') || chatModel;
-    const followUpModel = getLegacyFallbackModel(normalizedModelService, 'followUp') || chatModel;
-    const studyToolModel = getLegacyFallbackModel(normalizedModelService, 'studyTool') || chatModel;
-    const topicTitleModel = getLegacyFallbackModel(normalizedModelService, 'topicTitle') || chatModel;
-    const sourceGuideModel = getLegacyFallbackModel(normalizedModelService, 'sourceGuide');
-    const imageTranscriptionModel = getLegacyFallbackModel(normalizedModelService, 'imageTranscription');
-    const embeddingModel = getLegacyFallbackModel(normalizedModelService, 'embedding');
-    const rerankModel = getLegacyFallbackModel(normalizedModelService, 'rerank');
+    const chatModel = getDefaultModelId(normalizedModelService, 'chat');
+    const thinkingChatModel = getDefaultModelId(normalizedModelService, 'thinkingChat') || chatModel;
+    const followUpModel = getDefaultModelId(normalizedModelService, 'followUp') || chatModel;
+    const studyToolModel = getDefaultModelId(normalizedModelService, 'studyTool') || chatModel;
+    const topicTitleModel = getDefaultModelId(normalizedModelService, 'topicTitle') || chatModel;
+    const sourceGuideModel = getDefaultModelId(normalizedModelService, 'sourceGuide');
+    const imageTranscriptionModel = getDefaultModelId(normalizedModelService, 'imageTranscription');
+    const embeddingModel = getDefaultModelId(normalizedModelService, 'embedding');
+    const rerankModel = getDefaultModelId(normalizedModelService, 'rerank');
     const kbExecution = embeddingExecution?.endpoint
         ? embeddingExecution
         : rerankExecution;
@@ -1318,8 +1458,10 @@ module.exports = {
     AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL,
     AIP_TEST_CHAT_ENDPOINT,
     AIP_TEST_DEFAULT_MODEL,
+    AIP_TEST_EMBEDDING_DEFAULT_MODEL,
     AIP_TEST_PROVIDER_NAME,
     AIP_TEST_PROVIDER_PRESET_ID,
+    AIP_TEST_RERANK_DEFAULT_MODEL,
     AIP_TEST_SOURCE_DEFAULT_MODEL,
     AIP_TEST_THINKING_DEFAULT_MODEL,
     DEFAULT_MODEL_SERVICE,
@@ -1328,7 +1470,7 @@ module.exports = {
     MODEL_SERVICE_DEFAULT_REQUIRED_CAPABILITIES,
     MODEL_SERVICE_VERSION,
     PROVIDER_PRESETS,
-    TASK_KEY_BY_LEGACY_SETTINGS_KEY,
+    TASK_KEY_BY_SETTINGS_KEY,
     buildChatEndpoint,
     buildEmbeddingsEndpoint,
     buildInterruptEndpoint,
@@ -1338,11 +1480,13 @@ module.exports = {
     cloneModelService,
     createDefaultModelService,
     createBuiltInTestProvider,
+    createBuiltInTestModelService,
     createFetchedModelEntry,
     detectRemoteModelCapabilities,
     ensureBuiltInTestProvider,
     findModelById,
     findProviderById,
+    hasCustomAipTestPresetConfig,
     listEnabledModels,
     mergeFetchedModelsIntoProvider,
     mergeModelServices,

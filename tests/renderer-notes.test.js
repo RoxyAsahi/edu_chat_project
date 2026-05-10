@@ -695,7 +695,7 @@ test('removeDeletedNoteReferencesFromHistory clears favorite state only when the
     assert.equal(nextHistory[1].favoriteAt, 456);
 });
 
-test('normalizeNote derives structured quiz data from legacy markdown content', async () => {
+test('normalizeNote derives structured quiz data from markdown content', async () => {
     const { normalizeNote } = await loadNotesUtilsModule();
 
     const note = normalizeNote({

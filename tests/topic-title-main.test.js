@@ -102,8 +102,8 @@ test('topic title helpers recognize placeholder names and keep numbering stable'
     assert.equal(buildPlaceholderTopicName([]), '新对话 1');
     assert.equal(buildPlaceholderTopicName([{ id: 'topic-1' }]), '新对话 2');
     assert.equal(isPlaceholderTopicName('新对话 3'), true);
-    assert.equal(isPlaceholderTopicName('主要对话'), true);
-    assert.equal(isPlaceholderTopicName('Main Conversation'), true);
+    assert.equal(isPlaceholderTopicName('主要对话'), false);
+    assert.equal(isPlaceholderTopicName('Main Conversation'), false);
     assert.equal(isPlaceholderTopicName('用户手动命名'), false);
 });
 
@@ -228,7 +228,7 @@ test('generate-topic-title uses the task model priority chain and parses dirty J
                     defaultModel: 'global-model',
                     chatEndpoint: 'http://example.com/v1/chat/completions',
                     chatApiKey: 'secret',
-                    topicTitlePromptTemplate: '自定义标题模板\n{{CHAT_HISTORY}}',
+                    topicTitlePromptTemplate: '自定义标题模板\n{{MESSAGES:END:2}}',
                 };
             },
         },
@@ -304,7 +304,7 @@ test('generate-topic-title falls back to the first user message when generation 
     assert.equal(result.title.endsWith('...'), true);
 });
 
-test('topic title prompt supports OpenWebUI-style MESSAGES placeholders and legacy CHAT_HISTORY', () => {
+test('topic title prompt supports OpenWebUI-style MESSAGES placeholders', () => {
     const { chatHandlers } = loadMainHandlers();
     const { buildTopicTitlePrompt } = chatHandlers.__testUtils;
     const messages = [
@@ -315,9 +315,6 @@ test('topic title prompt supports OpenWebUI-style MESSAGES placeholders and lega
     const openWebUiStylePrompt = buildTopicTitlePrompt('标题\n{{MESSAGES:END:2}}', messages);
     assert.match(openWebUiStylePrompt, /\[1\] User:\n请讲一次函数/);
     assert.match(openWebUiStylePrompt, /\[2\] Assistant:\n我们先看斜率。/);
-
-    const legacyPrompt = buildTopicTitlePrompt('旧模板\n{{CHAT_HISTORY}}', messages);
-    assert.match(legacyPrompt, /\[1\] User:\n请讲一次函数/);
 });
 
 test('topic title background task resolver rejects disabled, non-placeholder, empty, and non-initial turns', () => {

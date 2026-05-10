@@ -5,42 +5,13 @@ const path = require('path');
 let AGENT_DIR = null;
 let initialized = false;
 
-function extractPromptTextFromLegacyConfig(config = {}) {
+function extractPromptTextFromAgentConfig(config = {}) {
     if (typeof config.originalSystemPrompt === 'string' && config.originalSystemPrompt.trim()) {
         return config.originalSystemPrompt;
     }
 
     if (typeof config.systemPrompt === 'string' && config.systemPrompt.trim()) {
         return config.systemPrompt;
-    }
-
-    if (config.promptMode === 'modular') {
-        const advancedPrompt = config.advancedSystemPrompt;
-        if (typeof advancedPrompt === 'string' && advancedPrompt.trim()) {
-            return advancedPrompt;
-        }
-
-        if (advancedPrompt && typeof advancedPrompt === 'object' && Array.isArray(advancedPrompt.blocks)) {
-            return advancedPrompt.blocks
-                .filter((block) => block && block.disabled !== true)
-                .map((block) => {
-                    if (block.type === 'newline') {
-                        return '\n';
-                    }
-
-                    if (Array.isArray(block.variants) && block.variants.length > 0) {
-                        const selectedIndex = Number.isInteger(block.selectedVariant) ? block.selectedVariant : 0;
-                        return block.variants[selectedIndex] || block.content || '';
-                    }
-
-                    return block.content || '';
-                })
-                .join('');
-        }
-    }
-
-    if (config.promptMode === 'preset' && typeof config.presetSystemPrompt === 'string') {
-        return config.presetSystemPrompt;
     }
 
     return '';
@@ -77,7 +48,7 @@ function initialize(options) {
             const config = await loadAgentConfig(agentId);
             return {
                 success: true,
-                systemPrompt: extractPromptTextFromLegacyConfig(config),
+                systemPrompt: extractPromptTextFromAgentConfig(config),
                 promptMode: 'original',
             };
         } catch (error) {

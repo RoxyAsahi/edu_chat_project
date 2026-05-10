@@ -510,7 +510,7 @@ test('messageRenderer keeps raw HTML preview toggle after streamed message final
 
     toggle.click();
     await waitFor(() => previewContainer.querySelector('.unistudy-html-preview-frame'));
-    assert.match(previewContainer.querySelector('.unistudy-html-preview-frame')?.srcdoc, /vcp-wrapper/);
+    assert.match(previewContainer.querySelector('.unistudy-html-preview-frame')?.srcdoc, /unistudy-preview-wrapper/);
 });
 
 test('messageRenderer scopes style tags after streamed finalization', async (t) => {

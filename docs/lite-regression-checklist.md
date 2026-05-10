@@ -1,7 +1,7 @@
 # UniStudy 回归测试清单
 
 更新时间: 2026-04-27
-适用仓库: `C:\VCP\Eric\edu_chat_project`
+适用仓库: 当前仓库根目录
 
 ## 自动化入口
 - `npm run test:main`

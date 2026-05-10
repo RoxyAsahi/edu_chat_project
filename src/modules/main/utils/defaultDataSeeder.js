@@ -3,6 +3,7 @@ const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { createClient } = require('@libsql/client');
+const { createChatHistoryStore } = require('../chat-history/store');
 
 const KNOWLEDGE_BASE_SCHEMA = [
     `CREATE TABLE IF NOT EXISTS knowledge_base (
@@ -281,12 +282,95 @@ async function importSeedKnowledgeBase({ dataRoot, seedRoot }) {
     }
 }
 
+function parseSeedHistoryTarget(dataRoot, historyPath) {
+    const relative = path.relative(path.join(dataRoot, 'UserData'), historyPath);
+    const segments = relative.split(path.sep);
+    if (segments.length !== 4 || segments[1] !== 'topics' || segments[3] !== 'history.json') {
+        return null;
+    }
+
+    const [agentId, , topicId] = segments;
+    return agentId && topicId ? { agentId, topicId } : null;
+}
+
+async function importSeedChatHistories({ dataRoot, historyPaths = [] }) {
+    const normalizedHistoryPaths = [...new Set((Array.isArray(historyPaths) ? historyPaths : [])
+        .map((historyPath) => path.resolve(historyPath))
+        .filter((historyPath) => path.basename(historyPath) === 'history.json'))];
+    if (normalizedHistoryPaths.length === 0) {
+        return 0;
+    }
+
+    const store = createChatHistoryStore({ dataRoot });
+    let importedHistories = 0;
+    try {
+        for (const historyPath of normalizedHistoryPaths) {
+            const target = parseSeedHistoryTarget(dataRoot, historyPath);
+            if (!target) {
+                continue;
+            }
+
+            let history = [];
+            try {
+                const data = await fs.readJson(historyPath);
+                history = Array.isArray(data) ? data : [];
+            } catch (_error) {
+                continue;
+            }
+
+            await store.replaceHistory(target.agentId, target.topicId, history);
+            importedHistories += 1;
+        }
+    } finally {
+        await store.close();
+    }
+
+    return importedHistories;
+}
+
+async function removeEmptyDirectoryBestEffort(directoryPath, stopAtPath) {
+    const resolvedDirectory = path.resolve(directoryPath);
+    const resolvedStopAt = path.resolve(stopAtPath);
+    const relativeToStop = path.relative(resolvedStopAt, resolvedDirectory);
+    if (!relativeToStop || relativeToStop.startsWith('..') || path.isAbsolute(relativeToStop)) {
+        return;
+    }
+
+    let entries = [];
+    try {
+        entries = await fs.readdir(resolvedDirectory);
+    } catch (_error) {
+        return;
+    }
+
+    if (entries.length > 0) {
+        return;
+    }
+
+    await fs.rmdir(resolvedDirectory).catch(() => {});
+    await removeEmptyDirectoryBestEffort(path.dirname(resolvedDirectory), resolvedStopAt);
+}
+
+async function removeImportedSeedHistoryFiles({ dataRoot, historyPaths = [] }) {
+    const userDataRoot = path.join(dataRoot, 'UserData');
+    for (const historyPath of historyPaths) {
+        const resolvedHistoryPath = path.resolve(historyPath);
+        const relativeToUserData = path.relative(path.resolve(userDataRoot), resolvedHistoryPath);
+        if (!relativeToUserData || relativeToUserData.startsWith('..') || path.isAbsolute(relativeToUserData)) {
+            continue;
+        }
+        await fs.remove(resolvedHistoryPath).catch(() => {});
+        await removeEmptyDirectoryBestEffort(path.dirname(resolvedHistoryPath), userDataRoot);
+    }
+}
+
 async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
     if (!dataRoot || !seedRoot || !await sourcePathExists(seedRoot)) {
         return {
             copiedFiles: 0,
             skippedFiles: 0,
             hydratedHistories: 0,
+            chatHistoryImports: 0,
             knowledgeBaseImports: { knowledgeBases: 0, documents: 0, chunks: 0 },
             seedRootMissing: true,
         };
@@ -315,17 +399,26 @@ async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
     }
 
     let hydratedHistories = 0;
+    const copiedHistoryPaths = [];
     for (const copiedPath of copiedFilePaths) {
-        if (path.basename(copiedPath) === 'history.json'
-            && await hydrateHistoryAttachmentPaths(copiedPath, dataRoot)) {
-            hydratedHistories += 1;
+        if (path.basename(copiedPath) === 'history.json') {
+            copiedHistoryPaths.push(copiedPath);
+            if (await hydrateHistoryAttachmentPaths(copiedPath, dataRoot)) {
+                hydratedHistories += 1;
+            }
         }
+    }
+
+    const chatHistoryImports = await importSeedChatHistories({ dataRoot, historyPaths: copiedHistoryPaths });
+    if (chatHistoryImports === copiedHistoryPaths.length) {
+        await removeImportedSeedHistoryFiles({ dataRoot, historyPaths: copiedHistoryPaths });
     }
 
     return {
         copiedFiles,
         skippedFiles,
         hydratedHistories,
+        chatHistoryImports,
         knowledgeBaseImports: await importSeedKnowledgeBase({ dataRoot, seedRoot }),
         seedRootMissing: false,
     };
@@ -334,6 +427,7 @@ async function seedDefaultDataRoot({ dataRoot, seedRoot }) {
 module.exports = {
     copyMissingTree,
     hydrateHistoryAttachmentPaths,
+    importSeedChatHistories,
     importSeedKnowledgeBase,
     seedDefaultDataRoot,
     sourcePathExists,

@@ -192,7 +192,6 @@ const MODEL_SERVICE_CAPABILITY_LABELS = Object.freeze({
 const AIP_TEST_PROVIDER_PRESET_ID = 'aip-innovation-practice-test';
 const AIP_TEST_PROVIDER_NAME = 'AI&P创新实践项目测试专用预设';
 const AIP_TEST_API_BASE_URL = 'https://api.uniquest.top';
-const AIP_TEST_API_KEY = 'sk-TtwYTSOeumdwgYVLPM8ul0LcJXU7Cc4uCiiYEQQfjavRin8E';
 const AIP_TEST_DEFAULT_MODEL = 'glm-5.1';
 const AIP_TEST_THINKING_DEFAULT_MODEL = 'Qwen/Qwen3.5-397B-A17B';
 const AIP_TEST_CHAT_FALLBACK_DEFAULT_MODEL = 'Pro/moonshotai/Kimi-K2.6';
@@ -417,10 +416,9 @@ function stringifyModelServiceApiKeys(apiKeys = []) {
         .join('\n');
 }
 
-function resolveBuiltInModelServicePreset({ apiBaseUrl = '', apiKeys = [] } = {}) {
+function resolveBuiltInModelServicePreset({ apiBaseUrl = '' } = {}) {
     if (
         normalizeModelServiceBaseUrl(apiBaseUrl) === normalizeModelServiceBaseUrl(AIP_TEST_API_BASE_URL)
-        && parseModelServiceApiKeysInput(apiKeys).includes(AIP_TEST_API_KEY)
     ) {
         return MODEL_SERVICE_PRESETS.find((preset) => preset.presetId === AIP_TEST_PROVIDER_PRESET_ID) || null;
     }
@@ -685,7 +683,7 @@ function createBuiltInTestModelServiceProvider() {
         protocol: 'openai-compatible',
         enabled: true,
         apiBaseUrl: AIP_TEST_API_BASE_URL,
-        apiKeys: [AIP_TEST_API_KEY],
+        apiKeys: [],
         extraHeaders: {},
         models: AIP_TEST_BUILT_IN_MODELS.map((model) => ({
             ...model,
@@ -732,7 +730,6 @@ function ensureBuiltInTestProvider(service = {}) {
         provider.presetId === AIP_TEST_PROVIDER_PRESET_ID
         || (
             normalizeModelServiceBaseUrl(provider.apiBaseUrl) === normalizeModelServiceBaseUrl(AIP_TEST_API_BASE_URL)
-            && parseModelServiceApiKeysInput(provider.apiKeys).includes(AIP_TEST_API_KEY)
         )
     ));
     const builtInProvider = createBuiltInTestModelServiceProvider();
@@ -1117,7 +1114,11 @@ function buildBootstrapModelService(settings = {}) {
 }
 
 function composeSettingsWithModelService(settings = {}) {
-    const modelService = ensureBuiltInTestProvider(buildBootstrapModelService(settings));
+    const hasExplicitModelService = hasConfiguredLocalModelService(settings.modelService);
+    const bootstrappedModelService = buildBootstrapModelService(settings);
+    const modelService = hasExplicitModelService
+        ? normalizeModelService(bootstrappedModelService)
+        : ensureBuiltInTestProvider(bootstrappedModelService);
     return {
         ...settings,
         modelService,
@@ -1166,11 +1167,9 @@ function getModelServiceGroupMeta(group = 'chat') {
 
 function renderModelServiceModelLead(model = {}) {
     const label = normalizeModelServiceText(model.name || model.id).slice(0, 1).toUpperCase() || 'M';
-    const tone = getModelServiceAvatarTone(model.name || model.id || 'M');
     return `
         <span
           class="model-service-model-lead model-service-model-lead--${escapeHtml(model.group || 'chat')}"
-          style="background:${escapeHtml(tone.background)};color:${escapeHtml(tone.foreground)};"
           aria-hidden="true"
         >
           ${escapeHtml(label)}
@@ -1234,35 +1233,6 @@ function extractPromptTextFromAgentConfig(config = {}) {
 
     if (typeof config.systemPrompt === 'string' && config.systemPrompt.trim()) {
         return config.systemPrompt;
-    }
-
-    if (config.promptMode === 'modular') {
-        const advancedPrompt = config.advancedSystemPrompt;
-        if (typeof advancedPrompt === 'string' && advancedPrompt.trim()) {
-            return advancedPrompt;
-        }
-
-        if (advancedPrompt && typeof advancedPrompt === 'object' && Array.isArray(advancedPrompt.blocks)) {
-            return advancedPrompt.blocks
-                .filter((block) => block && block.disabled !== true)
-                .map((block) => {
-                    if (block.type === 'newline') {
-                        return '\n';
-                    }
-
-                    if (Array.isArray(block.variants) && block.variants.length > 0) {
-                        const selectedIndex = Number.isInteger(block.selectedVariant) ? block.selectedVariant : 0;
-                        return block.variants[selectedIndex] || block.content || '';
-                    }
-
-                    return block.content || '';
-                })
-                .join('');
-        }
-    }
-
-    if (config.promptMode === 'preset' && typeof config.presetSystemPrompt === 'string') {
-        return config.presetSystemPrompt;
     }
 
     return '';
@@ -1715,7 +1685,7 @@ function createSettingsController(deps = {}) {
         return normalizeModelService(getGlobalSettings().modelService);
     }
 
-    function syncLegacyModelServiceFields(settings = getGlobalSettings()) {
+    function syncModelServiceMirrorFields(settings = getGlobalSettings()) {
         const mirrors = buildModelServiceMirror(settings.modelService || createDefaultModelService(), settings);
 
         if (el.chatEndpoint) el.chatEndpoint.value = mirrors.chatEndpoint || '';
@@ -1765,7 +1735,7 @@ function createSettingsController(deps = {}) {
             ...mirrored,
         });
         ensureModelServiceUiSelections(normalizedService);
-        syncLegacyModelServiceFields({
+        syncModelServiceMirrorFields({
             ...getGlobalSettings(),
             modelService: normalizedService,
             ...mirrored,
@@ -2536,15 +2506,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
                       )}</span>
                     </span>
                   </button>
-                  <button
-                    class="model-service-provider-row__menu"
-                    type="button"
-                    data-model-service-provider-menu-toggle="${escapeHtml(provider.id)}"
-                    aria-expanded="${menuOpen ? 'true' : 'false'}"
-                    title="更多操作"
-                  >
-                    <span class="material-symbols-outlined">more_horiz</span>
-                  </button>
                   ${menuOpen ? `
                     <div class="model-service-provider-menu" data-model-service-provider-menu="${escapeHtml(provider.id)}">
                       <button class="model-service-provider-menu__item" type="button" data-model-service-provider-menu-action="edit" data-provider-id="${escapeHtml(provider.id)}">
@@ -2861,7 +2822,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         renderModelServiceProviderDetail(service);
         renderModelServiceModelsPanel(service);
         renderModelServicePopup(service);
-        syncLegacyModelServiceFields({
+        syncModelServiceMirrorFields({
             ...getGlobalSettings(),
             modelService: service,
         });
@@ -3160,22 +3121,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         return `${text.slice(0, limit).trim()}...`;
     }
 
-    function formatLegacyTokenSuggestions(unresolvedTokens = [], suggestionMap = {}) {
-        return (Array.isArray(unresolvedTokens) ? unresolvedTokens : []).map((token) => (
-            suggestionMap?.[token]
-                ? `${token} -> ${suggestionMap[token]}`
-                : token
-        ));
-    }
-
-    function formatLegacyFieldWarnings(warnings = []) {
-        return (Array.isArray(warnings) ? warnings : []).map((warning) => (
-            warning?.replacement
-                ? `${warning.field} -> ${warning.replacement}`
-                : warning?.field
-        )).filter(Boolean);
-    }
-
     function renderPromptSegmentPreview(preview = {}) {
         if (!el.promptSegmentPreview) {
             return;
@@ -3296,7 +3241,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         }
 
         const unresolvedTokens = Array.isArray(preview?.unresolvedTokens) ? preview.unresolvedTokens : [];
-        const legacyTokenSuggestions = preview?.legacyTokenSuggestions || {};
         const chips = [
             `智能体：${preview?.agentName || '未选择'}`,
             `话题：${preview?.topicName || '未选择'}`,
@@ -3340,7 +3284,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         }
 
         if (unresolvedTokens.length > 0) {
-            notes.push(`还有未解析变量：${formatLegacyTokenSuggestions(unresolvedTokens, legacyTokenSuggestions).join(', ')}`);
+            notes.push(`还有未解析变量：${unresolvedTokens.join(', ')}`);
         } else {
             notes.push('当前可见变量都已经成功展开。');
         }
@@ -3609,7 +3553,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             el.agentBubbleThemeResolvedPreview.value = preview?.resolvedPrompt || trimmedPrompt;
             setAgentBubbleThemeCaptionStatus(
                 el.agentBubbleThemePreviewMeta,
-                `存在未解析变量：${formatLegacyTokenSuggestions(preview.unresolvedTokens, preview.legacyTokenSuggestions || {}).join(', ')}`,
+                `存在未解析变量：${preview.unresolvedTokens.join(', ')}`,
                 'warning'
             );
             return;
@@ -3726,7 +3670,7 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         if (el.modelServiceProviderSearchInput) {
             el.modelServiceProviderSearchInput.value = modelServiceUiState.providerSearch;
         }
-        syncLegacyModelServiceFields(settings);
+        syncModelServiceMirrorFields(settings);
         renderModelServiceWorkbench();
         renderModelServiceDefaultSelectors();
         isSyncingGlobalSettingsForm = false;
@@ -3740,11 +3684,6 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
         syncLayoutSettings(getGlobalSettings());
         messageRendererApi?.setUserAvatar(getGlobalSettings().userAvatarUrl || '../assets/default_user_avatar.png');
         messageRendererApi?.setUserAvatarColor(getGlobalSettings().userAvatarCalculatedColor || null);
-
-        const legacyFieldWarnings = formatLegacyFieldWarnings(loaded?.settingsIssues?.legacyFieldWarnings);
-        if (legacyFieldWarnings.length > 0) {
-            ui.showToastNotification(`检测到已废弃设置字段：${legacyFieldWarnings.join('，')}。请改用新字段名。`, 'warning', 7000);
-        }
     }
 
     async function saveGlobalSettings(options = {}) {
@@ -4372,15 +4311,31 @@ function renderModelServiceProviderList(service = getNormalizedModelService()) {
             openModelServiceProviderEditorPopup();
         });
 
-        el.modelServiceProviderList?.addEventListener('click', (event) => {
-            const menuToggle = event.target.closest('[data-model-service-provider-menu-toggle]');
-            if (menuToggle) {
-                const providerId = menuToggle.dataset.modelServiceProviderMenuToggle || '';
-                modelServiceUiState.providerMenuId = modelServiceUiState.providerMenuId === providerId ? '' : providerId;
-                renderModelServiceProviderList();
+        el.modelServiceProviderList?.addEventListener('contextmenu', (event) => {
+            const menu = event.target.closest('[data-model-service-provider-menu]');
+            if (menu) {
                 return;
             }
 
+            const row = event.target.closest('[data-model-service-provider-menu-root]');
+            if (!row) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            const providerId = row.dataset.modelServiceProviderMenuRoot || '';
+            modelServiceUiState.selectedProviderId = providerId;
+            modelServiceUiState.selectedModelId = '';
+            modelServiceUiState.providerMenuId = providerId;
+            modelServiceUiState.showModelSearch = false;
+            modelServiceUiState.showApiKeys = false;
+            modelServiceUiState.providerStatus = null;
+            modelServiceUiState.popup = null;
+            renderModelServiceWorkbench();
+        });
+
+        el.modelServiceProviderList?.addEventListener('click', (event) => {
             const menuAction = event.target.closest('[data-model-service-provider-menu-action]');
             if (menuAction) {
                 const providerId = menuAction.dataset.providerId || '';

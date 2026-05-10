@@ -26,7 +26,7 @@ import { createAppBootstrap, initializeAppRuntime as initializeBootstrapRuntime 
 import {
     createMarkdownFragmentRenderer,
     createMarkedInitializer,
-    extractPromptTextFromLegacyConfig,
+    extractPromptTextFromConfig,
     normalizeTopic,
 } from '../modules/renderer/app/runtime/rendererRuntimeHelpers.js';
 
@@ -36,22 +36,13 @@ const store = createAppStore(createInitialAppState());
 let markedInstance;
 let agentAvatarPreviewObjectUrl = null;
 let agentAvatarPreviewListenerCleanup = null;
-const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
 
 function getGlobalChatDefaultModel() {
     return String(getSettingsSlice().settings?.defaultModel || '').trim();
 }
 
 function normalizeAgentModelOverride(rawModel, globalDefaultModel = getGlobalChatDefaultModel()) {
-    const normalizedModel = String(rawModel || '').trim();
-    if (
-        normalizedModel === LEGACY_AGENT_MODEL
-        && globalDefaultModel
-        && globalDefaultModel !== LEGACY_AGENT_MODEL
-    ) {
-        return '';
-    }
-    return normalizedModel;
+    return String(rawModel || '').trim();
 }
 
 function clearAgentAvatarPreviewListeners() {
@@ -973,12 +964,12 @@ async function syncPromptModule(agentId, config) {
     const activePrompt = await chatAPI.getActiveSystemPrompt(agentId).catch(() => null);
     const resolvedPrompt = activePrompt?.success
         ? (activePrompt.systemPrompt || '')
-        : extractPromptTextFromLegacyConfig(config);
+        : extractPromptTextFromConfig(config);
     const promptModule = getPromptModule();
 
     if (!promptModule) {
         el.systemPromptContainer.innerHTML = `
-            <p class="prompt-text-mode-note">UniStudy 当前仅保留单文本提示词编辑器，旧版模块化提示词会在这里按纯文本展示。</p>
+            <p class="prompt-text-mode-note">UniStudy 当前使用单文本提示词编辑器。</p>
             <textarea id="unistudyPromptFallback" rows="6" placeholder="输入系统提示词...">${resolvedPrompt}</textarea>
         `;
         return;
@@ -994,7 +985,7 @@ async function syncPromptModule(agentId, config) {
 
     const note = document.createElement('p');
     note.className = 'prompt-text-mode-note';
-    note.textContent = 'UniStudy 当前仅开放文本提示词模式，旧版模块化或预设提示词会在这里被展开为纯文本。';
+    note.textContent = 'UniStudy 当前使用单文本提示词编辑器。';
     el.systemPromptContainer.prepend(note);
 }
 

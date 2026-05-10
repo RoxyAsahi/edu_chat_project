@@ -8,16 +8,12 @@ const {
 } = require('./settingsSchema');
 
 function createValidationIssues(result = {}) {
-    const legacyFieldWarnings = Array.isArray(result.legacyFieldWarnings)
-        ? result.legacyFieldWarnings.map((item) => ({ ...item }))
-        : [];
     const unknownKeys = Array.isArray(result.unknownKeys)
         ? [...result.unknownKeys]
         : [];
 
     return {
         hasIssues: result.hasIssues === true,
-        legacyFieldWarnings,
         unknownKeys,
     };
 }
@@ -28,7 +24,7 @@ function attachValidationIssues(settings = {}, issues = null) {
     }
 
     Object.defineProperty(settings, '__validationIssues', {
-        value: issues || { hasIssues: false, legacyFieldWarnings: [], unknownKeys: [] },
+        value: issues || { hasIssues: false, unknownKeys: [] },
         enumerable: false,
         configurable: true,
         writable: true,
@@ -111,7 +107,6 @@ class SettingsManager extends EventEmitter {
             if (error.code === 'ENOENT') {
                 return cloneSettingsWithIssues(this.defaultSettings, {
                     hasIssues: false,
-                    legacyFieldWarnings: [],
                     unknownKeys: [],
                 });
             }

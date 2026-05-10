@@ -105,12 +105,11 @@ async function createHarness(t, config) {
         agentId,
         dataRoot,
         handlers,
-        historyPath: (topicId) => path.join(userDataDir, agentId, 'topics', topicId, 'history.json'),
         userDataDir,
     };
 }
 
-test('chat history IPC keeps full-history compatibility while writing to libSQL', async (t) => {
+test('chat history IPC reads and writes full histories through libSQL', async (t) => {
     const harness = await createHarness(t, {
         topics: [{ id: 'topic-1', name: 'Topic 1', unread: false }],
     });
@@ -125,7 +124,6 @@ test('chat history IPC keeps full-history compatibility while writing to libSQL'
     const getOriginalMessageContent = harness.handlers.get('get-original-message-content');
 
     assert.deepEqual(await saveChatHistory(null, harness.agentId, 'topic-1', history), { success: true });
-    assert.equal(await fs.pathExists(harness.historyPath('topic-1')), false);
     assert.ok(await fs.pathExists(path.join(harness.dataRoot, 'ChatHistory', 'chat-history.db')));
 
     assert.deepEqual(await getChatHistory(null, harness.agentId, 'topic-1'), history);
@@ -141,21 +139,19 @@ test('chat history IPC keeps full-history compatibility while writing to libSQL'
     );
 });
 
-test('chat history IPC migrates legacy JSON for search and uses DB summaries for unread counts', async (t) => {
+test('chat history IPC searches DB content and uses DB summaries for unread counts', async (t) => {
     const harness = await createHarness(t, {
         topics: [
-            { id: 'legacy-topic', name: 'Legacy Topic', unread: false },
+            { id: 'search-topic', name: 'Search Topic', unread: false },
             { id: 'assistant-only', name: 'Assistant Only', unread: false },
             { id: 'manual-unread', name: 'Manual Unread', unread: true },
         ],
     });
 
-    await fs.ensureDir(path.dirname(harness.historyPath('legacy-topic')));
-    await fs.writeJson(harness.historyPath('legacy-topic'), [
-        { id: 'legacy-1', role: 'user', content: 'Newton search target', timestamp: 1 },
-    ], { spaces: 2 });
-
     const saveChatHistory = harness.handlers.get('save-chat-history');
+    await saveChatHistory(null, harness.agentId, 'search-topic', [
+        { id: 'search-1', role: 'user', content: 'Newton search target', timestamp: 1 },
+    ]);
     await saveChatHistory(null, harness.agentId, 'assistant-only', [
         { id: 'assistant-1', role: 'assistant', content: 'Ping without user reply', timestamp: 2 },
     ]);
@@ -166,7 +162,7 @@ test('chat history IPC migrates legacy JSON for search and uses DB summaries for
     const searchTopicsByContent = harness.handlers.get('search-topics-by-content');
     assert.deepEqual(
         await searchTopicsByContent(null, harness.agentId, 'agent', 'newton'),
-        { success: true, matchedTopicIds: ['legacy-topic'] },
+        { success: true, matchedTopicIds: ['search-topic'] },
     );
 
     const getUnreadTopicCounts = harness.handlers.get('get-unread-topic-counts');

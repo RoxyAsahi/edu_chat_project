@@ -281,7 +281,7 @@ test('composerController shows user and thinking bubbles before persistence, ret
     );
 });
 
-test('composerController ignores the legacy agent default model when a different global chat model is configured', async (t) => {
+test('composerController preserves the configured agent model when a different global chat model is configured', async (t) => {
     const { createComposerController } = await loadComposerControllerModule();
     const harness = createComposerHarness();
     t.after(() => harness.dom.window.close());
@@ -353,7 +353,7 @@ test('composerController ignores the legacy agent default model when a different
     harness.el.messageInput.value = '继续讲解';
     await controller.handleSend();
 
-    assert.equal(requestPayload?.modelConfig?.fallbackModel, undefined);
+    assert.equal(requestPayload?.modelConfig?.fallbackModel, 'gemini-3.1-flash-lite-preview');
     assert.equal(requestPayload?.modelConfig?.model, undefined);
 });
 

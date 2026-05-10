@@ -14,7 +14,6 @@ const {
 const { loadBundledEmoticonPromptData } = require('../emoticons/bundledCatalog');
 const {
     resolveDailyNoteGuideInstruction,
-    rewriteLegacyStudyLogPromptText,
 } = require('../study/toolProtocol');
 let initialized = false;
 
@@ -33,7 +32,6 @@ function createEmptyPromptResolution() {
         unresolvedTokens: [],
         substitutions: {},
         variableSources: {},
-        legacyTokenSuggestions: {},
     };
 }
 
@@ -43,17 +41,7 @@ function toPromptResolutionPayload(result = {}) {
         unresolvedTokens: Array.isArray(result?.unresolvedTokens) ? result.unresolvedTokens : [],
         substitutions: isPlainObject(result?.substitutions) ? result.substitutions : {},
         variableSources: isPlainObject(result?.variableSources) ? result.variableSources : {},
-        legacyTokenSuggestions: isPlainObject(result?.legacyTokenSuggestions) ? result.legacyTokenSuggestions : {},
     };
-}
-
-function mergeLegacyTokenSuggestions(...maps) {
-    return maps.reduce((acc, map) => {
-        if (isPlainObject(map)) {
-            Object.assign(acc, map);
-        }
-        return acc;
-    }, {});
 }
 
 function readOwnPathValue(source, pathSegments = []) {
@@ -209,42 +197,13 @@ function buildPersistenceFieldChecks(rawSettings, requestedFields = {}) {
     };
 }
 
-function extractPromptTextFromLegacyConfig(config = {}) {
+function extractPromptTextFromAgentConfig(config = {}) {
     if (typeof config.originalSystemPrompt === 'string' && config.originalSystemPrompt.trim()) {
         return config.originalSystemPrompt;
     }
 
     if (typeof config.systemPrompt === 'string' && config.systemPrompt.trim()) {
         return config.systemPrompt;
-    }
-
-    if (config.promptMode === 'modular') {
-        const advancedPrompt = config.advancedSystemPrompt;
-        if (typeof advancedPrompt === 'string' && advancedPrompt.trim()) {
-            return advancedPrompt;
-        }
-
-        if (advancedPrompt && typeof advancedPrompt === 'object' && Array.isArray(advancedPrompt.blocks)) {
-            return advancedPrompt.blocks
-                .filter((block) => block && block.disabled !== true)
-                .map((block) => {
-                    if (block.type === 'newline') {
-                        return '\n';
-                    }
-
-                    if (Array.isArray(block.variants) && block.variants.length > 0) {
-                        const selectedIndex = Number.isInteger(block.selectedVariant) ? block.selectedVariant : 0;
-                        return block.variants[selectedIndex] || block.content || '';
-                    }
-
-                    return block.content || '';
-                })
-                .join('');
-        }
-    }
-
-    if (config.promptMode === 'preset' && typeof config.presetSystemPrompt === 'string') {
-        return config.presetSystemPrompt;
     }
 
     return '';
@@ -339,19 +298,6 @@ function applyEmoticonPrompt(messages, settings = {}, promptResolutionOptions = 
     return { messages: nextMessages, appended: true, skippedByToken: false, skippedByDuplicate: false };
 }
 
-function normalizeLegacyStudyLogPromptMessages(messages = []) {
-    return (Array.isArray(messages) ? messages : []).map((message) => {
-        if (!message || message.role !== 'system' || typeof message.content !== 'string') {
-            return message;
-        }
-
-        return {
-            ...message,
-            content: rewriteLegacyStudyLogPromptText(message.content),
-        };
-    });
-}
-
 function applyDailyNoteProtocol(messages, settings = {}, promptResolutionOptions = {}) {
     if (settings?.studyLogPolicy?.enabled === false) {
         return { messages, appended: false, skippedByToken: false };
@@ -428,7 +374,6 @@ function initialize(paths) {
 
             settings.settingsIssues = settings?.__validationIssues || {
                 hasIssues: false,
-                legacyFieldWarnings: [],
                 unknownKeys: [],
             };
             
@@ -442,7 +387,6 @@ function initialize(paths) {
                 userAvatarUrl: null,
                 settingsIssues: {
                     hasIssues: false,
-                    legacyFieldWarnings: [],
                     unknownKeys: [],
                 },
             };
@@ -511,7 +455,6 @@ function initialize(paths) {
                 settings: persistedSettings,
                 settingsIssues: persistedSettings?.__validationIssues || {
                     hasIssues: false,
-                    legacyFieldWarnings: [],
                     unknownKeys: [],
                 },
                 persistenceCheck: {
@@ -555,7 +498,6 @@ function initialize(paths) {
                 unresolvedTokens: [],
                 substitutions: {},
                 variableSources: {},
-                legacyTokenSuggestions: {},
             };
         }
 
@@ -578,7 +520,6 @@ function initialize(paths) {
                 unresolvedTokens: localResult.unresolvedTokens,
                 substitutions: localResult.substitutions,
                 variableSources: localResult.variableSources,
-                legacyTokenSuggestions: localResult.legacyTokenSuggestions,
             };
         } catch (error) {
             console.error('[SettingsHandlers] Failed to preview agent bubble theme prompt:', error);
@@ -590,7 +531,6 @@ function initialize(paths) {
                 unresolvedTokens: [],
                 substitutions: {},
                 variableSources: {},
-                legacyTokenSuggestions: {},
                 error: error.message,
                 errorCode: error.code || '',
             };
@@ -655,7 +595,7 @@ function initialize(paths) {
 
             const basePrompt = typeof previewPayload.systemPrompt === 'string'
                 ? previewPayload.systemPrompt
-                : extractPromptTextFromLegacyConfig(agentConfig || {});
+                : extractPromptTextFromAgentConfig(agentConfig || {});
             let messages = basePrompt ? [{ role: 'system', content: basePrompt }] : [];
 
             const renderingPromptSource = sanitizeText(previewSettings.renderingPrompt)
@@ -688,10 +628,9 @@ function initialize(paths) {
                 ? (sanitizeText(previewSettings.agentBubbleThemePrompt) || DEFAULT_AGENT_BUBBLE_THEME_PROMPT)
                 : '';
 
-            const normalizedMessages = normalizeLegacyStudyLogPromptMessages(messages);
             const bubbleThemeApplied = previewSettings.enableAgentBubbleTheme === true
-                ? applyAgentBubbleTheme(normalizedMessages, previewSettings.agentBubbleThemePrompt)
-                : { messages: normalizedMessages, appended: false };
+                ? applyAgentBubbleTheme(messages, previewSettings.agentBubbleThemePrompt)
+                : { messages, appended: false };
             const emoticonApplied = applyEmoticonPrompt(
                 bubbleThemeApplied.messages,
                 previewSettings,
@@ -718,7 +657,7 @@ function initialize(paths) {
                 ? toPromptResolutionPayload(resolvePromptVariables(bubbleThemeRaw, promptResolutionOptions))
                 : createEmptyPromptResolution();
 
-            const normalizedBasePrompt = rewriteLegacyStudyLogPromptText(basePrompt || '');
+            const normalizedBasePrompt = basePrompt || '';
             const references = {
                 renderingInBasePrompt: /{{\s*RenderingGuide\s*}}/.test(normalizedBasePrompt),
                 emoticonInBasePrompt: /{{\s*EmoticonGuide\s*}}/.test(normalizedBasePrompt),
@@ -737,13 +676,6 @@ function initialize(paths) {
                     unresolvedTokens: finalResolution.unresolvedTokens,
                     substitutions: finalResolution.substitutions,
                     variableSources: finalResolution.variableSources,
-                    legacyTokenSuggestions: mergeLegacyTokenSuggestions(
-                        finalResolution.legacyTokenSuggestions,
-                        renderingResolved.legacyTokenSuggestions,
-                        emoticonResolved.legacyTokenSuggestions,
-                        dailyNoteResolved.legacyTokenSuggestions,
-                        bubbleThemeResolved.legacyTokenSuggestions
-                    ),
                     segments: {
                         rendering: {
                             enabled: previewSettings.enableRenderingPrompt !== false,
@@ -752,7 +684,6 @@ function initialize(paths) {
                             rawPrompt: renderingRaw,
                             resolvedPrompt: renderingResolved.resolvedPrompt || '',
                             unresolvedTokens: renderingResolved.unresolvedTokens,
-                            legacyTokenSuggestions: renderingResolved.legacyTokenSuggestions,
                         },
                         emoticonPrompt: {
                             enabled: previewSettings.enableEmoticonPrompt !== false,
@@ -766,7 +697,6 @@ function initialize(paths) {
                             rawPrompt: emoticonRaw,
                             resolvedPrompt: emoticonResolved.resolvedPrompt || '',
                             unresolvedTokens: emoticonResolved.unresolvedTokens,
-                            legacyTokenSuggestions: emoticonResolved.legacyTokenSuggestions,
                         },
                         dailyNote: {
                             enabled: studyLogEnabled,
@@ -777,7 +707,6 @@ function initialize(paths) {
                             rawPrompt: dailyNoteRaw,
                             resolvedPrompt: dailyNoteResolved.resolvedPrompt || '',
                             unresolvedTokens: dailyNoteResolved.unresolvedTokens,
-                            legacyTokenSuggestions: dailyNoteResolved.legacyTokenSuggestions,
                         },
                         bubbleTheme: {
                             enabled: previewSettings.enableAgentBubbleTheme === true,
@@ -786,7 +715,6 @@ function initialize(paths) {
                             rawPrompt: bubbleThemeRaw,
                             resolvedPrompt: bubbleThemeResolved.resolvedPrompt || '',
                             unresolvedTokens: bubbleThemeResolved.unresolvedTokens,
-                            legacyTokenSuggestions: bubbleThemeResolved.legacyTokenSuggestions,
                         },
                     },
                 },
@@ -889,24 +817,14 @@ function initialize(paths) {
                 ? payload.mergedVoiceOptions
                 : [...defaults, ...remoteVoices];
 
-            const legacyModels = Array.isArray(payload?.models) ? payload.models : [];
-            const normalizedLegacyModels = legacyModels.flatMap(model => {
-                if (Array.isArray(model?.mergedVoiceOptions) && model.mergedVoiceOptions.length) {
-                    return model.mergedVoiceOptions;
-                }
-                const legacyDefaults = Array.isArray(model?.defaults) ? model.defaults : [];
-                const legacyRemoteVoices = Array.isArray(model?.remoteVoices) ? model.remoteVoices : [];
-                return [...legacyDefaults, ...legacyRemoteVoices];
-            });
-
             return {
                 success: true,
                 exists: true,
                 path: WEBINDEX_MODEL_FILE,
-                models: mergedVoiceOptions.length ? mergedVoiceOptions : normalizedLegacyModels,
+                models: mergedVoiceOptions,
                 defaults,
                 remoteVoices,
-                mergedVoiceOptions: mergedVoiceOptions.length ? mergedVoiceOptions : normalizedLegacyModels,
+                mergedVoiceOptions,
                 updatedAt: payload?.updatedAt || null,
                 source: payload?.source || 'unknown',
                 providerUrl: payload?.providerUrl || null,

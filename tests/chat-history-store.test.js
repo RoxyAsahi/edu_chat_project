@@ -26,61 +26,18 @@ async function createStoreHarness(t) {
     });
 
     return {
-        legacyPath: (agentId, topicId) => path.join(tempRoot, 'UserData', agentId, 'topics', topicId, 'history.json'),
         store,
         tempRoot,
     };
 }
 
-test('chat history store migrates legacy JSON once and preserves read order', async (t) => {
-    const { legacyPath, store, tempRoot } = await createStoreHarness(t);
-    const historyPath = legacyPath('agent-1', 'topic-1');
-    const originalHistory = [
-        { id: 'user-1', role: 'user', content: 'Hello', timestamp: 1 },
-        { id: 'assistant-1', role: 'assistant', content: 'Hi', timestamp: 2 },
-    ];
+test('chat history store initializes empty topics without reading JSON history files', async (t) => {
+    const { store, tempRoot } = await createStoreHarness(t);
 
-    await fs.ensureDir(path.dirname(historyPath));
-    await fs.writeJson(historyPath, originalHistory, { spaces: 2 });
-
-    assert.deepEqual(
-        await store.getHistory('agent-1', 'topic-1', { legacyHistoryPath: historyPath }),
-        originalHistory,
-    );
+    assert.deepEqual(await store.getHistory('agent-1', 'topic-1'), []);
     assert.ok(await fs.pathExists(path.join(tempRoot, 'ChatHistory', 'chat-history.db')));
 
-    await fs.writeJson(historyPath, [
-        { id: 'user-new', role: 'user', content: 'Should not reimport', timestamp: 3 },
-    ]);
-
-    assert.deepEqual(
-        await store.getHistory('agent-1', 'topic-1', { legacyHistoryPath: historyPath }),
-        originalHistory,
-    );
-
     const state = await store.getTopicState('agent-1', 'topic-1');
-    assert.equal(Number(state.message_count), 2);
-});
-
-test('chat history store marks missing legacy topics as empty to avoid repeated import checks', async (t) => {
-    const { legacyPath, store } = await createStoreHarness(t);
-    const historyPath = legacyPath('agent-1', 'empty-topic');
-
-    assert.deepEqual(
-        await store.getHistory('agent-1', 'empty-topic', { legacyHistoryPath: historyPath }),
-        [],
-    );
-
-    await fs.ensureDir(path.dirname(historyPath));
-    await fs.writeJson(historyPath, [
-        { id: 'late-message', role: 'user', content: 'Late legacy write', timestamp: 1 },
-    ]);
-
-    assert.deepEqual(
-        await store.getHistory('agent-1', 'empty-topic', { legacyHistoryPath: historyPath }),
-        [],
-    );
-    const state = await store.getTopicState('agent-1', 'empty-topic');
     assert.equal(Number(state.message_count), 0);
 });
 
@@ -140,32 +97,4 @@ test('chat history store searches content and summarizes unread activation from 
         assistantCount: 1,
         shouldActivateCount: true,
     });
-});
-
-test('chat history store falls back on corrupt legacy JSON and can migrate after the file is fixed', async (t) => {
-    const { legacyPath, store } = await createStoreHarness(t);
-    const historyPath = legacyPath('agent-1', 'topic-1');
-
-    await fs.ensureDir(path.dirname(historyPath));
-    await fs.writeFile(historyPath, '{not-valid-json', 'utf8');
-
-    const originalWarn = console.warn;
-    console.warn = () => {};
-    try {
-        assert.deepEqual(
-            await store.getHistory('agent-1', 'topic-1', { legacyHistoryPath: historyPath }),
-            [],
-        );
-    } finally {
-        console.warn = originalWarn;
-    }
-    assert.equal(await store.getTopicState('agent-1', 'topic-1'), null);
-
-    const fixedHistory = [{ id: 'fixed', role: 'user', content: 'Recovered', timestamp: 1 }];
-    await fs.writeJson(historyPath, fixedHistory, { spaces: 2 });
-
-    assert.deepEqual(
-        await store.getHistory('agent-1', 'topic-1', { legacyHistoryPath: historyPath }),
-        fixedHistory,
-    );
 });

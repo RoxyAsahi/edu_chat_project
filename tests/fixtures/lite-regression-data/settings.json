@@ -1,7 +1,7 @@
 ﻿{
   "userName": "Lite Regression User",
-  "vcpServerUrl": "http://vcp.uniquest.us.kg/v1/chat/completions",
-  "vcpApiKey": "123456",
+  "chatEndpoint": "http://chat.uniquest.us.kg/v1/chat/completions",
+  "chatApiKey": "123456",
   "currentThemeMode": "light",
   "enableAgentBubbleTheme": true,
   "enableWideChatLayout": true

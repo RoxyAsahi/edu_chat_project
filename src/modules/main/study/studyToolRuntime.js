@@ -97,7 +97,6 @@ function createStudyToolRuntime(options = {}) {
 
     async function executeCreate(toolRequest = {}, runtimeContext = {}) {
         const args = toolRequest.args || {};
-        const compatibilityMode = sanitizeText(toolRequest.compatibilityMode);
         const subjectInfo = parseSubject(args.subject, runtimeContext);
         const dateKey = resolveDateKey(args.Date, runtimeContext.dateKey);
         const contentValue = sanitizeText(args.Content);
@@ -118,7 +117,7 @@ function createStudyToolRuntime(options = {}) {
                 message: 'DailyNote.create requires Date in YYYY-MM-DD format.',
             };
         }
-        if (!compatibilityMode && !hasTimePrefix(contentValue)) {
+        if (!hasTimePrefix(contentValue)) {
             return {
                 success: false,
                 toolName: 'DailyNote',

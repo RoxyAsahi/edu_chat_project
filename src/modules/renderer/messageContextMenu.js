@@ -3,7 +3,6 @@
 let mainRefs = {};
 let contextMenuDependencies = {};
 let isInitialized = false;
-const LEGACY_AGENT_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const CHAT_CONTEXT_MENU_VIEWPORT_GAP = 12;
 
@@ -84,16 +83,7 @@ function normalizeTextContent(content) {
 }
 
 function normalizeAgentModelOverride(rawModel, globalDefaultModel = '') {
-    const normalizedModel = String(rawModel || '').trim();
-    const normalizedGlobalDefaultModel = String(globalDefaultModel || '').trim();
-    if (
-        normalizedModel === LEGACY_AGENT_MODEL
-        && normalizedGlobalDefaultModel
-        && normalizedGlobalDefaultModel !== LEGACY_AGENT_MODEL
-    ) {
-        return '';
-    }
-    return normalizedModel;
+    return String(rawModel || '').trim();
 }
 
 export function buildChatContextMenuModel({
