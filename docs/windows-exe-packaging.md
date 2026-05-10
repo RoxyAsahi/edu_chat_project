@@ -66,8 +66,8 @@
 
 当前 `package.json` 中的 `build.publish` 使用 `generic` provider:
 
-- 默认占位地址: `https://your-domain.example/unistudy/win`
-- 正式发布前把它改成你的宝塔面板 HTTPS 目录，例如 `https://你的域名/unistudy/win`
+- 当前更新地址: `https://feedback.uniquest.top/win`
+- 如需更换域名，把它改成新的宝塔面板 HTTPS 目录，例如 `https://update.uniquest.top/unistudy/win`
 - 安装版会读取打包时生成的 `app-update.yml`，之后从这个 URL 拉取 `latest.yml`
 
 每次发布新版时:
@@ -78,11 +78,11 @@
 - 上传 `dist/latest.yml`
 - 上传 `latest.yml` 里引用的安装包 `exe`
 - 上传同名 `.blockmap` 文件
-- 在浏览器确认 `https://你的域名/unistudy/win/latest.yml` 能直接访问
+- 在浏览器确认 `https://feedback.uniquest.top/win/latest.yml` 能直接访问
 
 宝塔面板建议:
 
-- 新建一个站点或子目录，例如 `/www/wwwroot/你的域名/unistudy/win`
+- 在当前站点下新建子目录，例如 `/www/wwwroot/feedback.uniquest.top/win`
 - 开启 HTTPS
 - 不要开启需要登录、鉴权或防盗链的访问限制
 - 保持 `latest.yml`、安装包和 `.blockmap` 在同一个目录

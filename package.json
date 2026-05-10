@@ -65,7 +65,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "https://your-domain.example/unistudy/win"
+        "url": "https://feedback.uniquest.top/win"
       }
     ],
     "detectUpdateChannel": false,
