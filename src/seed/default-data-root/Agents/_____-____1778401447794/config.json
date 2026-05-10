@@ -1,0 +1,17 @@
+{
+  "cardEmoji": "🔤",
+  "name": "演示案例 - 英语",
+  "topics": [
+    {
+      "id": "topic_1778409166243",
+      "name": "📚 一般过去时详解",
+      "createdAt": 1778409166243,
+      "locked": true,
+      "unread": false,
+      "creatorSource": "seed",
+      "knowledgeBaseId": "kb_1778409166571_17947140",
+      "selectedKnowledgeBaseDocumentIds": null
+    }
+  ],
+  "avatarCalculatedColor": "rgb(226,193,54)"
+}

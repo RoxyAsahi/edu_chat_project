@@ -163,6 +163,16 @@ function createShelfController(deps = {}) {
         return Array.isArray(documents) ? documents : [];
     }
 
+    function isEmptyUncategorizedShelfGroup(group = {}) {
+        const name = String(group.name || '').trim();
+        if (name !== '未归类') {
+            return false;
+        }
+        const loadedDocuments = getShelfDocumentsForGroup(group.id);
+        const listedDocumentCount = Number(group.documentCount || 0);
+        return loadedDocuments.length === 0 && listedDocumentCount === 0;
+    }
+
     function getAllShelfDocuments() {
         const groupedDocuments = Object.values(state.documentsByGroupId || {})
             .flatMap((items) => (Array.isArray(items) ? items : []));
@@ -1120,6 +1130,9 @@ function createShelfController(deps = {}) {
             } else {
                 el.sourceShelfGroups.appendChild(renderShelfAllGroupsButton());
                 state.groups.forEach((group) => {
+                    if (isEmptyUncategorizedShelfGroup(group) && group.id !== state.selectedGroupId) {
+                        return;
+                    }
                     el.sourceShelfGroups.appendChild(renderShelfGroupButton(group));
                 });
             }
@@ -1142,6 +1155,9 @@ function createShelfController(deps = {}) {
             } else if (isAllShelfView) {
                 el.sourceShelfDocuments.classList.remove('source-shelf-grid--empty');
                 state.groups.forEach((group) => {
+                    if (isEmptyUncategorizedShelfGroup(group)) {
+                        return;
+                    }
                     el.sourceShelfDocuments.appendChild(renderShelfGroupSection(group));
                 });
             } else if (state.documents.length === 0) {

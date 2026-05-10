@@ -2392,12 +2392,16 @@ function createNotesController(deps = {}) {
                 }
             }
         });
-        el.manualNotesAnalysisReportsBtn?.addEventListener('click', () => {
-            if (state.manualNotesLibraryActivePanel !== 'notes') {
-                state.manualNotesLibraryActivePanel = 'notes';
-                syncWorkspaceView();
+        el.manualNotesLibraryGrid?.addEventListener('click', (event) => {
+            const target = event.target;
+            const trigger = target instanceof ElementCtor
+                ? target.closest('[data-manual-notes-start-analysis]')
+                : null;
+            if (!trigger) {
+                return;
             }
-            setManualNotesLibraryFilter('analysis');
+            event.preventDefault();
+            void openNoteAnalysisWizard({ trigger });
         });
         el.manualNotesLibrarySubjectToggle?.addEventListener('click', () => {
             state.manualNotesLibraryTabsCollapsed = !state.manualNotesLibraryTabsCollapsed;

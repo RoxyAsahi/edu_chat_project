@@ -28,7 +28,6 @@ const DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION = [
     '——创建——',
     '',
     TOOL_REQUEST_START,
-    'subject:「始」[Nova]Nova「末」,',
     'tool_name:「始」DailyNote「末」,',
     'command:「始」create「末」,',
     'Date:「始」2025-11-23「末」,',
@@ -38,7 +37,7 @@ const DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION = [
     '新认知：好的日记不是给当前回答增加仪式感，而是给未来的自己留下可召回、可理解、可继续推理的上下文。「末」',
     TOOL_REQUEST_END,
     '',
-    '**subject**：格式必须是 `[学习主题/日记本名]Agent署名`。例如 `[数学错题]Nova`、`[英语阅读]Nova`、`[公共]Nova`。分类记录是好习惯，未来的检索路径始于今天的归档选择。',
+    '**subject**：通常省略。省略时自动写入当前学科 / Agent 的日记本，例如当前是“英语”，就归档到“英语”。只有需要覆盖归档位置时才填写，例如 `subject:「始」公共「末」` 或兼容旧格式 `subject:「始」[考前复盘]Reflection Coach「末」`。',
     '**Date**：使用 `YYYY-MM-DD`。',
     '**Content**：必须以 `[HH:MM]` 开头。这个时间来自上下文里的真实当前时间，不要臆造。正文追求信息密度，聚焦核心事件，保留洞察链条与决策脉络。',
     '',
@@ -49,14 +48,13 @@ const DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION = [
     '——更新——',
     '',
     TOOL_REQUEST_START,
-    'subject:「始」[Nova]Nova「末」,',
     'tool_name:「始」DailyNote「末」,',
     'command:「始」update「末」,',
     'target:「始」日记中需被替换的旧内容，至少15字符以确保精准匹配「末」,',
     'replace:「始」替换后写入的新内容「末」',
     TOOL_REQUEST_END,
     '',
-    '一次调用只改一处匹配。target 至少 15 字符。subject 同样使用 `[学习主题/索引名]署名` 格式。',
+    '一次调用只改一处匹配。target 至少 15 字符。通常不要写 subject；只有要更新非当前学科日记本时才填写 subject。',
     '',
     '——联想锚定 (Associative Anchoring)——',
     '',
@@ -78,7 +76,7 @@ function resolvePreferredDailyNoteSubject(options = {}) {
         ? options.context
         : {};
     const agentName = sanitizeText(context.agentName || agentConfig.name || context.agentId, 'UniStudy');
-    return `[${agentName}]${agentName}`;
+    return agentName;
 }
 
 function stripThinkBlocks(content = '') {
@@ -265,7 +263,7 @@ function resolveDailyNoteGuideInstruction(customGuide = '', options = {}) {
     const baseInstruction = sanitizeText(customGuide, DEFAULT_DAILY_NOTE_TOOL_INSTRUCTION);
     const normalizedInstruction = baseInstruction
         .replace(/subject:「始」\[Nova\]Nova「末」,/g, `subject:「始」${preferredSubject}「末」,`);
-    const preferredSubjectLine = `本轮默认优先写入 subject：${preferredSubject}。若无特别说明，不要改用 [默认] 或省略 []。`;
+    const preferredSubjectLine = `本轮默认归档到当前学科 / Agent：${preferredSubject}。通常不要额外输出 subject；只有需要覆盖归档位置时才填写。`;
 
     if (normalizedInstruction.includes(preferredSubjectLine)) {
         return normalizedInstruction;

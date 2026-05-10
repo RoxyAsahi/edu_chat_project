@@ -2,7 +2,7 @@
   {
     "id": "contest_demo_growth_assistant_intro",
     "role": "assistant",
-    "content": "# 展示建议卡\n\n- 先看这段复盘对话，观察 AI 如何把“焦虑”拆成可执行问题。\n- 再点顶部日记墙，看看连续几天的 DailyNote 是怎样聚合成成长线索的。\n- 最后选中右侧笔记，继续生成一份深度分析报告。\n\n这个案例想展示：\n\n1. UniStudy 不只做学科问答，也支持长期学习复盘。\n2. DailyNote 会把零散反思沉淀成可回看的日记墙。\n3. 反思内容还能继续进入 Studio，变成结构化分析。",
+    "content": "# 展示建议卡\n\n- 先看这段复盘对话，观察 AI 如何把“焦虑”拆成可执行问题。\n- 再点顶部 AI 主动记忆，看看连续几天的 DailyNote 是怎样聚合成成长线索的。\n- 最后选中右侧笔记，继续生成一份深度分析报告。\n\n这个案例想展示：\n\n1. UniStudy 不只做学科问答，也支持长期学习复盘。\n2. DailyNote 会把零散反思沉淀成可回看的 AI 主动记忆。\n3. 反思内容还能继续进入 Studio，变成结构化分析。",
     "timestamp": 1776218460000,
     "attachments": [],
     "favorited": false,

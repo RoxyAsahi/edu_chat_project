@@ -384,7 +384,9 @@ function stripThoughtChains(messages) {
 }
 
 function applyAgentBubbleTheme(messages, injectionPrompt = DEFAULT_AGENT_BUBBLE_THEME_PROMPT) {
-    const normalizedPrompt = typeof injectionPrompt === 'string' ? injectionPrompt.trim() : '';
+    const normalizedPrompt = typeof injectionPrompt === 'string' && injectionPrompt.trim()
+        ? injectionPrompt.trim()
+        : DEFAULT_AGENT_BUBBLE_THEME_PROMPT;
     if (!normalizedPrompt) {
         return messages;
     }

@@ -1,0 +1,52 @@
+[
+  {
+    "id": "study_log_1778409357150_qx3k17",
+    "agentId": "_____-____1778401447794",
+    "agentNameSnapshot": "演示案例 - 英语",
+    "topicId": "topic_1778409166243",
+    "topicNameSnapshot": "新对话 3",
+    "createdAt": 1778409357150,
+    "updatedAt": 1778409357150,
+    "dateKey": "2026-05-10",
+    "studentNameSnapshot": "User",
+    "gradeSnapshot": "",
+    "workspaceSnapshot": "",
+    "environmentSnapshot": "",
+    "sourceMessageIds": [
+      "user_1778409174332_vnn6ft",
+      "assistant_1778409174340_up94z2"
+    ],
+    "toolRequest": {
+      "toolName": "DailyNote",
+      "command": "create",
+      "args": {
+        "subject": "[演示案例 - 英语]演示案例 - 英语",
+        "command": "create",
+        "Date": "2026-05-10",
+        "Content": "[18:32] 基于课本（端午节与春节主题对话）开展 Past Simple 教学互动。从 Conversation A/B 的 celebrate/celebrated 与 like/didn't like 语境对比出发，明确一般过去时用于\"过去发生的动作\"及\"过去的状态/习惯\"。系统梳理规则动词四种变形规则（+ed, +d, 变y为i+ed, 双写尾字母+ed）与课本不规则动词（be→was/were, eat→ate, learn→learned/learnt, watch/celebrate/play→+ed）。整理句型结构：肯定句用过去式，否定句用 didn't + 原形，疑问句用 Did + 主语 + 原形，并强调时间标志词（last week, ago, yesterday, just now）。针对考试设计四类常考题型：动词变形填空、句型转换（否定/疑问/划线提问）、节日主题对话补全、不规则动词辨音/拼写。特别提示易错点：否定疑问句中动词必须还原原形，be动词与实义动词助动词不可混用。",
+        "Tag": "",
+        "target": "",
+        "replace": "",
+        "archery": ""
+      }
+    },
+    "contentMarkdown": "[18:32] 基于课本（端午节与春节主题对话）开展 Past Simple 教学互动。从 Conversation A/B 的 celebrate/celebrated 与 like/didn't like 语境对比出发，明确一般过去时用于\"过去发生的动作\"及\"过去的状态/习惯\"。系统梳理规则动词四种变形规则（+ed, +d, 变y为i+ed, 双写尾字母+ed）与课本不规则动词（be→was/were, eat→ate, learn→learned/learnt, watch/celebrate/play→+ed）。整理句型结构：肯定句用过去式，否定句用 didn't + 原形，疑问句用 Did + 主语 + 原形，并强调时间标志词（last week, ago, yesterday, just now）。针对考试设计四类常考题型：动词变形填空、句型转换（否定/疑问/划线提问）、节日主题对话补全、不规则动词辨音/拼写。特别提示易错点：否定疑问句中动词必须还原原形，be动词与实义动词助动词不可混用。",
+    "tags": [],
+    "status": "written",
+    "recallCount": 0,
+    "lastRecalledAt": 0,
+    "filePath": "",
+    "topicTag": "",
+    "agentTag": "",
+    "modelSnapshot": "",
+    "notebookId": "演示案例_-_英语",
+    "notebookName": "演示案例 - 英语",
+    "diaryId": "study_diary_演示案例_-_英语_2026-05-10",
+    "subjectRaw": "[演示案例 - 英语]演示案例 - 英语",
+    "subjectSignature": "演示案例 - 英语",
+    "requestedToolName": "DailyNote",
+    "requestedCommand": "create",
+    "archery": "",
+    "isPublicNotebook": false
+  }
+]

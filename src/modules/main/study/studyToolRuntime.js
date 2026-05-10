@@ -23,7 +23,7 @@ function hasTimePrefix(value = '') {
 
 function buildDefaultSubject(runtimeContext = {}) {
     const signature = sanitizeText(runtimeContext.agentName || runtimeContext.agentId, 'UniStudy');
-    return `[${signature}]${signature}`;
+    return signature;
 }
 
 function parseSubject(value = '', runtimeContext = {}) {
@@ -41,16 +41,16 @@ function parseSubject(value = '', runtimeContext = {}) {
         };
     }
 
+    const plainSubject = raw.startsWith('[') && raw.endsWith(']')
+        ? raw.slice(1, -1).trim()
+        : raw;
     const fallbackNotebookName = sanitizeText(runtimeContext.agentName || runtimeContext.agentId, '默认');
+    const notebookName = sanitizeText(plainSubject, fallbackNotebookName);
     return {
         subjectRaw: raw,
-        notebookName: raw.startsWith('[') && raw.endsWith(']')
-            ? raw.slice(1, -1).trim() || fallbackNotebookName
-            : fallbackNotebookName,
-        notebookId: normalizeNotebookId(raw.startsWith('[') && raw.endsWith(']')
-            ? raw.slice(1, -1).trim()
-            : fallbackNotebookName, 'default'),
-        subjectSignature: raw,
+        notebookName,
+        notebookId: normalizeNotebookId(notebookName, 'default'),
+        subjectSignature: notebookName,
         isPublicNotebook: raw === '[公共]' || raw === '公共',
     };
 }

@@ -283,7 +283,7 @@ test('send-chat-request auto-appends emoticon prompt when the base prompt does n
     assert.match(capturedRequest.messages[0].content, /Auto emoticon path \/表情包/);
 });
 
-test('send-chat-request skips bubble theme injection when the configured prompt is blank', async (t) => {
+test('send-chat-request falls back to the default bubble theme when the configured prompt is blank', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-prompt-resolution-'));
     t.after(() => fs.remove(tempRoot));
 
@@ -328,6 +328,7 @@ test('send-chat-request skips bubble theme injection when the configured prompt 
 
     assert.ok(capturedRequest);
     assert.match(capturedRequest.messages[0].content, /原始系统提示词/);
+    assert.match(capturedRequest.messages[0].content, /Output formatting requirement:/);
     assert.match(capturedRequest.messages[0].content, /—— 日记 \(DailyNote\) ——/);
 });
 
@@ -457,13 +458,10 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
                             message: {
                                 content: [
                                     '<<<[TOOL_REQUEST]>>>',
-                                    'subject: 「始」[Nova]Nova「末」',
                                     'tool_name: 「始」DailyNote「末」',
                                     'command: 「始」create「末」',
                                     'Date: 「始」2026-04-14「末」',
-                                    'Content: 「始」[19:30] 今天完成了导数复习，并整理了 3 道典型错题。\nTag: 高数, 导数「末」',
-                                    'Tag: 「始」高数, 导数「末」',
-                                    'archery: 「始」no_reply「末」',
+                                    'Content: 「始」[19:30] 今天完成了导数复习，并整理了 3 道典型错题。「末」',
                                     '<<<[END_TOOL_REQUEST]>>>',
                                 ].join('\n'),
                             },
@@ -547,9 +545,10 @@ test('send-chat-request executes local DailyNote tool requests and returns tool 
     const storedLogs = await fs.readJson(studyLogPath);
     assert.equal(storedLogs.length, 1);
     assert.match(storedLogs[0].contentMarkdown, /导数复习/);
-    assert.equal(storedLogs[0].notebookName, 'Nova');
-    assert.equal(storedLogs[0].toolRequest.args.subject, '[Nova]Nova');
-    assert.equal(storedLogs[0].subjectRaw, '[Nova]Nova');
+    assert.equal(storedLogs[0].notebookName, 'Study Agent');
+    assert.equal(storedLogs[0].toolRequest.args.subject, 'Study Agent');
+    assert.equal(storedLogs[0].subjectRaw, 'Study Agent');
+    assert.equal(storedLogs[0].subjectSignature, 'Study Agent');
     assert.equal(storedLogs[0].requestedToolName, 'DailyNote');
 });
 

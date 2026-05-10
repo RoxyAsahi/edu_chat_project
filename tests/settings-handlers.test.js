@@ -299,6 +299,46 @@ test('preview-final-system-prompt reports segment states and final prompt', asyn
     assert.equal(result.preview.segments.bubbleTheme.appended, true);
 });
 
+test('preview-final-system-prompt appends the default bubble theme when saved prompt is blank', async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
+    const settingsPath = path.join(tempRoot, 'settings.json');
+    const manager = new SettingsManager(settingsPath);
+    t.after(() => fs.remove(tempRoot));
+
+    await manager.writeSettings({
+        ...DEFAULT_SETTINGS,
+        enableAgentBubbleTheme: true,
+        agentBubbleThemePrompt: '',
+    });
+
+    const { settingsHandlers, handleHandlers } = loadSettingsHandlers();
+    settingsHandlers.initialize({
+        SETTINGS_FILE: settingsPath,
+        USER_AVATAR_FILE: path.join(tempRoot, 'user_avatar.png'),
+        AGENT_DIR: path.join(tempRoot, 'Agents'),
+        PROJECT_ROOT: path.join(tempRoot, 'project-root'),
+        settingsManager: manager,
+        agentConfigManager: null,
+    });
+
+    const previewPrompt = handleHandlers.get('preview-final-system-prompt');
+    const result = await previewPrompt({}, {
+        systemPrompt: 'Hello {{UserName}}',
+        settings: {
+            userName: 'PreviewUser',
+            enableAgentBubbleTheme: true,
+            agentBubbleThemePrompt: '',
+        },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.preview.segments.bubbleTheme.source, 'default');
+    assert.equal(result.preview.segments.bubbleTheme.appended, true);
+    assert.match(result.preview.finalSystemPrompt, /Output formatting requirement:/);
+    assert.match(result.preview.finalSystemPrompt, /当前真实时间：\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+    assert.equal(result.preview.finalSystemPrompt.includes('{{CurrentDateTime}}'), false);
+});
+
 test('preview-final-system-prompt auto-appends the emoticon segment when the base prompt does not reference emoticon variables', async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'unistudy-settings-handlers-'));
     const settingsPath = path.join(tempRoot, 'settings.json');

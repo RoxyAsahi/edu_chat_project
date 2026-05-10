@@ -54,7 +54,6 @@ function collectRootElements(rootDocument = document) {
         manualNotesLibraryDiaryTabBtn: rootDocument.getElementById('manualNotesLibraryDiaryTabBtn'),
         manualNotesLibraryFilters: rootDocument.getElementById('manualNotesLibraryFilters'),
         manualNotesLibraryNotesPanel: rootDocument.getElementById('manualNotesLibraryNotesPanel'),
-        manualNotesAnalysisReportsBtn: rootDocument.getElementById('manualNotesAnalysisReportsBtn'),
         manualNewNoteBtn: rootDocument.getElementById('manualNewNoteBtn'),
         workspaceCurrentAgent: rootDocument.getElementById('workspaceCurrentAgent'),
         workspaceCurrentTopic: rootDocument.getElementById('workspaceCurrentTopic'),

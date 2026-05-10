@@ -287,6 +287,10 @@ test('shelf document context menu can move a document to another group', async (
     });
 
     await controller.loadShelfGroups();
+    assert.doesNotMatch(dom.el.sourceShelfGroups.textContent, /未归类/);
+    assert.doesNotMatch(dom.el.sourceShelfDocuments.textContent, /未归类/);
+    assert.equal(dom.el.sourceShelfDocuments.querySelector('[data-shelf-group-section="shelf-2"]'), null);
+
     const card = dom.el.sourceShelfDocuments.querySelector('article.source-shelf-card');
     card.dispatchEvent(new dom.window.MouseEvent('contextmenu', {
         bubbles: true,

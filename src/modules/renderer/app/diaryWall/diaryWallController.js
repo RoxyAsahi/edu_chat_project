@@ -389,7 +389,7 @@ function createDiaryWallController(deps = {}) {
         const actions = [
             { key: 'open', label: '打开日记', icon: 'open_in_new' },
             { key: 'manage', label: state.manageMode ? '返回浏览' : '管理日记', icon: state.manageMode ? 'visibility' : 'edit' },
-            { key: 'refresh', label: '刷新日记墙', icon: 'refresh' },
+            { key: 'refresh', label: '刷新 AI 主动记忆', icon: 'refresh' },
             { key: 'delete', label: '删除日记', icon: 'delete', danger: true },
         ];
 
@@ -766,7 +766,7 @@ function createDiaryWallController(deps = {}) {
             return;
         }
         const entryCount = Number(card.entryCount || 0);
-        if (!confirmAction(`确定删除 ${card.dateKey || ''} [${card.notebookName || '默认'}] 的 ${entryCount || 1} 条日记源记录吗？此操作无法从日记墙恢复。`)) {
+        if (!confirmAction(`确定删除 ${card.dateKey || ''} [${card.notebookName || '默认'}] 的 ${entryCount || 1} 条日记源记录吗？此操作无法从 AI 主动记忆恢复。`)) {
             return;
         }
 
@@ -800,7 +800,7 @@ function createDiaryWallController(deps = {}) {
             return;
         }
         const totalEntries = selectedCards.reduce((sum, card) => sum + Number(card.entryCount || 0), 0);
-        if (!confirmAction(`确定删除选中的 ${selectedCards.length} 张日记卡、共 ${totalEntries || selectedCards.length} 条源记录吗？此操作无法从日记墙恢复。`)) {
+        if (!confirmAction(`确定删除选中的 ${selectedCards.length} 张日记卡、共 ${totalEntries || selectedCards.length} 条源记录吗？此操作无法从 AI 主动记忆恢复。`)) {
             return;
         }
 
@@ -937,7 +937,7 @@ function createDiaryWallController(deps = {}) {
             ui.showToastNotification('日记删除接口不可用。', 'error');
             return;
         }
-        if (!confirmAction('确定删除这条 DailyNote 源记录吗？此操作无法从日记墙恢复。')) {
+        if (!confirmAction('确定删除这条 DailyNote 源记录吗？此操作无法从 AI 主动记忆恢复。')) {
             return;
         }
 
@@ -1105,8 +1105,8 @@ function createDiaryWallController(deps = {}) {
         if (typeof chatAPI.listStudyDiaryWallCards !== 'function') {
             el.diaryWallCards.innerHTML = `
                 <div class="empty-list-state">
-                  <strong>日记墙接口不可用</strong>
-                  <span>当前 preload 还没有暴露独立日记墙接口。</span>
+                  <strong>AI 主动记忆接口不可用</strong>
+                  <span>当前 preload 还没有暴露独立 AI 主动记忆接口。</span>
                 </div>
             `;
             return;
@@ -1124,7 +1124,7 @@ function createDiaryWallController(deps = {}) {
             state.loadingPromise = null;
         }
         if (!result?.success) {
-            ui.showToastNotification(`加载日记墙失败：${result?.error || '未知错误'}`, 'error');
+            ui.showToastNotification(`加载 AI 主动记忆失败：${result?.error || '未知错误'}`, 'error');
             state.cards = [];
             state.selectedCardKey = '';
             state.detail = null;

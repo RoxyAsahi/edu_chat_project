@@ -1,0 +1,51 @@
+{
+  "id": "study_diary_演示案例_-_英语_2025-11-23",
+  "notebookId": "演示案例_-_英语",
+  "notebookName": "演示案例 - 英语",
+  "dateKey": "2025-11-23",
+  "createdAt": 1778408348306,
+  "updatedAt": 1778408348306,
+  "lastEntryAt": 1778408348306,
+  "entryIds": [
+    "study_log_1778408348306_675uvk"
+  ],
+  "entryRefs": [
+    {
+      "agentId": "_____-____1778401447794",
+      "topicId": "default",
+      "entryId": "study_log_1778408348306_675uvk"
+    }
+  ],
+  "entryCount": 1,
+  "recallCount": 2,
+  "lastRecalledAt": 1778409177468,
+  "tags": [],
+  "topicIds": [
+    "default"
+  ],
+  "topics": {
+    "default": {
+      "topicId": "default",
+      "topicName": "新对话 1",
+      "entryIds": [
+        "study_log_1778408348306_675uvk"
+      ],
+      "count": 1
+    }
+  },
+  "agentIds": [
+    "_____-____1778401447794"
+  ],
+  "agentNames": [
+    "演示案例 - 英语"
+  ],
+  "sourceMessageIds": [
+    "user_1778408298371_ehxuym",
+    "assistant_1778408298384_wie4ou"
+  ],
+  "subjectSignatures": [
+    "演示案例 - 英语"
+  ],
+  "isPublicNotebook": false,
+  "contentMarkdown": "# DailyNote 2025-11-23\n\n> 日记本：[演示案例 - 英语]\n\n## 新对话 1\n\n#### 18:19:08 · 演示案例 - 英语\n[20:15] 一般过去时教学互动记录\n核心内容：\n- 从课本对话（Conversation A/B）出发讲解 Past Simple 用法\n- 规则动词 (+ed) 与不规则动词变化（be→was/were, eat→ate）\n- 使用时间标志词：yesterday, last week, ago, just now\n- 否定句/疑问句结构：didn't + 原形，Did + 主语 + 原形\n- 设计三类常考题型：动词填空、时态选择、句型转换\n关键洞察：\n- 时态本质是\"时间坐标\"的表达工具\n- 助动词 did/didn't 后必须跟动词原形（高频易错点）\n- be 动词过去式独立变化，不加助动词\n关联节点：[@一般过去时][@动词变化规则][@时态标志词]\n后续跟进：可补充不规则动词表、更多语境练习\n\n\nSubject: [演示案例 - 英语]演示案例 - 英语"
+}

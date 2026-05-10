@@ -266,7 +266,6 @@ function createNotesDom() {
             <div id="manualNotesLibrarySubjectTabsWrapper">
                 <div id="manualNotesLibrarySubjectTabs"></div>
             </div>
-            <button id="manualNotesAnalysisReportsBtn"></button>
             <div id="manualNotesLibraryGrid"></div>
             <input id="noteTitleInput" />
             <textarea id="noteContentInput"></textarea>
@@ -369,7 +368,6 @@ function createNotesDom() {
             manualNotesLibrarySubjectToggle: window.document.getElementById('manualNotesLibrarySubjectToggle'),
             manualNotesLibrarySubjectTabsWrapper: window.document.getElementById('manualNotesLibrarySubjectTabsWrapper'),
             manualNotesLibrarySubjectTabs: window.document.getElementById('manualNotesLibrarySubjectTabs'),
-            manualNotesAnalysisReportsBtn: window.document.getElementById('manualNotesAnalysisReportsBtn'),
             manualNotesLibraryGrid: window.document.getElementById('manualNotesLibraryGrid'),
             noteTitleInput: window.document.getElementById('noteTitleInput'),
             noteContentInput: window.document.getElementById('noteContentInput'),
@@ -1051,7 +1049,7 @@ test('manual notes library keeps rich previews mounted during lightweight contro
 
     controller.bindEvents();
     controller.renderManualNotesLibrary({ forcePreviewRemount: true });
-    const firstCard = el.manualNotesLibraryGrid.querySelector('.manual-note-card');
+    const firstCard = el.manualNotesLibraryGrid.querySelector('.manual-note-card:not(.manual-note-card--analysis-start)');
     const firstPreviewBubble = firstCard.querySelector('.rich-bubble');
 
     assert.equal(mountCalls.length, 2);
@@ -1060,7 +1058,7 @@ test('manual notes library keeps rich previews mounted during lightweight contro
     controller.renderManualNotesLibrary();
 
     assert.equal(mountCalls.length, 2);
-    assert.strictEqual(el.manualNotesLibraryGrid.querySelector('.manual-note-card'), firstCard);
+    assert.strictEqual(el.manualNotesLibraryGrid.querySelector('.manual-note-card:not(.manual-note-card--analysis-start)'), firstCard);
     assert.strictEqual(firstCard.querySelector('.rich-bubble'), firstPreviewBubble);
 
     controller.renderManualNotesLibrary({ forcePreviewRemount: true });
@@ -1090,6 +1088,13 @@ test('manual notes library exposes deep analysis reports separately from subject
                 ],
             },
         },
+        depsOverrides: {
+            getDiaryWallTabs: () => [
+                { id: 'all', label: '全部' },
+                { id: 'agent-1', label: '数学' },
+            ],
+            getDiaryWallActiveFilter: () => 'all',
+        },
     });
 
     controller.bindEvents();
@@ -1097,19 +1102,71 @@ test('manual notes library exposes deep analysis reports separately from subject
 
     const subjectTabsText = el.manualNotesLibrarySubjectTabs.textContent;
     assert.match(subjectTabsText, /全部/);
-    assert.doesNotMatch(subjectTabsText, /深度分析/);
+    assert.match(subjectTabsText, /深度分析/);
     assert.match(subjectTabsText, /数学/);
     assert.doesNotMatch(subjectTabsText, /物理/);
+    assert.equal(
+        el.manualNotesLibrarySubjectTabs.querySelector('[data-subject-filter="all"] .manual-notes-library-page__subject-tab-icon')?.textContent,
+        'sticky_note_2'
+    );
+    assert.equal(
+        el.manualNotesLibrarySubjectTabs.querySelector('[data-subject-filter="analysis"] .manual-notes-library-page__subject-tab-icon')?.textContent,
+        'analytics'
+    );
+    assert.equal(
+        el.manualNotesLibrarySubjectTabs.querySelector('[data-subject-filter="agent-1"] .manual-notes-library-page__subject-tab-icon')?.textContent,
+        'folder'
+    );
+    const startAnalysisCard = el.manualNotesLibraryGrid.querySelector('[data-manual-notes-start-analysis]');
+    assert.ok(startAnalysisCard);
+    assert.equal(el.manualNotesLibraryGrid.firstElementChild, startAnalysisCard);
     assert.match(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /分析内容/);
 
-    el.manualNotesAnalysisReportsBtn.click();
+    store.patchState('notes', { manualNotesLibraryActivePanel: 'diary' });
+    controller.renderManualNotesLibrary();
+
+    assert.equal(el.manualNotesLibraryGrid.querySelector('[data-manual-notes-start-analysis]'), null);
+    assert.match(el.manualNotesLibraryTitle.textContent, /AI 主动记忆/);
+    assert.equal(
+        el.manualNotesLibrarySubjectTabs.querySelector('[data-subject-filter="all"] .manual-notes-library-page__subject-tab-icon')?.textContent,
+        'auto_stories'
+    );
+
+    store.patchState('notes', { manualNotesLibraryActivePanel: 'notes' });
+    controller.renderManualNotesLibrary();
+
+    el.manualNotesLibrarySubjectTabs.querySelector('[data-subject-filter="analysis"]').click();
 
     assert.equal(store.getState().notes.manualNotesLibraryFilter, 'analysis');
-    assert.equal(el.manualNotesAnalysisReportsBtn.classList.contains('manual-notes-library-page__analysis-report--active'), true);
     assert.match(el.manualNotesLibraryGrid.textContent, /分析内容/);
     assert.match(el.manualNotesLibraryGrid.textContent, /物理/);
     assert.doesNotMatch(el.manualNotesLibraryGrid.textContent, /普通内容 A/);
+});
+
+test('manual notes library starts deep analysis from the first grid card', async () => {
+    const { createNotesController } = await loadNotesControllerModule();
+
+    const { controller, el, store } = createNotesControllerHarness(createNotesController, {
+        stateOverrides: {
+            notes: {
+                allAgentManualNotes: [
+                    { id: 'note-1', title: '手写笔记 A', contentMarkdown: '普通内容 A', kind: 'note', agentId: 'agent-1', topicId: 'topic-1' },
+                ],
+            },
+        },
+    });
+
+    controller.bindEvents();
+    controller.renderManualNotesLibrary();
+
+    const startAnalysisCard = el.manualNotesLibraryGrid.querySelector('[data-manual-notes-start-analysis]');
+    assert.ok(startAnalysisCard);
+    startAnalysisCard.click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    assert.equal(store.getState().notes.noteAnalysisWizard.open, true);
+    assert.equal(el.noteAnalysisModal.classList.contains('hidden'), false);
 });
 
 test('manual notes library resets subject filters that no longer have manual notes', async () => {
@@ -1179,7 +1236,7 @@ test('note detail opened from manual notes returns to the manual notes library',
 
     controller.bindEvents();
     el.manualNotesLibraryBtn.click();
-    const card = el.manualNotesLibraryGrid.querySelector('.manual-note-card');
+    const card = el.manualNotesLibraryGrid.querySelector('.manual-note-card:not(.manual-note-card--analysis-start)');
     card.click();
 
     assert.equal(store.getState().notes.manualNotesLibraryOpen, true);
@@ -1211,7 +1268,7 @@ test('manual notes library can add a note into Studio selection from the right-c
 
     controller.bindEvents();
     el.manualNotesLibraryBtn.click();
-    const card = el.manualNotesLibraryGrid.querySelector('.manual-note-card');
+    const card = el.manualNotesLibraryGrid.querySelector('.manual-note-card:not(.manual-note-card--analysis-start)');
     card.dispatchEvent(new window.MouseEvent('contextmenu', {
         bubbles: true,
         cancelable: true,

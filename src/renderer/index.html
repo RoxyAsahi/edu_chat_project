@@ -81,7 +81,7 @@
         </div>
       </div>
       <div class="titlebar__meta">
-        <button id="openDiaryWallBtn" class="ghost-button icon-btn hidden" title="日记墙" aria-hidden="true" tabindex="-1"><span class="material-symbols-outlined">auto_stories</span></button>
+        <button id="openDiaryWallBtn" class="ghost-button icon-btn hidden" title="AI 主动记忆" aria-hidden="true" tabindex="-1"><span class="material-symbols-outlined">auto_stories</span></button>
         <button id="globalSettingsBtn" class="titlebar-settings-pill" title="设置">
           <span class="material-symbols-outlined" aria-hidden="true">settings</span>
           <span>设置</span>
@@ -111,35 +111,13 @@
               <div class="manual-notes-library-page__filter-stack">
                 <div id="manualNotesLibraryPanelSwitch" class="notes-studio-panel-switch manual-notes-library-page__switch" role="tablist" aria-label="笔记页面面板">
                   <button id="manualNotesLibraryNotesTabBtn" class="notes-studio-panel-switch__btn notes-studio-panel-switch__btn--active" type="button" role="tab" aria-selected="true" aria-controls="manualNotesLibraryNotesPanel">笔记</button>
-                  <button id="manualNotesLibraryDiaryTabBtn" class="notes-studio-panel-switch__btn" type="button" role="tab" aria-selected="false" aria-controls="diaryWallModal">日记墙</button>
+                  <button id="manualNotesLibraryDiaryTabBtn" class="notes-studio-panel-switch__btn" type="button" role="tab" aria-selected="false" aria-controls="diaryWallModal">AI 主动记忆</button>
                 </div>
                 <div id="manualNotesLibrarySubjectTabsWrapper" class="manual-notes-library-page__subject-tabs-wrapper">
                   <div id="manualNotesLibrarySubjectTabs" class="manual-notes-library-page__subject-tabs" aria-label="按学科筛选收藏笔记" role="tablist">
                     <button type="button" class="manual-notes-library-page__subject-tab manual-notes-library-page__subject-tab--active" data-subject-filter="all">全部</button>
                   </div>
                 </div>
-                <section class="manual-notes-library-page__analysis-card" aria-labelledby="manualNotesLibraryAnalysisTitle">
-                  <div>
-                    <h2 id="manualNotesLibraryAnalysisTitle">深度分析</h2>
-                    <p>选择多条笔记后生成一份结构化复盘，帮助你整理共性主题、薄弱点和下一步复习方向。</p>
-                  </div>
-                  <div id="manualNotesLibraryFilters" class="manual-notes-library-page__filters" aria-label="笔记操作">
-                    <button
-                      id="manualNotesAnalysisReportsBtn"
-                      class="ghost-button manual-notes-library-page__analysis-report"
-                      type="button"
-                    >
-                      <span>查看报告</span>
-                    </button>
-                    <button
-                      id="manualNewNoteBtn"
-                      class="accent-button manual-notes-library-page__new-note"
-                      type="button"
-                    >
-                      <span>开始分析</span>
-                    </button>
-                  </div>
-                </section>
               </div>
             </aside>
             <section class="manual-notes-library-page__content-card" aria-label="笔记列表">
@@ -152,17 +130,18 @@
               <div class="manual-notes-library-page__content-body">
                 <section id="manualNotesLibraryNotesPanel" class="manual-notes-library-page__panel manual-notes-library-page__panel--active" role="tabpanel" aria-labelledby="manualNotesLibraryNotesTabBtn">
                   <section id="manualNotesLibraryGrid" class="manual-notes-library-grid" aria-live="polite"></section>
+                  <button id="manualNewNoteBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1">开始深度分析</button>
                 </section>
                 <section id="diaryWallModal" class="diary-wall-modal diary-wall-panel manual-notes-library-page__panel hidden" aria-hidden="true" role="tabpanel" aria-labelledby="manualNotesLibraryDiaryTabBtn">
                   <div id="diaryWallModalBackdrop" class="diary-wall-modal__backdrop"></div>
-                  <div class="diary-wall-modal__dialog" role="region" aria-label="日记墙">
-                    <button id="diaryWallCloseBtn" class="ghost-button icon-btn hidden" type="button" aria-label="关闭日记墙">
+                  <div class="diary-wall-modal__dialog" role="region" aria-label="AI 主动记忆">
+                    <button id="diaryWallCloseBtn" class="ghost-button icon-btn hidden" type="button" aria-label="关闭 AI 主动记忆">
                       <span class="material-symbols-outlined">close</span>
                     </button>
                     <div class="diary-wall-modal__body">
                       <section class="diary-wall-canvas">
                         <div class="diary-wall-canvas__toolbar">
-                          <div id="diaryWallAgentNav" class="diary-wall-agent-nav" aria-label="日记墙 Agent 导航">
+                          <div id="diaryWallAgentNav" class="diary-wall-agent-nav" aria-label="AI 主动记忆学科导航">
                             <button id="diaryWallAgentToggle" type="button" class="diary-wall-agent-toggle" aria-label="展开/收起学科筛选" aria-expanded="true">
                               <span class="material-symbols-outlined" aria-hidden="true">tune</span>
                             </button>
@@ -174,10 +153,10 @@
                             <div id="diaryWallSummary" class="diary-wall-summary">
                               <span>等待加载</span>
                             </div>
-                            <button id="diaryWallEditBtn" class="ghost-button icon-btn" type="button" aria-label="编辑日记墙">
+                            <button id="diaryWallEditBtn" class="ghost-button icon-btn" type="button" aria-label="管理 AI 主动记忆">
                               <span class="material-symbols-outlined">edit</span>
                             </button>
-                            <button id="diaryWallRefreshBtn" class="ghost-button icon-btn" type="button" aria-label="刷新日记墙">
+                            <button id="diaryWallRefreshBtn" class="ghost-button icon-btn" type="button" aria-label="刷新 AI 主动记忆">
                               <span class="material-symbols-outlined">refresh</span>
                             </button>
                           </div>

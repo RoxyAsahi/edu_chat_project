@@ -229,7 +229,9 @@ function mergePreviewSettings(baseSettings = {}, overrideSettings = {}) {
 }
 
 function applyAgentBubbleTheme(messages, injectionPrompt = DEFAULT_AGENT_BUBBLE_THEME_PROMPT) {
-    const normalizedPrompt = typeof injectionPrompt === 'string' ? injectionPrompt.trim() : '';
+    const normalizedPrompt = typeof injectionPrompt === 'string' && injectionPrompt.trim()
+        ? injectionPrompt.trim()
+        : DEFAULT_AGENT_BUBBLE_THEME_PROMPT;
     if (!normalizedPrompt) {
         return { messages, appended: false };
     }
@@ -484,7 +486,7 @@ function initialize(paths) {
             const persistedSettings = await settingsManager.readSettings();
             const previewPayload = isPlainObject(payload) ? payload : {};
             const enabled = previewPayload.enabled === true;
-            const prompt = typeof previewPayload.prompt === 'string'
+            const prompt = typeof previewPayload.prompt === 'string' && previewPayload.prompt.trim()
                 ? previewPayload.prompt
                 : (persistedSettings.agentBubbleThemePrompt || DEFAULT_AGENT_BUBBLE_THEME_PROMPT);
             const trimmedPrompt = prompt.trim();
@@ -629,7 +631,7 @@ function initialize(paths) {
                 : '';
 
             const bubbleThemeApplied = previewSettings.enableAgentBubbleTheme === true
-                ? applyAgentBubbleTheme(messages, previewSettings.agentBubbleThemePrompt)
+                ? applyAgentBubbleTheme(messages, bubbleThemeRaw)
                 : { messages, appended: false };
             const emoticonApplied = applyEmoticonPrompt(
                 bubbleThemeApplied.messages,

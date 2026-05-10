@@ -414,7 +414,7 @@ test('diaryWallController manager mode can delete cards and save entry edits', a
     const diaryMenu = documentObj.getElementById('diaryWallActionMenu');
     assert.ok(diaryMenu);
     assert.match(diaryMenu.textContent, /管理日记/);
-    assert.match(diaryMenu.textContent, /刷新日记墙/);
+    assert.match(diaryMenu.textContent, /刷新 AI 主动记忆/);
     assert.match(diaryMenu.textContent, /删除日记/);
 
     diaryMenu.querySelector('[data-diary-wall-card-action="manage"]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));

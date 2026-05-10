@@ -1,0 +1,51 @@
+{
+  "id": "study_diary_演示案例_-_英语_2026-05-10",
+  "notebookId": "演示案例_-_英语",
+  "notebookName": "演示案例 - 英语",
+  "dateKey": "2026-05-10",
+  "createdAt": 1778409357150,
+  "updatedAt": 1778409357150,
+  "lastEntryAt": 1778409357150,
+  "entryIds": [
+    "study_log_1778409357150_qx3k17"
+  ],
+  "entryRefs": [
+    {
+      "agentId": "_____-____1778401447794",
+      "topicId": "topic_1778409166243",
+      "entryId": "study_log_1778409357150_qx3k17"
+    }
+  ],
+  "entryCount": 1,
+  "recallCount": 0,
+  "lastRecalledAt": 0,
+  "tags": [],
+  "topicIds": [
+    "topic_1778409166243"
+  ],
+  "topics": {
+    "topic_1778409166243": {
+      "topicId": "topic_1778409166243",
+      "topicName": "新对话 3",
+      "entryIds": [
+        "study_log_1778409357150_qx3k17"
+      ],
+      "count": 1
+    }
+  },
+  "agentIds": [
+    "_____-____1778401447794"
+  ],
+  "agentNames": [
+    "演示案例 - 英语"
+  ],
+  "sourceMessageIds": [
+    "user_1778409174332_vnn6ft",
+    "assistant_1778409174340_up94z2"
+  ],
+  "subjectSignatures": [
+    "演示案例 - 英语"
+  ],
+  "isPublicNotebook": false,
+  "contentMarkdown": "# DailyNote 2026-05-10\n\n> 日记本：[演示案例 - 英语]\n\n## 新对话 3\n\n#### 18:35:57 · 演示案例 - 英语\n[18:32] 基于课本（端午节与春节主题对话）开展 Past Simple 教学互动。从 Conversation A/B 的 celebrate/celebrated 与 like/didn't like 语境对比出发，明确一般过去时用于\"过去发生的动作\"及\"过去的状态/习惯\"。系统梳理规则动词四种变形规则（+ed, +d, 变y为i+ed, 双写尾字母+ed）与课本不规则动词（be→was/were, eat→ate, learn→learned/learnt, watch/celebrate/play→+ed）。整理句型结构：肯定句用过去式，否定句用 didn't + 原形，疑问句用 Did + 主语 + 原形，并强调时间标志词（last week, ago, yesterday, just now）。针对考试设计四类常考题型：动词变形填空、句型转换（否定/疑问/划线提问）、节日主题对话补全、不规则动词辨音/拼写。特别提示易错点：否定疑问句中动词必须还原原形，be动词与实义动词助动词不可混用。\n\n\nSubject: [演示案例 - 英语]演示案例 - 英语"
+}

@@ -492,31 +492,38 @@
 
 /* Main container for the diary entry */
 .learning-diary-bubble {
-    background: #fdfaf6 !important;
-    /* A very light, warm parchment color */
-    border: 1px solid #eaddd0;
-    /* A soft, paper-like border */
-    border-radius: 8px !important;
-    padding: 12px 18px 15px 48px !important;
-    /* Adjusted padding for new icon placement */
-    color: #5d4037 !important;
-    /* A warm, dark brown for text */
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
-    margin-top: 10px !important;
-    /* Add space above the diary bubble */
-    margin-bottom: 12px !important;
+    background:
+        linear-gradient(90deg, rgba(190, 97, 74, 0.07) 0 1px, transparent 1px) 64px 0 / 100% 100% no-repeat,
+        repeating-linear-gradient(
+            180deg,
+            transparent 0,
+            transparent 31px,
+            rgba(124, 95, 73, 0.065) 32px,
+            transparent 33px
+        ),
+        radial-gradient(circle at 14% 10%, rgba(255, 255, 255, 0.64), transparent 28%),
+        radial-gradient(circle at 86% 88%, rgba(223, 203, 179, 0.13), transparent 34%),
+        #fffdf8 !important;
+    border: 1px solid #ead9c7;
+    border-radius: 14px !important;
+    padding: 22px 30px 26px 72px !important;
+    color: #4f3e36 !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        inset 0 0 0 1px rgba(151, 118, 93, 0.08),
+        0 10px 24px rgba(69, 51, 38, 0.08);
+    margin-top: 12px !important;
+    margin-bottom: 14px !important;
     position: relative;
-    overflow: visible;
-    /* Allow for potential pseudo-elements to peek out */
+    isolation: isolate;
+    overflow: hidden;
     line-height: 1.7;
     display: block !important;
     font-family: var(--diary-font-family, 'Georgia', 'Times New Roman', serif) !important;
     font-size: 1em !important;
     white-space: normal !important;
-    /* Allow text to wrap naturally */
     word-break: break-word !important;
     will-change: transform;
-    /* 优化：日记气泡提升为独立层 */
 }
 
 /* Remove extra spacing in diary content caused by markdown paragraphs */
@@ -532,20 +539,36 @@
 .learning-diary-bubble::before {
     content: "✒️";
     position: absolute;
-    top: 14px;
-    left: 16px;
-    font-size: 22px;
-    opacity: 0.6;
+    top: 24px;
+    left: 25px;
+    font-size: 25px;
+    opacity: 0.68;
     z-index: 2;
     transform: rotate(-15deg);
-    /* Tilted for a more dynamic look */
     animation: none !important;
-    /* Removing previous animation for a more static, elegant feel */
 }
 
-/* Removing the animated border for a cleaner look */
 .learning-diary-bubble::after {
-    display: none !important;
+    content: "auto_stories";
+    position: absolute;
+    right: 22px;
+    bottom: 12px;
+    z-index: 0;
+    color: #8a7167;
+    font-family: 'Material Symbols Outlined';
+    font-size: 68px;
+    font-weight: normal;
+    line-height: 1;
+    font-feature-settings: "liga";
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 48;
+    opacity: 0.2;
+    transform: rotate(-14deg);
+    pointer-events: none;
+}
+
+.learning-diary-bubble > * {
+    position: relative;
+    z-index: 1;
 }
 
 /* Header section containing title and date */
@@ -553,34 +576,34 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    border-bottom: 1px solid #d7ccc8;
-    /* A subtle separator line */
-    padding-bottom: 6px;
-    margin-bottom: 10px;
+    gap: 18px;
+    border-bottom: 1px solid rgba(151, 118, 93, 0.24);
+    padding-bottom: 9px;
+    margin-bottom: 14px;
 }
 
 /* Diary title */
 .diary-title {
     font-weight: bold;
-    font-size: 1.1em;
-    color: #6d4c41;
-    /* A rich, brownish color */
+    font-size: 1.24em;
+    color: #654d43;
     font-family: var(--diary-font-family, 'Georgia', 'Times New Roman', serif) !important;
 }
 
 /* Date on the top right */
 .diary-date {
-    font-size: 0.85em;
-    color: #a1887f;
-    /* Lighter brown for secondary info */
+    color: #9b8175;
+    font-size: 0.92em;
     font-style: italic;
+    white-space: nowrap;
 }
 
 /* Container for the notebook info */
 .diary-notebook-info {
-    margin-bottom: 12px;
-    font-size: 0.9em;
-    color: #8d6e63;
+    margin-bottom: 16px;
+    color: #8a7167;
+    font-size: 0.95em;
+    font-weight: 600;
 }
 
 .diary-notebook-label {
@@ -589,19 +612,18 @@
 
 .diary-notebook-name {
     font-style: italic;
-    color: #a1887f;
-    background: rgba(161, 136, 127, 0.08);
-    padding: 1px 5px;
-    border-radius: 4px;
+    color: #9b8175;
+    background: rgba(151, 118, 93, 0.1);
+    padding: 2px 7px;
+    border-radius: 6px;
 }
 
 /* The main content of the diary entry */
 .diary-content {
-    font-size: 0.95em;
-    color: #4e342e;
-    /* A dark, rich brown for readability */
+    color: #4d3c34;
+    font-size: 1em;
+    line-height: 1.82;
     white-space: normal;
-    /* Changed from pre-wrap to normal to avoid extra line breaks from MD */
     word-break: break-word;
 }
 
@@ -612,16 +634,23 @@
 
 /* --- Learning Diary Dark Theme Overrides --- */
 body:not(.light-theme) .learning-diary-bubble {
-    background: #2c2a3a !important;
-    /* A deep, slightly magical purple-gray */
+    background:
+        linear-gradient(90deg, rgba(224, 139, 102, 0.16) 0 1px, transparent 1px) 64px 0 / 100% 100% no-repeat,
+        repeating-linear-gradient(
+            180deg,
+            transparent 0,
+            transparent 31px,
+            rgba(226, 205, 178, 0.09) 32px,
+            transparent 33px
+        ),
+        #2c2a3a !important;
     border-color: #4a485f;
     color: #d8d2c9 !important;
-    /* A soft, parchment-like off-white */
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
 }
 
 body:not(.light-theme) .diary-header {
-    border-bottom-color: #4a485f;
+    border-bottom-color: rgba(255, 204, 128, 0.18);
 }
 
 body:not(.light-theme) .diary-title {

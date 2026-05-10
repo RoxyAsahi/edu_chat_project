@@ -52,6 +52,20 @@ function stripMarkdown(text) {
         .trim();
 }
 
+function resolveManualNotesLibraryTabIcon(tab = {}, isDiaryPanel = false) {
+    const tabId = String(tab?.id || '').trim();
+    if (isDiaryPanel) {
+        return tabId === 'all' ? 'auto_stories' : 'folder';
+    }
+    if (tabId === 'all') {
+        return 'sticky_note_2';
+    }
+    if (tabId === 'analysis') {
+        return 'analytics';
+    }
+    return 'folder';
+}
+
 function createNotesDom(deps = {}) {
     const state = deps.state || {};
     const el = deps.el;
@@ -544,6 +558,32 @@ function createNotesDom(deps = {}) {
         card.dataset.manualGridItemSignature = signature;
     }
 
+    function createManualAnalysisStartCard() {
+        const card = documentObj.createElement('button');
+        card.type = 'button';
+        card.setAttribute('data-manual-notes-start-analysis', 'true');
+        return card;
+    }
+
+    function updateManualAnalysisStartCard(card) {
+        const selectedCount = state.selectedNoteIds.length;
+        const signature = JSON.stringify({ selectedCount });
+        if (card.dataset?.manualGridItemSignature === signature) {
+            return;
+        }
+
+        card.className = 'manual-note-card manual-note-card--analysis-start';
+        card.setAttribute('aria-label', '开始深度分析');
+        card.innerHTML = `
+            <span class="manual-note-card__analysis-start-icon material-symbols-outlined" aria-hidden="true">analytics</span>
+            <span class="manual-note-card__analysis-start-copy">
+                <strong>深度分析</strong>
+                <span>${selectedCount > 0 ? `已选 ${selectedCount} 条笔记` : '生成笔记复盘'}</span>
+            </span>
+        `;
+        card.dataset.manualGridItemSignature = signature;
+    }
+
     function createManualNoteCard() {
         const card = documentObj.createElement('article');
         card.addEventListener('click', (event) => {
@@ -901,10 +941,6 @@ function createNotesDom(deps = {}) {
         if (el.manualNotesLibrarySubjectToggle) {
             el.manualNotesLibrarySubjectToggle.setAttribute('aria-expanded', String(!tabsCollapsed));
         }
-        el.manualNotesAnalysisReportsBtn?.classList.toggle(
-            'manual-notes-library-page__analysis-report--active',
-            isAnalysisFilter
-        );
         if (el.manualNotesLibrarySubjectTabs) {
             const isDiaryPanel = state.manualNotesLibraryActivePanel === 'diary';
             let tabs;
@@ -917,12 +953,17 @@ function createNotesDom(deps = {}) {
             } else {
                 tabs = [
                     { id: 'all', label: '全部' },
+                    { id: 'analysis', label: '深度分析' },
                     ...subjectFilters,
                 ].filter(Boolean);
             }
             el.manualNotesLibrarySubjectTabs.innerHTML = tabs.map((tab) => {
                 const isActive = String(tab.id) === currentFilter;
-                return `<button type="button" class="manual-notes-library-page__subject-tab${isActive ? ' manual-notes-library-page__subject-tab--active' : ''}" data-subject-filter="${escapeHtml(tab.id)}" role="tab" aria-selected="${isActive ? 'true' : 'false'}">${escapeHtml(tab.label)}</button>`;
+                const icon = resolveManualNotesLibraryTabIcon(tab, isDiaryPanel);
+                return `<button type="button" class="manual-notes-library-page__subject-tab${isActive ? ' manual-notes-library-page__subject-tab--active' : ''}" data-subject-filter="${escapeHtml(tab.id)}" role="tab" aria-selected="${isActive ? 'true' : 'false'}">
+                    <span class="manual-notes-library-page__subject-tab-icon material-symbols-outlined" aria-hidden="true">${escapeHtml(icon)}</span>
+                    <span class="manual-notes-library-page__subject-tab-label">${escapeHtml(tab.label)}</span>
+                </button>`;
             }).join('');
         }
 
@@ -930,7 +971,9 @@ function createNotesDom(deps = {}) {
             const titlePrefix = isAnalysisFilter
                 ? '深度分析'
                 : (currentFilter === 'all' ? '全部学科' : currentAgentName);
-            el.manualNotesLibraryTitle.textContent = `${titlePrefix} · 我的笔记`;
+            el.manualNotesLibraryTitle.textContent = isDiaryPanel
+                ? `${titlePrefix} · AI 主动记忆`
+                : `${titlePrefix} · 我的笔记`;
         }
         if (el.manualNotesLibrarySubtitle) {
             if (isAnalysisFilter) {
@@ -967,21 +1010,26 @@ function createNotesDom(deps = {}) {
             return;
         }
 
-        if (libraryNotes.length === 0 && pendingAnalysisGenerations.length === 0) {
+        if (isAnalysisFilter && libraryNotes.length === 0 && pendingAnalysisGenerations.length === 0) {
             setGridEmptyState(true);
-            const emptyTitle = isAnalysisFilter
-                ? '还没有深度分析报告'
-                : (currentFilter === 'all' ? '还没有收藏的手写笔记' : '当前学科还没有手写笔记');
-            const emptyDescription = isAnalysisFilter
-                ? '点击“深度分析”，选择多条笔记后生成的报告会直接出现在这里。'
-                : '在对话页面对想沉淀的消息右键，选择“记入笔记”，内容会自动收纳到这里。';
-            replaceGridWithEmptyState(emptyTitle, emptyDescription);
+            replaceGridWithEmptyState(
+                '还没有深度分析报告',
+                '回到“全部”或某个学科，点击第一张深度分析卡片生成报告。'
+            );
             return;
         }
 
         setGridEmptyState(false);
 
         const gridItems = [];
+        if (!isDiaryPanel && !isAnalysisFilter) {
+            gridItems.push({
+                key: 'action:analysis-start',
+                create: createManualAnalysisStartCard,
+                update: updateManualAnalysisStartCard,
+            });
+        }
+
         pendingAnalysisGenerations.forEach((pending) => {
             gridItems.push({
                 key: buildPendingAnalysisKey(pending),

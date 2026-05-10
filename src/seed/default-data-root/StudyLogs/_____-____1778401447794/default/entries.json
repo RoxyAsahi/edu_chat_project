@@ -1,0 +1,52 @@
+[
+  {
+    "id": "study_log_1778408348306_675uvk",
+    "agentId": "_____-____1778401447794",
+    "agentNameSnapshot": "演示案例 - 英语",
+    "topicId": "default",
+    "topicNameSnapshot": "新对话 1",
+    "createdAt": 1778408348306,
+    "updatedAt": 1778408348306,
+    "dateKey": "2025-11-23",
+    "studentNameSnapshot": "User",
+    "gradeSnapshot": "",
+    "workspaceSnapshot": "",
+    "environmentSnapshot": "",
+    "sourceMessageIds": [
+      "user_1778408298371_ehxuym",
+      "assistant_1778408298384_wie4ou"
+    ],
+    "toolRequest": {
+      "toolName": "DailyNote",
+      "command": "create",
+      "args": {
+        "subject": "[演示案例 - 英语]演示案例 - 英语",
+        "command": "create",
+        "Date": "2025-11-23",
+        "Content": "[20:15] 一般过去时教学互动记录\n核心内容：\n- 从课本对话（Conversation A/B）出发讲解 Past Simple 用法\n- 规则动词 (+ed) 与不规则动词变化（be→was/were, eat→ate）\n- 使用时间标志词：yesterday, last week, ago, just now\n- 否定句/疑问句结构：didn't + 原形，Did + 主语 + 原形\n- 设计三类常考题型：动词填空、时态选择、句型转换\n关键洞察：\n- 时态本质是\"时间坐标\"的表达工具\n- 助动词 did/didn't 后必须跟动词原形（高频易错点）\n- be 动词过去式独立变化，不加助动词\n关联节点：[@一般过去时][@动词变化规则][@时态标志词]\n后续跟进：可补充不规则动词表、更多语境练习",
+        "Tag": "",
+        "target": "",
+        "replace": "",
+        "archery": ""
+      }
+    },
+    "contentMarkdown": "[20:15] 一般过去时教学互动记录\n核心内容：\n- 从课本对话（Conversation A/B）出发讲解 Past Simple 用法\n- 规则动词 (+ed) 与不规则动词变化（be→was/were, eat→ate）\n- 使用时间标志词：yesterday, last week, ago, just now\n- 否定句/疑问句结构：didn't + 原形，Did + 主语 + 原形\n- 设计三类常考题型：动词填空、时态选择、句型转换\n关键洞察：\n- 时态本质是\"时间坐标\"的表达工具\n- 助动词 did/didn't 后必须跟动词原形（高频易错点）\n- be 动词过去式独立变化，不加助动词\n关联节点：[@一般过去时][@动词变化规则][@时态标志词]\n后续跟进：可补充不规则动词表、更多语境练习",
+    "tags": [],
+    "status": "written",
+    "recallCount": 2,
+    "lastRecalledAt": 1778409177476,
+    "filePath": "",
+    "topicTag": "",
+    "agentTag": "",
+    "modelSnapshot": "",
+    "notebookId": "演示案例_-_英语",
+    "notebookName": "演示案例 - 英语",
+    "diaryId": "study_diary_演示案例_-_英语_2025-11-23",
+    "subjectRaw": "[演示案例 - 英语]演示案例 - 英语",
+    "subjectSignature": "演示案例 - 英语",
+    "requestedToolName": "DailyNote",
+    "requestedCommand": "create",
+    "archery": "",
+    "isPublicNotebook": false
+  }
+]

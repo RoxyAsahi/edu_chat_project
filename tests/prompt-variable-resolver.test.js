@@ -6,6 +6,9 @@ const {
     resolvePromptVariables,
     resolvePromptMessageSet,
 } = require('../src/modules/main/utils/promptVariableResolver');
+const {
+    DEFAULT_AGENT_BUBBLE_THEME_PROMPT,
+} = require('../src/modules/main/utils/settingsSchema');
 
 test('resolvePromptVariables resolves builtin and derived agent alias tokens', () => {
     const result = resolvePromptVariables('我是{{Nova}}。{{UserName}} 在 {{TopicName}}。', {
@@ -39,6 +42,14 @@ test('resolvePromptVariables resolves RenderingGuide locally', () => {
     assert.deepEqual(result.unresolvedTokens, []);
 });
 
+test('resolvePromptVariables resolves the current time in the default bubble theme prompt', () => {
+    const result = resolvePromptVariables(DEFAULT_AGENT_BUBBLE_THEME_PROMPT);
+
+    assert.match(result.resolvedPrompt, /当前真实时间：\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+    assert.equal(result.resolvedPrompt.includes('{{CurrentDateTime}}'), false);
+    assert.deepEqual(result.unresolvedTokens, []);
+});
+
 test('resolvePromptVariables resolves study profile variables and DailyNoteGuide locally', () => {
     const result = resolvePromptVariables('{{StudentName}} / {{Grade}} @ {{StudyWorkspace}} / {{WorkEnvironment}}\n{{DailyNoteGuide}}', {
         settings: {
@@ -58,7 +69,8 @@ test('resolvePromptVariables resolves study profile variables and DailyNoteGuide
     assert.match(result.resolvedPrompt, /Alice \/ 高二 @ Dorm A-301 \/ Laptop \+ Pen Tablet/);
     assert.match(result.resolvedPrompt, /DailyNote/);
     assert.match(result.resolvedPrompt, /<<<\[TOOL_REQUEST\]>>>/);
-    assert.match(result.resolvedPrompt, /\[Hornet_验收\]Hornet_验收/);
+    assert.match(result.resolvedPrompt, /默认归档到当前学科 \/ Agent：Hornet_验收/);
+    assert.doesNotMatch(result.resolvedPrompt, /\[Hornet_验收\]Hornet_验收/);
     assert.deepEqual(result.unresolvedTokens, []);
 });
 
